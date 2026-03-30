@@ -27,11 +27,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Plugin registers at least one tool visible in the OpenCode session (placeholder is fine)
   3. Bundled asset files are copied to the correct `.opencode/` directories on install without overwriting user modifications
   4. Agents created by the plugin work regardless of which LLM provider the user has configured
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Scaffold npm package, utility modules, and placeholder tool registration
+- [ ] 01-02-PLAN.md — Asset installer, config system, bundled assets, and plugin wiring
 
 ### Phase 2: Creation Tooling
 **Goal**: Users can scaffold new agents, skills, and commands from within an OpenCode session without leaving the TUI
@@ -72,6 +72,6 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Plugin Infrastructure | 0/0 | Not started | - |
+| 1. Plugin Infrastructure | 0/2 | Planning complete | - |
 | 2. Creation Tooling | 0/0 | Not started | - |
 | 3. Curated Assets | 0/0 | Not started | - |
