@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Scaffold npm package, utility modules, and placeholder tool registration
+- [x] 01-01-PLAN.md — Scaffold npm package, utility modules, and placeholder tool registration
 - [ ] 01-02-PLAN.md — Asset installer, config system, bundled assets, and plugin wiring
 
 ### Phase 2: Creation Tooling
