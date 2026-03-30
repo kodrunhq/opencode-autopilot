@@ -83,27 +83,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CRTL-01 | Pending | Pending |
-| CRTL-02 | Pending | Pending |
-| CRTL-03 | Pending | Pending |
-| CRTL-04 | Pending | Pending |
-| CRTL-05 | Pending | Pending |
-| AGNT-01 | Pending | Pending |
-| AGNT-02 | Pending | Pending |
-| AGNT-03 | Pending | Pending |
-| AGNT-04 | Pending | Pending |
-| CMND-01 | Pending | Pending |
-| SKLL-01 | Pending | Pending |
-| PLGN-01 | Pending | Pending |
-| PLGN-02 | Pending | Pending |
-| PLGN-03 | Pending | Pending |
-| PLGN-04 | Pending | Pending |
+| PLGN-01 | Phase 1 | Pending |
+| PLGN-02 | Phase 1 | Pending |
+| PLGN-03 | Phase 1 | Pending |
+| PLGN-04 | Phase 1 | Pending |
+| CRTL-01 | Phase 2 | Pending |
+| CRTL-02 | Phase 2 | Pending |
+| CRTL-03 | Phase 2 | Pending |
+| CRTL-04 | Phase 2 | Pending |
+| CRTL-05 | Phase 2 | Pending |
+| AGNT-01 | Phase 3 | Pending |
+| AGNT-02 | Phase 3 | Pending |
+| AGNT-03 | Phase 3 | Pending |
+| AGNT-04 | Phase 3 | Pending |
+| CMND-01 | Phase 3 | Pending |
+| SKLL-01 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15
+- Mapped to phases: 15
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 after initial definition*
+*Last updated: 2026-03-31 after roadmap creation*
