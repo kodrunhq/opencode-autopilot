@@ -1,13 +1,16 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { ensureDir } from "./utils/fs-helpers";
+import { z } from "zod";
+import { ensureDir, isEnoentError } from "./utils/fs-helpers";
 
-export interface PluginConfig {
-	readonly version: 1;
-	readonly configured: boolean;
-	readonly models: Readonly<Record<string, string>>;
-}
+const pluginConfigSchema = z.object({
+	version: z.literal(1),
+	configured: z.boolean(),
+	models: z.record(z.string(), z.string()),
+});
+
+export type PluginConfig = z.infer<typeof pluginConfigSchema>;
 
 export const CONFIG_PATH = join(
 	homedir(),
@@ -21,13 +24,10 @@ export async function loadConfig(
 ): Promise<PluginConfig | null> {
 	try {
 		const raw = await readFile(configPath, "utf-8");
-		return JSON.parse(raw) as PluginConfig;
+		const parsed = JSON.parse(raw);
+		return pluginConfigSchema.parse(parsed);
 	} catch (error: unknown) {
-		if (
-			error instanceof Error &&
-			"code" in error &&
-			error.code === "ENOENT"
-		) {
+		if (isEnoentError(error)) {
 			return null;
 		}
 		throw error;

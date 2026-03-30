@@ -126,4 +126,19 @@ describe("installAssets", () => {
 		expect(result.skipped).toHaveLength(0);
 		expect(result.errors).toHaveLength(0);
 	});
+
+	test("populates errors array when source file is unreadable", async () => {
+		const { chmod } = await import("node:fs/promises");
+		const agentPath = join(sourceDir, "agents", "unreadable.md");
+		await writeFile(agentPath, "content");
+		await chmod(agentPath, 0o000);
+
+		const result = await installAssets(sourceDir, targetDir);
+
+		expect(result.errors.length).toBeGreaterThan(0);
+		expect(result.errors[0]).toContain("agents/unreadable.md");
+
+		// Restore permissions for cleanup
+		await chmod(agentPath, 0o644);
+	});
 });

@@ -1,5 +1,16 @@
 import { access, copyFile, mkdir } from "node:fs/promises";
+import { constants } from "node:fs";
 import { dirname } from "node:path";
+
+export function isEnoentError(
+	error: unknown,
+): error is NodeJS.ErrnoException {
+	return (
+		error instanceof Error &&
+		"code" in error &&
+		(error as NodeJS.ErrnoException).code === "ENOENT"
+	);
+}
 
 export async function fileExists(path: string): Promise<boolean> {
 	try {
@@ -18,10 +29,18 @@ export async function copyIfMissing(
 	source: string,
 	target: string,
 ): Promise<{ copied: boolean }> {
-	if (await fileExists(target)) {
-		return { copied: false };
-	}
 	await ensureDir(dirname(target));
-	await copyFile(source, target);
-	return { copied: true };
+	try {
+		await copyFile(source, target, constants.COPYFILE_EXCL);
+		return { copied: true };
+	} catch (error: unknown) {
+		if (
+			error instanceof Error &&
+			"code" in error &&
+			(error as NodeJS.ErrnoException).code === "EEXIST"
+		) {
+			return { copied: false };
+		}
+		throw error;
+	}
 }

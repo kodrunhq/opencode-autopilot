@@ -2,7 +2,32 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyIfMissing, ensureDir, fileExists } from "../../src/utils/fs-helpers";
+import {
+	copyIfMissing,
+	ensureDir,
+	fileExists,
+	isEnoentError,
+} from "../../src/utils/fs-helpers";
+
+describe("isEnoentError", () => {
+	test("returns true for ENOENT error", () => {
+		const err = Object.assign(new Error("not found"), { code: "ENOENT" });
+		expect(isEnoentError(err)).toBe(true);
+	});
+
+	test("returns false for other error codes", () => {
+		const err = Object.assign(new Error("permission denied"), {
+			code: "EACCES",
+		});
+		expect(isEnoentError(err)).toBe(false);
+	});
+
+	test("returns false for non-Error values", () => {
+		expect(isEnoentError("ENOENT")).toBe(false);
+		expect(isEnoentError(null)).toBe(false);
+		expect(isEnoentError(undefined)).toBe(false);
+	});
+});
 
 describe("fileExists", () => {
 	test("returns true for an existing file", async () => {

@@ -78,4 +78,21 @@ describe("saveConfig and loadConfig round-trip", () => {
 		const loaded = await loadConfig(nestedPath);
 		expect(loaded).toEqual(config);
 	});
+
+	test("loadConfig throws on malformed JSON", async () => {
+		const { writeFile } = await import("node:fs/promises");
+		await writeFile(configPath, "{ not valid json !!!");
+
+		await expect(loadConfig(configPath)).rejects.toThrow();
+	});
+
+	test("loadConfig throws on invalid config schema", async () => {
+		const { writeFile } = await import("node:fs/promises");
+		await writeFile(
+			configPath,
+			JSON.stringify({ version: 99, configured: "yes", models: null }),
+		);
+
+		await expect(loadConfig(configPath)).rejects.toThrow();
+	});
 });

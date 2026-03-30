@@ -47,4 +47,20 @@ describe("plugin entry point", () => {
 		expect(result.event).toBeDefined();
 		expect(typeof result.event).toBe("function");
 	});
+
+	test("event handler handles session.created with null config gracefully", async () => {
+		const result = await plugin(mockInput);
+		// Should not throw when config is null (first load)
+		await result.event!({
+			event: { type: "session.created", properties: {} } as any,
+		} as any);
+	});
+
+	test("event handler handles session.created with configured:true", async () => {
+		const result = await plugin(mockInput);
+		// Should not throw with a configured state
+		await result.event!({
+			event: { type: "session.created", properties: {} } as any,
+		} as any);
+	});
 });

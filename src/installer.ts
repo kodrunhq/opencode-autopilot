@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { copyIfMissing } from "./utils/fs-helpers";
+import { isEnoentError } from "./utils/fs-helpers";
 import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
 
 export interface InstallResult {
@@ -16,11 +17,7 @@ async function listEntries(
 		const entries = await readdir(dirPath, { withFileTypes: true });
 		return entries.map((e) => ({ name: e.name, isDirectory: e.isDirectory() }));
 	} catch (error: unknown) {
-		if (
-			error instanceof Error &&
-			"code" in error &&
-			(error as NodeJS.ErrnoException).code === "ENOENT"
-		) {
+		if (isEnoentError(error)) {
 			return [];
 		}
 		throw error;
@@ -31,10 +28,11 @@ async function processFiles(
 	sourceDir: string,
 	targetDir: string,
 	category: string,
-	copied: string[],
-	skipped: string[],
-	errors: string[],
-): Promise<void> {
+): Promise<InstallResult> {
+	const copied: string[] = [];
+	const skipped: string[] = [];
+	const errors: string[] = [];
+
 	const entries = await listEntries(join(sourceDir, category));
 
 	for (const entry of entries) {
@@ -58,15 +56,18 @@ async function processFiles(
 			errors.push(`${relativePath}: ${message}`);
 		}
 	}
+
+	return { copied, skipped, errors };
 }
 
 async function processSkills(
 	sourceDir: string,
 	targetDir: string,
-	copied: string[],
-	skipped: string[],
-	errors: string[],
-): Promise<void> {
+): Promise<InstallResult> {
+	const copied: string[] = [];
+	const skipped: string[] = [];
+	const errors: string[] = [];
+
 	const skillDirs = await listEntries(join(sourceDir, "skills"));
 
 	for (const dir of skillDirs) {
@@ -97,26 +98,23 @@ async function processSkills(
 			}
 		}
 	}
+
+	return { copied, skipped, errors };
 }
 
 export async function installAssets(
 	assetsDir: string = getAssetsDir(),
 	targetDir: string = getGlobalConfigDir(),
 ): Promise<InstallResult> {
-	const copied: string[] = [];
-	const skipped: string[] = [];
-	const errors: string[] = [];
+	const [agents, commands, skills] = await Promise.all([
+		processFiles(assetsDir, targetDir, "agents"),
+		processFiles(assetsDir, targetDir, "commands"),
+		processSkills(assetsDir, targetDir),
+	]);
 
-	await processFiles(assetsDir, targetDir, "agents", copied, skipped, errors);
-	await processFiles(
-		assetsDir,
-		targetDir,
-		"commands",
-		copied,
-		skipped,
-		errors,
-	);
-	await processSkills(assetsDir, targetDir, copied, skipped, errors);
-
-	return { copied, skipped, errors };
+	return {
+		copied: [...agents.copied, ...commands.copied, ...skills.copied],
+		skipped: [...agents.skipped, ...commands.skipped, ...skills.skipped],
+		errors: [...agents.errors, ...commands.errors, ...skills.errors],
+	};
 }
