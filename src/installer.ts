@@ -1,7 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { copyIfMissing } from "./utils/fs-helpers";
-import { isEnoentError } from "./utils/fs-helpers";
+import { copyIfMissing, isEnoentError } from "./utils/fs-helpers";
 import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
 
 export interface InstallResult {
