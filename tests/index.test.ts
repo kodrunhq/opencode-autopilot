@@ -1,20 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import plugin from "../src/index";
 
 describe("plugin entry point", () => {
 	let tempDir: string;
 	const mockInput = {
-		client: {} as ReturnType<
-			typeof import("@opencode-ai/sdk").createOpencodeClient
-		>,
+		client: {} as ReturnType<typeof import("@opencode-ai/sdk").createOpencodeClient>,
 		project: {} as import("@opencode-ai/sdk").Project,
 		directory: "/tmp",
 		worktree: "/tmp",
 		serverUrl: new URL("http://localhost:3000"),
+		// biome-ignore lint/suspicious/noExplicitAny: BunShell mock requires any
 		$: {} as any,
 	};
 
@@ -38,8 +37,8 @@ describe("plugin entry point", () => {
 
 	test("tool property contains oc_placeholder", async () => {
 		const result = await plugin(mockInput);
-		expect(result.tool!.oc_placeholder).toBeDefined();
-		expect(typeof result.tool!.oc_placeholder.execute).toBe("function");
+		expect(result.tool?.oc_placeholder).toBeDefined();
+		expect(typeof result.tool?.oc_placeholder.execute).toBe("function");
 	});
 
 	test("returns event handler function", async () => {
@@ -51,16 +50,14 @@ describe("plugin entry point", () => {
 	test("event handler handles session.created with null config gracefully", async () => {
 		const result = await plugin(mockInput);
 		// Should not throw when config is null (first load)
-		await result.event!({
-			event: { type: "session.created", properties: {} } as any,
-		} as any);
+		// biome-ignore lint/suspicious/noExplicitAny: SDK event mock requires any
+		await result.event?.({ event: { type: "session.created", properties: {} } } as any);
 	});
 
 	test("event handler handles session.created with configured:true", async () => {
 		const result = await plugin(mockInput);
 		// Should not throw with a configured state
-		await result.event!({
-			event: { type: "session.created", properties: {} } as any,
-		} as any);
+		// biome-ignore lint/suspicious/noExplicitAny: SDK event mock requires any
+		await result.event?.({ event: { type: "session.created", properties: {} } } as any);
 	});
 });

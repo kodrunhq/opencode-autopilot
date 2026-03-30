@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
-	type PluginConfig,
 	createDefaultConfig,
 	isFirstLoad,
 	loadConfig,
+	type PluginConfig,
 	saveConfig,
 } from "../src/config";
 
@@ -88,10 +88,7 @@ describe("saveConfig and loadConfig round-trip", () => {
 
 	test("loadConfig throws on invalid config schema", async () => {
 		const { writeFile } = await import("node:fs/promises");
-		await writeFile(
-			configPath,
-			JSON.stringify({ version: 99, configured: "yes", models: null }),
-		);
+		await writeFile(configPath, JSON.stringify({ version: 99, configured: "yes", models: null }));
 
 		await expect(loadConfig(configPath)).rejects.toThrow();
 	});

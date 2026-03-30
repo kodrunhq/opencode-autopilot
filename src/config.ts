@@ -12,16 +12,9 @@ const pluginConfigSchema = z.object({
 
 export type PluginConfig = z.infer<typeof pluginConfigSchema>;
 
-export const CONFIG_PATH = join(
-	homedir(),
-	".config",
-	"opencode",
-	"opencode-assets.json",
-);
+export const CONFIG_PATH = join(homedir(), ".config", "opencode", "opencode-assets.json");
 
-export async function loadConfig(
-	configPath: string = CONFIG_PATH,
-): Promise<PluginConfig | null> {
+export async function loadConfig(configPath: string = CONFIG_PATH): Promise<PluginConfig | null> {
 	try {
 		const raw = await readFile(configPath, "utf-8");
 		const parsed = JSON.parse(raw);

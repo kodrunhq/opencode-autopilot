@@ -1,14 +1,10 @@
-import { access, copyFile, mkdir } from "node:fs/promises";
 import { constants } from "node:fs";
+import { access, copyFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
-export function isEnoentError(
-	error: unknown,
-): error is NodeJS.ErrnoException {
+export function isEnoentError(error: unknown): error is NodeJS.ErrnoException {
 	return (
-		error instanceof Error &&
-		"code" in error &&
-		(error as NodeJS.ErrnoException).code === "ENOENT"
+		error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
 	);
 }
 
@@ -25,10 +21,7 @@ export async function ensureDir(dirPath: string): Promise<void> {
 	await mkdir(dirPath, { recursive: true });
 }
 
-export async function copyIfMissing(
-	source: string,
-	target: string,
-): Promise<{ copied: boolean }> {
+export async function copyIfMissing(source: string, target: string): Promise<{ copied: boolean }> {
 	await ensureDir(dirname(target));
 	try {
 		await copyFile(source, target, constants.COPYFILE_EXCL);

@@ -2,12 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-	copyIfMissing,
-	ensureDir,
-	fileExists,
-	isEnoentError,
-} from "../../src/utils/fs-helpers";
+import { copyIfMissing, ensureDir, fileExists, isEnoentError } from "../../src/utils/fs-helpers";
 
 describe("isEnoentError", () => {
 	test("returns true for ENOENT error", () => {

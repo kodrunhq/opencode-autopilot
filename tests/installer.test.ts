@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { installAssets } from "../src/installer";
 import { fileExists } from "../src/utils/fs-helpers";
@@ -34,23 +34,14 @@ describe("installAssets", () => {
 		expect(result.copied).toContain("agents/test-agent.md");
 		expect(result.errors).toHaveLength(0);
 
-		const targetContent = await readFile(
-			join(targetDir, "agents", "test-agent.md"),
-			"utf-8",
-		);
+		const targetContent = await readFile(join(targetDir, "agents", "test-agent.md"), "utf-8");
 		expect(targetContent).toBe(agentContent);
 	});
 
 	test("skips file that already exists at target", async () => {
-		await writeFile(
-			join(sourceDir, "agents", "existing.md"),
-			"source content",
-		);
+		await writeFile(join(sourceDir, "agents", "existing.md"), "source content");
 		await mkdir(join(targetDir, "agents"), { recursive: true });
-		await writeFile(
-			join(targetDir, "agents", "existing.md"),
-			"user customized content",
-		);
+		await writeFile(join(targetDir, "agents", "existing.md"), "user customized content");
 
 		const result = await installAssets(sourceDir, targetDir);
 
@@ -58,10 +49,7 @@ describe("installAssets", () => {
 		expect(result.copied).not.toContain("agents/existing.md");
 
 		// Verify user's content was NOT overwritten
-		const content = await readFile(
-			join(targetDir, "agents", "existing.md"),
-			"utf-8",
-		);
+		const content = await readFile(join(targetDir, "agents", "existing.md"), "utf-8");
 		expect(content).toBe("user customized content");
 	});
 
@@ -74,9 +62,7 @@ describe("installAssets", () => {
 		const result = await installAssets(sourceDir, targetDir);
 
 		expect(result.copied).toContain("commands/configure.md");
-		expect(
-			await fileExists(join(targetDir, "commands", "configure.md")),
-		).toBe(true);
+		expect(await fileExists(join(targetDir, "commands", "configure.md"))).toBe(true);
 	});
 
 	test("copies skill directory structure", async () => {
@@ -87,9 +73,7 @@ describe("installAssets", () => {
 		const result = await installAssets(sourceDir, targetDir);
 
 		expect(result.copied).toContain("skills/test-skill/SKILL.md");
-		expect(
-			await fileExists(join(targetDir, "skills", "test-skill", "SKILL.md")),
-		).toBe(true);
+		expect(await fileExists(join(targetDir, "skills", "test-skill", "SKILL.md"))).toBe(true);
 	});
 
 	test("skips .gitkeep files", async () => {
@@ -99,24 +83,17 @@ describe("installAssets", () => {
 
 		expect(result.copied).not.toContain("agents/.gitkeep");
 		expect(result.skipped).not.toContain("agents/.gitkeep");
-		expect(
-			await fileExists(join(targetDir, "agents", ".gitkeep")),
-		).toBe(false);
+		expect(await fileExists(join(targetDir, "agents", ".gitkeep"))).toBe(false);
 	});
 
 	test("creates target directories if they do not exist", async () => {
 		const freshTarget = join(targetDir, "fresh");
-		await writeFile(
-			join(sourceDir, "agents", "new-agent.md"),
-			"agent content",
-		);
+		await writeFile(join(sourceDir, "agents", "new-agent.md"), "agent content");
 
 		const result = await installAssets(sourceDir, freshTarget);
 
 		expect(result.copied).toContain("agents/new-agent.md");
-		expect(
-			await fileExists(join(freshTarget, "agents", "new-agent.md")),
-		).toBe(true);
+		expect(await fileExists(join(freshTarget, "agents", "new-agent.md"))).toBe(true);
 	});
 
 	test("returns empty arrays when no assets exist", async () => {

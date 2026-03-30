@@ -50,8 +50,7 @@ async function processFiles(
 				skipped.push(relativePath);
 			}
 		} catch (error: unknown) {
-			const message =
-				error instanceof Error ? error.message : String(error);
+			const message = error instanceof Error ? error.message : String(error);
 			errors.push(`${relativePath}: ${message}`);
 		}
 	}
@@ -59,10 +58,7 @@ async function processFiles(
 	return { copied, skipped, errors };
 }
 
-async function processSkills(
-	sourceDir: string,
-	targetDir: string,
-): Promise<InstallResult> {
+async function processSkills(sourceDir: string, targetDir: string): Promise<InstallResult> {
 	const copied: string[] = [];
 	const skipped: string[] = [];
 	const errors: string[] = [];
@@ -91,8 +87,7 @@ async function processSkills(
 					skipped.push(relativePath);
 				}
 			} catch (error: unknown) {
-				const message =
-					error instanceof Error ? error.message : String(error);
+				const message = error instanceof Error ? error.message : String(error);
 				errors.push(`${relativePath}: ${message}`);
 			}
 		}
