@@ -34,8 +34,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **PLGN-01**: Single npm package installable via one line in `opencode.json`
 - [x] **PLGN-02**: Plugin registers creation tools with Zod-validated schemas
-- [ ] **PLGN-03**: Bundled assets (agents, skills, commands) are installed to correct filesystem paths
-- [ ] **PLGN-04**: Works with any provider configured in OpenCode (model-agnostic agents)
+- [x] **PLGN-03**: Bundled assets (agents, skills, commands) are installed to correct filesystem paths
+- [x] **PLGN-04**: Works with any provider configured in OpenCode (model-agnostic agents)
 
 ## v2 Requirements
 
@@ -85,8 +85,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | PLGN-01 | Phase 1 | Complete |
 | PLGN-02 | Phase 1 | Complete |
-| PLGN-03 | Phase 1 | Pending |
-| PLGN-04 | Phase 1 | Pending |
+| PLGN-03 | Phase 1 | Complete |
+| PLGN-04 | Phase 1 | Complete |
 | CRTL-01 | Phase 2 | Pending |
 | CRTL-02 | Phase 2 | Pending |
 | CRTL-03 | Phase 2 | Pending |

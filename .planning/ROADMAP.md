@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Scaffold npm package, utility modules, and placeholder tool registration
-- [ ] 01-02-PLAN.md — Asset installer, config system, bundled assets, and plugin wiring
+- [x] 01-02-PLAN.md — Asset installer, config system, bundled assets, and plugin wiring
 
 ### Phase 2: Creation Tooling
 **Goal**: Users can scaffold new agents, skills, and commands from within an OpenCode session without leaving the TUI
