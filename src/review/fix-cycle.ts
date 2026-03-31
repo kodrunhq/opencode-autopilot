@@ -7,13 +7,13 @@
  * or very short suggestions are filtered out.
  */
 
-import type { ReviewFinding } from "./types";
+import type { ReviewAgent, ReviewFinding } from "./types";
 
-/** Minimal agent shape needed for fix cycle prompt building. */
-export interface ReviewAgent {
-	readonly name: string;
-	readonly prompt: string;
-	readonly [key: string]: unknown;
+/**
+ * Strip {{PLACEHOLDER}} tokens from untrusted content before template substitution.
+ */
+function sanitizeTemplateContent(content: string): string {
+	return content.replace(/\{\{[A-Z_]+\}\}/g, "[REDACTED]");
 }
 
 export interface FixInstructions {
@@ -122,9 +122,10 @@ export function buildFixInstructions(
 			.map((f) => `- [${f.severity}] ${f.title} in ${f.file}${f.line ? `:${f.line}` : ""}`)
 			.join("\n");
 
-		// Replace placeholders and add fix-cycle context
+		// Sanitize untrusted content and replace placeholders
+		const safeDiff = sanitizeTemplateContent(diff);
 		const basePrompt = agent.prompt
-			.replace("{{DIFF}}", diff)
+			.replace("{{DIFF}}", safeDiff)
 			.replace("{{PRIOR_FINDINGS}}", "")
 			.replace("{{MEMORY}}", "");
 

@@ -1,18 +1,11 @@
-// TODO: Import ReviewAgent from "../schemas" once schemas plan (05-01) is integrated
-interface ReviewAgent {
-	readonly name: string;
-	readonly description: string;
-	readonly relevantStacks: readonly string[];
-	readonly severityFocus: readonly string[];
-	readonly prompt: string;
-}
+import type { ReviewAgent } from "../types";
 
 export const securityAuditor: Readonly<ReviewAgent> = Object.freeze({
 	name: "security-auditor",
 	description:
 		"Audits OWASP vulnerabilities, hardcoded secrets, injection vectors, and cryptographic correctness.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["CRITICAL", "HIGH"] as readonly string[],
+	severityFocus: ["CRITICAL", "WARNING"] as const,
 	prompt: `You are the Security Auditor. You scan for security vulnerabilities and secure coding violations. Every finding must include a concrete exploit scenario.
 
 ## Instructions
@@ -47,7 +40,7 @@ Do not comment on code style or architecture -- only security vulnerabilities.
 ## Output
 
 For each finding, output a JSON object:
-{"file": "path/to/file", "line": 42, "severity": "CRITICAL", "agent": "security-auditor", "finding": "description", "suggestion": "how to fix"}
+{"severity": "CRITICAL|WARNING|NITPICK", "domain": "security", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "security-auditor", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

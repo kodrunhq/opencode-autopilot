@@ -1,6 +1,10 @@
 import type { AgentCategory, AgentDefinition } from "./types";
 
 /**
+ * NOTE: This catalog is reference data and is NOT yet wired into the review pipeline.
+ * The pipeline uses the agent definitions from src/review/agents/*.ts directly.
+ * This file may be integrated in a future milestone to drive dynamic agent selection.
+ *
  * Complete registry of review agents ported from the ace review engine.
  * Core squad always runs. Parallel specialists run based on stack gate.
  * Sequenced specialists run after all prior findings are collected.

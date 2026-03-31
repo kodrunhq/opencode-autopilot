@@ -32,3 +32,12 @@ export interface AgentDefinition {
 	readonly stackAffinity: readonly string[];
 	readonly hardGatesSummary: string;
 }
+
+/** Shared interface for the 8 review agents used in the pipeline. */
+export interface ReviewAgent {
+	readonly name: string;
+	readonly description: string;
+	readonly relevantStacks: readonly string[];
+	readonly severityFocus: readonly Severity[];
+	readonly prompt: string;
+}

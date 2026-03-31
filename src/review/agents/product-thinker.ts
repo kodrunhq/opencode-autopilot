@@ -1,18 +1,11 @@
-// TODO: Import ReviewAgent from "../schemas" once schemas plan (05-01) is integrated
-interface ReviewAgent {
-	readonly name: string;
-	readonly description: string;
-	readonly relevantStacks: readonly string[];
-	readonly severityFocus: readonly string[];
-	readonly prompt: string;
-}
+import type { ReviewAgent } from "../types";
 
 export const productThinker: Readonly<ReviewAgent> = Object.freeze({
 	name: "product-thinker",
 	description:
 		"Evaluates user experience completeness from a PM/user perspective -- identifies missing features, dead-end flows, and product gaps.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["MEDIUM", "HIGH"] as readonly string[],
+	severityFocus: ["WARNING", "CRITICAL"] as const,
 	prompt: `You are the Product Thinker. You review code not as an engineer but as a product manager and user advocate. You evaluate whether the implementation delivers a complete, usable feature.
 
 ## Instructions
@@ -49,7 +42,7 @@ Think like a user, not an engineer. "The POST handler works" is irrelevant. "The
 ## Output
 
 For each finding, output a JSON object:
-{"file": "path/to/file", "line": 42, "severity": "HIGH", "agent": "product-thinker", "finding": "description", "suggestion": "how to fix"}
+{"severity": "CRITICAL|WARNING|NITPICK", "domain": "product", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "product-thinker", "source": "product-review", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

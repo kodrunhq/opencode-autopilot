@@ -15,7 +15,12 @@ import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { REVIEW_AGENTS } from "../review/agents/index";
-import { createEmptyMemory, loadReviewMemory, saveReviewMemory } from "../review/memory";
+import {
+	createEmptyMemory,
+	loadReviewMemory,
+	pruneMemory,
+	saveReviewMemory,
+} from "../review/memory";
 import type { ReviewState } from "../review/pipeline";
 import { advancePipeline } from "../review/pipeline";
 import { reviewStateSchema } from "../review/schemas";
@@ -166,11 +171,11 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 			if (result.action === "complete") {
 				// Update memory with findings
 				const memory = (await loadReviewMemory(projectRoot)) ?? createEmptyMemory();
-				const updatedMemory = {
+				const updatedMemory = pruneMemory({
 					...memory,
 					recentFindings: [...memory.recentFindings, ...(result.report?.findings ?? [])],
 					lastReviewedAt: new Date().toISOString(),
-				};
+				});
 				await saveReviewMemory(updatedMemory, projectRoot);
 
 				// Clear state

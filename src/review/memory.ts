@@ -37,7 +37,8 @@ export function createEmptyMemory(): ReviewMemory {
 /**
  * Load review memory from disk.
  * Returns null if file doesn't exist (first run).
- * Throws on invalid JSON or schema violations (don't silently corrupt).
+ * Returns null on malformed JSON (SyntaxError) or invalid schema (ZodError)
+ * to allow recovery rather than crashing the pipeline.
  * Prunes on load to cap storage.
  */
 export async function loadReviewMemory(projectRoot: string): Promise<ReviewMemory | null> {
@@ -49,6 +50,13 @@ export async function loadReviewMemory(projectRoot: string): Promise<ReviewMemor
 		return pruneMemory(validated);
 	} catch (error: unknown) {
 		if (isEnoentError(error)) {
+			return null;
+		}
+		// Recover from malformed JSON or schema violations instead of crashing
+		if (
+			error instanceof SyntaxError ||
+			(error !== null && typeof error === "object" && "issues" in error)
+		) {
 			return null;
 		}
 		throw error;

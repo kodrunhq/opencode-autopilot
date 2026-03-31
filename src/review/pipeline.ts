@@ -13,17 +13,19 @@
 
 import { REVIEW_AGENTS, STAGE3_AGENTS } from "./agents/index";
 import { buildCrossVerificationPrompts, condenseFinding } from "./cross-verification";
+import { buildFixInstructions, determineFixableFindings } from "./fix-cycle";
 import { buildReport } from "./report";
 import { reviewFindingSchema } from "./schemas";
-import type { ReviewFinding, ReviewReport } from "./types";
+import type { ReviewFinding, ReviewReport, ReviewState } from "./types";
 
-/** Serializable pipeline state for persistence between dispatch rounds. */
-export interface ReviewState {
-	readonly stage: number;
-	readonly selectedAgentNames: readonly string[];
-	readonly accumulatedFindings: readonly ReviewFinding[];
-	readonly scope: string;
-	readonly startedAt: string;
+export type { ReviewState };
+
+/**
+ * Strip {{PLACEHOLDER}} tokens from untrusted content before template substitution.
+ * Prevents prompt injection via user-controlled diff/findings/memory content.
+ */
+function sanitizeTemplateContent(content: string): string {
+	return content.replace(/\{\{[A-Z_]+\}\}/g, "[REDACTED]");
 }
 
 /** Result of a pipeline step -- either dispatch more agents or return the final report. */
@@ -139,7 +141,8 @@ export function advancePipeline(
 			// Stage 1 -> 2: Build cross-verification prompts
 			const agents = REVIEW_AGENTS.filter((a) => currentState.selectedAgentNames.includes(a.name));
 			const findingsByAgent = groupFindingsByAgent(accumulated);
-			const prompts = buildCrossVerificationPrompts(agents, findingsByAgent, "");
+			const sanitizedScope = sanitizeTemplateContent(currentState.scope);
+			const prompts = buildCrossVerificationPrompts(agents, findingsByAgent, sanitizedScope);
 			const newState: ReviewState = {
 				...currentState,
 				stage: nextStage,
@@ -155,11 +158,12 @@ export function advancePipeline(
 
 		case 2: {
 			// Stage 2 -> 3: Build red-team + product-thinker prompts
-			const condensed = accumulated.map(condenseFinding).join("\n");
+			const condensed = sanitizeTemplateContent(accumulated.map(condenseFinding).join("\n"));
+			const sanitizedScope2 = sanitizeTemplateContent(currentState.scope);
 			const stage3Prompts = STAGE3_AGENTS.map((agent) => ({
 				name: agent.name,
 				prompt: agent.prompt
-					.replace("{{DIFF}}", "")
+					.replace("{{DIFF}}", sanitizedScope2)
 					.replace("{{PRIOR_FINDINGS}}", condensed)
 					.replace("{{MEMORY}}", ""),
 			}));
@@ -177,12 +181,13 @@ export function advancePipeline(
 		}
 
 		case 3: {
-			// Stage 3 -> 4 or complete: Check for actionable CRITICAL/WARNING fixes
-			const hasCriticalActionable = accumulated.some(
-				(f) => f.severity === "CRITICAL" && f.fix.length > 0,
-			);
-			if (hasCriticalActionable) {
-				// Return fix instructions (stage 4)
+			// Stage 3 -> 4 or complete: Check for actionable CRITICAL fixes
+			const fixResult = determineFixableFindings(accumulated);
+			if (fixResult.fixable.length > 0) {
+				// Build fix-cycle prompts for agents whose findings are fixable
+				const allAgents = [...REVIEW_AGENTS, ...STAGE3_AGENTS];
+				const sanitizedScope3 = sanitizeTemplateContent(currentState.scope);
+				const fixAgents = buildFixInstructions(fixResult.fixable, allAgents, sanitizedScope3);
 				const newState: ReviewState = {
 					...currentState,
 					stage: nextStage,
@@ -192,7 +197,7 @@ export function advancePipeline(
 					action: "dispatch" as const,
 					stage: nextStage,
 					message: "Fix cycle: CRITICAL findings with actionable suggestions detected.",
-					agents: Object.freeze([]),
+					agents: Object.freeze(fixAgents),
 					state: newState,
 				});
 			}

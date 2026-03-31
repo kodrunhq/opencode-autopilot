@@ -1,18 +1,11 @@
-// TODO: Import ReviewAgent from "../schemas" once schemas plan (05-01) is integrated
-interface ReviewAgent {
-	readonly name: string;
-	readonly description: string;
-	readonly relevantStacks: readonly string[];
-	readonly severityFocus: readonly string[];
-	readonly prompt: string;
-}
+import type { ReviewAgent } from "../types";
 
 export const silentFailureHunter: Readonly<ReviewAgent> = Object.freeze({
 	name: "silent-failure-hunter",
 	description:
 		"Hunts for silent failures including empty catch blocks, swallowed errors, catch-log-only patterns, and optional chaining that masks real errors.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["HIGH", "MEDIUM"] as readonly string[],
+	severityFocus: ["CRITICAL", "WARNING"] as const,
 	prompt: `You are the Silent Failure Hunter. You find every place where errors are silently swallowed, inadequately handled, or masked. Every error must either be handled meaningfully or propagated.
 
 ## Instructions
@@ -45,7 +38,7 @@ Do not comment on code style or architecture -- only error handling quality and 
 ## Output
 
 For each finding, output a JSON object:
-{"file": "path/to/file", "line": 42, "severity": "HIGH", "agent": "silent-failure-hunter", "finding": "description", "suggestion": "how to fix"}
+{"severity": "CRITICAL|WARNING|NITPICK", "domain": "reliability", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "silent-failure-hunter", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

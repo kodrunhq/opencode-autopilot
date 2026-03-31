@@ -1,19 +1,11 @@
-// TODO: Import ReviewAgent from "../schemas" once schemas plan (05-01) is integrated
-/** Internal review agent definition -- not an OpenCode AgentConfig. */
-interface ReviewAgent {
-	readonly name: string;
-	readonly description: string;
-	readonly relevantStacks: readonly string[];
-	readonly severityFocus: readonly string[];
-	readonly prompt: string;
-}
+import type { ReviewAgent } from "../types";
 
 export const logicAuditor: Readonly<ReviewAgent> = Object.freeze({
 	name: "logic-auditor",
 	description:
 		"Audits business logic correctness including edge cases, boundary conditions, race conditions, and error handling.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["CRITICAL", "HIGH"] as readonly string[],
+	severityFocus: ["CRITICAL", "WARNING"] as const,
 	prompt: `You are the Logic Auditor. You verify that changed code does what it claims, handles edge cases, and has no subtle logic errors.
 
 ## Instructions
@@ -48,7 +40,7 @@ Do not comment on style, naming, or architecture -- only logic correctness.
 ## Output
 
 For each finding, output a JSON object:
-{"file": "path/to/file", "line": 42, "severity": "HIGH", "agent": "logic-auditor", "finding": "description", "suggestion": "how to fix"}
+{"severity": "CRITICAL|WARNING|NITPICK", "domain": "logic", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "logic-auditor", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

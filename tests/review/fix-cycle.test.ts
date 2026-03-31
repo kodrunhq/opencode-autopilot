@@ -100,7 +100,7 @@ describe("buildFixInstructions", () => {
 		name: "security-auditor",
 		description: "Security auditor",
 		relevantStacks: [] as readonly string[],
-		severityFocus: ["CRITICAL"] as readonly string[],
+		severityFocus: ["CRITICAL"] as const,
 		prompt: "Review {{DIFF}} for security issues.\n{{PRIOR_FINDINGS}}\n{{MEMORY}}",
 	};
 

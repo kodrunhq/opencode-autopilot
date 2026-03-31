@@ -54,16 +54,17 @@ describe("loadReviewMemory", () => {
 		expect(result!.schemaVersion).toBe(1);
 	});
 
-	test("throws on invalid JSON content", async () => {
+	test("returns null on invalid JSON content (recoverable)", async () => {
 		const memoryDir = join(tempDir, ".opencode-assets");
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(memoryDir, { recursive: true });
 		await writeFile(join(memoryDir, "review-memory.json"), "not valid json {{{", "utf-8");
 
-		await expect(loadReviewMemory(tempDir)).rejects.toThrow();
+		const result = await loadReviewMemory(tempDir);
+		expect(result).toBeNull();
 	});
 
-	test("throws on valid JSON but invalid schema", async () => {
+	test("returns null on valid JSON but invalid schema (recoverable)", async () => {
 		const memoryDir = join(tempDir, ".opencode-assets");
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(memoryDir, { recursive: true });
@@ -73,7 +74,8 @@ describe("loadReviewMemory", () => {
 			"utf-8",
 		);
 
-		await expect(loadReviewMemory(tempDir)).rejects.toThrow();
+		const result = await loadReviewMemory(tempDir);
+		expect(result).toBeNull();
 	});
 });
 

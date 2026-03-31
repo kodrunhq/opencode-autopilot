@@ -6,13 +6,13 @@
  * Uses a 1-line condensed format to prevent token budget explosion (Pitfall 2).
  */
 
-import type { ReviewFinding } from "./types";
+import type { ReviewAgent, ReviewFinding } from "./types";
 
-/** Minimal agent shape needed for cross-verification. */
-interface PromptableAgent {
-	readonly name: string;
-	readonly prompt: string;
-	readonly [key: string]: unknown;
+/**
+ * Strip {{PLACEHOLDER}} tokens from untrusted content before template substitution.
+ */
+function sanitizeTemplateContent(content: string): string {
+	return content.replace(/\{\{[A-Z_]+\}\}/g, "[REDACTED]");
 }
 
 /**
@@ -39,7 +39,7 @@ export function condenseFinding(finding: ReviewFinding): string {
  * An agent's own findings are NEVER included in its prompt.
  */
 export function buildCrossVerificationPrompts(
-	agents: readonly PromptableAgent[],
+	agents: readonly ReviewAgent[],
 	findingsByAgent: ReadonlyMap<string, readonly ReviewFinding[]>,
 	diff: string,
 ): readonly { readonly name: string; readonly prompt: string }[] {
@@ -60,10 +60,14 @@ export function buildCrossVerificationPrompts(
 
 		const crossVerifyInstruction = `Review these findings from other agents. You may: (1) UPGRADE severity with justification, (2) ADD a new finding you missed, (3) Report no changes.`;
 
+		// Sanitize untrusted content before template substitution
+		const safeDiff = sanitizeTemplateContent(diff);
+		const safeFindings = sanitizeTemplateContent(priorFindingsBlock);
+
 		// Replace placeholders in the agent's prompt
 		const prompt = agent.prompt
-			.replace("{{DIFF}}", diff)
-			.replace("{{PRIOR_FINDINGS}}", `${priorFindingsBlock}\n\n${crossVerifyInstruction}`)
+			.replace("{{DIFF}}", safeDiff)
+			.replace("{{PRIOR_FINDINGS}}", `${safeFindings}\n\n${crossVerifyInstruction}`)
 			.replace("{{MEMORY}}", "");
 
 		results.push(Object.freeze({ name: agent.name, prompt }));

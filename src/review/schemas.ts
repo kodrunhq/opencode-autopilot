@@ -24,15 +24,15 @@ export const reviewFindingSchema = z.object({
 export const agentResultSchema = z.object({
 	agent: z.string().max(128),
 	category: z.enum(["core", "parallel", "sequenced"]),
-	findings: z.array(reviewFindingSchema).default([]),
+	findings: z.array(reviewFindingSchema).max(500).default([]),
 	durationMs: z.number(),
 	completedAt: z.string().max(128),
 });
 
 export const reviewReportSchema = z.object({
 	verdict: verdictSchema,
-	findings: z.array(reviewFindingSchema),
-	agentResults: z.array(agentResultSchema),
+	findings: z.array(reviewFindingSchema).max(500),
+	agentResults: z.array(agentResultSchema).max(500),
 	totalDurationMs: z.number(),
 	completedAt: z.string().max(128),
 	summary: z.string().max(4096),
@@ -47,20 +47,20 @@ export const falsePositiveSchema = z.object({
 export const reviewMemorySchema = z.object({
 	schemaVersion: z.literal(1),
 	projectProfile: z.object({
-		stacks: z.array(z.string()),
-		lastDetectedAt: z.string(),
+		stacks: z.array(z.string().max(128)).max(32),
+		lastDetectedAt: z.string().max(128),
 	}),
-	recentFindings: z.array(reviewFindingSchema),
-	falsePositives: z.array(falsePositiveSchema),
-	lastReviewedAt: z.string().nullable(),
+	recentFindings: z.array(reviewFindingSchema).max(500),
+	falsePositives: z.array(falsePositiveSchema).max(50),
+	lastReviewedAt: z.string().max(128).nullable(),
 });
 
 export const reviewStateSchema = z.object({
 	stage: z.number().int().min(1).max(5),
-	selectedAgentNames: z.array(z.string()),
-	accumulatedFindings: z.array(reviewFindingSchema),
-	scope: z.string(),
-	startedAt: z.string(),
+	selectedAgentNames: z.array(z.string().max(128)).max(32),
+	accumulatedFindings: z.array(reviewFindingSchema).max(500),
+	scope: z.string().max(4096),
+	startedAt: z.string().max(128),
 });
 
 export const reviewConfigSchema = z.object({
