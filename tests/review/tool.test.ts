@@ -32,7 +32,7 @@ describe("reviewCore", () => {
 		const parsed = parseResult(result);
 		expect(parsed.action).toBe("error");
 		expect(typeof parsed.message).toBe("string");
-		expect((parsed.message as string)).toContain("scope");
+		expect(parsed.message as string).toContain("scope");
 	});
 
 	test("saves review state to current-review.json after start", async () => {

@@ -10,6 +10,7 @@ import { ocOrchestrate } from "./tools/orchestrate";
 import { ocPhase } from "./tools/phase";
 import { ocPlaceholder } from "./tools/placeholder";
 import { ocPlan } from "./tools/plan";
+import { ocReview } from "./tools/review";
 import { ocState } from "./tools/state";
 
 const plugin: Plugin = async (_input) => {
@@ -33,6 +34,7 @@ const plugin: Plugin = async (_input) => {
 			oc_phase: ocPhase,
 			oc_plan: ocPlan,
 			oc_orchestrate: ocOrchestrate,
+			oc_review: ocReview,
 		},
 		event: async ({ event }) => {
 			if (event.type === "session.created" && isFirstLoad(config)) {
