@@ -8,16 +8,16 @@ describe("researcher agent config", () => {
 
 	test("has a non-empty description", () => {
 		expect(typeof researcherAgent.description).toBe("string");
-		expect(researcherAgent.description!.length).toBeGreaterThan(0);
+		expect(researcherAgent.description?.length).toBeGreaterThan(0);
 	});
 
 	test("has a production-ready prompt with at least 100 characters", () => {
 		expect(typeof researcherAgent.prompt).toBe("string");
-		expect(researcherAgent.prompt!.length).toBeGreaterThanOrEqual(100);
+		expect(researcherAgent.prompt?.length).toBeGreaterThanOrEqual(100);
 	});
 
 	test("prompt references webfetch capability", () => {
-		const prompt = researcherAgent.prompt!.toLowerCase();
+		const prompt = researcherAgent.prompt?.toLowerCase();
 		expect(prompt.includes("webfetch") || prompt.includes("web")).toBe(true);
 	});
 

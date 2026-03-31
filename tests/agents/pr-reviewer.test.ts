@@ -8,16 +8,16 @@ describe("pr-reviewer agent config", () => {
 
 	test("has a non-empty description", () => {
 		expect(typeof prReviewerAgent.description).toBe("string");
-		expect(prReviewerAgent.description!.length).toBeGreaterThan(0);
+		expect(prReviewerAgent.description?.length).toBeGreaterThan(0);
 	});
 
 	test("has a production-ready prompt with at least 100 characters", () => {
 		expect(typeof prReviewerAgent.prompt).toBe("string");
-		expect(prReviewerAgent.prompt!.length).toBeGreaterThanOrEqual(100);
+		expect(prReviewerAgent.prompt?.length).toBeGreaterThanOrEqual(100);
 	});
 
 	test("prompt references git or gh commands", () => {
-		const prompt = prReviewerAgent.prompt!.toLowerCase();
+		const prompt = prReviewerAgent.prompt?.toLowerCase();
 		expect(prompt.includes("git") || prompt.includes("gh")).toBe(true);
 	});
 

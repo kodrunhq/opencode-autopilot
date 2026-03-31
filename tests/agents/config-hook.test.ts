@@ -7,10 +7,10 @@ describe("configHook", () => {
 		const config = { agent: {} } as Config;
 		await configHook(config);
 
-		expect(config.agent!.researcher).toBeDefined();
-		expect(config.agent!.metaprompter).toBeDefined();
-		expect(config.agent!.documenter).toBeDefined();
-		expect(config.agent!["pr-reviewer"]).toBeDefined();
+		expect(config.agent?.researcher).toBeDefined();
+		expect(config.agent?.metaprompter).toBeDefined();
+		expect(config.agent?.documenter).toBeDefined();
+		expect(config.agent?.["pr-reviewer"]).toBeDefined();
 	});
 
 	test("initializes config.agent if it is undefined", async () => {
@@ -18,10 +18,10 @@ describe("configHook", () => {
 		await configHook(config);
 
 		expect(config.agent).toBeDefined();
-		expect(config.agent!.researcher).toBeDefined();
-		expect(config.agent!.metaprompter).toBeDefined();
-		expect(config.agent!.documenter).toBeDefined();
-		expect(config.agent!["pr-reviewer"]).toBeDefined();
+		expect(config.agent?.researcher).toBeDefined();
+		expect(config.agent?.metaprompter).toBeDefined();
+		expect(config.agent?.documenter).toBeDefined();
+		expect(config.agent?.["pr-reviewer"]).toBeDefined();
 	});
 
 	test("does NOT overwrite an existing agent key", async () => {
@@ -33,8 +33,8 @@ describe("configHook", () => {
 		const config = { agent: { researcher: customAgent } } as Config;
 		await configHook(config);
 
-		expect(config.agent!.researcher).toBe(customAgent);
-		expect(config.agent!.researcher!.description).toBe("custom researcher");
+		expect(config.agent?.researcher).toBe(customAgent);
+		expect(config.agent?.researcher?.description).toBe("custom researcher");
 	});
 
 	test("does not touch built-in keys (build, plan) if they exist", async () => {
@@ -45,7 +45,7 @@ describe("configHook", () => {
 		} as Config;
 		await configHook(config);
 
-		expect(config.agent!.build).toBe(buildAgent);
-		expect(config.agent!.plan).toBe(planAgent);
+		expect(config.agent?.build).toBe(buildAgent);
+		expect(config.agent?.plan).toBe(planAgent);
 	});
 });
