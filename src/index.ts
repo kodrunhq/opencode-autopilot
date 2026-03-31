@@ -1,4 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin";
+import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
 import { installAssets } from "./installer";
 import { ocCreateAgent } from "./tools/create-agent";
@@ -29,6 +30,7 @@ const plugin: Plugin = async (_input) => {
 				// Phase 2 will add the oc_configure tool
 			}
 		},
+		config: configHook,
 	};
 };
 
