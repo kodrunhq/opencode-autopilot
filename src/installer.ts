@@ -9,17 +9,24 @@ export interface InstallResult {
 	readonly errors: readonly string[];
 }
 
-async function listEntries(
-	dirPath: string,
-): Promise<ReadonlyArray<{ name: string; isDirectory: boolean }>> {
+interface ListEntriesResult {
+	readonly entries: ReadonlyArray<{ name: string; isDirectory: boolean }>;
+	readonly error: string | null;
+}
+
+async function listEntries(dirPath: string): Promise<ListEntriesResult> {
 	try {
 		const entries = await readdir(dirPath, { withFileTypes: true });
-		return entries.map((e) => ({ name: e.name, isDirectory: e.isDirectory() }));
+		return {
+			entries: entries.map((e) => ({ name: e.name, isDirectory: e.isDirectory() })),
+			error: null,
+		};
 	} catch (error: unknown) {
 		if (isEnoentError(error)) {
-			return [];
+			return { entries: [], error: null };
 		}
-		throw error;
+		const message = error instanceof Error ? error.message : String(error);
+		return { entries: [], error: `${dirPath}: ${message}` };
 	}
 }
 
@@ -32,9 +39,12 @@ async function processFiles(
 	const skipped: string[] = [];
 	const errors: string[] = [];
 
-	const entries = await listEntries(join(sourceDir, category));
+	const listing = await listEntries(join(sourceDir, category));
+	if (listing.error) {
+		errors.push(listing.error);
+	}
 
-	for (const entry of entries) {
+	for (const entry of listing.entries) {
 		if (entry.name === ".gitkeep") continue;
 		if (entry.isDirectory) continue;
 
@@ -63,15 +73,21 @@ async function processSkills(sourceDir: string, targetDir: string): Promise<Inst
 	const skipped: string[] = [];
 	const errors: string[] = [];
 
-	const skillDirs = await listEntries(join(sourceDir, "skills"));
+	const skillListing = await listEntries(join(sourceDir, "skills"));
+	if (skillListing.error) {
+		errors.push(skillListing.error);
+	}
 
-	for (const dir of skillDirs) {
+	for (const dir of skillListing.entries) {
 		if (!dir.isDirectory) continue;
 		if (dir.name === ".gitkeep") continue;
 
-		const files = await listEntries(join(sourceDir, "skills", dir.name));
+		const fileListing = await listEntries(join(sourceDir, "skills", dir.name));
+		if (fileListing.error) {
+			errors.push(fileListing.error);
+		}
 
-		for (const file of files) {
+		for (const file of fileListing.entries) {
 			if (file.name === ".gitkeep") continue;
 			if (file.isDirectory) continue;
 

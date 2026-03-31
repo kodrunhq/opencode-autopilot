@@ -1,8 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { ensureDir, isEnoentError } from "./utils/fs-helpers";
+import { getGlobalConfigDir } from "./utils/paths";
 
 const pluginConfigSchema = z.object({
 	version: z.literal(1),
@@ -12,7 +12,7 @@ const pluginConfigSchema = z.object({
 
 export type PluginConfig = z.infer<typeof pluginConfigSchema>;
 
-export const CONFIG_PATH = join(homedir(), ".config", "opencode", "opencode-assets.json");
+export const CONFIG_PATH = join(getGlobalConfigDir(), "opencode-assets.json");
 
 export async function loadConfig(configPath: string = CONFIG_PATH): Promise<PluginConfig | null> {
 	try {

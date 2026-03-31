@@ -1,12 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
+import { describe, expect, test } from "bun:test";
 import plugin from "../src/index";
 
 describe("plugin entry point", () => {
-	let tempDir: string;
 	const mockInput = {
 		client: {} as ReturnType<typeof import("@opencode-ai/sdk").createOpencodeClient>,
 		project: {} as import("@opencode-ai/sdk").Project,
@@ -16,15 +11,6 @@ describe("plugin entry point", () => {
 		// biome-ignore lint/suspicious/noExplicitAny: BunShell mock requires any
 		$: {} as any,
 	};
-
-	beforeEach(async () => {
-		tempDir = join(tmpdir(), `opencode-index-test-${Date.now()}`);
-		await mkdir(tempDir, { recursive: true });
-	});
-
-	afterEach(async () => {
-		await rm(tempDir, { recursive: true, force: true });
-	});
 
 	test("default export is a function", () => {
 		expect(typeof plugin).toBe("function");
@@ -47,16 +33,8 @@ describe("plugin entry point", () => {
 		expect(typeof result.event).toBe("function");
 	});
 
-	test("event handler handles session.created with null config gracefully", async () => {
+	test("event handler handles session.created gracefully", async () => {
 		const result = await plugin(mockInput);
-		// Should not throw when config is null (first load)
-		// biome-ignore lint/suspicious/noExplicitAny: SDK event mock requires any
-		await result.event?.({ event: { type: "session.created", properties: {} } } as any);
-	});
-
-	test("event handler handles session.created with configured:true", async () => {
-		const result = await plugin(mockInput);
-		// Should not throw with a configured state
 		// biome-ignore lint/suspicious/noExplicitAny: SDK event mock requires any
 		await result.event?.({ event: { type: "session.created", properties: {} } } as any);
 	});
