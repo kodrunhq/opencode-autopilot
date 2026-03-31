@@ -93,9 +93,8 @@ export async function loadConfig(configPath: string = CONFIG_PATH): Promise<Plug
 		const v1Result = pluginConfigSchemaV1.safeParse(parsed);
 		if (v1Result.success) {
 			const migrated = migrateV1toV2(v1Result.data);
-			// Persist the migrated config back to disk
-			await ensureDir(dirname(configPath));
-			await writeFile(configPath, JSON.stringify(migrated, null, 2), "utf-8");
+			// Persist the migrated config back to disk using atomic save
+			await saveConfig(migrated, configPath);
 			return migrated;
 		}
 

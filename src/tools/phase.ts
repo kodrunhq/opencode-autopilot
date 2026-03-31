@@ -22,7 +22,7 @@ export async function phaseCore(args: PhaseArgs, artifactDir: string): Promise<s
 				if (currentPhase === null) {
 					return JSON.stringify({
 						currentPhase: null,
-						status: "COMPLETED",
+						status: state.status,
 					});
 				}
 				const phaseStatus = getPhaseStatus(state, currentPhase);

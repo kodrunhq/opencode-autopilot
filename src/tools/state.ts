@@ -50,7 +50,15 @@ export async function stateCore(args: StateArgs, artifactDir: string): Promise<s
 				if (state === null) {
 					return JSON.stringify({ error: "no_state" });
 				}
-				const updated = patchState(state, { [args.field]: args.value });
+				// Coerce value based on field type
+				let coercedValue: string | boolean | null = args.value ?? null;
+				if (args.field === "exploreTriggered") {
+					coercedValue = args.value === "true";
+				}
+				if (args.field === "arenaConfidence" && args.value === "null") {
+					coercedValue = null;
+				}
+				const updated = patchState(state, { [args.field]: coercedValue });
 				await saveState(updated, artifactDir);
 				return JSON.stringify({ ok: true });
 			}
