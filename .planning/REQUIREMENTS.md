@@ -17,10 +17,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Agents
 
-- [ ] **AGNT-01**: Researcher agent that searches the web thoroughly about a topic and produces a clear, comprehensive report with sources
-- [ ] **AGNT-02**: Metaprompter agent that crafts high-quality prompts, system instructions, and configurations for new agents, skills, and commands
-- [ ] **AGNT-03**: Documenter agent that creates documentation, READMEs, SVGs, diagrams, GitHub badges, quickstarts, and wikis
-- [ ] **AGNT-04**: PR Reviewer agent that reviews pull requests with structured feedback on code quality, security, and patterns
+- [x] **AGNT-01**: Researcher agent that searches the web thoroughly about a topic and produces a clear, comprehensive report with sources
+- [x] **AGNT-02**: Metaprompter agent that crafts high-quality prompts, system instructions, and configurations for new agents, skills, and commands
+- [x] **AGNT-03**: Documenter agent that creates documentation, READMEs, SVGs, diagrams, GitHub badges, quickstarts, and wikis
+- [x] **AGNT-04**: PR Reviewer agent that reviews pull requests with structured feedback on code quality, security, and patterns
 
 ### Commands
 
@@ -92,10 +92,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CRTL-03 | Phase 2 | Complete |
 | CRTL-04 | Phase 2 | Complete |
 | CRTL-05 | Phase 2 | Complete |
-| AGNT-01 | Phase 3 | Pending |
-| AGNT-02 | Phase 3 | Pending |
-| AGNT-03 | Phase 3 | Pending |
-| AGNT-04 | Phase 3 | Pending |
+| AGNT-01 | Phase 3 | Complete |
+| AGNT-02 | Phase 3 | Complete |
+| AGNT-03 | Phase 3 | Complete |
+| AGNT-04 | Phase 3 | Complete |
 | CMND-01 | Phase 3 | Complete |
 | SKLL-01 | Phase 3 | Complete |
 
