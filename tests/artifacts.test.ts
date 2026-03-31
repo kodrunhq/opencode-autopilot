@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { PHASE_ARTIFACTS, getArtifactRef, getPhaseDir, ensurePhaseDir } from "../src/orchestrator/artifacts";
+import {
+	ensurePhaseDir,
+	getArtifactRef,
+	getPhaseDir,
+	PHASE_ARTIFACTS,
+} from "../src/orchestrator/artifacts";
+import type { DispatchResult } from "../src/orchestrator/handlers/types";
 import { AGENT_NAMES } from "../src/orchestrator/handlers/types";
-import type { DispatchResult, PhaseHandler } from "../src/orchestrator/handlers/types";
 import { buildProgressSchema, pipelineStateSchema } from "../src/orchestrator/schemas";
 
 describe("getPhaseDir", () => {
@@ -39,7 +44,16 @@ describe("ensurePhaseDir", () => {
 
 describe("PHASE_ARTIFACTS", () => {
 	test("has entries for all 8 phases", () => {
-		const phases = ["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN", "BUILD", "SHIP", "RETROSPECTIVE"];
+		const phases = [
+			"RECON",
+			"CHALLENGE",
+			"ARCHITECT",
+			"EXPLORE",
+			"PLAN",
+			"BUILD",
+			"SHIP",
+			"RETROSPECTIVE",
+		];
 		for (const phase of phases) {
 			expect(PHASE_ARTIFACTS).toHaveProperty(phase);
 			expect(Array.isArray(PHASE_ARTIFACTS[phase])).toBe(true);
