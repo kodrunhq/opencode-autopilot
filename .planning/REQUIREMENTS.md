@@ -12,8 +12,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CRTL-01**: User can type `/new-agent` in-session and get a new agent markdown file created with proper frontmatter, prompt, and tool permissions
 - [ ] **CRTL-02**: User can type `/new-skill` in-session and get a new skill directory + SKILL.md created with proper frontmatter and structure
 - [ ] **CRTL-03**: User can type `/new-command` in-session and get a new command markdown file created with template and description
-- [ ] **CRTL-04**: Creation tools validate names (lowercase alphanumeric, hyphens, 1-64 chars for skills) and prevent path conflicts
-- [ ] **CRTL-05**: Creation tools write assets to global `~/.config/opencode/` target (user decision D-10: always global for simplicity)
+- [x] **CRTL-04**: Creation tools validate names (lowercase alphanumeric, hyphens, 1-64 chars for skills) and prevent path conflicts
+- [x] **CRTL-05**: Creation tools write assets to global `~/.config/opencode/` target (user decision D-10: always global for simplicity)
 
 ### Agents
 
@@ -90,8 +90,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CRTL-01 | Phase 2 | Pending |
 | CRTL-02 | Phase 2 | Pending |
 | CRTL-03 | Phase 2 | Pending |
-| CRTL-04 | Phase 2 | Pending |
-| CRTL-05 | Phase 2 | Pending |
+| CRTL-04 | Phase 2 | Complete |
+| CRTL-05 | Phase 2 | Complete |
 | AGNT-01 | Phase 3 | Pending |
 | AGNT-02 | Phase 3 | Pending |
 | AGNT-03 | Phase 3 | Pending |
