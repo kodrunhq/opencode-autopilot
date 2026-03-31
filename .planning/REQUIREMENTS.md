@@ -72,10 +72,10 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 ### Review Engine
 
 - [ ] **REVW-01**: User can invoke the review engine standalone (not just within the orchestrator) to review current changes
-- [ ] **REVW-02**: Team lead agent analyzes project stack and diff to select relevant specialist agents from the catalog
-- [ ] **REVW-03**: At least 6 universal review agents ship by default (logic, security, quality, test coverage, silent failure, contract/type)
+- [x] **REVW-02**: Team lead agent analyzes project stack and diff to select relevant specialist agents from the catalog
+- [x] **REVW-03**: At least 6 universal review agents ship by default (logic, security, quality, test coverage, silent failure, contract/type)
 - [ ] **REVW-04**: Selected review agents dispatch in parallel and return findings in a standardized severity format (CRITICAL/HIGH/MEDIUM/LOW)
-- [ ] **REVW-05**: Stack-gated selection automatically excludes agents whose technology is absent from the project
+- [x] **REVW-05**: Stack-gated selection automatically excludes agents whose technology is absent from the project
 - [ ] **REVW-06**: After parallel review, cross-verification pass lets agents see each other's findings and upgrade severity or add new findings
 - [ ] **REVW-07**: Red team agent runs as final adversarial pass, reading all findings and hunting inter-domain gaps
 - [ ] **REVW-08**: Product thinker agent traces user journeys and checks CRUD completeness after technical review
@@ -141,10 +141,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TOOL-05 | Phase 4 | Pending |
 | TOOL-06 | Phase 4 | Pending |
 | REVW-01 | Phase 5 | Pending |
-| REVW-02 | Phase 5 | Pending |
-| REVW-03 | Phase 5 | Pending |
+| REVW-02 | Phase 5 | Complete |
+| REVW-03 | Phase 5 | Complete |
 | REVW-04 | Phase 5 | Pending |
-| REVW-05 | Phase 5 | Pending |
+| REVW-05 | Phase 5 | Complete |
 | REVW-06 | Phase 5 | Pending |
 | REVW-07 | Phase 5 | Pending |
 | REVW-08 | Phase 5 | Pending |
