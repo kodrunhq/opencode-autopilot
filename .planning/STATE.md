@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
-status: Defining requirements
-stopped_at: Milestone v2.0 started
+status: Ready to plan
+stopped_at: Roadmap created for v2.0
 last_updated: "2026-03-31"
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,14 +19,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** A single command transforms an idea into a shipped, reviewed, tested result
-**Current focus:** Defining requirements for v2.0
+**Current focus:** Phase 4 - Foundation Infrastructure
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-31 — Milestone v2.0 started
+Phase: 4 of 7 (Foundation Infrastructure) -- first v2.0 phase
+Plan: --
+Status: Ready to plan
+Last activity: 2026-03-31 -- Roadmap created for v2.0 milestone
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -51,8 +53,6 @@ Last activity: 2026-03-31 — Milestone v2.0 started
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [v1.0]: Three coarse phases: infrastructure -> creation tooling -> curated assets
-- [v1.0]: Used node:fs/promises over Bun.file() for cross-runtime testability
 - [v1.0]: Config hook mutates config.agent directly (Promise<void> by design)
 - [v1.0]: All curated agents use mode: subagent to avoid polluting Tab cycle
 - [v2.0]: Port hands-free + ace as unified tool-based orchestrator (not command)
@@ -66,12 +66,12 @@ None yet.
 
 ### Blockers/Concerns
 
-- OpenCode's tool system capabilities and limits need empirical validation for orchestrator pattern
-- Subagent dispatch mechanism in OpenCode may differ from Claude Code's Agent tool
-- Confidence ledger and institutional memory persistence paths need design
+- Agent dispatch pattern (tool-returns-instruction) is unvalidated -- hard gate for Phase 4
+- OpenCode Agent tool concurrency limits unknown -- affects Phase 5 parallel dispatch
+- Token budget explosion risk from nested prompt contexts (orchestrator + review + diff)
 
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Milestone v2.0 started
+Stopped at: Roadmap created for v2.0 milestone
 Resume file: None

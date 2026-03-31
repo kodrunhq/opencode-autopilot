@@ -1,7 +1,7 @@
 # Requirements: OpenCode Assets Plugin
 
 **Defined:** 2026-03-31
-**Core Value:** A single command transforms an idea into a shipped, reviewed, tested result — fully autonomous, with built-in code quality enforcement at every stage.
+**Core Value:** A single command transforms an idea into a shipped, reviewed, tested result -- fully autonomous, with built-in code quality enforcement at every stage.
 
 ## v1 Requirements (Validated)
 
@@ -39,11 +39,11 @@ All v1 requirements shipped and validated in Milestone v1.0.
 
 ## v2 Requirements
 
-Requirements for Milestone v2.0 — Autonomous Orchestrator.
+Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 
 ### Orchestrator Foundation
 
-- [ ] **ORCH-01**: User can invoke `oc_orchestrate` with an idea and the orchestrator drives an 8-phase pipeline (RECON → CHALLENGE → ARCHITECT → EXPLORE → PLAN → BUILD → SHIP → RETROSPECTIVE) to completion autonomously
+- [ ] **ORCH-01**: User can invoke `oc_orchestrate` with an idea and the orchestrator drives an 8-phase pipeline (RECON -> CHALLENGE -> ARCHITECT -> EXPLORE -> PLAN -> BUILD -> SHIP -> RETROSPECTIVE) to completion autonomously
 - [ ] **ORCH-02**: Orchestrator persists state to JSON so interrupted runs resume from the last completed phase without re-executing earlier phases
 - [ ] **ORCH-03**: Every autonomous decision is logged to a decision log with timestamp, phase, agent, decision, and rationale
 - [ ] **ORCH-04**: User can configure orchestrator settings (autonomy level, phase toggles, strictness) via the plugin config schema
@@ -130,18 +130,47 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CMND-01 | Phase 3 (v1.0) | Complete |
 | SKLL-01 | Phase 3 (v1.0) | Complete |
 | PLGN-01 through PLGN-04 | Phase 1 (v1.0) | Complete |
-| ORCH-01 through ORCH-05 | TBD | Pending |
-| TOOL-01 through TOOL-06 | TBD | Pending |
-| PIPE-01 through PIPE-08 | TBD | Pending |
-| REVW-01 through REVW-11 | TBD | Pending |
-| LRNR-01 through LRNR-04 | TBD | Pending |
+| ORCH-02 | Phase 4 | Pending |
+| ORCH-03 | Phase 4 | Pending |
+| ORCH-04 | Phase 4 | Pending |
+| ORCH-05 | Phase 4 | Pending |
+| TOOL-01 | Phase 4 | Pending |
+| TOOL-02 | Phase 4 | Pending |
+| TOOL-03 | Phase 4 | Pending |
+| TOOL-04 | Phase 4 | Pending |
+| TOOL-05 | Phase 4 | Pending |
+| TOOL-06 | Phase 4 | Pending |
+| REVW-01 | Phase 5 | Pending |
+| REVW-02 | Phase 5 | Pending |
+| REVW-03 | Phase 5 | Pending |
+| REVW-04 | Phase 5 | Pending |
+| REVW-05 | Phase 5 | Pending |
+| REVW-06 | Phase 5 | Pending |
+| REVW-07 | Phase 5 | Pending |
+| REVW-08 | Phase 5 | Pending |
+| REVW-09 | Phase 5 | Pending |
+| REVW-10 | Phase 5 | Pending |
+| REVW-11 | Phase 5 | Pending |
+| ORCH-01 | Phase 6 | Pending |
+| PIPE-01 | Phase 6 | Pending |
+| PIPE-02 | Phase 6 | Pending |
+| PIPE-03 | Phase 6 | Pending |
+| PIPE-04 | Phase 6 | Pending |
+| PIPE-05 | Phase 6 | Pending |
+| PIPE-06 | Phase 6 | Pending |
+| PIPE-07 | Phase 6 | Pending |
+| PIPE-08 | Phase 6 | Pending |
+| LRNR-01 | Phase 7 | Pending |
+| LRNR-02 | Phase 7 | Pending |
+| LRNR-03 | Phase 7 | Pending |
+| LRNR-04 | Phase 7 | Pending |
 
 **Coverage:**
 - v1 requirements: 15 total (all Complete)
 - v2 requirements: 34 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 34 ⚠️
+- Mapped to phases: 34/34
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 after milestone v2.0 requirements definition*
+*Last updated: 2026-03-31 after v2.0 roadmap creation*
