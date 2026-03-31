@@ -132,7 +132,7 @@ Plans:
 Plans:
 - [ ] 06-01-PLAN.md -- Foundation: handler types, artifacts module, 9 pipeline agent configs, schema extension
 - [ ] 06-02-PLAN.md -- Early pipeline handlers: RECON, CHALLENGE, ARCHITECT with Arena
-- [ ] 06-03-PLAN.md -- Late pipeline handlers: PLAN, BUILD with review integration, SHIP, RETROSPECTIVE, EXPLORE
+- [x] 06-03-PLAN.md -- Late pipeline handlers: PLAN, BUILD with review integration, SHIP, RETROSPECTIVE, EXPLORE
 - [ ] 06-04-PLAN.md -- Wiring: handler dispatch map, enhanced orchestrateCore, configHook registration
 
 ### Phase 7: Learning & Resilience
@@ -157,5 +157,5 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 | 3. Curated Assets | v1.0 | 2/2 | Complete | - |
 | 4. Foundation Infrastructure | v2.0 | 0/4 | Planning | - |
 | 5. Review Engine | v2.0 | 1/1 | In Progress | - |
-| 6. Orchestrator Pipeline | v2.0 | 0/4 | Planning | - |
+| 6. Orchestrator Pipeline | v2.0 | 1/4 | In Progress | - |
 | 7. Learning & Resilience | v2.0 | 0/0 | Not started | - |
