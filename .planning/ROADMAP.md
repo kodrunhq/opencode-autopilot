@@ -47,7 +47,7 @@ Plans:
 
 Plans:
 - [x] 02-01: TBD
-- [ ] 02-02: TBD
+- [x] 02-02: TBD
 
 ### Phase 3: Curated Assets
 **Goal**: The plugin ships with a useful set of agents, a command, and a skill that users get out of the box on install
