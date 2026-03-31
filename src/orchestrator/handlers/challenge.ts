@@ -1,3 +1,4 @@
+import { sanitizeTemplateContent } from "../../review/sanitize";
 import { ensurePhaseDir, getArtifactRef } from "../artifacts";
 import type { PipelineState } from "../types";
 import { AGENT_NAMES, type DispatchResult } from "./types";
@@ -23,12 +24,14 @@ export async function handleChallenge(
 	const reconRef = getArtifactRef("RECON", "report.md");
 	const outputRef = getArtifactRef("CHALLENGE", "brief.md");
 
+	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
+
 	return Object.freeze({
 		action: "dispatch" as const,
 		agent: AGENT_NAMES.CHALLENGE,
 		prompt: [
 			`Read ${reconRef} for research context.`,
-			`Original idea: ${state.idea}`,
+			`Original idea: ${safeIdea}`,
 			`Propose up to 3 enhancements. Write ambitious brief to ${outputRef}`,
 			`For each: name, user value, complexity (LOW/MEDIUM/HIGH), accept/reject rationale.`,
 		].join("\n"),

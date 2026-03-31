@@ -1,3 +1,4 @@
+import { sanitizeTemplateContent } from "../../review/sanitize";
 import { ensurePhaseDir, getArtifactRef } from "../artifacts";
 import type { PipelineState } from "../types";
 import { AGENT_NAMES, type DispatchResult } from "./types";
@@ -22,12 +23,14 @@ export async function handleRecon(
 	const phaseDir = await ensurePhaseDir(artifactDir, "RECON");
 	const outputRef = getArtifactRef("RECON", "report.md");
 
+	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
+
 	return Object.freeze({
 		action: "dispatch" as const,
 		agent: AGENT_NAMES.RECON,
 		prompt: [
 			`Research the following idea and write findings to ${outputRef}`,
-			`Idea: ${state.idea}`,
+			`Idea: ${safeIdea}`,
 			`Output: ${phaseDir}/report.md`,
 			`Include: Market Analysis, Technology Options, UX Considerations, Feasibility Assessment, Confidence (HIGH/MEDIUM/LOW)`,
 		].join("\n"),

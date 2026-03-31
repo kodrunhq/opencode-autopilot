@@ -1,3 +1,4 @@
+import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
 import type { BuildProgress, Task } from "../types";
@@ -67,14 +68,19 @@ function hasCriticalFindings(resultStr: string): boolean {
 	try {
 		const parsed = JSON.parse(resultStr);
 		if (parsed.severity === "CRITICAL") return true;
-		if (Array.isArray(parsed.findings)) {
-			return parsed.findings.some(
+		const hasCritical = (arr: unknown[]): boolean =>
+			arr.some(
 				(f: unknown) =>
 					typeof f === "object" &&
 					f !== null &&
 					"severity" in f &&
 					(f as { severity: string }).severity === "CRITICAL",
 			);
+		if (Array.isArray(parsed.findings)) {
+			return hasCritical(parsed.findings);
+		}
+		if (parsed.report?.findings && Array.isArray(parsed.report.findings)) {
+			return hasCritical(parsed.report.findings);
 		}
 		return false;
 	} catch {
@@ -107,9 +113,10 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 	if (buildProgress.reviewPending && result) {
 		if (hasCriticalFindings(result)) {
 			// Re-dispatch implementer with fix instructions
+			const safeResult = sanitizeTemplateContent(result).slice(0, 4000);
 			const prompt = [
 				`CRITICAL review findings detected. Fix the following issues:`,
-				result,
+				safeResult,
 				`Reference ${getArtifactRef("PLAN", "tasks.md")} for context.`,
 			].join(" ");
 
@@ -125,7 +132,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 						strikeCount: buildProgress.strikeCount + 1,
 					},
 				},
-			} as DispatchResult);
+			} satisfies DispatchResult);
 		}
 
 		// No critical -> advance to next wave
@@ -143,7 +150,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 						reviewPending: false,
 					},
 				},
-			} as DispatchResult);
+			} satisfies DispatchResult);
 		}
 
 		const pendingTasks = findPendingTasks(waveMap, nextWave);
@@ -164,7 +171,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 				_stateUpdates: {
 					buildProgress: { ...updatedProgress, currentTask: task.id },
 				},
-			} as DispatchResult);
+			} satisfies DispatchResult);
 		}
 
 		return Object.freeze({
@@ -178,7 +185,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			_stateUpdates: {
 				buildProgress: { ...updatedProgress, currentTask: pendingTasks[0].id },
 			},
-		} as DispatchResult);
+		} satisfies DispatchResult);
 	}
 
 	// Case 2: Result provided + not review pending -> mark task done
@@ -188,31 +195,10 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 		const currentWave = buildProgress.currentWave ?? 1;
 
 		if (isWaveComplete(waveMap, currentWave)) {
-			// Check if there are more waves
-			const nextWave = findCurrentWave(waveMap);
-			if (nextWave === null) {
-				// All done, but need review of final wave
-				return Object.freeze({
-					action: "dispatch",
-					agent: "oc-review",
-					prompt: "Review completed wave. Scope: branch. Report any CRITICAL findings.",
-					phase: "BUILD",
-					progress: `Wave ${currentWave} complete — review pending`,
-					_stateUpdates: {
-						tasks: updatedTasks,
-						buildProgress: {
-							...buildProgress,
-							currentTask: null,
-							reviewPending: true,
-						},
-					},
-				} as DispatchResult);
-			}
-
-			// Wave complete but more waves -> trigger review
+			// Wave complete -> trigger review (same for final wave or intermediate)
 			return Object.freeze({
 				action: "dispatch",
-				agent: "oc-review",
+				agent: AGENT_NAMES.REVIEW,
 				prompt: "Review completed wave. Scope: branch. Report any CRITICAL findings.",
 				phase: "BUILD",
 				progress: `Wave ${currentWave} complete — review pending`,
@@ -224,7 +210,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 						reviewPending: true,
 					},
 				},
-			} as DispatchResult);
+			} satisfies DispatchResult);
 		}
 
 		// Wave not complete -> dispatch next pending task in wave
@@ -244,7 +230,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 						currentTask: next.id,
 					},
 				},
-			} as DispatchResult);
+			} satisfies DispatchResult);
 		}
 	}
 
@@ -287,7 +273,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 					currentWave,
 				},
 			},
-		} as DispatchResult);
+		} satisfies DispatchResult);
 	}
 
 	// Multiple pending tasks in wave -> dispatch_multi
@@ -306,5 +292,5 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 				currentWave,
 			},
 		},
-	} as DispatchResult);
+	} satisfies DispatchResult);
 };

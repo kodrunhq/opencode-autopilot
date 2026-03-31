@@ -4,8 +4,8 @@ import { ocReviewerAgent } from "../src/agents/pipeline/oc-reviewer";
 import { AGENT_NAMES } from "../src/orchestrator/handlers/types";
 
 describe("pipelineAgents", () => {
-	test("has exactly 9 entries", () => {
-		expect(Object.keys(pipelineAgents)).toHaveLength(9);
+	test("has exactly 10 entries", () => {
+		expect(Object.keys(pipelineAgents)).toHaveLength(10);
 	});
 
 	test("all agents have mode subagent", () => {

@@ -11,8 +11,9 @@ export const orchestratorAgent: Readonly<AgentConfig> = Object.freeze({
 1. Call oc_orchestrate with your initial idea (first turn) or with the result from the previous agent.
 2. Parse the JSON response.
 3. If action is "dispatch": call the named agent with the provided prompt, then pass its output back to oc_orchestrate via the result parameter.
-4. If action is "complete": report the summary to the user. You are done.
-5. If action is "error": report the error to the user. Stop.
+4. If action is "dispatch_multi": call each agent in the agents array in parallel, collect all outputs, then pass the combined result back to oc_orchestrate via the result parameter.
+5. If action is "complete": report the summary to the user. You are done.
+6. If action is "error": report the error to the user. Stop.
 
 ## Rules
 

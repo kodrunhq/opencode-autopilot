@@ -1,5 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { sanitizeTemplateContent } from "../../review/sanitize";
 import { fileExists } from "../../utils/fs-helpers";
 import { getDebateDepth } from "../arena";
 import { ensurePhaseDir, getArtifactRef, getPhaseDir } from "../artifacts";
@@ -64,6 +65,7 @@ export async function handleArchitect(
 	const depth = getDebateDepth(reconEntries);
 	const reconRef = getArtifactRef("RECON", "report.md");
 	const challengeRef = getArtifactRef("CHALLENGE", "brief.md");
+	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
 
 	if (depth === 1) {
 		return Object.freeze({
@@ -71,7 +73,7 @@ export async function handleArchitect(
 			agent: AGENT_NAMES.ARCHITECT,
 			prompt: [
 				`Read ${reconRef} and ${challengeRef} for context.`,
-				`Design architecture for: ${state.idea}`,
+				`Design architecture for: ${safeIdea}`,
 				`Write design to ${getArtifactRef("ARCHITECT", "design.md")}`,
 				`Include: component diagram, data flow, technology choices, confidence (HIGH/MEDIUM/LOW).`,
 			].join("\n"),
@@ -86,7 +88,7 @@ export async function handleArchitect(
 			agent: AGENT_NAMES.ARCHITECT,
 			prompt: [
 				`Read ${reconRef} and ${challengeRef} for context.`,
-				`Design architecture for: ${state.idea}`,
+				`Design architecture for: ${safeIdea}`,
 				`Constraint: ${constraint}`,
 				`Write proposal to phases/ARCHITECT/proposals/proposal-${label}.md`,
 				`Include: component diagram, data flow, technology choices, confidence (HIGH/MEDIUM/LOW).`,

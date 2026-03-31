@@ -8,6 +8,7 @@ export const AGENT_NAMES = Object.freeze({
 	EXPLORE: "oc-explorer",
 	PLAN: "oc-planner",
 	BUILD: "oc-implementer",
+	REVIEW: "oc-reviewer",
 	SHIP: "oc-shipper",
 	RETROSPECTIVE: "oc-retrospector",
 } as const);
@@ -20,6 +21,7 @@ export interface DispatchResult {
 	readonly phase?: string;
 	readonly progress?: string;
 	readonly message?: string;
+	readonly _stateUpdates?: Partial<PipelineState>;
 }
 
 export type PhaseHandler = (

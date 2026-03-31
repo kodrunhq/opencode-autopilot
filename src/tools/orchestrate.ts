@@ -20,15 +20,12 @@ interface OrchestrateArgs {
  */
 async function applyStateUpdates(
 	state: Readonly<import("../orchestrator/types").PipelineState>,
-	handlerResult: DispatchResult & { readonly _stateUpdates?: Record<string, unknown> },
+	handlerResult: DispatchResult,
 	artifactDir: string,
 ): Promise<import("../orchestrator/types").PipelineState> {
 	const updates = handlerResult._stateUpdates;
 	if (updates) {
-		const updated = patchState(
-			state,
-			updates as Partial<import("../orchestrator/types").PipelineState>,
-		);
+		const updated = patchState(state, updates);
 		await saveState(updated, artifactDir);
 		return updated;
 	}
@@ -46,7 +43,7 @@ async function maybeInlineReview(
 ): Promise<{ readonly inlined: boolean; readonly reviewResult?: string }> {
 	if (
 		handlerResult.action === "dispatch" &&
-		handlerResult.agent === "oc-review" &&
+		handlerResult.agent === "oc-reviewer" &&
 		handlerResult.prompt
 	) {
 		const projectRoot = join(artifactDir, "..");
@@ -61,7 +58,7 @@ async function maybeInlineReview(
  * On complete, advances the phase and invokes the next handler.
  */
 async function processHandlerResult(
-	handlerResult: DispatchResult & { readonly _stateUpdates?: Record<string, unknown> },
+	handlerResult: DispatchResult,
 	state: Readonly<import("../orchestrator/types").PipelineState>,
 	artifactDir: string,
 ): Promise<string> {
@@ -81,11 +78,7 @@ async function processHandlerResult(
 				if (reloadedState?.currentPhase) {
 					const handler = PHASE_HANDLERS[reloadedState.currentPhase];
 					const nextResult = await handler(reloadedState, artifactDir, reviewResult);
-					return processHandlerResult(
-						nextResult as DispatchResult & { readonly _stateUpdates?: Record<string, unknown> },
-						reloadedState,
-						artifactDir,
-					);
+					return processHandlerResult(nextResult, reloadedState, artifactDir);
 				}
 			}
 			return JSON.stringify(handlerResult);
@@ -119,11 +112,7 @@ async function processHandlerResult(
 			// Invoke the next phase handler immediately
 			const nextHandler = PHASE_HANDLERS[nextPhase];
 			const nextResult = await nextHandler(advanced, artifactDir);
-			return processHandlerResult(
-				nextResult as DispatchResult & { readonly _stateUpdates?: Record<string, unknown> },
-				advanced,
-				artifactDir,
-			);
+			return processHandlerResult(nextResult, advanced, artifactDir);
 		}
 
 		default:
@@ -158,11 +147,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 
 			const handler = PHASE_HANDLERS[newState.currentPhase as Phase];
 			const handlerResult = await handler(newState, artifactDir);
-			return processHandlerResult(
-				handlerResult as DispatchResult & { readonly _stateUpdates?: Record<string, unknown> },
-				newState,
-				artifactDir,
-			);
+			return processHandlerResult(handlerResult, newState, artifactDir);
 		}
 
 		// State exists
@@ -178,11 +163,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 			// Delegate to current phase handler
 			const handler = PHASE_HANDLERS[state.currentPhase];
 			const handlerResult = await handler(state, artifactDir, args.result);
-			return processHandlerResult(
-				handlerResult as DispatchResult & { readonly _stateUpdates?: Record<string, unknown> },
-				state,
-				artifactDir,
-			);
+			return processHandlerResult(handlerResult, state, artifactDir);
 		}
 
 		return JSON.stringify({ action: "error", message: "Unexpected state" });

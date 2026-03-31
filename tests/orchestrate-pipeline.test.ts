@@ -242,8 +242,8 @@ describe("configHook pipeline agents", () => {
 		expect(config.agent["oc-researcher"]).toBeDefined();
 		expect(config.agent["oc-implementer"]).toBeDefined();
 
-		// Total: 5 v1 + 9 pipeline = 14
-		expect(Object.keys(config.agent).length).toBe(14);
+		// Total: 5 v1 + 10 pipeline = 15
+		expect(Object.keys(config.agent).length).toBe(15);
 	});
 
 	test("pipeline agents have mode subagent", async () => {
