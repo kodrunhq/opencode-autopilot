@@ -1,6 +1,9 @@
 import type { Plugin } from "@opencode-ai/plugin";
 import { isFirstLoad, loadConfig } from "./config";
 import { installAssets } from "./installer";
+import { ocCreateAgent } from "./tools/create-agent";
+import { ocCreateCommand } from "./tools/create-command";
+import { ocCreateSkill } from "./tools/create-skill";
 import { ocPlaceholder } from "./tools/placeholder";
 
 const plugin: Plugin = async (_input) => {
@@ -16,6 +19,9 @@ const plugin: Plugin = async (_input) => {
 	return {
 		tool: {
 			oc_placeholder: ocPlaceholder,
+			oc_create_agent: ocCreateAgent,
+			oc_create_skill: ocCreateSkill,
+			oc_create_command: ocCreateCommand,
 		},
 		event: async ({ event }) => {
 			if (event.type === "session.created" && isFirstLoad(config)) {

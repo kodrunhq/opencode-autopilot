@@ -14,4 +14,4 @@ The config file uses this format:
 }
 ```
 
-Note: An interactive `oc_configure` tool will be added in Phase 2 to automate this process.
+Note: An interactive configuration tool will be added in a future phase to automate this process.
