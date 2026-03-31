@@ -1,0 +1,76 @@
+import type { Phase, PhaseStatus, PipelineState } from "./types";
+
+/**
+ * Maps each phase to its valid successor. RETROSPECTIVE is terminal (null).
+ */
+export const VALID_TRANSITIONS: Readonly<Record<Phase, Phase | null>> = Object.freeze({
+	RECON: "CHALLENGE",
+	CHALLENGE: "ARCHITECT",
+	ARCHITECT: "EXPLORE",
+	EXPLORE: "PLAN",
+	PLAN: "BUILD",
+	BUILD: "SHIP",
+	SHIP: "RETROSPECTIVE",
+	RETROSPECTIVE: null,
+} satisfies Record<Phase, Phase | null>);
+
+/**
+ * Throws if the transition from -> to is not allowed by the state machine.
+ */
+export function validateTransition(from: Phase, to: Phase): void {
+	const expected = VALID_TRANSITIONS[from];
+	if (expected !== to) {
+		throw new Error(
+			`Invalid phase transition: ${from} -> ${to}. Expected: ${from} -> ${expected ?? "END"}`,
+		);
+	}
+}
+
+/**
+ * Returns the next phase in the pipeline, or null if at terminal phase.
+ */
+export function getNextPhase(current: Phase): Phase | null {
+	return VALID_TRANSITIONS[current];
+}
+
+/**
+ * Completes the current phase and advances to the next one.
+ * Returns a new state object (never mutates the input).
+ * Throws if currentPhase is null.
+ */
+export function completePhase(state: Readonly<PipelineState>): PipelineState {
+	if (state.currentPhase === null) {
+		throw new Error("Cannot complete phase: no current phase (pipeline may be finished)");
+	}
+
+	const currentPhaseName = state.currentPhase;
+	const nextPhase = getNextPhase(currentPhaseName);
+	const completedAt = new Date().toISOString();
+
+	const updatedPhases = state.phases.map((phase) => {
+		if (phase.name === currentPhaseName) {
+			return { ...phase, status: "DONE" as const, completedAt };
+		}
+		if (nextPhase !== null && phase.name === nextPhase) {
+			return { ...phase, status: "IN_PROGRESS" as const };
+		}
+		return phase;
+	});
+
+	return {
+		...state,
+		currentPhase: nextPhase,
+		phases: updatedPhases,
+		lastUpdatedAt: new Date().toISOString(),
+	};
+}
+
+/**
+ * Returns the PhaseStatus entry for the given phase name, or undefined if not found.
+ */
+export function getPhaseStatus(
+	state: Readonly<PipelineState>,
+	phase: Phase,
+): PhaseStatus | undefined {
+	return state.phases.find((p) => p.name === phase);
+}
