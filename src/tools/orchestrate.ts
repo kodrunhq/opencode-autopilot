@@ -25,7 +25,10 @@ async function applyStateUpdates(
 ): Promise<import("../orchestrator/types").PipelineState> {
 	const updates = handlerResult._stateUpdates;
 	if (updates) {
-		const updated = patchState(state, updates as Partial<import("../orchestrator/types").PipelineState>);
+		const updated = patchState(
+			state,
+			updates as Partial<import("../orchestrator/types").PipelineState>,
+		);
 		await saveState(updated, artifactDir);
 		return updated;
 	}
@@ -75,7 +78,7 @@ async function processHandlerResult(
 			if (inlined && reviewResult) {
 				// Feed the review result back into the current phase handler
 				const reloadedState = await loadState(artifactDir);
-				if (reloadedState && reloadedState.currentPhase) {
+				if (reloadedState?.currentPhase) {
 					const handler = PHASE_HANDLERS[reloadedState.currentPhase];
 					const nextResult = await handler(reloadedState, artifactDir, reviewResult);
 					return processHandlerResult(

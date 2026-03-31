@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { AGENT_NAMES } from "../src/orchestrator/handlers/types";
 import { PHASES } from "../src/orchestrator/schemas";
-import { createInitialState, patchState, saveState } from "../src/orchestrator/state";
-import type { Phase, PipelineState } from "../src/orchestrator/types";
+import { createInitialState, saveState } from "../src/orchestrator/state";
+import type { Phase } from "../src/orchestrator/types";
 
 // ---- PHASE_HANDLERS tests ----
 
@@ -208,5 +209,69 @@ describe("orchestrateCore pipeline dispatch", () => {
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed.phase).toBe("RECON");
 		expect(parsed.agent).toBe("oc-researcher");
+	});
+});
+
+// ---- configHook pipeline agent registration tests ----
+
+describe("configHook pipeline agents", () => {
+	test("registers all 9 pipeline agents in config", async () => {
+		const { configHook } = await import("../src/agents/index");
+		const config = { agent: {} } as import("@opencode-ai/plugin").Config;
+		await configHook(config);
+
+		const pipelineNames = Object.values(AGENT_NAMES);
+		for (const name of pipelineNames) {
+			expect(config.agent[name]).toBeDefined();
+		}
+	});
+
+	test("registers v1 agents alongside pipeline agents", async () => {
+		const { configHook } = await import("../src/agents/index");
+		const config = { agent: {} } as import("@opencode-ai/plugin").Config;
+		await configHook(config);
+
+		// v1 agents
+		expect(config.agent.researcher).toBeDefined();
+		expect(config.agent.metaprompter).toBeDefined();
+		expect(config.agent.documenter).toBeDefined();
+		expect(config.agent["pr-reviewer"]).toBeDefined();
+		expect(config.agent.orchestrator).toBeDefined();
+
+		// pipeline agents
+		expect(config.agent["oc-researcher"]).toBeDefined();
+		expect(config.agent["oc-implementer"]).toBeDefined();
+
+		// Total: 5 v1 + 9 pipeline = 14
+		expect(Object.keys(config.agent).length).toBe(14);
+	});
+
+	test("pipeline agents have mode subagent", async () => {
+		const { configHook } = await import("../src/agents/index");
+		const config = { agent: {} } as import("@opencode-ai/plugin").Config;
+		await configHook(config);
+
+		const pipelineNames = Object.values(AGENT_NAMES);
+		for (const name of pipelineNames) {
+			const agent = config.agent[name] as Record<string, unknown>;
+			expect(agent.mode).toBe("subagent");
+		}
+	});
+
+	test("preserves user customizations (does not overwrite pre-set agent)", async () => {
+		const { configHook } = await import("../src/agents/index");
+		const customAgent = { prompt: "my custom researcher", mode: "primary" };
+		const config = {
+			agent: { "oc-researcher": customAgent },
+		} as unknown as import("@opencode-ai/plugin").Config;
+		await configHook(config);
+
+		// Should preserve user's custom config
+		expect((config.agent["oc-researcher"] as Record<string, unknown>).prompt).toBe(
+			"my custom researcher",
+		);
+		expect((config.agent["oc-researcher"] as Record<string, unknown>).mode).toBe("primary");
+		// Other pipeline agents still registered
+		expect(config.agent["oc-implementer"]).toBeDefined();
 	});
 });
