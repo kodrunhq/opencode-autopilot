@@ -61,11 +61,11 @@ Plans:
   4. After install, user can invoke `@pr-reviewer` or the `/review-pr` command and get structured feedback on a GitHub pull request
   5. After install, user can reference the coding standards skill during code review or generation and the LLM applies the documented conventions
   6. None of the curated agents appear in the Tab cycle — only accessible via `@` or delegation from primary agents
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md — Agent config modules, config hook barrel, plugin wiring, and tests
+- [ ] 03-02-PLAN.md — Coding-standards skill and /review-pr command
 
 ## Progress
 
