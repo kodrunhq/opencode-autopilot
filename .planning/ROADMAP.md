@@ -94,7 +94,13 @@ Plans:
   3. Every autonomous decision is recorded in a decision log with timestamp, phase, agent, decision, and rationale -- viewable as a JSON artifact after any run
   4. User can set orchestrator configuration (autonomy level, phase toggles, strictness) in the plugin config and the settings take effect on next invocation
   5. A proof-of-concept agent dispatch (tool-returns-instruction pattern) completes end-to-end in an OpenCode session, confirming the architecture is viable
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 04-01-PLAN.md -- Zod schemas, state persistence, confidence ledger, and path helpers
+- [ ] 04-02-PLAN.md -- Config v2 schema with orchestrator/confidence namespaces and v1 migration
+- [ ] 04-03-PLAN.md -- Phase transitions, plan indexing, and arena depth modules
+- [ ] 04-04-PLAN.md -- Tool registrations, orchestrator agent, plugin wiring, and dispatch proof
 
 ### Phase 5: Review Engine
 **Goal**: Users can run a standalone multi-agent code review that selects relevant specialists, dispatches them in parallel, cross-verifies findings, and auto-fixes issues
@@ -140,7 +146,7 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 | 1. Plugin Infrastructure | v1.0 | 2/2 | Complete | - |
 | 2. Creation Tooling | v1.0 | 2/2 | Complete | - |
 | 3. Curated Assets | v1.0 | 2/2 | Complete | - |
-| 4. Foundation Infrastructure | v2.0 | 0/0 | Not started | - |
+| 4. Foundation Infrastructure | v2.0 | 0/4 | Planning | - |
 | 5. Review Engine | v2.0 | 0/0 | Not started | - |
 | 6. Orchestrator Pipeline | v2.0 | 0/0 | Not started | - |
 | 7. Learning & Resilience | v2.0 | 0/0 | Not started | - |
