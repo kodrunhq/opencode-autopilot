@@ -64,8 +64,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Agent config modules, config hook barrel, plugin wiring, and tests
-- [ ] 03-02-PLAN.md — Coding-standards skill and /review-pr command
+- [x] 03-01-PLAN.md — Agent config modules, config hook barrel, plugin wiring, and tests
+- [x] 03-02-PLAN.md — Coding-standards skill and /review-pr command
 
 ## Progress
 

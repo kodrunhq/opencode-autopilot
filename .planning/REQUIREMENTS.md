@@ -24,11 +24,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Commands
 
-- [ ] **CMND-01**: `/review-pr` command that reviews a GitHub PR with structured, actionable feedback
+- [x] **CMND-01**: `/review-pr` command that reviews a GitHub PR with structured, actionable feedback
 
 ### Skills
 
-- [ ] **SKLL-01**: Coding standards skill with style, patterns, and naming conventions the LLM can reference during code review and generation
+- [x] **SKLL-01**: Coding standards skill with style, patterns, and naming conventions the LLM can reference during code review and generation
 
 ### Plugin Infrastructure
 
@@ -96,8 +96,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AGNT-02 | Phase 3 | Pending |
 | AGNT-03 | Phase 3 | Pending |
 | AGNT-04 | Phase 3 | Pending |
-| CMND-01 | Phase 3 | Pending |
-| SKLL-01 | Phase 3 | Pending |
+| CMND-01 | Phase 3 | Complete |
+| SKLL-01 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 15 total
