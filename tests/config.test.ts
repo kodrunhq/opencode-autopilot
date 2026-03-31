@@ -3,13 +3,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-	createDefaultConfig,
-	isFirstLoad,
-	loadConfig,
-	type PluginConfig,
-	saveConfig,
-} from "../src/config";
+import { createDefaultConfig, isFirstLoad, loadConfig, saveConfig } from "../src/config";
 
 describe("isFirstLoad", () => {
 	test("returns true when config is null", () => {
@@ -114,10 +108,7 @@ describe("saveConfig and loadConfig round-trip", () => {
 	});
 
 	test("loadConfig throws on invalid config schema", async () => {
-		await writeFile(
-			configPath,
-			JSON.stringify({ version: 99, configured: "yes", models: null }),
-		);
+		await writeFile(configPath, JSON.stringify({ version: 99, configured: "yes", models: null }));
 
 		await expect(loadConfig(configPath)).rejects.toThrow();
 	});
@@ -147,14 +138,14 @@ describe("v1 to v2 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result!.version).toBe(2);
-		expect(result!.configured).toBe(true);
-		expect(result!.models).toEqual({ default: "gpt-4" });
-		expect(result!.orchestrator.autonomy).toBe("full");
-		expect(result!.orchestrator.strictness).toBe("normal");
-		expect(result!.confidence.enabled).toBe(true);
-		expect(result!.confidence.thresholds.proceed).toBe("MEDIUM");
-		expect(result!.confidence.thresholds.abort).toBe("LOW");
+		expect(result?.version).toBe(2);
+		expect(result?.configured).toBe(true);
+		expect(result?.models).toEqual({ default: "gpt-4" });
+		expect(result?.orchestrator.autonomy).toBe("full");
+		expect(result?.orchestrator.strictness).toBe("normal");
+		expect(result?.confidence.enabled).toBe(true);
+		expect(result?.confidence.thresholds.proceed).toBe("MEDIUM");
+		expect(result?.confidence.thresholds.abort).toBe("LOW");
 	});
 
 	test("loadConfig on a v1 JSON file writes migrated v2 back to disk", async () => {
@@ -197,12 +188,12 @@ describe("v1 to v2 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result!.version).toBe(2);
-		expect(result!.orchestrator.autonomy).toBe("supervised");
-		expect(result!.orchestrator.strictness).toBe("strict");
-		expect(result!.orchestrator.phases.challenge).toBe(false);
-		expect(result!.confidence.enabled).toBe(false);
-		expect(result!.confidence.thresholds.proceed).toBe("HIGH");
+		expect(result?.version).toBe(2);
+		expect(result?.orchestrator.autonomy).toBe("supervised");
+		expect(result?.orchestrator.strictness).toBe("strict");
+		expect(result?.orchestrator.phases.challenge).toBe(false);
+		expect(result?.confidence.enabled).toBe(false);
+		expect(result?.confidence.thresholds.proceed).toBe("HIGH");
 	});
 });
 
