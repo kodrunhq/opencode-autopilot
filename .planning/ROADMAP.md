@@ -1,8 +1,9 @@
 # Roadmap: OpenCode Assets Plugin
 
-## Overview
+## Milestones
 
-This roadmap delivers the OpenCode Assets Plugin in three phases following a strict dependency chain: plugin infrastructure first (so tools can register and assets can install), creation tooling second (the core differentiator that validates the infrastructure), and curated assets last (agents, commands, and skills that ship with the plugin and prove the pipeline works end-to-end).
+- **v1.0 MVP** - Phases 1-3 (shipped)
+- **v2.0 Autonomous Orchestrator** - Phases 4-7 (in progress)
 
 ## Phases
 
@@ -12,11 +13,26 @@ This roadmap delivers the OpenCode Assets Plugin in three phases following a str
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Plugin Infrastructure** - Scaffolding, tool registration, asset installer, and npm package structure
-- [ ] **Phase 2: Creation Tooling** - In-session commands and tools for scaffolding new agents, skills, and commands
-- [ ] **Phase 3: Curated Assets** - Bundled agents, commands, and skills that ship with the plugin
+<details>
+<summary>v1.0 MVP (Phases 1-3) - SHIPPED</summary>
+
+- [x] **Phase 1: Plugin Infrastructure** - Scaffolding, tool registration, asset installer, and npm package structure
+- [x] **Phase 2: Creation Tooling** - In-session commands and tools for scaffolding new agents, skills, and commands
+- [x] **Phase 3: Curated Assets** - Bundled agents, commands, and skills that ship with the plugin
+
+</details>
+
+### v2.0 Autonomous Orchestrator
+
+- [ ] **Phase 4: Foundation Infrastructure** - State machine, deterministic tooling, config schema, and agent dispatch validation
+- [ ] **Phase 5: Review Engine** - Standalone multi-agent code review with parallel dispatch, cross-verification, and fix cycle
+- [ ] **Phase 6: Orchestrator Pipeline** - Full 8-phase autonomous SDLC pipeline integrating review engine
+- [ ] **Phase 7: Learning & Resilience** - Institutional memory, retrospective extraction, and failure forensics
 
 ## Phase Details
+
+<details>
+<summary>v1.0 MVP Phase Details (Phases 1-3)</summary>
 
 ### Phase 1: Plugin Infrastructure
 **Goal**: A working plugin package that registers tools with OpenCode, installs bundled assets to the correct filesystem paths, and works with any configured provider
@@ -30,8 +46,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [x] 01-01-PLAN.md — Scaffold npm package, utility modules, and placeholder tool registration
-- [x] 01-02-PLAN.md — Asset installer, config system, bundled assets, and plugin wiring
+- [x] 01-01-PLAN.md -- Scaffold npm package, utility modules, and placeholder tool registration
+- [x] 01-02-PLAN.md -- Asset installer, config system, bundled assets, and plugin wiring
 
 ### Phase 2: Creation Tooling
 **Goal**: Users can scaffold new agents, skills, and commands from within an OpenCode session without leaving the TUI
@@ -43,37 +59,94 @@ Plans:
   3. User can type `/new-command` in-session and get a correctly-formatted command markdown file
   4. Creation tools reject invalid names (uppercase, special chars, too long) and warn on path conflicts before writing
   5. User can choose between project-local (`.opencode/`) and global (`~/.config/opencode/`) as the installation target
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [x] 02-01: TBD
-- [x] 02-02: TBD
+- [x] 02-01: Creation tooling core
+- [x] 02-02: Creation tooling commands
 
 ### Phase 3: Curated Assets
 **Goal**: The plugin ships with a useful set of subagents (injected via config hook), a command, and a skill that users get out of the box on install
 **Depends on**: Phase 1, Phase 2
 **Requirements**: AGNT-01, AGNT-02, AGNT-03, AGNT-04, CMND-01, SKLL-01
-**Architecture note**: Curated agents are registered via OpenCode's `config` plugin hook (programmatic injection), NOT as markdown files. All 4 agents are `mode: "subagent"` — callable via `@mention` or by primary agents, never in the Tab cycle. Skills and commands remain file-based.
 **Success Criteria** (what must be TRUE):
   1. After install, user can invoke `@researcher` to search the web and receive a structured report with sources
   2. After install, user can invoke `@metaprompter` to craft prompts and configurations for new assets
   3. After install, user can invoke `@documenter` to generate documentation, READMEs, and diagrams
   4. After install, user can invoke `@pr-reviewer` or the `/review-pr` command and get structured feedback on a GitHub pull request
   5. After install, user can reference the coding standards skill during code review or generation and the LLM applies the documented conventions
-  6. None of the curated agents appear in the Tab cycle — only accessible via `@` or delegation from primary agents
+  6. None of the curated agents appear in the Tab cycle -- only accessible via `@` or delegation from primary agents
 **Plans**: 2 plans
 
 Plans:
-- [x] 03-01-PLAN.md — Agent config modules, config hook barrel, plugin wiring, and tests
-- [x] 03-02-PLAN.md — Coding-standards skill and /review-pr command
+- [x] 03-01-PLAN.md -- Agent config modules, config hook barrel, plugin wiring, and tests
+- [x] 03-02-PLAN.md -- Coding-standards skill and /review-pr command
+
+</details>
+
+### Phase 4: Foundation Infrastructure
+**Goal**: Deterministic TypeScript tooling provides state management, confidence tracking, config extension, and validated agent dispatch -- the bedrock everything else builds on
+**Depends on**: Phase 3 (v1.0 complete)
+**Requirements**: ORCH-02, ORCH-03, ORCH-04, ORCH-05, TOOL-01, TOOL-02, TOOL-03, TOOL-04, TOOL-05, TOOL-06
+**Success Criteria** (what must be TRUE):
+  1. An interrupted orchestrator run can be resumed from the last completed phase without re-executing earlier phases
+  2. User can invoke `oc_state` / `oc_confidence` / `oc_phase` / `oc_plan` tools and receive Zod-validated JSON responses reflecting current pipeline state
+  3. Every autonomous decision is recorded in a decision log with timestamp, phase, agent, decision, and rationale -- viewable as a JSON artifact after any run
+  4. User can set orchestrator configuration (autonomy level, phase toggles, strictness) in the plugin config and the settings take effect on next invocation
+  5. A proof-of-concept agent dispatch (tool-returns-instruction pattern) completes end-to-end in an OpenCode session, confirming the architecture is viable
+**Plans**: 4 plans
+
+Plans:
+- [ ] 04-01-PLAN.md -- Zod schemas, state persistence, confidence ledger, and path helpers
+- [x] 04-02-PLAN.md -- Config v2 schema with orchestrator/confidence namespaces and v1 migration
+- [ ] 04-03-PLAN.md -- Phase transitions, plan indexing, and arena depth modules
+- [ ] 04-04-PLAN.md -- Tool registrations, orchestrator agent, plugin wiring, and dispatch proof
+
+### Phase 5: Review Engine
+**Goal**: Users can run a standalone multi-agent code review that selects relevant specialists, dispatches them in parallel, cross-verifies findings, and auto-fixes issues
+**Depends on**: Phase 4
+**Requirements**: REVW-01, REVW-02, REVW-03, REVW-04, REVW-05, REVW-06, REVW-07, REVW-08, REVW-09, REVW-10, REVW-11
+**Success Criteria** (what must be TRUE):
+  1. User can invoke the review engine standalone (outside the orchestrator) and receive a consolidated report of findings grouped by file with severity levels
+  2. The review engine automatically selects relevant specialist agents based on project stack and excludes agents whose technology is absent
+  3. At least 6 universal review agents (logic, security, quality, test coverage, silent failure, contract/type) run in parallel and return findings in CRITICAL/HIGH/MEDIUM/LOW format
+  4. After parallel review, a cross-verification pass and red team adversarial pass surface inter-domain gaps and upgrade severities where warranted
+  5. The fix cycle auto-applies fixes for actionable findings and re-verifies that fixes do not introduce new issues
+**Plans**: TBD
+
+### Phase 6: Orchestrator Pipeline
+**Goal**: Users give the orchestrator an idea and it autonomously drives through all 8 phases -- research, challenge, architect, explore, plan, build, ship, retrospective -- to deliver a completed result
+**Depends on**: Phase 4, Phase 5
+**Requirements**: ORCH-01, PIPE-01, PIPE-02, PIPE-03, PIPE-04, PIPE-05, PIPE-06, PIPE-07, PIPE-08
+**Success Criteria** (what must be TRUE):
+  1. User invokes `oc_orchestrate` with an idea description and the pipeline runs through all 8 phases to completion without manual intervention
+  2. RECON phase produces a structured domain research report; CHALLENGE phase proposes up to 3 enhancements with logged accept/reject rationale
+  3. ARCHITECT phase produces a system design -- when Arena is enabled, 2-3 parallel proposals are evaluated by an adversarial critic before selection
+  4. BUILD phase implements tasks iteratively with branch/commit per task, running review after each task, and supports wave-based parallel execution for independent tasks
+  5. SHIP phase produces a ship package (architecture walkthrough, decision summary, changelog) and the pipeline ends cleanly
+**Plans**: TBD
+
+### Phase 7: Learning & Resilience
+**Goal**: The system learns from completed runs and provides diagnostic tools for failed runs, improving quality over time
+**Depends on**: Phase 6
+**Requirements**: LRNR-01, LRNR-02, LRNR-03, LRNR-04
+**Success Criteria** (what must be TRUE):
+  1. After a completed run, lessons are extracted and persisted to institutional memory with domain categorization (architecture, testing, review, planning)
+  2. Stale lessons decay over time so the memory store does not grow unbounded
+  3. User can invoke forensics on a failed run and receive a diagnosis identifying the failing phase, agent, root cause, and whether the failure is recoverable or terminal
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3
+Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Plugin Infrastructure | 0/2 | Planning complete | - |
-| 2. Creation Tooling | 0/0 | Not started | - |
-| 3. Curated Assets | 0/0 | Not started | - |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Plugin Infrastructure | v1.0 | 2/2 | Complete | - |
+| 2. Creation Tooling | v1.0 | 2/2 | Complete | - |
+| 3. Curated Assets | v1.0 | 2/2 | Complete | - |
+| 4. Foundation Infrastructure | v2.0 | 0/4 | Planning | - |
+| 5. Review Engine | v2.0 | 0/0 | Not started | - |
+| 6. Orchestrator Pipeline | v2.0 | 0/0 | Not started | - |
+| 7. Learning & Resilience | v2.0 | 0/0 | Not started | - |

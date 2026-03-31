@@ -11,3 +11,7 @@ export function getGlobalConfigDir(): string {
 export function getAssetsDir(): string {
 	return join(__dirname, "..", "..", "assets");
 }
+
+export function getProjectArtifactDir(projectRoot: string): string {
+	return join(projectRoot, ".opencode-assets");
+}
