@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
 status: Executing Phase 06
-stopped_at: Completed 06-03-PLAN.md
-last_updated: "2026-03-31T22:42:00Z"
+stopped_at: Completed 06-04-PLAN.md
+last_updated: "2026-03-31T23:08:49Z"
 progress:
   total_phases: 7
   completed_phases: 5
@@ -50,6 +50,7 @@ Plan: 4 of 4
 | Phase 05 P04 | 6min | 2 tasks | 9 files |
 | Phase 06 P01 | 5min | 2 tasks | 17 files |
 | Phase 06 P03 | 5min | 2 tasks | 6 files |
+| Phase 06 P04 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Recent decisions affecting current work:
 - [Phase 06]: dispatch_multi used for concurrent wave tasks per D-06
 - [Phase 06]: EXPLORE returns complete immediately as skip stub (Phase 7 will add shouldTriggerExplorer)
 - [Phase 06]: Review triggers only after wave completion, not per-task (Pitfall 4 prevention)
+- [Phase 06]: orchestrateCore recursively invokes next handler on phase complete (no round-trip)
+- [Phase 06]: Review dispatch inlined via reviewCore when BUILD handler dispatches oc-review
+- [Phase 06]: Pipeline agents registered alongside v1 agents in configHook (14 total)
 
 ### Pending Todos
 
@@ -98,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-31T22:42:00Z
-Stopped at: Completed 06-03-PLAN.md
+Last session: 2026-03-31T23:08:49Z
+Stopped at: Completed 06-04-PLAN.md
 Resume file: None
