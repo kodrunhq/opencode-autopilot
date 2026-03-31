@@ -71,7 +71,7 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 
 ### Review Engine
 
-- [ ] **REVW-01**: User can invoke the review engine standalone (not just within the orchestrator) to review current changes
+- [x] **REVW-01**: User can invoke the review engine standalone (not just within the orchestrator) to review current changes
 - [ ] **REVW-02**: Team lead agent analyzes project stack and diff to select relevant specialist agents from the catalog
 - [x] **REVW-03**: At least 6 universal review agents ship by default (logic, security, quality, test coverage, silent failure, contract/type)
 - [ ] **REVW-04**: Selected review agents dispatch in parallel and return findings in a standardized severity format (CRITICAL/HIGH/MEDIUM/LOW)
@@ -79,9 +79,9 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 - [ ] **REVW-06**: After parallel review, cross-verification pass lets agents see each other's findings and upgrade severity or add new findings
 - [x] **REVW-07**: Red team agent runs as final adversarial pass, reading all findings and hunting inter-domain gaps
 - [x] **REVW-08**: Product thinker agent traces user journeys and checks CRUD completeness after technical review
-- [ ] **REVW-09**: Fix cycle auto-applies fixes for findings and re-verifies that fixes don't introduce new issues
+- [x] **REVW-09**: Fix cycle auto-applies fixes for findings and re-verifies that fixes don't introduce new issues
 - [ ] **REVW-10**: Consolidated review report groups findings by file with severity levels and actionable fix descriptions
-- [ ] **REVW-11**: Per-project memory stores findings, false positives, and project profile so reviews improve across runs on the same codebase
+- [x] **REVW-11**: Per-project memory stores findings, false positives, and project profile so reviews improve across runs on the same codebase
 
 ### Learning & Resilience
 
@@ -140,7 +140,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TOOL-04 | Phase 4 | Complete |
 | TOOL-05 | Phase 4 | Complete |
 | TOOL-06 | Phase 4 | Complete |
-| REVW-01 | Phase 5 | Pending |
+| REVW-01 | Phase 5 | Complete |
 | REVW-02 | Phase 5 | Pending |
 | REVW-03 | Phase 5 | Complete |
 | REVW-04 | Phase 5 | Pending |
@@ -148,9 +148,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REVW-06 | Phase 5 | Pending |
 | REVW-07 | Phase 5 | Complete |
 | REVW-08 | Phase 5 | Complete |
-| REVW-09 | Phase 5 | Pending |
+| REVW-09 | Phase 5 | Complete |
 | REVW-10 | Phase 5 | Pending |
-| REVW-11 | Phase 5 | Pending |
+| REVW-11 | Phase 5 | Complete |
 | ORCH-01 | Phase 6 | Pending |
 | PIPE-01 | Phase 6 | Pending |
 | PIPE-02 | Phase 6 | Pending |
