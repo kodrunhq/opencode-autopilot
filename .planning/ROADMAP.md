@@ -50,15 +50,17 @@ Plans:
 - [x] 02-02: TBD
 
 ### Phase 3: Curated Assets
-**Goal**: The plugin ships with a useful set of agents, a command, and a skill that users get out of the box on install
+**Goal**: The plugin ships with a useful set of subagents (injected via config hook), a command, and a skill that users get out of the box on install
 **Depends on**: Phase 1, Phase 2
 **Requirements**: AGNT-01, AGNT-02, AGNT-03, AGNT-04, CMND-01, SKLL-01
+**Architecture note**: Curated agents are registered via OpenCode's `config` plugin hook (programmatic injection), NOT as markdown files. All 4 agents are `mode: "subagent"` — callable via `@mention` or by primary agents, never in the Tab cycle. Skills and commands remain file-based.
 **Success Criteria** (what must be TRUE):
-  1. After install, user can invoke the researcher agent to search the web and receive a structured report with sources
-  2. After install, user can invoke the metaprompter agent to craft prompts and configurations for new assets
-  3. After install, user can invoke the documenter agent to generate documentation, READMEs, and diagrams
-  4. After install, user can invoke the PR reviewer agent or the `/review-pr` command and get structured feedback on a GitHub pull request
+  1. After install, user can invoke `@researcher` to search the web and receive a structured report with sources
+  2. After install, user can invoke `@metaprompter` to craft prompts and configurations for new assets
+  3. After install, user can invoke `@documenter` to generate documentation, READMEs, and diagrams
+  4. After install, user can invoke `@pr-reviewer` or the `/review-pr` command and get structured feedback on a GitHub pull request
   5. After install, user can reference the coding standards skill during code review or generation and the LLM applies the documented conventions
+  6. None of the curated agents appear in the Tab cycle — only accessible via `@` or delegation from primary agents
 **Plans**: TBD
 
 Plans:
