@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type {
+	buildProgressSchema,
 	confidenceEntrySchema,
 	decisionEntrySchema,
 	phaseSchema,
@@ -14,3 +15,4 @@ export type PhaseStatus = z.infer<typeof phaseStatusSchema>;
 export type DecisionEntry = z.infer<typeof decisionEntrySchema>;
 export type ConfidenceEntry = z.infer<typeof confidenceEntrySchema>;
 export type Task = z.infer<typeof taskSchema>;
+export type BuildProgress = z.infer<typeof buildProgressSchema>;

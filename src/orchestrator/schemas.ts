@@ -46,6 +46,14 @@ export const taskSchema = z.object({
 	strike: z.number().default(0),
 });
 
+export const buildProgressSchema = z.object({
+	currentTask: z.number().nullable().default(null),
+	currentWave: z.number().nullable().default(null),
+	attemptCount: z.number().default(0),
+	strikeCount: z.number().default(0),
+	reviewPending: z.boolean().default(false),
+});
+
 export const pipelineStateSchema = z.object({
 	schemaVersion: z.literal(2),
 	status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"]),
@@ -59,4 +67,11 @@ export const pipelineStateSchema = z.object({
 	tasks: z.array(taskSchema).default([]),
 	arenaConfidence: z.enum(["HIGH", "MEDIUM", "LOW"]).nullable().default(null),
 	exploreTriggered: z.boolean().default(false),
+	buildProgress: buildProgressSchema.default({
+		currentTask: null,
+		currentWave: null,
+		attemptCount: 0,
+		strikeCount: 0,
+		reviewPending: false,
+	}),
 });
