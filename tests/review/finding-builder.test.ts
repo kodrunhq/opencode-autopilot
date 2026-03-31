@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	createAgentResult,
-	createFinding,
-	mergeFindings,
-} from "../../src/review/finding-builder";
+import { createAgentResult, createFinding, mergeFindings } from "../../src/review/finding-builder";
 import type { ReviewFinding } from "../../src/review/types";
 
 describe("createFinding", () => {

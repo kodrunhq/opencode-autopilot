@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-	STACK_GATE_RULES,
-	applyStackGate,
-	detectStackTags,
-} from "../../src/review/stack-gate";
 import { AGENT_CATALOG } from "../../src/review/agent-catalog";
+import { applyStackGate, detectStackTags, STACK_GATE_RULES } from "../../src/review/stack-gate";
 
 describe("STACK_GATE_RULES", () => {
 	test("maps agent names to required tags", () => {

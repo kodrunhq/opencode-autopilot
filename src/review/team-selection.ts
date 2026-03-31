@@ -1,5 +1,5 @@
 import { AGENT_CATALOG, CORE_SQUAD } from "./agent-catalog";
-import { STACK_GATE_RULES, applyStackGate } from "./stack-gate";
+import { applyStackGate, STACK_GATE_RULES } from "./stack-gate";
 import type { AgentDefinition } from "./types";
 
 export interface ReviewContext {

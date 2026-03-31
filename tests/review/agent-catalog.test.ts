@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	AGENT_CATALOG,
-	CORE_SQUAD,
-	getAgentsByCategory,
-} from "../../src/review/agent-catalog";
+import { AGENT_CATALOG, CORE_SQUAD, getAgentsByCategory } from "../../src/review/agent-catalog";
 
 describe("AGENT_CATALOG", () => {
 	test("has 15+ entries", () => {

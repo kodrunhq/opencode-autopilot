@@ -260,8 +260,7 @@ export const AGENT_CATALOG: readonly AgentDefinition[] = Object.freeze([
 			"Crypto usage",
 		]),
 		stackAffinity: Object.freeze(["universal"]),
-		hardGatesSummary:
-			"Checks OWASP Top 10 categories systematically, scans for hardcoded secrets",
+		hardGatesSummary: "Checks OWASP Top 10 categories systematically, scans for hardcoded secrets",
 	}),
 	Object.freeze({
 		name: "scope-intent-verifier",
@@ -299,8 +298,7 @@ export const AGENT_CATALOG: readonly AgentDefinition[] = Object.freeze([
 			"Default values on failure paths",
 		]),
 		stackAffinity: Object.freeze(["universal"]),
-		hardGatesSummary:
-			"Every catch block must log with context and surface actionable feedback",
+		hardGatesSummary: "Every catch block must log with context and surface actionable feedback",
 	}),
 	Object.freeze({
 		name: "react-patterns-auditor",

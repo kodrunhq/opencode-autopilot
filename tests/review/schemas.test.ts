@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
-	SEVERITIES,
-	VERDICTS,
 	agentResultSchema,
 	reviewConfigSchema,
 	reviewFindingSchema,
 	reviewReportSchema,
+	SEVERITIES,
+	VERDICTS,
 } from "../../src/review/schemas";
 
 describe("SEVERITIES", () => {
@@ -63,9 +63,7 @@ describe("reviewFindingSchema", () => {
 	});
 
 	test("rejects invalid severity", () => {
-		expect(() =>
-			reviewFindingSchema.parse({ ...validFinding, severity: "INVALID" }),
-		).toThrow();
+		expect(() => reviewFindingSchema.parse({ ...validFinding, severity: "INVALID" })).toThrow();
 	});
 
 	test("rejects missing required fields", () => {

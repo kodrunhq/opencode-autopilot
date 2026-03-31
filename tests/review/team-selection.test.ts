@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-	scoreAgent,
-	selectReviewTeam,
-} from "../../src/review/team-selection";
 import { AGENT_CATALOG } from "../../src/review/agent-catalog";
+import { scoreAgent, selectReviewTeam } from "../../src/review/team-selection";
 
 describe("selectReviewTeam", () => {
 	test("always includes core squad (3 agents)", () => {
@@ -54,15 +51,24 @@ describe("scoreAgent", () => {
 
 	test("returns a number between 0 and 10", () => {
 		if (!typeSoundness) throw new Error("Agent not found");
-		const score = scoreAgent(typeSoundness, { stackTags: ["typescript"], changedFiles: ["src/index.ts"] });
+		const score = scoreAgent(typeSoundness, {
+			stackTags: ["typescript"],
+			changedFiles: ["src/index.ts"],
+		});
 		expect(score).toBeGreaterThanOrEqual(0);
 		expect(score).toBeLessThanOrEqual(10);
 	});
 
 	test("scores higher for matching stack", () => {
 		if (!typeSoundness) throw new Error("Agent not found");
-		const matchScore = scoreAgent(typeSoundness, { stackTags: ["typescript"], changedFiles: ["src/index.ts"] });
-		const noMatchScore = scoreAgent(typeSoundness, { stackTags: ["python"], changedFiles: ["app.py"] });
+		const matchScore = scoreAgent(typeSoundness, {
+			stackTags: ["typescript"],
+			changedFiles: ["src/index.ts"],
+		});
+		const noMatchScore = scoreAgent(typeSoundness, {
+			stackTags: ["python"],
+			changedFiles: ["app.py"],
+		});
 		expect(matchScore).toBeGreaterThan(noMatchScore);
 	});
 

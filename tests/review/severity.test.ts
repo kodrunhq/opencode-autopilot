@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
-	SEVERITY_DEFINITIONS,
 	compareSeverity,
 	isBlockingSeverity,
+	SEVERITY_DEFINITIONS,
 } from "../../src/review/severity";
 
 describe("SEVERITY_DEFINITIONS", () => {
