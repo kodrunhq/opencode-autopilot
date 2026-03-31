@@ -1,318 +1,695 @@
 # Architecture Patterns
 
-**Domain:** OpenCode plugin providing bundled agents/skills/commands + in-session creation tooling
+**Domain:** Autonomous SDLC orchestrator with embedded code review engine (OpenCode plugin)
 **Researched:** 2026-03-31
 
 ## Recommended Architecture
 
-The plugin is a single npm package with two distinct subsystems: a **static asset layer** (markdown files for agents, skills, commands) and a **runtime tool layer** (TypeScript plugin providing creation tools). These subsystems share no runtime coupling -- the asset layer is filesystem-based and consumed by OpenCode natively, while the tool layer is a standard OpenCode plugin that writes new asset files to disk.
+The v2.0 architecture merges two distinct systems -- the hands-free orchestrator (state machine + subagent dispatch) and the ace review engine (phased review pipeline) -- into the existing opencode-assets plugin. The core design principle: **everything is a registered tool or config-hook-injected agent**, matching the existing plugin patterns exactly.
+
+### High-Level Structure
 
 ```
-opencode-assets (npm package)
-|
-+-- assets/                      <-- Static markdown files (source of truth)
-|   +-- agents/                  <-- Agent .md files with frontmatter
-|   |   +-- code-reviewer.md
-|   |   +-- planner.md
-|   |   +-- tdd-guide.md
-|   |   +-- security-reviewer.md
-|   |   +-- ...
-|   +-- skills/                  <-- Skill directories with SKILL.md
-|   |   +-- coding-standards/
-|   |   |   +-- SKILL.md
-|   |   +-- api-patterns/
-|   |   |   +-- SKILL.md
-|   |   +-- ...
-|   +-- commands/                <-- Command .md files with frontmatter
-|       +-- commit.md
-|       +-- review-pr.md
-|       +-- simplify.md
-|       +-- create-agent.md      <-- Meta-command: creates new agents
-|       +-- create-skill.md      <-- Meta-command: creates new skills
-|       +-- create-command.md    <-- Meta-command: creates new commands
-|       +-- ...
-|
-+-- src/                         <-- Plugin runtime (TypeScript)
-|   +-- index.ts                 <-- Plugin entry point, exports plugin function
-|   +-- installer.ts             <-- Asset copying logic (npm postinstall)
-|   +-- tools/                   <-- Custom tools for creation workflows
-|   |   +-- create-agent.ts
-|   |   +-- create-skill.ts
-|   |   +-- create-command.ts
-|   +-- templates/               <-- Template strings/functions for scaffolding
-|   |   +-- agent-template.ts
-|   |   +-- skill-template.ts
-|   |   +-- command-template.ts
-|   +-- utils/                   <-- Shared utilities
-|       +-- paths.ts             <-- Resolve .opencode/ directories
-|       +-- validation.ts        <-- Validate names, frontmatter
-|       +-- frontmatter.ts       <-- Generate YAML frontmatter
-|
-+-- package.json                 <-- files: ["dist/", "assets/"], postinstall script
-+-- tsconfig.json
-+-- opencode.json                <-- Example config for development
+src/
+  index.ts                    Plugin entry (MODIFIED: register new tools)
+  config.ts                   Plugin config (MODIFIED: add orchestrator settings)
+  installer.ts                Asset installer (UNCHANGED)
+
+  agents/                     Config-hook injected agents (MODIFIED: add 12+ new agents)
+    index.ts                  Agent registry + configHook (MODIFIED)
+    researcher.ts             (existing, unchanged)
+    metaprompter.ts           (existing, unchanged)
+    documenter.ts             (existing, unchanged)
+    pr-reviewer.ts            (existing, unchanged)
+    --- new orchestrator agents ---
+    hf-researcher.ts          RECON phase researcher
+    hf-challenge.ts           CHALLENGE phase enhancement proposer
+    hf-proposer.ts            Architecture Arena proposer
+    hf-critic.ts              Architecture Arena critic
+    hf-planner.ts             PLAN phase task planner
+    hf-implementer.ts         BUILD phase code writer
+    hf-reviewer.ts            BUILD phase PR reviewer
+    hf-mediator.ts            Dispute resolver
+    hf-comparator.ts          EXPLORE phase branch comparator
+    hf-qa.ts                  SHIP phase QA verifier
+    hf-shipper.ts             SHIP phase release packager
+    hf-retrospective.ts       RETROSPECTIVE phase learner
+    --- new review agents ---
+    ace-team-lead.ts          Review agent selector
+    ace-logic-auditor.ts      Core review agent
+    ace-test-interrogator.ts  Core review agent
+    ace-contract-verifier.ts  Core review agent
+    ace-security-auditor.ts   Parallel review specialist
+    ace-code-quality.ts       Parallel review specialist
+    (... additional ace specialists)
+
+  tools/                      Registered tools (MODIFIED: add new tools)
+    create-agent.ts           (existing, unchanged)
+    create-skill.ts           (existing, unchanged)
+    create-command.ts         (existing, unchanged)
+    placeholder.ts            (existing, remove when orchestrator ready)
+    --- new ---
+    orchestrate.ts            oc_orchestrate: main state machine driver
+    review.ts                 oc_review: standalone review pipeline
+    state.ts                  oc_state: state read/update/patch
+    confidence.ts             oc_confidence: ledger read/append/summary
+    phase.ts                  oc_phase: phase transition
+    plan.ts                   oc_plan: task index/wave query
+
+  orchestrator/               NEW: State machine + pipeline logic
+    state-machine.ts          Phase transition logic, valid transitions map
+    phase-handlers.ts         Handler dispatch table (phase -> handler function)
+    phases/
+      recon.ts                RECON phase handler
+      challenge.ts            CHALLENGE phase handler
+      architect.ts            ARCHITECT phase handler (Arena)
+      explore.ts              EXPLORE phase handler (Divergent Explorer)
+      plan.ts                 PLAN phase handler
+      build.ts                BUILD phase handler (wave executor)
+      ship.ts                 SHIP phase handler
+      retrospective.ts        RETROSPECTIVE phase handler
+
+  review/                     NEW: Ace review engine
+    pipeline.ts               Review pipeline orchestration
+    team-selection.ts         Agent selection logic
+    cross-verification.ts     Phase 2 cross-check logic
+    fix-cycle.ts              Auto-fix + re-verify loop
+    verdict.ts                Verdict computation
+    agent-catalog.ts          Agent metadata registry
+
+  state/                      NEW: State management (replaces hf-tools CJS CLI)
+    state-store.ts            Read/write .hands-free/state.json
+    confidence-ledger.ts      Read/append/summarize confidence entries
+    decision-log.ts           Append decisions
+    run-log.ts                Append run events
+    metrics.ts                Timing + cost tracking
+
+  templates/                  (existing + new)
+    agent-template.ts         (existing, unchanged)
+    skill-template.ts         (existing, unchanged)
+    command-template.ts       (existing, unchanged)
+    --- new ---
+    state-template.ts         Initial state content
+    review-finding.ts         Finding format template
+    review-report.ts          Final report template
+
+  utils/                      (existing + new)
+    validators.ts             (existing, unchanged)
+    paths.ts                  (existing, MODIFIED: add .hands-free paths)
+    fs-helpers.ts             (existing, unchanged)
+    --- new ---
+    markdown-parser.ts        Parse markdown tables, extract fields
+    slug.ts                   Text to URL-safe slug
+    timestamp.ts              ISO 8601 timestamp helpers
+
+  references/                 NEW: Embedded reference data
+    severity-definitions.ts   Critical/Warning/Nitpick definitions
+    agent-hard-gates.ts       Per-agent verification requirements
+    stack-gate.ts             Stack-to-agent relevance mapping
 ```
 
-## Component Boundaries
+### Component Boundaries
 
 | Component | Responsibility | Communicates With |
 |-----------|---------------|-------------------|
-| **Asset Layer** (`assets/`) | Stores curated agent, skill, and command markdown files | OpenCode runtime (read at startup via filesystem) |
-| **Installer** (`src/installer.ts`) | Copies assets from npm package to user's `.opencode/` or `~/.config/opencode/` directories | Filesystem (write), npm lifecycle (postinstall trigger) |
-| **Plugin Entry** (`src/index.ts`) | Registers custom tools and hooks with OpenCode | OpenCode plugin runtime (registration) |
-| **Creation Tools** (`src/tools/`) | Accept parameters via Zod schemas, generate markdown files, write to disk | Plugin entry (tool registration), Templates (content generation), Paths util (target resolution) |
-| **Templates** (`src/templates/`) | Pure functions that produce markdown strings from structured input | Creation tools (called by) |
-| **Path Resolution** (`src/utils/paths.ts`) | Determines correct target directory (project-local vs global) | Creation tools, Installer |
-| **Validation** (`src/utils/validation.ts`) | Validates names (regex `^[a-z0-9]+(-[a-z0-9]+)*$`), required fields | Creation tools |
+| `index.ts` | Plugin entry, registers tools + config hook | tools/*, agents/index |
+| `agents/index.ts` | Config hook: injects all agents into OpenCode config | All agent definition files |
+| `tools/orchestrate.ts` | Entry point tool `oc_orchestrate` | orchestrator/state-machine |
+| `tools/review.ts` | Entry point tool `oc_review` | review/pipeline |
+| `tools/state.ts` | State query/mutation tool | state/state-store |
+| `tools/confidence.ts` | Confidence ledger tool | state/confidence-ledger |
+| `orchestrator/state-machine.ts` | Phase transitions, resume detection, circuit breakers | state/*, orchestrator/phases/* |
+| `orchestrator/phases/*` | Individual phase execution logic | state/* |
+| `review/pipeline.ts` | Review execution flow (selection -> parallel -> cross-verify -> fix) | review/*, state/* |
+| `state/state-store.ts` | Atomic read/write of `.hands-free/state.json` | utils/fs-helpers |
+| `state/confidence-ledger.ts` | Confidence tracking and aggregation | utils/markdown-parser |
+| `config.ts` | Plugin configuration (autonomy, strictness, model routing) | state/state-store |
 
-## Data Flow
-
-### Flow 1: Plugin Installation (npm install)
-
-```
-npm install opencode-assets
-        |
-        v
-postinstall script (src/installer.ts)
-        |
-        +-- Reads assets/ from package directory
-        +-- Determines target: project (.opencode/) or global (~/.config/opencode/)
-        +-- Copies agents/*.md --> target/agents/
-        +-- Copies skills/*/SKILL.md --> target/skills/*/
-        +-- Copies commands/*.md --> target/commands/
-        +-- Skips files that already exist (no clobber) to preserve user edits
-        v
-Assets on filesystem, ready for OpenCode to discover
-```
-
-### Flow 2: Plugin Loading (OpenCode startup)
+### Dependency Flow (strictly top-down, no cycles)
 
 ```
-OpenCode reads opencode.json
+index.ts
+  |
+  +-- tools/*
+  |     |
+  |     +-- orchestrator/*  (orchestrate.ts only)
+  |     +-- review/*        (review.ts only)
+  |     +-- state/*         (state.ts, confidence.ts, phase.ts, plan.ts)
+  |     +-- templates/*     (existing creation tools)
+  |     +-- utils/*
+  |
+  +-- agents/index.ts       (config hook)
         |
-        +-- "plugin": ["opencode-assets"]
-        v
-OpenCode runs bun install (installs/updates package)
-        |
-        v
-OpenCode imports plugin entry (src/index.ts)
-        |
-        +-- Plugin function receives { project, client, $, directory, worktree }
-        +-- Registers custom tools: create-agent, create-skill, create-command
-        +-- Returns tool definitions to OpenCode
-        v
-Tools available in session for agent to call
+        +-- agents/*.ts     (agent definitions: pure data, no logic)
+
+orchestrator/*
+  |
+  +-- state/*               (read/write state, confidence, decisions)
+  +-- review/*              (BUILD phase invokes review pipeline)
+  +-- utils/*
+
+review/*
+  |
+  +-- state/*               (write findings, read config)
+  +-- references/*          (severity defs, hard gates, stack gate)
+  +-- utils/*
+
+state/*
+  |
+  +-- utils/*               (markdown parser, fs-helpers, paths)
+
+templates/*
+  |
+  +-- Node built-ins + yaml
+
+utils/*
+  |
+  +-- Node built-ins only
 ```
 
-### Flow 3: In-Session Asset Creation (runtime)
+**Critical constraint:** `agents/*.ts` files are pure data (frozen AgentConfig objects with string prompts) with no imports from orchestrator/, review/, or state/. The orchestrator constructs dynamic prompts at runtime and dispatches agents by name.
+
+### Data Flow
+
+#### Orchestration Flow
 
 ```
-User types /create-agent (or agent decides to call create-agent tool)
-        |
-        v
-OpenCode command triggers prompt --> LLM responds with tool call
-        |
-        v
-create-agent tool receives args (name, description, model, mode, prompt)
-        |
-        +-- validation.ts validates name format, required fields
-        +-- paths.ts resolves target directory (.opencode/agents/ or ~/.config/opencode/agents/)
-        +-- agent-template.ts generates markdown with frontmatter
-        +-- Tool writes file to disk via Bun fs API
-        v
-New agent available immediately (OpenCode watches filesystem)
+User invokes oc_orchestrate("Build a task tracker app")
+  |
+  v
+tools/orchestrate.ts
+  |-- Calls orchestrator/state-machine.ts.run(idea)
+  |
+  v
+state-machine.ts
+  |-- Checks .hands-free/state.json (resume or fresh start)
+  |-- If fresh: creates .hands-free/ directory structure + initial state
+  |-- Reads currentPhase, dispatches to phase handler
+  |
+  v
+phases/recon.ts (example phase)
+  |-- Idempotency check: .hands-free/RECON/research.md exists?
+  |-- Constructs prompt with idea + institutional memory
+  |-- Returns { status: "dispatch", agent, prompt } to state-machine
+  |
+  v
+state-machine.ts
+  |-- Returns dispatch instruction to orchestrate.ts tool
+  |
+  v
+tools/orchestrate.ts
+  |-- Returns structured result to calling agent
+  |-- Calling agent (orchestrator agent) dispatches hf-researcher via Agent tool
+  |-- Calling agent re-invokes oc_orchestrate to advance state
+  |
+  v
+Next phase...
 ```
 
-### Flow 4: Curated Asset Usage (passive)
+**Key architectural insight:** The orchestrator tool cannot directly invoke subagents because tools in OpenCode run in a sandboxed context without Agent tool access. Only agents can spawn other agents. The solution:
+
+1. A config-hook-injected `orchestrator` agent has `tools: Agent` permission
+2. Its static prompt instructs it to: call `oc_orchestrate` -> read dispatch instructions -> dispatch the named subagent via Agent tool -> call `oc_orchestrate` again to advance
+3. The tool is the brain (all state logic), the agent is the hands (agent dispatch)
+
+This mirrors how hands-free works: the `hands-free.md` command IS an agent that calls `hf-tools.cjs` for every decision.
+
+#### Review Pipeline Flow
 
 ```
-OpenCode starts session
-        |
-        +-- Scans .opencode/agents/ --> finds installed agent .md files
-        +-- Scans .opencode/skills/*/ --> finds installed SKILL.md files
-        +-- Scans .opencode/commands/ --> finds installed command .md files
-        v
-Agents available via @mention, skills via skill tool, commands via /slash
+oc_review invoked (standalone or from BUILD phase handler)
+  |
+  v
+review/pipeline.ts
+  |-- Gathers diff (via git commands in utils)
+  |-- Detects stack (via file analysis in utils)
+  |-- Loads project memory
+  |
+  v
+review/team-selection.ts
+  |-- Scores all agents against project + diff
+  |-- Returns selected parallel + sequenced agent names
+  |
+  v
+review/pipeline.ts
+  |-- Returns list of dispatch instructions:
+  |   { agents: ["ace-logic-auditor", "ace-security-auditor", ...],
+  |     prompts: { "ace-logic-auditor": "...", ... },
+  |     phase: "parallel-review" }
+  |-- Caller dispatches all in parallel via Agent tool
+  |-- Caller re-invokes oc_review with phase 1 findings
+  |
+  v
+review/cross-verification.ts (Phase 2)
+  |-- Creates cross-verification prompts per agent
+  |-- Returns dispatch instructions for re-dispatch
+  |
+  v
+review/fix-cycle.ts (Phase 5, if mode=fix)
+  |-- Sorts findings by severity + domain priority
+  |-- Returns fix instructions (which files, which edits)
+  |-- Iterates up to 3 re-verify cycles
+  |
+  v
+review/verdict.ts
+  |-- Aggregates all findings
+  |-- Computes verdict: CLEAN / APPROVED / CONCERNS / BLOCKED
+  |-- Returns structured report
 ```
 
-## Architecture Decision: Commands vs Tools for Creation
+#### State Data Flow
 
-There are two viable approaches for the creation UX:
+```
+.hands-free/                    Project-local working directory (.gitignored)
+  state.json                    Current phase, status, timestamps (machine-readable)
+  state.md                      Human-readable state view (generated from .json)
+  confidence.json               Confidence ledger entries
+  decision-log.md               All decisions with rationale (append-only)
+  run-log.md                    Chronological event log (append-only)
+  metrics.json                  Timing, PR counts, token estimates
+  idea.md                       Original user input (immutable after creation)
+  config.json                   Per-project config overrides
+  RECON/research.md             Research output
+  CHALLENGE/brief.md            Enhancement proposals
+  CHALLENGE/backlog.md          Deferred items
+  ARCHITECT/
+    proposals/proposal-A.md     Arena proposals
+    proposals/proposal-B.md
+    critique.md                 Critic output
+    debate.md                   Deliberation transcript
+    architecture.md             Winning architecture
+    stack.md                    Technology stack decisions
+  EXPLORE/
+    branch-a/                   Exploratory spike A
+    branch-b/                   Exploratory spike B
+    comparison.md               Comparison result
+  PLAN/
+    tasks.json                  Wave-grouped task list (machine-readable)
+    tasks.md                    Human-readable task view
+    dod.md                      Definition of Done
+    verification-dimensions.md  QA verification criteria
+  BUILD/
+    {task-id}.md                Per-task implementation report
+    {task-id}-rebuttal.md       Implementer rebuttals
+  review/
+    {task-id}-review.md         Review verdicts
+  SHIP/                         Release artifacts
+  RETROSPECTIVE/                Lessons learned
 
-**Option A: OpenCode Commands (markdown-based, recommended)**
-- Creation prompts defined as `.md` files in `assets/commands/`
-- The command template uses `$ARGUMENTS` and the LLM generates the file
-- No TypeScript runtime needed for basic creation
-- Limited: the LLM writes the file, not deterministic tooling
+~/.config/opencode/             Global config (existing)
+  opencode-assets.json          Plugin config (MODIFIED: add orchestrator settings)
 
-**Option B: Custom Tools (TypeScript-based, recommended as complement)**
-- Zod-validated parameters ensure correct structure
-- Deterministic output -- same inputs always produce same file
-- Agent can call the tool programmatically
-- More complex to build but more reliable
+~/.claude/hands-free-memory/    Institutional memory (cross-project)
+  {domain}/                     Domain-specific lessons
+```
 
-**Recommendation: Use both.** Commands as the user-facing entry point (type `/create-agent reviewer`), which instruct the LLM to call the corresponding custom tool. The tool handles validation and file writing deterministically. This gives the best UX (natural language commands) with reliable output (structured tool execution).
+**Design decision: JSON for machine state, Markdown for human artifacts.** The hands-free source uses markdown tables parsed with regex for ALL state -- fragile and error-prone. The TypeScript port uses JSON for anything the code reads/writes programmatically (`state.json`, `confidence.json`, `tasks.json`, `metrics.json`, `config.json`). Markdown is reserved for human-readable artifacts that agents produce and consume (research, architecture, reviews, decisions).
 
 ## Patterns to Follow
 
-### Pattern 1: Deterministic File Generation via Tools
+### Pattern 1: Tool-Returns-Instruction
 
-The creation tools should be pure-ish functions: given structured input, produce a known output. Do not rely on the LLM to format frontmatter correctly.
+**What:** Tools compute state and return structured instructions; agents execute them.
+**When:** Whenever the orchestrator or review pipeline needs to dispatch a subagent.
+**Why:** OpenCode tools cannot call the Agent tool directly. Only agents can spawn subagents.
 
 ```typescript
-import { tool } from "@opencode-ai/plugin"
-import { z } from "zod"
+// tools/orchestrate.ts
+interface OrchestrateResult {
+  readonly status: "dispatch" | "complete" | "error";
+  readonly agent?: string;
+  readonly prompt?: string;
+  readonly phase?: string;
+  readonly progress?: string;
+}
 
-export const createAgentTool = tool({
-  name: "create_agent",
-  description: "Create a new OpenCode agent markdown file",
-  parameters: z.object({
-    name: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
-    description: z.string().min(10).max(200),
-    mode: z.enum(["primary", "subagent", "all"]).default("all"),
-    model: z.string().optional(),
-    systemPrompt: z.string().min(50),
-    scope: z.enum(["project", "global"]).default("project"),
-  }),
-  async execute(args, ctx) {
-    const content = renderAgentMarkdown(args)
-    const targetDir = resolveAgentDir(args.scope, ctx.directory)
-    const filePath = path.join(targetDir, `${args.name}.md`)
-    await Bun.write(filePath, content)
-    return { created: filePath }
+export async function orchestrateCore(
+  args: { idea?: string; resume?: boolean },
+  baseDir: string,
+): Promise<OrchestrateResult> {
+  const state = await loadState(baseDir);
+  if (!state) {
+    await initializeProject(args.idea!, baseDir);
+    return reconHandler(baseDir);
+  }
+  const handler = phaseHandlers[state.currentPhase];
+  return handler(state, baseDir);
+}
+```
+
+### Pattern 2: Agent Definition as Pure Data
+
+**What:** Agent definitions are readonly frozen objects with no runtime logic.
+**When:** Every agent registered via config hook.
+**Why:** Matches existing pattern in `agents/researcher.ts`. Keeps agent registry side-effect-free.
+
+```typescript
+// agents/hf-researcher.ts
+import type { AgentConfig } from "@opencode-ai/sdk";
+
+export const hfResearcherAgent: Readonly<AgentConfig> = Object.freeze({
+  description: "Conducts domain research during RECON phase",
+  mode: "subagent",
+  prompt: `You are hf-researcher. Your job is to conduct exhaustive domain
+research for a software product idea...
+
+## Output Contract
+Write your research to: .hands-free/RECON/research.md
+...`,
+  permission: {
+    read: "allow",
+    write: "allow",
+    bash: "allow",
   },
-})
+});
 ```
 
-### Pattern 2: No-Clobber Asset Installation
+### Pattern 3: Idempotent Phase Handlers
 
-When the installer copies assets, it must never overwrite user-modified files. Check existence before writing. Optionally provide an `--force` flag or a `update-assets` command for explicit refresh.
+**What:** Every phase handler checks for existing artifacts before dispatching.
+**When:** Every phase in the state machine.
+**Why:** Enables resume after interruption. Prevents duplicate agent invocations.
 
 ```typescript
-async function installAsset(source: string, target: string): Promise<boolean> {
-  if (await Bun.file(target).exists()) {
-    return false // skip, user may have customized
+// orchestrator/phases/recon.ts
+export async function handleRecon(
+  state: PipelineState,
+  baseDir: string,
+): Promise<OrchestrateResult> {
+  const researchPath = join(baseDir, ".hands-free/RECON/research.md");
+
+  // Idempotency: if output exists, advance to next phase
+  if (await fileExists(researchPath)) {
+    const newState = await transitionPhase(state, "RECON", "CHALLENGE", baseDir);
+    return handleChallenge(newState, baseDir);
   }
-  await Bun.write(target, await Bun.file(source).text())
-  return true
+
+  const idea = await readFile(join(baseDir, ".hands-free/idea.md"), "utf-8");
+  const memory = await getInstitutionalMemory("researcher", baseDir);
+
+  return {
+    status: "dispatch",
+    agent: "hf-researcher",
+    prompt: buildReconPrompt(idea, memory),
+    phase: "RECON",
+    progress: "Dispatching researcher for domain analysis",
+  };
 }
 ```
 
-### Pattern 3: Scope Resolution (Project vs Global)
+### Pattern 4: Immutable State Transitions
 
-The plugin must handle both scopes. Project-local is the default for creation tools (assets live with the repo). Global is an explicit opt-in for personal tooling.
+**What:** State updates create new state objects; file writes are atomic via write-rename.
+**When:** Every state mutation in the pipeline.
+**Why:** Matches project immutability constraint. Prevents corrupted state on crash.
 
 ```typescript
-function resolveTargetDir(
-  assetType: "agents" | "skills" | "commands",
-  scope: "project" | "global",
-  projectDir: string
-): string {
-  if (scope === "global") {
-    return path.join(os.homedir(), ".config", "opencode", assetType)
+// state/state-store.ts
+export async function transitionPhase(
+  currentState: Readonly<PipelineState>,
+  fromPhase: Phase,
+  toPhase: Phase,
+  baseDir: string,
+): Promise<PipelineState> {
+  if (!VALID_TRANSITIONS[fromPhase]?.includes(toPhase)) {
+    throw new Error(`Invalid transition: ${fromPhase} -> ${toPhase}`);
   }
-  return path.join(projectDir, ".opencode", assetType)
+
+  const timestamp = new Date().toISOString();
+  const newState: PipelineState = {
+    ...currentState,
+    currentPhase: toPhase,
+    lastUpdatedAt: timestamp,
+    phases: currentState.phases.map((p) =>
+      p.name === fromPhase
+        ? { ...p, status: "DONE" as const, completedAt: timestamp }
+        : p.name === toPhase
+          ? { ...p, status: "IN_PROGRESS" as const }
+          : p,
+    ),
+  };
+
+  await writeStateAtomic(newState, baseDir);
+  return newState;
 }
+```
+
+### Pattern 5: Confidence-Gated Depth
+
+**What:** The confidence ledger controls pipeline depth (Arena proposals, critique rounds, Explorer trigger).
+**When:** ARCHITECT phase (Arena depth) and post-Critic (Explorer trigger).
+**Why:** Avoids wasting compute on well-understood problems while investing more on uncertain ones.
+
+```typescript
+// orchestrator/phases/architect.ts
+function determineArenaDepth(
+  confidenceSummary: ConfidenceSummary,
+): { proposalCount: number; critiqueRounds: number } {
+  switch (confidenceSummary.dominant) {
+    case "HIGH":
+      return { proposalCount: 2, critiqueRounds: 1 };
+    case "MEDIUM":
+    case "LOW":
+    default:
+      return { proposalCount: 3, critiqueRounds: 2 };
+  }
+}
+```
+
+### Pattern 6: Tool Registration Following Existing Convention
+
+**What:** Each tool exports a `*Core` function (testable, accepts `baseDir`) and a `tool()` wrapper.
+**When:** Every new tool.
+**Why:** Matches the established pattern in `create-agent.ts` exactly.
+
+```typescript
+// tools/state.ts
+export async function stateCore(
+  args: { subcommand: string; field?: string; value?: string },
+  baseDir: string,
+): Promise<string> {
+  // Pure logic, testable with temp directories
+}
+
+export const ocState = tool({
+  description: "Read or update orchestrator pipeline state",
+  args: { /* Zod schema */ },
+  async execute(args) {
+    return stateCore(args, getProjectDir());
+  },
+});
 ```
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Runtime Asset Discovery from node_modules
+### Anti-Pattern 1: Tool Calling Agent Tool
 
-**What:** Having the plugin scan its own `node_modules` path at runtime to find assets.
-**Why bad:** `node_modules` paths are fragile, vary by package manager, and break with hoisting. The postinstall copy pattern is standard in the OpenCode ecosystem (oh-my-opencode uses it).
-**Instead:** Copy assets to standard filesystem locations during installation. Assets are then owned by the user and discovered by OpenCode natively.
+**What:** Trying to dispatch subagents from within a tool's `execute` function.
+**Why bad:** OpenCode tools run in a sandboxed context. They do not have access to the Agent tool. Only agents can spawn other agents.
+**Instead:** Return structured dispatch instructions from the tool. The orchestrator agent (injected via config hook) interprets and executes them.
 
-### Anti-Pattern 2: Synthetic Message Injection for Asset Registration
+### Anti-Pattern 2: Monolithic Orchestrator Prompt
 
-**What:** Using `session.created` hooks to inject agent/skill definitions as synthetic messages.
-**Why bad:** Wastes context window tokens on every session. Agents, skills, and commands are designed to be filesystem-based. Injection is a workaround for plugins that cannot write files (our plugin can and should).
-**Instead:** Write files to disk. Let OpenCode discover them natively.
+**What:** Putting the entire 800-line hands-free.md orchestrator logic into a single agent prompt.
+**Why bad:** Agent prompts via config hook are static strings set at plugin load time. The hands-free orchestrator needs dynamic context injection (idea content, research output, confidence scores) at each phase. A static mega-prompt with all 8 phase handlers wastes context and cannot adapt to runtime state.
+**Instead:** Use a lean orchestrator agent prompt (~50 lines) that instructs the agent to call `oc_orchestrate` for every decision. The tool returns phase-specific context and dispatch instructions dynamically. The agent prompt is a loop: call tool -> dispatch agent -> call tool -> dispatch agent.
 
-### Anti-Pattern 3: Monolithic Plugin Entry
+### Anti-Pattern 3: Markdown Files as Machine State
 
-**What:** Putting all tool definitions, templates, and installation logic in a single `index.ts`.
-**Why bad:** Hard to test, hard to maintain, violates single responsibility.
-**Instead:** Separate concerns: entry point registers tools, tools import templates, templates are pure functions.
+**What:** Parsing and writing markdown tables with regex for every state operation (the hf-tools CJS approach).
+**Why bad:** Regex parsing of markdown tables is fragile -- whitespace, missing columns, and malformed rows cause silent data corruption. No type safety. No atomic writes. The CJS CLI approach exists because Claude Code commands cannot use native TypeScript modules or import npm packages.
+**Instead:** Use JSON files for machine state (`state.json`, `confidence.json`, `tasks.json`). JSON.parse/stringify is deterministic, atomic write-rename is trivial, and Zod validates the schema. Generate markdown views for human readability as a separate (lossy) step.
 
-### Anti-Pattern 4: LLM-Generated Frontmatter Without Validation
+### Anti-Pattern 4: Shell Scripts for Deterministic Logic
 
-**What:** Relying on the LLM to produce correctly-formatted YAML frontmatter.
-**Why bad:** LLMs frequently produce malformed YAML (wrong indentation, missing quotes, invalid field names). Validation errors surface only when OpenCode tries to load the file.
-**Instead:** Use Zod schemas to validate inputs, then generate frontmatter programmatically with a known-correct serializer.
+**What:** Using bash scripts for diff-scope, stack detection, change classification (the ace approach with `scripts/diff-scope.sh`, `scripts/detect-stack.sh`, etc.).
+**Why bad:** In the plugin context, TypeScript functions are testable with `bun test`, type-safe, and do not require shell execution or path resolution. The ace scripts exist because Claude Code skills cannot bundle TypeScript modules -- they must use shell scripts and the Agent tool.
+**Instead:** Port all deterministic logic (diff gathering, stack detection, change classification) to TypeScript functions in `utils/` or domain-specific modules. Run `git diff` via `node:child_process` when needed.
 
-## Key Architectural Constraints
+### Anti-Pattern 5: Global Mutable State via Config Mutation
 
-1. **Plugins cannot register agents/skills/commands programmatically.** There is no API like `registerAgent()`. The only mechanism is creating files on disk in the expected locations. This is a hard constraint from OpenCode's architecture.
+**What:** Storing runtime orchestrator state (current phase, confidence scores) in the Config object that the config hook mutates.
+**Why bad:** The config hook runs once at plugin load. It cannot track state changes during a session. Config mutation is reserved for agent registration.
+**Instead:** Config hook injects agents only (static data). All runtime state lives in `.hands-free/state.json` managed by `state/state-store.ts`.
 
-2. **OpenCode watches the filesystem.** New files in `.opencode/agents/`, `.opencode/skills/`, and `.opencode/commands/` are discovered without restart. This makes the "create file on disk" approach viable for in-session creation.
+## Integration Points with Existing Code
 
-3. **Bun is the runtime.** All filesystem operations should use Bun APIs (`Bun.write`, `Bun.file`). Node.js `fs` module works but Bun-native APIs are preferred.
+### Modified Files (5 files)
 
-4. **Skills have strict naming rules.** Name must match `^[a-z0-9]+(-[a-z0-9]+)*$`, be 1-64 chars, and match the containing directory name. The creation tools must enforce this.
+| File | Change | Risk |
+|------|--------|------|
+| `src/index.ts` | Register 6 new tools in the `tool` object | LOW -- additive, no existing behavior changed |
+| `src/agents/index.ts` | Import and register 15+ new agents in configHook | LOW -- same deep-copy pattern, more entries |
+| `src/config.ts` | Extend pluginConfigSchema with v2 orchestrator settings | MEDIUM -- schema migration from version 1 to 2 |
+| `src/utils/paths.ts` | Add `getHandsFreeDir()` and `getProjectRoot()` helpers | LOW -- additive exports |
+| `package.json` | Add no new runtime deps (all Node built-ins) | LOW |
 
-5. **Agent frontmatter fields are typed.** `mode` must be one of `primary | subagent | all`. `model` must be `provider/model-id` format. `permission` is an object with tool-name keys. The creation tools should expose only the most useful subset.
+### Unchanged Files (8 files)
+
+| File | Why Unchanged |
+|------|---------------|
+| `src/installer.ts` | Orchestrator state is project-local, not global assets |
+| `src/tools/create-agent.ts` | v1 creation tooling preserved as-is |
+| `src/tools/create-skill.ts` | v1 creation tooling preserved as-is |
+| `src/tools/create-command.ts` | v1 creation tooling preserved as-is |
+| `src/templates/agent-template.ts` | Existing template patterns unchanged |
+| `src/templates/skill-template.ts` | Existing template patterns unchanged |
+| `src/templates/command-template.ts` | Existing template patterns unchanged |
+| `src/utils/fs-helpers.ts` | Existing helpers reused, not modified |
+
+### New Directories (5 directories, ~40 files)
+
+| Directory | Purpose | Estimated Files |
+|-----------|---------|-----------------|
+| `src/orchestrator/` | State machine + phase dispatch | 2 files |
+| `src/orchestrator/phases/` | Individual phase handler modules | 8 files |
+| `src/review/` | Ace review engine | 6 files |
+| `src/state/` | State management layer | 5 files |
+| `src/references/` | Embedded reference data | 3 files |
+
+Plus ~18 new agent definition files in `src/agents/` and ~6 new tool files in `src/tools/`.
 
 ## Suggested Build Order
 
-Based on dependency analysis, components should be built in this order:
+The build order respects the dependency flow (bottom-up) and provides testable increments at each step. Each layer can be fully tested before building the next.
 
-### Phase 1: Foundation (no dependencies)
-1. **`utils/validation.ts`** -- Name validation, frontmatter field validation
-2. **`utils/paths.ts`** -- Scope resolution (project vs global directory paths)
-3. **`utils/frontmatter.ts`** -- YAML frontmatter generation from structured data
+### Layer 1: Foundation Utilities (no new dependencies)
 
-These are pure utility functions with no external dependencies. They can be built and tested in isolation.
+**Build first -- everything else depends on these.**
 
-### Phase 2: Templates (depends on Phase 1)
-4. **`templates/agent-template.ts`** -- Agent markdown generation
-5. **`templates/skill-template.ts`** -- Skill SKILL.md generation
-6. **`templates/command-template.ts`** -- Command markdown generation
+1. `src/utils/markdown-parser.ts` -- Port hf-tools `core.cjs` markdown table parsing + field extraction to TypeScript
+2. `src/utils/slug.ts` -- Port slug generation from core.cjs
+3. `src/utils/timestamp.ts` -- Port timestamp formatting from core.cjs
+4. `src/utils/paths.ts` (modification) -- Add `getHandsFreeDir()`, `getProjectRoot()`
 
-Templates import from utils. Pure functions: structured input in, markdown string out. Highly testable.
+**Test gate:** Unit tests for each utility. Pure functions, zero side effects.
 
-### Phase 3: Creation Tools (depends on Phases 1-2)
-7. **`tools/create-agent.ts`** -- Zod schema + execute function
-8. **`tools/create-skill.ts`** -- Zod schema + execute function (creates directory + SKILL.md)
-9. **`tools/create-command.ts`** -- Zod schema + execute function
+### Layer 2: State Management (depends on Layer 1)
 
-Tools compose validation, path resolution, and templates. They perform filesystem writes.
+**Build second -- orchestrator and review engine both need persistent state.**
 
-### Phase 4: Plugin Entry (depends on Phase 3)
-10. **`index.ts`** -- Imports and registers all tools, exports plugin function
+5. `src/state/state-store.ts` -- Read/write pipeline state as JSON with atomic write-rename
+6. `src/state/confidence-ledger.ts` -- Confidence tracking, aggregation, phase filtering
+7. `src/state/decision-log.ts` -- Append-only decision logging to markdown
+8. `src/state/run-log.ts` -- Append-only event logging
+9. `src/state/metrics.ts` -- Timing, PR counts, token/cost estimates
 
-### Phase 5: Installer (depends on Phase 1)
-11. **`installer.ts`** -- postinstall script that copies `assets/` to target directories
+**Test gate:** Integration tests with temp directories. Verify atomic writes, resume detection, confidence math.
 
-Can be built in parallel with Phases 2-4 since it only depends on path resolution.
+### Layer 3: State Tools (depends on Layer 2)
 
-### Phase 6: Curated Assets (independent, parallel with everything)
-12. **Agent markdown files** -- Written by hand, validated by templates
-13. **Skill SKILL.md files** -- Written by hand
-14. **Command markdown files** -- Written by hand, including meta-commands
+**Build third -- exposes state management as registered OpenCode tools.**
 
-Assets have no code dependencies. They can be authored at any time, but are more useful after creation tools exist (to validate format consistency).
+10. `src/tools/state.ts` -- `oc_state` tool (load, get, update, patch)
+11. `src/tools/confidence.ts` -- `oc_confidence` tool (read, append, summary)
+12. `src/tools/phase.ts` -- `oc_phase` tool (complete, status)
+13. `src/tools/plan.ts` -- `oc_plan` tool (index, wave-group)
+
+**Test gate:** Tool unit tests following create-agent.ts pattern (`*Core` function + tool wrapper).
+
+### Layer 4: Review Engine Core (depends on Layers 1-2)
+
+**Build fourth -- needed by BUILD phase, also usable standalone.**
+
+14. `src/references/severity-definitions.ts` -- Severity level data
+15. `src/references/agent-hard-gates.ts` -- Per-agent verification requirements
+16. `src/references/stack-gate.ts` -- Stack-to-agent relevance mapping
+17. `src/review/agent-catalog.ts` -- Agent metadata registry
+18. `src/review/team-selection.ts` -- Agent scoring and selection logic
+19. `src/review/cross-verification.ts` -- Phase 2 cross-check prompt generation
+20. `src/review/fix-cycle.ts` -- Auto-fix + re-verify loop logic
+21. `src/review/verdict.ts` -- Verdict computation (CLEAN/APPROVED/CONCERNS/BLOCKED)
+22. `src/review/pipeline.ts` -- Review pipeline orchestration
+
+**Test gate:** Unit tests for selection logic, verdict computation, severity sorting. Integration tests for pipeline dispatch instruction generation.
+
+### Layer 5: Review Tool + Agents (depends on Layer 4)
+
+**Build fifth -- standalone review capability is usable before orchestrator.**
+
+23. `src/tools/review.ts` -- `oc_review` tool
+24. `src/agents/ace-team-lead.ts` -- Team lead agent definition
+25. `src/agents/ace-logic-auditor.ts` -- Core squad agent
+26. `src/agents/ace-test-interrogator.ts` -- Core squad agent
+27. `src/agents/ace-contract-verifier.ts` -- Core squad agent
+28. `src/agents/ace-*.ts` -- Remaining review specialist agents (batch: security-auditor, code-quality, dead-code-scanner, wiring-inspector, type-soundness, database-auditor, auth-flow-verifier, state-mgmt-auditor, concurrency-checker, scope-intent-verifier, spec-checker, product-thinker, red-team)
+
+**Test gate:** Review pipeline end-to-end test: given a diff, produces correct team selection and dispatch instructions.
+
+### Layer 6: Orchestrator State Machine (depends on Layers 2-3)
+
+**Build sixth -- the core state machine without phase implementations.**
+
+29. `src/orchestrator/state-machine.ts` -- Phase transitions, resume detection, circuit breakers, valid transition map
+30. `src/orchestrator/phase-handlers.ts` -- Handler dispatch table mapping Phase -> handler function
+31. `src/templates/state-template.ts` -- Initial state.json content factory
+
+**Test gate:** State machine unit tests covering: fresh start, resume from each phase, invalid transition rejection, circuit breaker at 3 attempts, idempotent re-entry.
+
+### Layer 7: Phase Handlers (depends on Layers 2, 4, 6)
+
+**Build seventh -- individual phase implementations. Order follows pipeline sequence.**
+
+32. `src/orchestrator/phases/recon.ts`
+33. `src/orchestrator/phases/challenge.ts`
+34. `src/orchestrator/phases/architect.ts` (includes Arena depth logic, proposer/critic dispatch)
+35. `src/orchestrator/phases/explore.ts` (includes Divergent Explorer, branch comparison)
+36. `src/orchestrator/phases/plan.ts` (includes scope fidelity check)
+37. `src/orchestrator/phases/build.ts` (depends on `review/pipeline.ts` for PR review integration)
+38. `src/orchestrator/phases/ship.ts` (depends on QA verification)
+39. `src/orchestrator/phases/retrospective.ts` (includes institutional memory writes)
+
+**Test gate:** Per-phase unit tests with mocked state and agent responses. Verify idempotency, correct dispatch instructions, state transitions.
+
+### Layer 8: Orchestrator Agents + Tool (depends on Layers 6-7)
+
+**Build eighth -- the orchestrator's own subagents and entry tool.**
+
+40. `src/agents/hf-researcher.ts` through `src/agents/hf-retrospective.ts` (12 agent definitions)
+41. `src/tools/orchestrate.ts` -- `oc_orchestrate` tool (the main entry point)
+
+**Test gate:** Full integration test: `orchestrateCore` returns correct dispatch instruction for each phase with mocked filesystem.
+
+### Layer 9: Registration + Config (depends on all above)
+
+**Build last -- ties everything together.**
+
+42. `src/agents/index.ts` (modification) -- Import and register all 15+ new agents in configHook
+43. `src/config.ts` (modification) -- Extend schema to version 2 with orchestrator settings (autonomy level, review strictness, model routing, phase toggles)
+44. `src/index.ts` (modification) -- Register all 6 new tools
+
+**Test gate:** Plugin load test: all tools registered, all agents injected via config hook, config schema validates both v1 and v2.
+
+### Build Order Rationale
+
+- **Bottom-up construction:** Each layer depends only on layers below it. No forward references or circular dependencies.
+- **Testable at every layer:** Each layer has clear test gates before proceeding. Catching bugs in the foundation prevents cascade failures.
+- **Review engine before orchestrator:** The review engine is simpler (stateless pipeline, no state machine), independently useful (standalone `/review` command), and required by the BUILD phase handler. Building it first delivers value early.
+- **State management as shared foundation:** Both orchestrator and review need to read/write state. Centralizing it in Layer 2 prevents duplication and ensures consistent atomic write patterns.
+- **Agents last:** Agent definitions are pure data objects with string prompts. They have zero runtime logic and can be written at any point, but registering them in the config hook should happen after the tools they interact with are tested and stable.
+- **Config migration last:** Extending the config schema is a breaking change that should happen only after all components are proven to work individually.
 
 ## Scalability Considerations
 
-| Concern | At 5 assets | At 20 assets | At 50+ assets |
-|---------|-------------|--------------|---------------|
-| Installation time | Negligible | Negligible | ~1s file copy, still fine |
-| Context window | No impact (filesystem-based) | No impact | No impact |
-| Discoverability | Users remember names | Need good descriptions | Consider categories/namespaces |
-| Maintenance | Manual review | Need lint/validate script | Need CI validation of frontmatter |
-
-The filesystem-based architecture scales well. The main concern at scale is discoverability -- users need good `description` fields and possibly a `/list-agents` command.
+| Concern | Single Project | 10 Concurrent Projects | Notes |
+|---------|---------------|----------------------|-------|
+| State isolation | `.hands-free/` per project | Each project has own state dir | No conflict -- state is project-local |
+| Agent count in config | 20+ agents registered | Same 20+ agents | Agents registered once globally via config hook |
+| Review parallelism | 10-20 agents per review | Same per review | Bounded by OpenCode Agent tool concurrency |
+| Memory usage | JSON state loaded on demand | One orchestration at a time | OpenCode is single-session; no multi-project concern |
+| Institutional memory | `~/.claude/hands-free-memory/` | Shared across projects | Cross-project learning is intentional |
+| Config schema | v2 schema | Same | Backward-compatible migration from v1 |
 
 ## Sources
 
-- [OpenCode Plugins Documentation](https://opencode.ai/docs/plugins/) -- Official plugin API reference (HIGH confidence)
-- [OpenCode Agents Documentation](https://opencode.ai/docs/agents/) -- Agent frontmatter specification (HIGH confidence)
-- [OpenCode Commands Documentation](https://opencode.ai/docs/commands/) -- Command format specification (HIGH confidence)
-- [OpenCode Skills Documentation](https://opencode.ai/docs/skills/) -- Skill SKILL.md specification (HIGH confidence)
-- [OpenCode Plugins Guide (Gist)](https://gist.github.com/johnlindquist/0adf1032b4e84942f3e1050aba3c5e4a) -- Comprehensive plugin patterns (MEDIUM confidence)
-- [oh-my-opencode (GitHub)](https://github.com/opensoft/oh-my-opencode) -- Reference plugin with asset bundling pattern (MEDIUM confidence)
-- [opencode-agent-skills (GitHub)](https://github.com/joshuadavidthomas/opencode-agent-skills) -- Skills loading architecture (MEDIUM confidence)
-- [opencode-skillful (GitHub)](https://github.com/zenobi-us/opencode-skillful) -- Alternative skills plugin with lazy loading (MEDIUM confidence)
-- [opencode-plugin-template (GitHub)](https://github.com/zenobi-us/opencode-plugin-template) -- Plugin project scaffold (MEDIUM confidence)
-- [awesome-opencode (GitHub)](https://github.com/awesome-opencode/awesome-opencode) -- Plugin ecosystem catalog (MEDIUM confidence)
+- hands-free orchestrator command: `/home/joseibanez/develop/projects/claude-hands-free/commands/hands-free.md` -- 800+ line state machine with 8 phases, Arena, Divergent Explorer (HIGH confidence: direct source analysis)
+- hands-free deterministic tools: `/home/joseibanez/develop/projects/claude-hands-free/bin/hf-tools.cjs` + `bin/lib/*.cjs` -- 13 CJS modules for state, config, confidence, phase, plan, arena, commit, validate (HIGH confidence: direct source analysis)
+- hands-free agents: `/home/joseibanez/develop/projects/claude-hands-free/agents/*.md` -- 12 specialized agents with output contracts and behavioral rules (HIGH confidence: direct source analysis)
+- hands-free hooks: `/home/joseibanez/develop/projects/claude-hands-free/hooks/hooks.json` -- SessionStart resume, PreCompact checkpoint, Stop recovery (HIGH confidence: direct source analysis)
+- ace review skill: `/home/joseibanez/develop/projects/claude-ace/skills/ace-full/SKILL.md` -- 7-phase review pipeline with team selection, parallel dispatch, cross-verification, auto-fix (HIGH confidence: direct source analysis)
+- ace orchestrator agent: `/home/joseibanez/develop/projects/claude-ace/agents/orchestrator.md` -- Programmatic dispatch for review-gateway (HIGH confidence: direct source analysis)
+- ace agent catalog: `/home/joseibanez/develop/projects/claude-ace/references/agent-catalog.md` -- 16 parallel specialists + 2 sequenced + 3 core squad (HIGH confidence: direct source analysis)
+- ace severity definitions: `/home/joseibanez/develop/projects/claude-ace/references/severity-definitions.md` -- Critical/Warning/Nitpick (HIGH confidence: direct source analysis)
+- existing plugin architecture: `/home/joseibanez/develop/projects/opencode-assets/src/` -- Current tool registration, config hook, agent definitions (HIGH confidence: direct source analysis)
+- OpenCode plugin API: `@opencode-ai/plugin` dist/index.d.ts -- Hooks interface with tool, config, event, chat.message, chat.params hooks (HIGH confidence: direct type analysis)
+- Tool-returns-instruction pattern: MEDIUM confidence -- this is the logical design given OpenCode's constraints, but untested in this plugin context. May need adjustment based on how OpenCode handles agent dispatch from tool responses.

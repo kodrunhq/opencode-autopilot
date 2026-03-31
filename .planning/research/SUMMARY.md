@@ -1,185 +1,179 @@
 # Project Research Summary
 
-**Project:** OpenCode Assets Plugin
-**Domain:** AI Coding CLI Plugin (OpenCode extension)
+**Project:** OpenCode Assets Plugin v2.0 -- Autonomous Orchestrator + Review Engine
+**Domain:** Autonomous SDLC orchestrator with embedded multi-agent code review engine (OpenCode plugin)
 **Researched:** 2026-03-31
-**Confidence:** HIGH
+**Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-OpenCode Assets is an npm-distributed plugin for the OpenCode AI coding CLI that delivers two things: a curated set of markdown-based agents, skills, and commands, and in-session creation tooling that lets users scaffold new assets without leaving the TUI. The plugin runs inside OpenCode's Bun runtime and registers custom tools via the `@opencode-ai/plugin` SDK. All assets are filesystem-based markdown files with YAML frontmatter -- there is no programmatic registration API. The recommended stack is deliberately minimal: TypeScript on Bun, the plugin SDK, one runtime dependency (`yaml` for frontmatter generation), and built-in `bun:test` for testing.
+OpenCode Assets v2.0 merges two proven systems -- the hands-free autonomous orchestrator (8-phase SDLC pipeline with 12 subagents) and the ace multi-agent review engine (30 review agents, 7-phase review pipeline) -- into the existing opencode-assets plugin. The key architectural insight is that OpenCode's plugin model requires a fundamentally different approach from the source systems: orchestrator logic must live in deterministic TypeScript code (not 2400-line markdown prompts), agents are dispatched indirectly through a tool-returns-instruction pattern (tools compute state, agents execute dispatch), and review specialists should be internal prompt templates rather than config-hook-injected agents. The existing plugin's patterns (tool registration, config hook, Zod validation, immutable data, atomic writes) extend naturally to support the new capabilities.
 
-The core differentiator over competitors (primarily Oh My OpenCode) is the creation tooling. No existing plugin or CLI command offers in-session agent, skill, or command scaffolding. Oh My OpenCode ships pre-built assets but no creation workflow. OpenCode's own `agent create` CLI wizard requires leaving the TUI. By combining deterministic tool-based file generation with user-facing slash commands, this plugin fills a genuine gap. The architecture follows the "commands as entry points, tools as engines" pattern: users type `/create-agent`, the LLM calls the validated tool, and the tool writes a correctly-formatted file to disk.
+The recommended approach is bottom-up construction across 5 phases: foundation infrastructure (state machine, config, tooling), standalone review engine, orchestrator pipeline phases, adversarial intelligence features, and learning systems. Only one new runtime dependency is needed: mitt (200-byte event emitter). Everything else uses existing deps (Zod, yaml, node:fs/promises) or custom TypeScript. The review engine should ship before the orchestrator because it is simpler, independently useful, and required by the orchestrator's BUILD phase -- delivering value early while de-risking the harder integration.
 
-The primary risks are OpenCode platform quirks: skill path singular/plural inconsistency (documented bug), no hot reload for newly created assets (users must restart), and name collision for skills without namespacing. All three are mitigable with runtime path testing, clear UX messaging, and a naming prefix convention. Version drift between the plugin SDK and OpenCode runtime is a secondary risk addressed through loose peer dependency ranges and avoiding undocumented APIs.
+The top risks are: token budget explosion from nested prompt contexts (orchestrator dispatching review engine inside BUILD phase), architectural fragmentation from porting two independent state machines instead of designing one unified system, and the untested tool-returns-instruction dispatch pattern that is the logical design given OpenCode's constraints but has not been validated end-to-end. All three must be resolved in Phase 1 before any implementation begins.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack is intentionally minimal for a content-first plugin. The entire runtime beyond the mandatory plugin SDK is a single npm package.
+The stack strategy is deliberately conservative: one new dependency (mitt, 200 bytes), everything else custom TypeScript. This matches the codebase philosophy of minimal external deps and leverages existing patterns.
 
 **Core technologies:**
-- **TypeScript 5.8.x on Bun 1.2.x+**: Required by OpenCode -- Bun runs plugins natively, no build step for development
-- **`@opencode-ai/plugin` ^1.3.7**: Official SDK providing `Plugin` type, `tool()` factory, and Zod-based `tool.schema`
-- **`yaml` ^2.7.x**: YAML frontmatter generation for agent/skill/command files -- handles special characters and nested objects correctly
-- **`bun:test`**: Built-in Jest-compatible test runner, zero config
-- **Biome 2.x**: Single-tool linting and formatting (replaces ESLint + Prettier)
-- **`node:fs/promises` + `node:path` + `node:os`**: Standard file operations for cross-platform compatibility
+- **Custom FSM (discriminated unions):** 8-phase orchestrator state machine -- ~80 lines of TypeScript, compile-time exhaustiveness checking, no library needed (XState rejected as overkill for a linear pipeline)
+- **JSON + Zod persistence:** State, confidence ledger, decision log -- extends existing config.ts atomic write pattern, zero new deps
+- **mitt (^3.0.1):** Typed event bus for lifecycle events -- 200 bytes, decouples state changes from consumers (logging, hooks, confidence ledger)
+- **Pure function registry:** Review dimension-to-agent mapping -- flat fan-out via dispatch instructions, not a DAG framework
+- **Config-hook agents:** 12+ orchestrator subagents registered via existing configHook pattern -- OpenCode handles all session management
 
-**Do not use:** standalone Zod (bundled in SDK), gray-matter (we write, not parse), template engines (template literals suffice), HTTP frameworks (plugin is not a server), tsx/ts-node (Bun runs TS natively).
+**Critical stack decisions:**
+- No agent framework (LangChain, Mastra, ADK-TS) -- OpenCode IS the agent runtime
+- No database (bun:sqlite) -- JSON files sufficient for ~8 writes per run; upgrade path documented for future
+- No task queue -- subagent dispatch goes through OpenCode's Task tool
 
 ### Expected Features
 
 **Must have (table stakes):**
-- Curated code reviewer agent
-- Curated planner agent
-- Curated commit command
-- Curated PR review command
-- Single-install via opencode.json
-- Project-local and global installation support
-- Model routing per agent via frontmatter
-- Proper tool permissions per agent
+- State machine orchestrator with crash recovery and idempotent re-entry
+- Research, Architecture, Plan, Build, Review, Ship phases as subagents
+- Code review gate with review-fix loop (max 3 cycles)
+- Specialized review agents: logic auditor, test interrogator, contract verifier (core squad)
+- Dynamic agent selection (team lead) with parallel dispatch
+- Decision logging for accountability
+- Deterministic tooling in TypeScript (not LLM-generated state management)
+- User-configurable settings (autonomy, strictness, phase toggles)
+- Consolidated review report with severity levels
 
 **Should have (differentiators):**
-- `/new-agent` in-session creation command (no competitor offers this)
-- `/new-skill` in-session creation command (no equivalent exists anywhere)
-- `/new-command` in-session creation command (no equivalent exists)
-- Guided validation in creation tools (names, required fields, path conflicts)
-- Template-based scaffolding with opinionated defaults
-- Security reviewer agent
-- Refactor helper agent
-- Coding standards, API patterns, and testing strategies skills
+- Architecture Arena (2-3 parallel proposals + adversarial critic)
+- Confidence ledger driving pipeline depth decisions
+- Challenge phase (Ambition Engine) for scope enhancement
+- Cross-verification between review agents
+- Wave-based parallel build for independent tasks
+- Red team adversarial final pass
 
-**Defer (v2+):**
-- Multi-agent orchestration / parallel agents
-- Custom hooks (JS/TS lifecycle hooks)
-- MCP server bundling
-- Agent-to-agent delegation chains
-- LSP / AST-Grep integration
-- Claude Code compatibility layer
+**Defer (v2.1+):**
+- Divergent explorer (parallel prototyping) -- too complex, rare value
+- Ace enforcement pipeline (inline quality during build) -- separate product scope
+- Language-specific auditors beyond TypeScript -- add based on demand
+- Product thinker agent -- not needed for library/CLI projects
+- Full institutional memory with decay mechanisms -- needs real-world usage data first
 
 ### Architecture Approach
 
-The plugin has two decoupled subsystems: a static asset layer (markdown files copied to `.opencode/` directories at install time) and a runtime tool layer (TypeScript plugin registering creation tools). Assets are discovered by OpenCode via filesystem scanning, not programmatic registration. The creation tools use Zod schemas for input validation and generate frontmatter programmatically via the `yaml` package, avoiding LLM-generated YAML which is unreliable. Commands serve as user-facing entry points that instruct the LLM to call the corresponding validated tool.
+The architecture follows a strictly top-down dependency flow with clear component boundaries: tools call orchestrator/review modules, which call state management, which calls utilities. No cycles. Agent definitions are pure frozen data objects with no runtime logic. The critical pattern is "tool-returns-instruction": the orchestrator tool computes state and returns structured dispatch instructions, while a lean orchestrator agent (injected via config hook with Agent tool permission) executes them by dispatching subagents via Task tool. All machine state uses JSON (not markdown tables parsed by regex); markdown is reserved for human-readable artifacts.
 
 **Major components:**
-1. **Asset Layer** (`assets/`) -- Curated markdown files for agents, skills, commands; source of truth
-2. **Installer** (`src/installer.ts`) -- Copies assets from npm package to user directories with no-clobber semantics
-3. **Creation Tools** (`src/tools/`) -- Zod-validated tool functions that generate and write new asset files
-4. **Templates** (`src/templates/`) -- Pure functions producing markdown strings from structured input
-5. **Utilities** (`src/utils/`) -- Path resolution (project vs global), name validation, frontmatter generation
-6. **Plugin Entry** (`src/index.ts`) -- Registers all tools with OpenCode, exports plugin function
+1. **`src/orchestrator/`** -- State machine transitions, phase handlers (8 phases), dispatch instruction generation. Pure functions operating on immutable state.
+2. **`src/review/`** -- Review pipeline orchestration, team selection (deterministic TypeScript, not an agent), cross-verification, fix cycle, verdict computation. Usable standalone via `oc_review` tool.
+3. **`src/state/`** -- Atomic JSON read/write for pipeline state, confidence ledger, decision log, metrics. Single working directory, single config schema.
+4. **`src/tools/`** -- 6 new tools (`oc_orchestrate`, `oc_review`, `oc_state`, `oc_confidence`, `oc_phase`, `oc_plan`) following existing `*Core` + `tool()` wrapper pattern.
+5. **`src/agents/`** -- 12+ orchestrator subagents + review agents. Orchestrator agents are config-hook injected; review specialists are internal prompt templates (not config-hook agents).
 
 ### Critical Pitfalls
 
-1. **Skill path singular/plural mismatch** -- OpenCode docs say `skills/` but runtime may use `skill/` in some contexts. Test every path against the live runtime before hardcoding. Must be resolved in Phase 1.
-2. **No hot reload for created assets** -- Users must restart OpenCode after creating an agent/skill/command. Creation tool output must include explicit restart instructions.
-3. **Skill name collisions** -- No namespacing; first-found-wins. Prefix all plugin skills with `oc-` and warn users of conflicts in creation tooling.
-4. **Plugin cannot register assets programmatically** -- Design around filesystem writes from day one. No `registerAgent()` API exists.
-5. **Custom tools shadowing built-ins** -- Prefix all tool names with `oc_` to avoid overriding OpenCode's `read`, `write`, `bash`, etc.
+1. **Token budget explosion** -- Nested prompts (orchestrator + review engine + diff) can exceed 30K tokens before analyzing code. Prevention: orchestrator logic in TypeScript code (not prompt), lazy-load reference material, compress agent prompts to ~50 lines, cap per-phase prompt budgets at 15K tokens.
+
+2. **Franken-architecture (dual state machines)** -- Porting hands-free and ace as independent systems creates two state machines, two configs, two memory stores. Prevention: single unified state machine, single Zod config schema, single working directory, single memory interface. Design from OpenCode's model backward, not port forward.
+
+3. **Untested agent dispatch pattern** -- OpenCode tools cannot call Agent tool directly. The tool-returns-instruction pattern is the logical design but unvalidated. Prevention: build and test one agent dispatch end-to-end in Phase 1 before designing the full pipeline. If it fails, the entire architecture changes.
+
+4. **CJS-to-TypeScript behavioral drift** -- 3300 lines of battle-tested CJS tooling (regex parsers, sync I/O, lock files) will subtly change behavior when ported to async TypeScript with Zod. Prevention: port test suites first, parity test both implementations against same fixtures, port one module at a time.
+
+5. **Agent count overwhelming the plugin** -- 30 ace agents pollute the config-hook namespace. Prevention: only orchestrator-level agents are config-hook injected (~12); review specialists are internal prompt templates loaded on demand. Team-lead selection becomes a deterministic TypeScript function, not an agent.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+### Phase 1: Foundation Infrastructure
+**Rationale:** Everything depends on the state machine, state management, and validated agent dispatch pattern. The dispatch pattern validation is a hard gate -- if it fails, the architecture must change before any other work proceeds.
+**Delivers:** State machine with transitions and resume, state management layer (atomic JSON read/write), confidence ledger, decision logging, 4 state tools (`oc_state`, `oc_confidence`, `oc_phase`, `oc_plan`), foundation utilities (markdown parser, slug, timestamp), validated agent dispatch proof-of-concept.
+**Addresses:** State machine orchestrator, deterministic tooling, decision logging, user-configurable settings (config schema extension).
+**Avoids:** Pitfall 2 (franken-architecture -- unified design from day one), Pitfall 3 (blind dispatch port -- validated before scaling), Pitfall 9 (config complexity -- single schema from the start), Pitfall 16 (orchestrator logic in code, not prompt).
 
-### Phase 1: Foundation and Utilities
-**Rationale:** All other phases depend on validated path resolution, name validation, and frontmatter generation. These are pure utility functions with no external dependencies -- highest testability, lowest risk.
-**Delivers:** `utils/validation.ts`, `utils/paths.ts`, `utils/frontmatter.ts`, project scaffolding (package.json, tsconfig, biome config)
-**Addresses:** Plugin infrastructure, development setup
-**Avoids:** Pitfall #1 (path mismatches -- resolved here through runtime testing), Pitfall #7 (file permissions -- handled in path utils), Pitfall #14 (Bun API assumptions -- use `node:fs` in utils)
+### Phase 2: Review Engine (Standalone)
+**Rationale:** The review engine is simpler than the orchestrator (stateless pipeline, no state machine), independently useful as a standalone `/review` capability, and required by the orchestrator's BUILD phase. Building it first delivers value early and de-risks the harder integration. The team-lead selection as deterministic TypeScript validates the approach of keeping review agents internal.
+**Delivers:** `oc_review` tool, team-lead selection function, core squad agents (logic, test, contract), parallel dispatch instructions, cross-verification, fix cycle (1-cycle default), verdict computation, consolidated report, severity definitions, agent catalog.
+**Addresses:** Specialized review agents, dynamic agent selection, parallel dispatch, cross-verification, consolidated report, review-fix loop.
+**Avoids:** Pitfall 5 (agent count -- review specialists are internal, not config-hook), Pitfall 8 (convergence cascade -- 1-cycle default, short-circuit on nitpicks).
 
-### Phase 2: Templates and Creation Tools
-**Rationale:** Templates depend on Phase 1 utilities. Creation tools compose templates with validation and filesystem writes. This is the core differentiator and must be built before curated assets to validate the scaffolding pipeline.
-**Delivers:** `templates/agent-template.ts`, `templates/skill-template.ts`, `templates/command-template.ts`, `tools/create-agent.ts`, `tools/create-skill.ts`, `tools/create-command.ts`
-**Addresses:** `/new-agent`, `/new-skill`, `/new-command` differentiators
-**Avoids:** Pitfall #4 (no hot reload -- UX messaging in tool responses), Pitfall #6 (tool shadowing -- `oc_` prefix), Pitfall #12 (SKILL.md capitalization -- hardcoded in template)
+### Phase 3: Orchestrator Pipeline
+**Rationale:** With state management proven (Phase 1) and review engine available (Phase 2), the orchestrator phases can be built sequentially. Each phase is an independent handler with clear input/output contracts. The BUILD phase integrates the review engine.
+**Delivers:** `oc_orchestrate` tool, 8 phase handlers (RECON through RETROSPECTIVE), 12 orchestrator subagent definitions, orchestrator agent (lean prompt + tool loop), iterative build loop with branch/commit per task.
+**Addresses:** Research phase, architecture phase, task decomposition, iterative build, code review gate (via Phase 2 integration), ship package.
+**Avoids:** Pitfall 1 (token explosion -- lean orchestrator prompt, phase-specific context injection), Pitfall 13 (arena over-engineering -- confidence-gated depth, default shallow), Pitfall 7 (stale state -- git SHA checkpoints, artifact validation on resume).
 
-### Phase 3: Plugin Entry and Installer
-**Rationale:** Plugin entry imports and registers tools from Phase 2. Installer uses path utilities from Phase 1. Can be built once tools are ready.
-**Delivers:** `src/index.ts` (plugin registration), `src/installer.ts` (postinstall asset copy with no-clobber), `assets/commands/create-agent.md`, `assets/commands/create-skill.md`, `assets/commands/create-command.md` (meta-commands)
-**Addresses:** Single-install via opencode.json, plugin packaging
-**Avoids:** Pitfall #3 (no programmatic registration -- uses filesystem), Pitfall #5 (version drift -- loose peer deps in package.json)
+### Phase 4: Adversarial Intelligence
+**Rationale:** These features enhance decision quality but require a stable base pipeline. They add compute cost and complexity. Shipping them after the pipeline is proven avoids premature optimization of features that may need redesign based on real usage.
+**Delivers:** Architecture Arena (parallel proposals + critic + mediator), Challenge phase (Ambition Engine, capped at 3 additions), confidence ledger wired into all agents for depth gating, negotiating reviewer dialogue protocol.
+**Addresses:** Architecture Arena, challenge phase, confidence-gated depth, negotiating reviewer.
+**Avoids:** Pitfall 13 (arena depth is configurable and confidence-gated from the start).
 
-### Phase 4: Curated Table-Stakes Assets
-**Rationale:** Curated assets validate that creation tooling and the installer work correctly. Table-stakes agents and commands come first because they are expected by users.
-**Delivers:** Code reviewer agent, planner agent, commit command, PR review command
-**Addresses:** Table-stakes features that prevent users from choosing Oh My OpenCode instead
-**Avoids:** Pitfall #8 (model portability -- omit `model` field), Pitfall #9 (bloat -- ship only essentials), Pitfall #10 (command shadowing -- check against built-in names)
-
-### Phase 5: Specialized Assets and Skills
-**Rationale:** Differentiator assets and skills round out the offering. These are lower priority than table-stakes but provide competitive advantage. Skills validate the `/new-skill` creation tool.
-**Delivers:** TDD guide agent, security reviewer agent, refactor helper agent, simplify command, coding standards skill, API patterns skill, testing strategies skill
-**Addresses:** Differentiator features, skill ecosystem
-**Avoids:** Pitfall #2 (name collisions -- `oc-` prefix on all skills), Pitfall #11 (skill content length -- keep under 500 words)
-
-### Phase 6: Distribution and Polish
-**Rationale:** Final phase handles npm publishing, cleanup tooling, and documentation. Depends on all other phases being stable.
-**Delivers:** npm package publishing setup, `/oc-cleanup` command, contributing guide, CI validation of frontmatter
-**Addresses:** Distribution, maintenance, contributor experience
-**Avoids:** Pitfall #13 (no cleanup on uninstall -- explicit cleanup command), Pitfall #5 (version drift -- CI tests against multiple OpenCode versions)
+### Phase 5: Learning and Resilience
+**Rationale:** Institutional and project memory provide compounding value but require multiple successful runs to validate what data is actually useful to persist. Forensics (failure analysis) similarly needs real failure modes to design against.
+**Delivers:** Institutional memory store with recency weighting and size caps, project-specific memory, retrospective agent, forensics/failure analysis, memory injection into agent prompts (budgeted at 500 tokens per agent).
+**Addresses:** Institutional memory, project memory, forensics.
+**Avoids:** Pitfall 10 (unbounded memory growth -- size caps, recency weighting, garbage collection from day one).
 
 ### Phase Ordering Rationale
 
-- Phases follow a strict dependency chain: utilities -> templates -> tools -> plugin entry -> assets. This matches the architecture's build order analysis.
-- Creation tooling (Phases 1-3) before curated assets (Phases 4-5) because creation tooling is the unique value proposition and validates the infrastructure.
-- Table-stakes assets before specialized assets because table-stakes features determine whether users adopt the plugin at all.
-- Distribution last because it requires a stable, tested plugin.
+- **Bottom-up construction:** Each phase depends only on phases before it. No forward references or circular dependencies between phases.
+- **Review before orchestrator:** The review engine is a prerequisite for the BUILD phase handler and is independently shippable. This follows the architecture research's build order recommendation.
+- **Adversarial features after base pipeline:** Arena, Challenge, and negotiating reviewer add cost and complexity. They need a stable pipeline to enhance, not a fragile one to destabilize.
+- **Learning systems last:** Memory requires real-world usage data to validate. The storage format is designed in Phase 1 (per Pitfall 10 prevention), but implementation waits until Phase 5.
+- **Config migration spans phases:** The Zod config schema is extended incrementally as each phase adds settings, not as a big-bang migration.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 1:** Skill path convention (`skills/` vs `skill/`) must be verified against live OpenCode runtime before any code is written. Run a test skill through OpenCode and observe which path works.
-- **Phase 3:** Installer mechanism (postinstall vs on-demand) needs validation. OpenCode may re-run `bun install` on each startup, which could trigger postinstall repeatedly.
-- **Phase 4:** Agent frontmatter fields need verification against current OpenCode version. The `permission` object structure and `mode` enum values should be confirmed.
+- **Phase 1:** Agent dispatch mechanism validation -- the tool-returns-instruction pattern is untested in OpenCode. A proof-of-concept spike is mandatory before full design.
+- **Phase 2:** OpenCode Agent tool concurrency limits -- parallel dispatch of 10+ review agents may hit undocumented rate limits or session caps.
+- **Phase 3:** BUILD phase git operations -- branching strategy, PR creation, and merge workflow need to support non-GitHub remotes and trunk-based development (Pitfall 14).
+- **Phase 5:** Institutional memory usefulness -- what data is actually valuable to persist across projects is unknown until real runs produce data. Research spike needed during implementation.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 2:** Template and tool patterns are well-documented in the plugin SDK and community examples. Standard Zod schema + `tool()` factory.
-- **Phase 5:** Skills and commands are straightforward markdown authoring. No technical unknowns.
-- **Phase 6:** npm publishing is standard. No research needed.
+- **Phase 1 (state management):** Atomic JSON write, Zod validation, discriminated union FSM -- all well-documented TypeScript patterns already used in the codebase.
+- **Phase 2 (review pipeline core):** Fan-out dispatch, severity aggregation, verdict computation -- straightforward data processing with no novel patterns.
+- **Phase 4 (Arena/Challenge):** These are subagent prompt engineering problems, not architectural problems. The dispatch mechanism is proven by Phase 3.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Official docs, npm registry, and OpenCode source code all confirm the recommended stack. Only 1 runtime dependency. |
-| Features | HIGH | Competitive analysis across 6+ tools (Claude Code, Cursor, Goose, Aider, Oh My OpenCode). Clear table-stakes vs differentiator separation. |
-| Architecture | HIGH | Plugin API documented with examples. Filesystem-based asset discovery confirmed. Community plugins (oh-my-opencode, opencode-skillful) validate the pattern. |
-| Pitfalls | HIGH | 5 of 14 pitfalls confirmed via GitHub issues with issue numbers. Remaining pitfalls inferred from documented behavior and general plugin patterns. |
+| Stack | HIGH | Only 1 new dep (mitt). All others are existing or custom TS. Alternatives thoroughly evaluated and rejected with clear rationale. |
+| Features | MEDIUM | Core features well-understood from source analysis. OpenCode plugin API constraints (agent dispatch, parallel execution limits) introduce uncertainty. Feature dependency tree is clear. |
+| Architecture | MEDIUM-HIGH | Component boundaries, dependency flow, and build order are well-designed. The tool-returns-instruction pattern is logical but unvalidated -- this is the single biggest uncertainty. |
+| Pitfalls | HIGH | All pitfalls derived from direct source code analysis of three codebases. Prevention strategies are specific and actionable. |
 
-**Overall confidence:** HIGH
+**Overall confidence:** MEDIUM-HIGH
 
 ### Gaps to Address
 
-- **Skill path convention:** The `skills/` vs `skill/` inconsistency (Pitfall #1) must be resolved empirically before Phase 1 implementation. Run a test against the actual OpenCode runtime.
-- **Hot reload behavior:** Architecture research says OpenCode watches the filesystem for changes, but Pitfalls research says no hot reload. These contradict. Must test whether newly created files in `.opencode/agents/` are discovered mid-session.
-- **Installer trigger frequency:** If OpenCode runs `bun install` on every startup, the postinstall script runs repeatedly. Need to confirm whether no-clobber is sufficient or if a "first-run" guard is needed.
-- **Tool naming constraints:** The exact rules for custom tool names (underscores vs hyphens, length limits) are not fully documented. Test with the `oc_create_agent` naming pattern.
-- **Model aliasing:** OpenCode may support provider-agnostic model tiers. If so, agents could use `fast` or `smart` instead of specific model IDs. Not confirmed in current docs.
+- **Agent dispatch validation:** The tool-returns-instruction pattern (tools return dispatch instructions, orchestrator agent executes them) is the foundational pattern but has not been tested in OpenCode. Must be validated as Phase 1's first task. If it does not work, the entire architecture needs redesign.
+- **OpenCode concurrency limits:** How many parallel Agent tool calls can an agent make? If limited to 3-5 concurrent, the review engine's parallel dispatch strategy needs wave sizing adjustment.
+- **Institutional memory schema:** What data is useful to persist across projects is speculative. The storage format and interface should be designed early (Phase 1), but the actual content schema needs a research spike during Phase 5 implementation.
+- **Plugin load performance:** Registering 15+ agents via config hook at plugin load -- does this noticeably slow OpenCode startup? Need to measure after Phase 1 implementation.
+- **mitt compatibility with Bun:** mitt is a standard ESM package and should work fine, but must be verified in the Bun runtime during Phase 1 setup.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [OpenCode Plugin Documentation](https://opencode.ai/docs/plugins/)
-- [OpenCode Agents Documentation](https://opencode.ai/docs/agents/)
-- [OpenCode Skills Documentation](https://opencode.ai/docs/skills/)
-- [OpenCode Commands Documentation](https://opencode.ai/docs/commands/)
-- [OpenCode Custom Tools](https://opencode.ai/docs/custom-tools/)
-- [@opencode-ai/plugin on npm](https://www.npmjs.com/package/@opencode-ai/plugin) -- v1.3.7, 634 dependents
-- [OpenCode Changelog](https://opencode.ai/changelog) -- v1.3.5, March 29, 2026
-- GitHub Issues: [#9819](https://github.com/anomalyco/opencode/issues/9819), [#10273](https://github.com/anomalyco/opencode/issues/10273), [#10441](https://github.com/anomalyco/opencode/issues/10441)
+- claude-hands-free source code at `/home/joseibanez/develop/projects/claude-hands-free/` -- 2413-line orchestrator, 12 agents, 3538 lines CJS tooling, 8-phase state machine
+- claude-ace source code at `/home/joseibanez/develop/projects/claude-ace/` -- 30 agents, 8-phase review pipeline, 6 bash scripts, references directory
+- opencode-assets source code at `/home/joseibanez/develop/projects/opencode-assets/src/` -- current plugin architecture, tool registration, config hook, agent definitions
+- OpenCode plugin API (`@opencode-ai/plugin` dist/index.d.ts) -- hooks interface, tool registration, config hook
+- [XState v5 documentation](https://stately.ai/docs/xstate) -- evaluated and rejected
+- [mitt GitHub](https://github.com/developit/mitt) -- 200-byte typed event emitter
 
 ### Secondary (MEDIUM confidence)
-- [oh-my-opencode](https://github.com/opensoft/oh-my-opencode) -- Reference plugin, ecosystem patterns
-- [Plugin Development Guide (gist)](https://gist.github.com/rstacruz/946d02757525c9a0f49b25e316fbe715) -- Community examples
-- [opencode-plugin-template](https://github.com/zenobi-us/opencode-plugin-template) -- Plugin scaffold
-- [OpenCode DeepWiki](https://deepwiki.com/sst/opencode) -- Architecture analysis
-- [Claude-Command-Suite](https://github.com/qdhenry/Claude-Command-Suite) -- Competitive analysis
-- [Addy Osmani - LLM Coding Workflow 2026](https://addyosmani.com/blog/ai-coding-workflow/) -- Industry patterns
+- [OpenCode Plugin Documentation](https://opencode.ai/docs/plugins/) -- plugin API, config hook, event hooks
+- [OpenCode Agent Documentation](https://opencode.ai/docs/agents/) -- Task tool dispatch, subagent architecture
+- [oh-my-opencode / Sisyphus pattern](https://github.com/opensoft/oh-my-opencode) -- supervisor orchestrator pattern validation
+- [Supervisor pattern for agent orchestration](https://dev.to/programmingcentral/the-supervisor-pattern-stop-writing-monolithic-agents-and-start-orchestrating-teams-2olk) -- hub-and-spoke topology validation
+- hands-free v2 vision document -- Architecture Arena, Divergent Explorer, Ambition Engine design specs
 
 ### Tertiary (LOW confidence)
-- [Duplicate Skill Warnings - Issue #2909](https://github.com/code-yeongyu/oh-my-openagent/issues/2909) -- Third-party fork, may not apply directly
-- [Bun Runtime Conflicts - Issue #11824](https://github.com/anomalyco/opencode/issues/11824) -- May be resolved in newer Bun versions
+- Tool-returns-instruction pattern -- logical design given OpenCode constraints, but untested in this plugin context. Needs validation spike.
+- OpenCode Agent tool concurrency limits -- not documented, needs empirical testing.
 
 ---
 *Research completed: 2026-03-31*
