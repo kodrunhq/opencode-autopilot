@@ -87,6 +87,20 @@ describe("summarizeConfidence", () => {
 		const summary2 = summarizeConfidence(entries2);
 		expect(summary2.dominant).toBe("MEDIUM");
 	});
+
+	test("three-way tie (one HIGH, one MEDIUM, one LOW) returns HIGH as dominant", () => {
+		const entries: readonly ConfidenceEntry[] = [
+			makeEntry({ level: "HIGH" }),
+			makeEntry({ level: "MEDIUM" }),
+			makeEntry({ level: "LOW" }),
+		];
+		const summary = summarizeConfidence(entries);
+		expect(summary.HIGH).toBe(1);
+		expect(summary.MEDIUM).toBe(1);
+		expect(summary.LOW).toBe(1);
+		expect(summary.total).toBe(3);
+		expect(summary.dominant).toBe("HIGH");
+	});
 });
 
 describe("filterByPhase", () => {

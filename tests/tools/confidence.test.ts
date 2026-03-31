@@ -91,4 +91,10 @@ describe("confidenceCore", () => {
 		const parsed = JSON.parse(result);
 		expect(parsed.error).toBeDefined();
 	});
+
+	test("unknown subcommand returns error", async () => {
+		const result = await confidenceCore({ subcommand: "nonexistent" as any }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.error).toContain("unknown subcommand");
+	});
 });

@@ -36,4 +36,11 @@ describe("ensureGitignore", () => {
 		const content = await readFile(join(tempDir, ".gitignore"), "utf-8");
 		expect(content).toBe(original);
 	});
+
+	test("inserts newline before entry when file has no trailing newline", async () => {
+		await writeFile(join(tempDir, ".gitignore"), "node_modules/", "utf-8");
+		await ensureGitignore(tempDir);
+		const content = await readFile(join(tempDir, ".gitignore"), "utf-8");
+		expect(content).toBe("node_modules/\n.opencode-assets/\n");
+	});
 });

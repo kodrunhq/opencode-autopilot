@@ -56,4 +56,24 @@ describe("phaseCore", () => {
 		const parsed = JSON.parse(result);
 		expect(parsed.error).toBeDefined();
 	});
+
+	test("unknown subcommand returns error", async () => {
+		const result = await phaseCore({ subcommand: "nonexistent" as any }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.error).toContain("unknown subcommand");
+	});
+
+	test("status with completed pipeline returns currentPhase null", async () => {
+		const state = createInitialState("test idea");
+		const completedState = {
+			...state,
+			currentPhase: null as null,
+			status: "COMPLETED" as const,
+		};
+		await saveState(completedState, tempDir);
+		const result = await phaseCore({ subcommand: "status" }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.currentPhase).toBeNull();
+		expect(parsed.status).toBe("COMPLETED");
+	});
 });

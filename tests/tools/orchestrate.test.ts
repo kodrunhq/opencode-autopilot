@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { orchestratorAgent } from "../../src/agents/orchestrator";
@@ -62,6 +62,37 @@ describe("orchestrateCore", () => {
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("complete");
 		expect(parsed.summary).toBeDefined();
+	});
+
+	test("resumes at current phase when state exists but no result/idea provided", async () => {
+		const state = createInitialState("build a chat");
+		await saveState(state, tempDir);
+		const result = await orchestrateCore({}, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.phase).toBe("RECON");
+	});
+
+	test("already-complete pipeline returns complete when result arrives late", async () => {
+		const state = createInitialState("build a chat");
+		const completedState = {
+			...state,
+			currentPhase: null as null,
+			status: "COMPLETED" as const,
+		};
+		await saveState(completedState, tempDir);
+		const result = await orchestrateCore({ result: "late result" }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("complete");
+	});
+
+	test("catch block converts thrown errors to error response", async () => {
+		await mkdir(tempDir, { recursive: true });
+		await writeFile(join(tempDir, "state.json"), "NOT VALID JSON{{{", "utf-8");
+		const result = await orchestrateCore({ result: "done" }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.message).toBeDefined();
 	});
 });
 
