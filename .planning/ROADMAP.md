@@ -98,7 +98,7 @@ Plans:
 
 Plans:
 - [ ] 04-01-PLAN.md -- Zod schemas, state persistence, confidence ledger, and path helpers
-- [ ] 04-02-PLAN.md -- Config v2 schema with orchestrator/confidence namespaces and v1 migration
+- [x] 04-02-PLAN.md -- Config v2 schema with orchestrator/confidence namespaces and v1 migration
 - [ ] 04-03-PLAN.md -- Phase transitions, plan indexing, and arena depth modules
 - [ ] 04-04-PLAN.md -- Tool registrations, orchestrator agent, plugin wiring, and dispatch proof
 

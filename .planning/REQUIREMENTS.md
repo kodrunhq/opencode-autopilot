@@ -46,13 +46,13 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 - [ ] **ORCH-01**: User can invoke `oc_orchestrate` with an idea and the orchestrator drives an 8-phase pipeline (RECON -> CHALLENGE -> ARCHITECT -> EXPLORE -> PLAN -> BUILD -> SHIP -> RETROSPECTIVE) to completion autonomously
 - [ ] **ORCH-02**: Orchestrator persists state to JSON so interrupted runs resume from the last completed phase without re-executing earlier phases
 - [ ] **ORCH-03**: Every autonomous decision is logged to a decision log with timestamp, phase, agent, decision, and rationale
-- [ ] **ORCH-04**: User can configure orchestrator settings (autonomy level, phase toggles, strictness) via the plugin config schema
+- [x] **ORCH-04**: User can configure orchestrator settings (autonomy level, phase toggles, strictness) via the plugin config schema
 - [ ] **ORCH-05**: Confidence ledger tracks every agent decision as HIGH/MEDIUM/LOW with rationale, and downstream phases use confidence scores to adjust effort allocation
 
 ### Deterministic Tooling
 
 - [ ] **TOOL-01**: State management module in TypeScript handles state load, update, get, patch, and phase transitions with Zod-validated schemas
-- [ ] **TOOL-02**: Config module extends existing pluginConfigSchema with orchestrator and review engine settings
+- [x] **TOOL-02**: Config module extends existing pluginConfigSchema with orchestrator and review engine settings
 - [ ] **TOOL-03**: Confidence module reads, appends, summarizes, and filters confidence entries by phase
 - [ ] **TOOL-04**: Phase module tracks phase completion status and validates transitions
 - [ ] **TOOL-05**: Plan module indexes task lists and groups tasks into dependency waves
@@ -132,10 +132,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PLGN-01 through PLGN-04 | Phase 1 (v1.0) | Complete |
 | ORCH-02 | Phase 4 | Pending |
 | ORCH-03 | Phase 4 | Pending |
-| ORCH-04 | Phase 4 | Pending |
+| ORCH-04 | Phase 4 | Complete |
 | ORCH-05 | Phase 4 | Pending |
 | TOOL-01 | Phase 4 | Pending |
-| TOOL-02 | Phase 4 | Pending |
+| TOOL-02 | Phase 4 | Complete |
 | TOOL-03 | Phase 4 | Pending |
 | TOOL-04 | Phase 4 | Pending |
 | TOOL-05 | Phase 4 | Pending |
