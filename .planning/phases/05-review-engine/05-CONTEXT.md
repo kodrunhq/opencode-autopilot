@@ -31,18 +31,18 @@ Requirements: REVW-01, REVW-02, REVW-03, REVW-04, REVW-05, REVW-06, REVW-07, REV
   - Stage 1: Parallel specialist dispatch (selected agents run concurrently on the diff/files)
   - Stage 2: Cross-verification (each agent sees all other agents' findings, can upgrade severity or add new findings)
   - Stage 3: Red team + product thinker (adversarial final pass + UX journey check)
-  - Stage 4: Fix cycle (auto-fix CRITICAL/HIGH, re-verify affected agents)
+  - Stage 4: Fix cycle (auto-fix CRITICAL findings only, re-verify affected agents)
   Each stage's output feeds into the next as context.
 
 ### Fix Cycle (REVW-09)
-- **D-07:** Auto-fix + re-verify, MAX 1 CYCLE. Apply fixes for CRITICAL/HIGH findings automatically. Re-run only the agents whose findings were fixed to verify no regressions. Remaining issues reported as-is. No multi-cycle oscillation risk.
+- **D-07:** Auto-fix + re-verify, MAX 1 CYCLE. Apply fixes for CRITICAL findings with actionable fix suggestions. Re-run only the agents whose findings were fixed to verify no regressions. Remaining issues reported as-is. No multi-cycle oscillation risk.
 
 ### Standalone Invocation (REVW-01, REVW-10)
 - **D-08:** `oc_review` registered tool. Accepts scope options and returns consolidated report as JSON. Can be called by orchestrator BUILD phase AND by users directly.
 - **D-09:** Scope options: `staged` (default), `unstaged`, `branch` (diff vs main), `all` (staged + unstaged), `directory` (review all files in a path). Plus optional file filter pattern.
 
 ### Severity Format (REVW-04)
-- **D-10:** Standardized finding format: `{ file, line, severity: CRITICAL|HIGH|MEDIUM|LOW, agent, finding, suggestion }`. Zod schema validates all findings before aggregation.
+- **D-10:** Standardized finding format: `{ file, line, severity: CRITICAL|WARNING|NITPICK, domain, title, agent, source, evidence, problem, fix }`. Zod schema validates all findings before aggregation.
 
 ### Consolidated Report (REVW-10)
 - **D-11:** Report groups findings by file, sorted by severity within each file. Includes total counts per severity, list of agents that ran, and scope that was reviewed. Output is JSON (tool response) -- pretty formatting is the caller's responsibility.

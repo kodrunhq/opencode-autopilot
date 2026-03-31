@@ -74,7 +74,7 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 - [x] **REVW-01**: User can invoke the review engine standalone (not just within the orchestrator) to review current changes
 - [ ] **REVW-02**: Team lead agent analyzes project stack and diff to select relevant specialist agents from the catalog
 - [x] **REVW-03**: At least 6 universal review agents ship by default (logic, security, quality, test coverage, silent failure, contract/type)
-- [ ] **REVW-04**: Selected review agents dispatch in parallel and return findings in a standardized severity format (CRITICAL/HIGH/MEDIUM/LOW)
+- [ ] **REVW-04**: Selected review agents dispatch in parallel and return findings in a standardized severity format (CRITICAL/WARNING/NITPICK)
 - [ ] **REVW-05**: Stack-gated selection automatically excludes agents whose technology is absent from the project
 - [ ] **REVW-06**: After parallel review, cross-verification pass lets agents see each other's findings and upgrade severity or add new findings
 - [x] **REVW-07**: Red team agent runs as final adversarial pass, reading all findings and hunting inter-domain gaps

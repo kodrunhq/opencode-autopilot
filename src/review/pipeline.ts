@@ -100,11 +100,27 @@ function extractJson(raw: string): string | null {
 				? objectStart
 				: Math.min(objectStart, arrayStart);
 
-	// Find matching close bracket (simple depth tracking)
+	// Find matching close bracket (string-literal-aware depth tracking)
 	let depth = 0;
+	let inString = false;
+	let escaped = false;
 	for (let i = start; i < raw.length; i++) {
-		if (raw[i] === "{" || raw[i] === "[") depth++;
-		if (raw[i] === "}" || raw[i] === "]") depth--;
+		const ch = raw[i];
+		if (escaped) {
+			escaped = false;
+			continue;
+		}
+		if (ch === "\\" && inString) {
+			escaped = true;
+			continue;
+		}
+		if (ch === '"') {
+			inString = !inString;
+			continue;
+		}
+		if (inString) continue;
+		if (ch === "{" || ch === "[") depth++;
+		if (ch === "}" || ch === "]") depth--;
 		if (depth === 0) {
 			return raw.slice(start, i + 1);
 		}

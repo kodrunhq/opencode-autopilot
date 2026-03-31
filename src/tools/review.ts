@@ -225,7 +225,7 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 
 export const ocReview = tool({
 	description:
-		"Run multi-agent code review. Provide scope (staged|unstaged|branch|all|directory) to start, or findings from dispatched agents to advance the pipeline. Returns JSON with action (dispatch|complete|error).",
+		"Run multi-agent code review. Provide scope (staged|unstaged|branch|all|directory) to start, or findings from dispatched agents to advance the pipeline. Returns JSON with action (dispatch|complete|status|error).",
 	args: {
 		scope: tool.schema
 			.enum(["staged", "unstaged", "branch", "all", "directory"])
