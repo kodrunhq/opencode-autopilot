@@ -1,11 +1,11 @@
 # Requirements: OpenCode Assets Plugin
 
 **Defined:** 2026-03-31
-**Core Value:** Users can create and use high-quality agents, skills, and commands from within the OpenCode session
+**Core Value:** A single command transforms an idea into a shipped, reviewed, tested result — fully autonomous, with built-in code quality enforcement at every stage.
 
-## v1 Requirements
+## v1 Requirements (Validated)
 
-Requirements for initial release. Each maps to roadmap phases.
+All v1 requirements shipped and validated in Milestone v1.0.
 
 ### Creation Tooling
 
@@ -13,69 +13,111 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **CRTL-02**: User can type `/new-skill` in-session and get a new skill directory + SKILL.md created with proper frontmatter and structure
 - [x] **CRTL-03**: User can type `/new-command` in-session and get a new command markdown file created with template and description
 - [x] **CRTL-04**: Creation tools validate names (lowercase alphanumeric, hyphens, 1-64 chars for skills) and prevent path conflicts
-- [x] **CRTL-05**: Creation tools write assets to global `~/.config/opencode/` target (user decision D-10: always global for simplicity)
+- [x] **CRTL-05**: Creation tools write assets to global `~/.config/opencode/` target
 
 ### Agents
 
-- [x] **AGNT-01**: Researcher agent that searches the web thoroughly about a topic and produces a clear, comprehensive report with sources
-- [x] **AGNT-02**: Metaprompter agent that crafts high-quality prompts, system instructions, and configurations for new agents, skills, and commands
-- [x] **AGNT-03**: Documenter agent that creates documentation, READMEs, SVGs, diagrams, GitHub badges, quickstarts, and wikis
-- [x] **AGNT-04**: PR Reviewer agent that reviews pull requests with structured feedback on code quality, security, and patterns
+- [x] **AGNT-01**: Researcher agent that searches the web and produces structured reports with sources
+- [x] **AGNT-02**: Metaprompter agent that crafts prompts and configurations for new assets
+- [x] **AGNT-03**: Documenter agent that creates documentation, READMEs, diagrams
+- [x] **AGNT-04**: PR Reviewer agent that reviews PRs with structured feedback
 
 ### Commands
 
-- [x] **CMND-01**: `/review-pr` command that reviews a GitHub PR with structured, actionable feedback
+- [x] **CMND-01**: `/review-pr` command that reviews a GitHub PR with structured feedback
 
 ### Skills
 
-- [x] **SKLL-01**: Coding standards skill with style, patterns, and naming conventions the LLM can reference during code review and generation
+- [x] **SKLL-01**: Coding standards skill with style, patterns, and naming conventions
 
 ### Plugin Infrastructure
 
 - [x] **PLGN-01**: Single npm package installable via one line in `opencode.json`
 - [x] **PLGN-02**: Plugin registers creation tools with Zod-validated schemas
-- [x] **PLGN-03**: Bundled assets (agents, skills, commands) are installed to correct filesystem paths
-- [x] **PLGN-04**: Works with any provider configured in OpenCode (model-agnostic agents)
+- [x] **PLGN-03**: Bundled assets installed to correct filesystem paths
+- [x] **PLGN-04**: Works with any provider configured in OpenCode (model-agnostic)
 
 ## v2 Requirements
 
-Deferred to future release. Tracked but not in current roadmap.
+Requirements for Milestone v2.0 — Autonomous Orchestrator.
 
-### Additional Agents
+### Orchestrator Foundation
+
+- [ ] **ORCH-01**: User can invoke `oc_orchestrate` with an idea and the orchestrator drives an 8-phase pipeline (RECON → CHALLENGE → ARCHITECT → EXPLORE → PLAN → BUILD → SHIP → RETROSPECTIVE) to completion autonomously
+- [ ] **ORCH-02**: Orchestrator persists state to JSON so interrupted runs resume from the last completed phase without re-executing earlier phases
+- [ ] **ORCH-03**: Every autonomous decision is logged to a decision log with timestamp, phase, agent, decision, and rationale
+- [ ] **ORCH-04**: User can configure orchestrator settings (autonomy level, phase toggles, strictness) via the plugin config schema
+- [ ] **ORCH-05**: Confidence ledger tracks every agent decision as HIGH/MEDIUM/LOW with rationale, and downstream phases use confidence scores to adjust effort allocation
+
+### Deterministic Tooling
+
+- [ ] **TOOL-01**: State management module in TypeScript handles state load, update, get, patch, and phase transitions with Zod-validated schemas
+- [ ] **TOOL-02**: Config module extends existing pluginConfigSchema with orchestrator and review engine settings
+- [ ] **TOOL-03**: Confidence module reads, appends, summarizes, and filters confidence entries by phase
+- [ ] **TOOL-04**: Phase module tracks phase completion status and validates transitions
+- [ ] **TOOL-05**: Plan module indexes task lists and groups tasks into dependency waves
+- [ ] **TOOL-06**: Arena module determines debate depth and triggers explorer based on confidence
+
+### Pipeline Phases
+
+- [ ] **PIPE-01**: RECON phase dispatches a researcher subagent that produces a structured domain research report
+- [ ] **PIPE-02**: CHALLENGE phase proposes enhancements the user did not articulate, capped at 3 additions, with logged accept/reject rationale
+- [ ] **PIPE-03**: ARCHITECT phase produces a system design; when Arena is enabled, 2-3 parallel proposals are evaluated by an adversarial critic
+- [ ] **PIPE-04**: PLAN phase decomposes architecture into ordered tasks with wave numbers, max 300-line diffs per task
+- [ ] **PIPE-05**: BUILD phase implements tasks iteratively with branch/commit per task, running review after each task
+- [ ] **PIPE-06**: BUILD phase supports wave-based parallel execution where independent tasks within a wave build concurrently
+- [ ] **PIPE-07**: SHIP phase produces a ship package (architecture walkthrough, decision summary, changelog)
+- [ ] **PIPE-08**: RETROSPECTIVE phase extracts lessons learned and writes them to institutional memory
+
+### Review Engine
+
+- [ ] **REVW-01**: User can invoke the review engine standalone (not just within the orchestrator) to review current changes
+- [ ] **REVW-02**: Team lead agent analyzes project stack and diff to select relevant specialist agents from the catalog
+- [ ] **REVW-03**: At least 6 universal review agents ship by default (logic, security, quality, test coverage, silent failure, contract/type)
+- [ ] **REVW-04**: Selected review agents dispatch in parallel and return findings in a standardized severity format (CRITICAL/HIGH/MEDIUM/LOW)
+- [ ] **REVW-05**: Stack-gated selection automatically excludes agents whose technology is absent from the project
+- [ ] **REVW-06**: After parallel review, cross-verification pass lets agents see each other's findings and upgrade severity or add new findings
+- [ ] **REVW-07**: Red team agent runs as final adversarial pass, reading all findings and hunting inter-domain gaps
+- [ ] **REVW-08**: Product thinker agent traces user journeys and checks CRUD completeness after technical review
+- [ ] **REVW-09**: Fix cycle auto-applies fixes for findings and re-verifies that fixes don't introduce new issues
+- [ ] **REVW-10**: Consolidated review report groups findings by file with severity levels and actionable fix descriptions
+- [ ] **REVW-11**: Per-project memory stores findings, false positives, and project profile so reviews improve across runs on the same codebase
+
+### Learning & Resilience
+
+- [ ] **LRNR-01**: Institutional memory persists lessons from completed runs to a global store, with decay mechanism for stale entries
+- [ ] **LRNR-02**: Retrospective agent extracts lessons categorized by domain (architecture, testing, review, planning) after each run
+- [ ] **LRNR-03**: Forensics tool analyzes failed runs: identifies failing phase, agent, root cause, and classifies as recoverable vs. terminal
+- [ ] **LRNR-04**: User can invoke forensics via a `--forensics` flag on the orchestrator tool
+
+## Future Requirements
+
+Deferred beyond v2.0. Tracked for future milestones.
+
+### Additional Agents (from v1 backlog)
 
 - **AGNT-05**: Code reviewer agent focused on code quality and patterns
 - **AGNT-06**: Planner agent that creates structured implementation plans
 - **AGNT-07**: TDD guide agent for test-driven development workflows
-- **AGNT-08**: Security reviewer agent for secrets, injection, and auth analysis
-- **AGNT-09**: Refactor helper agent for extract-function, rename, move patterns
 
-### Additional Commands
+### Advanced Features
 
-- **CMND-02**: `/commit` command with AI-generated commit messages
-- **CMND-03**: `/simplify` command to reduce code complexity
-
-### Additional Skills
-
-- **SKLL-02**: API patterns skill (REST/GraphQL best practices)
-- **SKLL-03**: Testing strategies skill (test structure, mocking, coverage)
-
-### Hooks
-
-- **HOOK-01**: Pre-commit validation hook
-- **HOOK-02**: Post-edit auto-format hook
+- **ADV-01**: Divergent explorer (parallel prototyping with branch comparison)
+- **ADV-02**: Ace enforcement pipeline (inline quality during build with enriched plans + checkpoints)
+- **ADV-03**: Language-specific review agents beyond TypeScript (Go, Python, Rust, React)
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Multi-agent orchestration | Oh My OpenCode's territory; massive scope for marginal v1 gain |
-| MCP server bundling | Separate concern, own config, better as standalone plugins |
-| Plugin marketplace / registry | Distribution is via npm; custom registry is a separate product |
-| TUI theming | Cosmetic, not functional |
-| Agent-to-agent delegation chains | Brittle, hard to debug, confusing UX |
-| Porting Claude Code / ECC / GSD assets | Building fresh; most existing assets aren't actively used |
-| LSP / AST-Grep integration | Heavy infrastructure, Oh My OpenCode already provides this |
-| Claude Code compatibility layer | OpenCode already reads CLAUDE.md and .claude/skills/ natively |
+| GUI/web dashboard | OpenCode is a TUI; all interaction via tools and commands |
+| MCP server for review | Out of scope per project constraints; review is native plugin tools |
+| Human approval gates | Core promise is zero-intervention autonomy; decision logging provides accountability |
+| Model-specific agent assignments | Model-agnostic constraint; users configure models via OpenCode's routing |
+| Shared mutable state between agents | Agents communicate through filesystem artifacts; prevents concurrency bugs |
+| Divergent explorer | Too complex, rare value; Arena + review cycle catches bad choices |
+| Documentation exceeding 2x codebase LOC | Ship Package must be proportional to project complexity |
+| Silent scope accumulation | Challenge additions must be logged; hard cap of 3 per run |
 
 ## Traceability
 
@@ -83,27 +125,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLGN-01 | Phase 1 | Complete |
-| PLGN-02 | Phase 1 | Complete |
-| PLGN-03 | Phase 1 | Complete |
-| PLGN-04 | Phase 1 | Complete |
-| CRTL-01 | Phase 2 | Complete |
-| CRTL-02 | Phase 2 | Complete |
-| CRTL-03 | Phase 2 | Complete |
-| CRTL-04 | Phase 2 | Complete |
-| CRTL-05 | Phase 2 | Complete |
-| AGNT-01 | Phase 3 | Complete |
-| AGNT-02 | Phase 3 | Complete |
-| AGNT-03 | Phase 3 | Complete |
-| AGNT-04 | Phase 3 | Complete |
-| CMND-01 | Phase 3 | Complete |
-| SKLL-01 | Phase 3 | Complete |
+| CRTL-01 through CRTL-05 | Phase 1-2 (v1.0) | Complete |
+| AGNT-01 through AGNT-04 | Phase 3 (v1.0) | Complete |
+| CMND-01 | Phase 3 (v1.0) | Complete |
+| SKLL-01 | Phase 3 (v1.0) | Complete |
+| PLGN-01 through PLGN-04 | Phase 1 (v1.0) | Complete |
+| ORCH-01 through ORCH-05 | TBD | Pending |
+| TOOL-01 through TOOL-06 | TBD | Pending |
+| PIPE-01 through PIPE-08 | TBD | Pending |
+| REVW-01 through REVW-11 | TBD | Pending |
+| LRNR-01 through LRNR-04 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 15 total
-- Mapped to phases: 15
-- Unmapped: 0
+- v1 requirements: 15 total (all Complete)
+- v2 requirements: 34 total
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 34 ⚠️
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 after roadmap creation*
+*Last updated: 2026-03-31 after milestone v2.0 requirements definition*
