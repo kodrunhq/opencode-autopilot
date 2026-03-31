@@ -97,9 +97,9 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [x] 04-01-PLAN.md -- Zod schemas, state persistence, confidence ledger, and path helpers
+- [ ] 04-01-PLAN.md -- Zod schemas, state persistence, confidence ledger, and path helpers
 - [x] 04-02-PLAN.md -- Config v2 schema with orchestrator/confidence namespaces and v1 migration
-- [x] 04-03-PLAN.md -- Phase transitions, plan indexing, and arena depth modules
+- [ ] 04-03-PLAN.md -- Phase transitions, plan indexing, and arena depth modules
 - [ ] 04-04-PLAN.md -- Tool registrations, orchestrator agent, plugin wiring, and dispatch proof
 
 ### Phase 5: Review Engine
@@ -112,13 +112,10 @@ Plans:
   3. At least 6 universal review agents (logic, security, quality, test coverage, silent failure, contract/type) run in parallel and return findings in CRITICAL/HIGH/MEDIUM/LOW format
   4. After parallel review, a cross-verification pass and red team adversarial pass surface inter-domain gaps and upgrade severities where warranted
   5. The fix cycle auto-applies fixes for actionable findings and re-verifies that fixes do not introduce new issues
-**Plans**: 4 plans
+**Plans**: 1 plan
 
 Plans:
-- [ ] 05-01-PLAN.md -- Zod schemas, stack detection, and diff resolver
-- [ ] 05-02-PLAN.md -- 8 internal review agent definitions (6 universal + red team + product thinker)
-- [ ] 05-03-PLAN.md -- Deterministic selection, pipeline state machine, cross-verification, and report builder
-- [ ] 05-04-PLAN.md -- oc_review tool, per-project memory, fix cycle, and plugin registration
+- [x] 05-01-PLAN.md -- Review engine data layer: schemas, agent catalog, stack gate, team selection, severity, finding builder
 
 ### Phase 6: Orchestrator Pipeline
 **Goal**: Users give the orchestrator an idea and it autonomously drives through all 8 phases -- research, challenge, architect, explore, plan, build, ship, retrospective -- to deliver a completed result
@@ -152,7 +149,7 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 | 1. Plugin Infrastructure | v1.0 | 2/2 | Complete | - |
 | 2. Creation Tooling | v1.0 | 2/2 | Complete | - |
 | 3. Curated Assets | v1.0 | 2/2 | Complete | - |
-| 4. Foundation Infrastructure | v2.0 | 1/4 | In Progress|  |
-| 5. Review Engine | v2.0 | 0/4 | Not started | - |
+| 4. Foundation Infrastructure | v2.0 | 0/4 | Planning | - |
+| 5. Review Engine | v2.0 | 1/1 | In Progress | - |
 | 6. Orchestrator Pipeline | v2.0 | 0/0 | Not started | - |
 | 7. Learning & Resilience | v2.0 | 0/0 | Not started | - |
