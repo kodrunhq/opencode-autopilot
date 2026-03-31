@@ -17,7 +17,7 @@ describe("documenter agent config", () => {
 	});
 
 	test("prompt references coding-standards or conventions", () => {
-		const prompt = documenterAgent.prompt?.toLowerCase();
+		const prompt = (documenterAgent.prompt ?? "").toLowerCase();
 		expect(prompt.includes("coding-standards") || prompt.includes("conventions")).toBe(true);
 	});
 

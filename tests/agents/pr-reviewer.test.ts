@@ -17,7 +17,7 @@ describe("pr-reviewer agent config", () => {
 	});
 
 	test("prompt references git or gh commands", () => {
-		const prompt = prReviewerAgent.prompt?.toLowerCase();
+		const prompt = (prReviewerAgent.prompt ?? "").toLowerCase();
 		expect(prompt.includes("git") || prompt.includes("gh")).toBe(true);
 	});
 

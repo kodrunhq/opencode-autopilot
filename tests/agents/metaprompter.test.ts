@@ -17,7 +17,7 @@ describe("metaprompter agent config", () => {
 	});
 
 	test("prompt references asset formats", () => {
-		const prompt = metaprompterAgent.prompt?.toLowerCase();
+		const prompt = (metaprompterAgent.prompt ?? "").toLowerCase();
 		expect(prompt.includes("agent") || prompt.includes("skill") || prompt.includes("command")).toBe(
 			true,
 		);

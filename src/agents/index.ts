@@ -20,8 +20,11 @@ export async function configHook(config: Config): Promise<void> {
 		if (config.agent[name] === undefined) {
 			// Mutation of config.agent is intentional: the OpenCode plugin configHook
 			// API requires mutating the provided Config object to register agents.
-			// We shallow-copy each frozen agent config to avoid sharing references.
-			config.agent[name] = { ...agentConfig };
+			// We deep-copy agent config including nested permission to avoid shared references.
+			config.agent[name] = {
+				...agentConfig,
+				...(agentConfig.permission && { permission: { ...agentConfig.permission } }),
+			};
 		}
 	}
 }

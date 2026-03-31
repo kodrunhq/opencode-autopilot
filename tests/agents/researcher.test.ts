@@ -17,7 +17,7 @@ describe("researcher agent config", () => {
 	});
 
 	test("prompt references webfetch capability", () => {
-		const prompt = researcherAgent.prompt?.toLowerCase();
+		const prompt = (researcherAgent.prompt ?? "").toLowerCase();
 		expect(prompt.includes("webfetch") || prompt.includes("web")).toBe(true);
 	});
 
