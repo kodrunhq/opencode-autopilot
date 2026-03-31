@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	getDebateDepth,
-	shouldTriggerExplorer,
-} from "../../src/orchestrator/arena";
+import { getDebateDepth, shouldTriggerExplorer } from "../../src/orchestrator/arena";
 import type { ConfidenceEntry } from "../../src/orchestrator/types";
 
 function makeEntry(overrides: Partial<ConfidenceEntry> = {}): ConfidenceEntry {
@@ -72,9 +69,7 @@ describe("shouldTriggerExplorer", () => {
 	});
 
 	test("HIGH threshold triggers on MEDIUM entries", () => {
-		const entries: readonly ConfidenceEntry[] = [
-			makeEntry({ level: "MEDIUM" }),
-		];
+		const entries: readonly ConfidenceEntry[] = [makeEntry({ level: "MEDIUM" })];
 		expect(shouldTriggerExplorer(entries, "HIGH")).toBe(true);
 	});
 
@@ -88,9 +83,7 @@ describe("shouldTriggerExplorer", () => {
 	});
 
 	test("defaults to MEDIUM threshold when not specified", () => {
-		const entries: readonly ConfidenceEntry[] = [
-			makeEntry({ level: "LOW" }),
-		];
+		const entries: readonly ConfidenceEntry[] = [makeEntry({ level: "LOW" })];
 		expect(shouldTriggerExplorer(entries)).toBe(true);
 	});
 });

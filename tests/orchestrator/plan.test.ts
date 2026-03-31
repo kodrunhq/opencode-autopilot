@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	countByStatus,
-	groupByWave,
-	indexTasks,
-} from "../../src/orchestrator/plan";
+import { countByStatus, groupByWave, indexTasks } from "../../src/orchestrator/plan";
 import type { Task } from "../../src/orchestrator/types";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -64,14 +60,12 @@ describe("groupByWave", () => {
 	});
 
 	test("preserves task data in grouped results", () => {
-		const tasks: readonly Task[] = [
-			makeTask({ id: 5, title: "Wave 2 task", wave: 2 }),
-		];
+		const tasks: readonly Task[] = [makeTask({ id: 5, title: "Wave 2 task", wave: 2 })];
 		const grouped = groupByWave(tasks);
 		const wave2 = grouped.get(2);
 		expect(wave2).toBeDefined();
-		expect(wave2![0].id).toBe(5);
-		expect(wave2![0].title).toBe("Wave 2 task");
+		expect(wave2?.[0].id).toBe(5);
+		expect(wave2?.[0].title).toBe("Wave 2 task");
 	});
 });
 

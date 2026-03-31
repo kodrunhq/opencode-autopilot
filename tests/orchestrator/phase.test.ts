@@ -14,15 +14,11 @@ describe("validateTransition", () => {
 	});
 
 	test("RECON -> BUILD throws with descriptive message", () => {
-		expect(() => validateTransition("RECON", "BUILD")).toThrow(
-			"Invalid phase transition",
-		);
+		expect(() => validateTransition("RECON", "BUILD")).toThrow("Invalid phase transition");
 	});
 
 	test("RETROSPECTIVE -> any throws (terminal phase)", () => {
-		expect(() => validateTransition("RETROSPECTIVE", "RECON")).toThrow(
-			"Invalid phase transition",
-		);
+		expect(() => validateTransition("RETROSPECTIVE", "RECON")).toThrow("Invalid phase transition");
 	});
 
 	test("each phase transitions to its successor", () => {
@@ -37,7 +33,10 @@ describe("validateTransition", () => {
 		];
 		for (const [from, to] of transitions) {
 			expect(() =>
-				validateTransition(from as Parameters<typeof validateTransition>[0], to as Parameters<typeof validateTransition>[1]),
+				validateTransition(
+					from as Parameters<typeof validateTransition>[0],
+					to as Parameters<typeof validateTransition>[1],
+				),
 			).not.toThrow();
 		}
 	});

@@ -1,4 +1,3 @@
-import { PHASES } from "./schemas";
 import type { Phase, PhaseStatus, PipelineState } from "./types";
 
 /**

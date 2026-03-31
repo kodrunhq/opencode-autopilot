@@ -33,9 +33,7 @@ export function groupByWave(tasks: readonly Task[]): ReadonlyMap<number, readonl
 /**
  * Counts tasks by status. Returns an object with counts for every possible status.
  */
-export function countByStatus(
-	tasks: readonly Task[],
-): Readonly<Record<string, number>> {
+export function countByStatus(tasks: readonly Task[]): Readonly<Record<string, number>> {
 	const counts: Record<string, number> = {};
 
 	for (const status of TASK_STATUSES) {
