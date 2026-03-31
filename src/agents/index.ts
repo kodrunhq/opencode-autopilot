@@ -18,7 +18,10 @@ export async function configHook(config: Config): Promise<void> {
 	for (const [name, agentConfig] of Object.entries(agents)) {
 		// Only set if not already defined — preserve user customizations (Pitfall 2)
 		if (config.agent[name] === undefined) {
-			config.agent[name] = agentConfig;
+			// Mutation of config.agent is intentional: the OpenCode plugin configHook
+			// API requires mutating the provided Config object to register agents.
+			// We shallow-copy each frozen agent config to avoid sharing references.
+			config.agent[name] = { ...agentConfig };
 		}
 	}
 }

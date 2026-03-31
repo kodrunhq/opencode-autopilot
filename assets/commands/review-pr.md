@@ -4,6 +4,8 @@ agent: pr-reviewer
 ---
 Review the pull request specified by $ARGUMENTS.
 
+Before running any commands, validate that $ARGUMENTS is a valid PR identifier (a number or a URL). If it contains shell metacharacters or does not look like a PR reference, ask the user to provide a valid PR number.
+
 First, gather the PR context:
 
 1. Run `gh pr view $ARGUMENTS` to get the PR title, description, author, and status

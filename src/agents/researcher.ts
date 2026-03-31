@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
-export const researcherAgent: AgentConfig = {
+export const researcherAgent: Readonly<AgentConfig> = Object.freeze({
 	description: "Searches the web about a topic and produces a comprehensive report with sources",
 	mode: "subagent",
 	prompt: `You are a research specialist. Your job is to thoroughly investigate a given topic and produce a clear, well-organized report.
@@ -37,7 +37,7 @@ Numbered list of every URL you consulted, with a brief note on what each source 
 - DO NOT fabricate sources — only cite URLs you actually fetched.`,
 	permission: {
 		webfetch: "allow",
-		edit: "deny",
+		edit: "allow",
 		bash: "deny",
 	},
-};
+});

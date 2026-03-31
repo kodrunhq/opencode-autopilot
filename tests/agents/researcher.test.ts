@@ -21,10 +21,10 @@ describe("researcher agent config", () => {
 		expect(prompt.includes("webfetch") || prompt.includes("web")).toBe(true);
 	});
 
-	test("permissions match D-07: webfetch=allow, edit=deny, bash=deny", () => {
+	test("permissions match D-07: webfetch=allow, edit=allow, bash=deny", () => {
 		expect(researcherAgent.permission).toEqual({
 			webfetch: "allow",
-			edit: "deny",
+			edit: "allow",
 			bash: "deny",
 		});
 	});

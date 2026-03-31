@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
-export const documenterAgent: AgentConfig = {
+export const documenterAgent: Readonly<AgentConfig> = Object.freeze({
 	description:
 		"Creates and maintains documentation, READMEs, architecture diagrams, and developer guides",
 	mode: "subagent",
@@ -41,4 +41,4 @@ Write documentation as polished markdown. Use headings, lists, code blocks, tabl
 		bash: "deny",
 		webfetch: "deny",
 	},
-};
+});

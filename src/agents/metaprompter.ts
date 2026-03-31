@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
-export const metaprompterAgent: AgentConfig = {
+export const metaprompterAgent: Readonly<AgentConfig> = Object.freeze({
 	description:
 		"Crafts high-quality prompts, system instructions, and configurations for OpenCode agents, skills, and commands",
 	mode: "subagent",
@@ -47,4 +47,4 @@ Provide the complete file content as a single markdown code block, ready to be s
 		bash: "deny",
 		webfetch: "deny",
 	},
-};
+});
