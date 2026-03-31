@@ -1,8 +1,8 @@
-import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { completePhase, getPhaseStatus, validateTransition } from "../orchestrator/phase";
+import { phaseSchema } from "../orchestrator/schemas";
 import { loadState, saveState } from "../orchestrator/state";
-import type { Phase } from "../orchestrator/types";
+import { getProjectArtifactDir } from "../utils/paths";
 
 interface PhaseArgs {
 	readonly subcommand: string;
@@ -54,7 +54,9 @@ export async function phaseCore(args: PhaseArgs, artifactDir: string): Promise<s
 					});
 				}
 				try {
-					validateTransition(args.from as Phase, args.to as Phase);
+					const fromPhase = phaseSchema.parse(args.from);
+					const toPhase = phaseSchema.parse(args.to);
+					validateTransition(fromPhase, toPhase);
 					return JSON.stringify({ valid: true });
 				} catch (validationError: unknown) {
 					const message =
@@ -85,6 +87,6 @@ export const ocPhase = tool({
 		to: tool.schema.string().optional().describe("Target phase for validate subcommand"),
 	},
 	async execute(args) {
-		return phaseCore(args, join(process.cwd(), ".opencode-assets"));
+		return phaseCore(args, getProjectArtifactDir(process.cwd()));
 	},
 });

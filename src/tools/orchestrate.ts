@@ -4,6 +4,7 @@ import { completePhase, getNextPhase } from "../orchestrator/phase";
 import { createInitialState, loadState, saveState } from "../orchestrator/state";
 import type { Phase } from "../orchestrator/types";
 import { ensureGitignore } from "../utils/gitignore";
+import { getProjectArtifactDir } from "../utils/paths";
 
 const PHASE_AGENTS: Readonly<Record<Phase, string>> = Object.freeze({
 	RECON: "oc-researcher",
@@ -60,6 +61,8 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 		if (state !== null) {
 			// If result provided -> complete current phase and advance
 			if (args.result) {
+				const truncatedResult =
+					args.result.length > 4000 ? `${args.result.slice(0, 4000)}... [truncated]` : args.result;
 				const currentPhase = state.currentPhase;
 
 				if (currentPhase === null) {
@@ -90,7 +93,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 				return JSON.stringify({
 					action: "dispatch",
 					agent,
-					prompt: `${nextPhase}: Continue pipeline for "${state.idea}". Previous phase result: ${args.result}`,
+					prompt: `${nextPhase}: Continue pipeline for "${state.idea}". Previous phase result: ${truncatedResult}`,
 					phase: nextPhase,
 					progress: `Advancing from ${currentPhase} to ${nextPhase}`,
 				});
@@ -132,6 +135,6 @@ export const ocOrchestrate = tool({
 			.describe("Result from previous agent to advance the pipeline"),
 	},
 	async execute(args) {
-		return orchestrateCore(args, join(process.cwd(), ".opencode-assets"));
+		return orchestrateCore(args, getProjectArtifactDir(process.cwd()));
 	},
 });

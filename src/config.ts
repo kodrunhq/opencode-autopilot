@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { ensureDir, isEnoentError } from "./utils/fs-helpers";
@@ -114,7 +114,9 @@ export async function saveConfig(
 	configPath: string = CONFIG_PATH,
 ): Promise<void> {
 	await ensureDir(dirname(configPath));
-	await writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
+	const tmpPath = `${configPath}.tmp.${Date.now()}`;
+	await writeFile(tmpPath, JSON.stringify(config, null, 2), "utf-8");
+	await rename(tmpPath, configPath);
 }
 
 export function isFirstLoad(config: PluginConfig | null): boolean {

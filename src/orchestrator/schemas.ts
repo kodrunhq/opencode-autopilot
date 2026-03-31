@@ -16,30 +16,30 @@ export const phaseSchema = z.enum(PHASES);
 export const phaseStatusSchema = z.object({
 	name: phaseSchema,
 	status: z.enum(["PENDING", "IN_PROGRESS", "DONE", "SKIPPED"]),
-	completedAt: z.string().nullable().default(null),
+	completedAt: z.string().max(128).nullable().default(null),
 	confidence: z.enum(["HIGH", "MEDIUM", "LOW"]).nullable().default(null),
 });
 
 export const decisionEntrySchema = z.object({
-	timestamp: z.string(),
-	phase: z.string(),
-	agent: z.string(),
-	decision: z.string(),
-	rationale: z.string(),
+	timestamp: z.string().max(128),
+	phase: z.string().max(128),
+	agent: z.string().max(128),
+	decision: z.string().max(2048),
+	rationale: z.string().max(2048),
 });
 
 export const confidenceEntrySchema = z.object({
-	timestamp: z.string(),
-	phase: z.string(),
-	agent: z.string(),
-	area: z.string(),
+	timestamp: z.string().max(128),
+	phase: z.string().max(128),
+	agent: z.string().max(128),
+	area: z.string().max(128),
 	level: z.enum(["HIGH", "MEDIUM", "LOW"]),
-	rationale: z.string(),
+	rationale: z.string().max(2048),
 });
 
 export const taskSchema = z.object({
 	id: z.number(),
-	title: z.string(),
+	title: z.string().max(2048),
 	status: z.enum(["PENDING", "IN_PROGRESS", "DONE", "FAILED", "SKIPPED", "BLOCKED"]),
 	wave: z.number(),
 	attempt: z.number().default(0),
@@ -49,13 +49,13 @@ export const taskSchema = z.object({
 export const pipelineStateSchema = z.object({
 	schemaVersion: z.literal(2),
 	status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"]),
-	idea: z.string(),
+	idea: z.string().max(4096),
 	currentPhase: phaseSchema.nullable(),
-	startedAt: z.string(),
-	lastUpdatedAt: z.string(),
+	startedAt: z.string().max(128),
+	lastUpdatedAt: z.string().max(128),
 	phases: z.array(phaseStatusSchema),
-	decisions: z.array(decisionEntrySchema).default([]),
-	confidence: z.array(confidenceEntrySchema).default([]),
+	decisions: z.array(decisionEntrySchema).max(1000).default([]),
+	confidence: z.array(confidenceEntrySchema).max(1000).default([]),
 	tasks: z.array(taskSchema).default([]),
 	arenaConfidence: z.enum(["HIGH", "MEDIUM", "LOW"]).nullable().default(null),
 	exploreTriggered: z.boolean().default(false),

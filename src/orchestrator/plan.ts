@@ -16,15 +16,10 @@ export function indexTasks(tasks: readonly Task[]): readonly Task[] {
  * Groups tasks by wave number into a ReadonlyMap.
  */
 export function groupByWave(tasks: readonly Task[]): ReadonlyMap<number, readonly Task[]> {
-	const map = new Map<number, Task[]>();
+	const map = new Map<number, readonly Task[]>();
 
 	for (const task of tasks) {
-		const existing = map.get(task.wave);
-		if (existing) {
-			existing.push(task);
-		} else {
-			map.set(task.wave, [task]);
-		}
+		map.set(task.wave, [...(map.get(task.wave) ?? []), task]);
 	}
 
 	return map;

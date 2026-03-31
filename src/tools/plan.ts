@@ -1,7 +1,7 @@
-import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { countByStatus, groupByWave } from "../orchestrator/plan";
 import { loadState } from "../orchestrator/state";
+import { getProjectArtifactDir } from "../utils/paths";
 
 interface PlanArgs {
 	readonly subcommand: string;
@@ -51,6 +51,6 @@ export const ocPlan = tool({
 		subcommand: tool.schema.enum(["waves", "status-count"]).describe("Operation to perform"),
 	},
 	async execute(args) {
-		return planCore(args, join(process.cwd(), ".opencode-assets"));
+		return planCore(args, getProjectArtifactDir(process.cwd()));
 	},
 });

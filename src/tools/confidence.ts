@@ -1,8 +1,8 @@
-import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { appendConfidence, filterByPhase, summarizeConfidence } from "../orchestrator/confidence";
+import { phaseSchema } from "../orchestrator/schemas";
 import { loadState, saveState } from "../orchestrator/state";
-import type { Phase } from "../orchestrator/types";
+import { getProjectArtifactDir } from "../utils/paths";
 
 interface ConfidenceArgs {
 	readonly subcommand: string;
@@ -57,7 +57,8 @@ export async function confidenceCore(args: ConfidenceArgs, artifactDir: string):
 				if (state === null) {
 					return JSON.stringify({ error: "no_state" });
 				}
-				const filtered = filterByPhase(state.confidence, args.phase as Phase);
+				const validPhase = phaseSchema.parse(args.phase);
+				const filtered = filterByPhase(state.confidence, validPhase);
 				return JSON.stringify({ entries: filtered });
 			}
 
@@ -87,6 +88,6 @@ export const ocConfidence = tool({
 		rationale: tool.schema.string().optional().describe("Rationale text for append"),
 	},
 	async execute(args) {
-		return confidenceCore(args, join(process.cwd(), ".opencode-assets"));
+		return confidenceCore(args, getProjectArtifactDir(process.cwd()));
 	},
 });

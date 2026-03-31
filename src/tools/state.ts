@@ -1,6 +1,8 @@
-import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { appendDecision, loadState, patchState, saveState } from "../orchestrator/state";
+import { getProjectArtifactDir } from "../utils/paths";
+
+const PATCHABLE_FIELDS = ["status", "arenaConfidence", "exploreTriggered"] as const;
 
 interface StateArgs {
 	readonly subcommand: string;
@@ -38,6 +40,11 @@ export async function stateCore(args: StateArgs, artifactDir: string): Promise<s
 			case "patch": {
 				if (!args.field) {
 					return JSON.stringify({ error: "field required" });
+				}
+				if (!(PATCHABLE_FIELDS as readonly string[]).includes(args.field)) {
+					return JSON.stringify({
+						error: `field not patchable: ${args.field}. Allowed: ${PATCHABLE_FIELDS.join(", ")}`,
+					});
 				}
 				const state = await loadState(artifactDir);
 				if (state === null) {
@@ -92,6 +99,6 @@ export const ocState = tool({
 		rationale: tool.schema.string().optional().describe("Rationale text for append-decision"),
 	},
 	async execute(args) {
-		return stateCore(args, join(process.cwd(), ".opencode-assets"));
+		return stateCore(args, getProjectArtifactDir(process.cwd()));
 	},
 });
