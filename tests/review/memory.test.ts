@@ -2,8 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createEmptyMemory, loadReviewMemory, pruneMemory, saveReviewMemory } from "../../src/review/memory";
 import type { ReviewMemory } from "../../src/review/memory";
+import {
+	createEmptyMemory,
+	loadReviewMemory,
+	pruneMemory,
+	saveReviewMemory,
+} from "../../src/review/memory";
 
 let tempDir: string;
 
@@ -53,11 +58,7 @@ describe("loadReviewMemory", () => {
 		const memoryDir = join(tempDir, ".opencode-assets");
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(memoryDir, { recursive: true });
-		await writeFile(
-			join(memoryDir, "review-memory.json"),
-			"not valid json {{{",
-			"utf-8",
-		);
+		await writeFile(join(memoryDir, "review-memory.json"), "not valid json {{{", "utf-8");
 
 		await expect(loadReviewMemory(tempDir)).rejects.toThrow();
 	});

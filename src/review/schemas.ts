@@ -38,6 +38,31 @@ export const reviewReportSchema = z.object({
 	summary: z.string().max(4096),
 });
 
+export const falsePositiveSchema = z.object({
+	finding: reviewFindingSchema,
+	reason: z.string().max(1024),
+	markedAt: z.string().max(128),
+});
+
+export const reviewMemorySchema = z.object({
+	schemaVersion: z.literal(1),
+	projectProfile: z.object({
+		stacks: z.array(z.string()),
+		lastDetectedAt: z.string(),
+	}),
+	recentFindings: z.array(reviewFindingSchema),
+	falsePositives: z.array(falsePositiveSchema),
+	lastReviewedAt: z.string().nullable(),
+});
+
+export const reviewStateSchema = z.object({
+	stage: z.number().int().min(1).max(5),
+	selectedAgentNames: z.array(z.string()),
+	accumulatedFindings: z.array(reviewFindingSchema),
+	scope: z.string(),
+	startedAt: z.string(),
+});
+
 export const reviewConfigSchema = z.object({
 	parallel: z.boolean().default(true),
 	maxFixAttempts: z.number().int().min(0).max(10).default(3),

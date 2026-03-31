@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	buildFixInstructions,
-	determineFixableFindings,
-} from "../../src/review/fix-cycle";
+import { buildFixInstructions, determineFixableFindings } from "../../src/review/fix-cycle";
 import type { ReviewFinding } from "../../src/review/types";
 
 function makeFinding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
@@ -43,26 +40,20 @@ describe("determineFixableFindings", () => {
 	});
 
 	test("skips findings with vague suggestions containing 'consider'", () => {
-		const findings = [
-			makeFinding({ fix: "You should consider using a different approach" }),
-		];
+		const findings = [makeFinding({ fix: "You should consider using a different approach" })];
 		const result = determineFixableFindings(findings);
 		expect(result.fixable.length).toBe(0);
 		expect(result.skipped[0].reason).toContain("vague");
 	});
 
 	test("skips findings with vague suggestions containing 'might'", () => {
-		const findings = [
-			makeFinding({ fix: "You might want to refactor this code" }),
-		];
+		const findings = [makeFinding({ fix: "You might want to refactor this code" })];
 		const result = determineFixableFindings(findings);
 		expect(result.fixable.length).toBe(0);
 	});
 
 	test("skips findings with vague suggestions containing 'perhaps'", () => {
-		const findings = [
-			makeFinding({ fix: "Perhaps this should be different" }),
-		];
+		const findings = [makeFinding({ fix: "Perhaps this should be different" })];
 		const result = determineFixableFindings(findings);
 		expect(result.fixable.length).toBe(0);
 	});
