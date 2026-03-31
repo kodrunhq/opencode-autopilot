@@ -17,9 +17,6 @@ export const BUILT_IN_COMMANDS: ReadonlySet<string> = new Set([
 	"bug",
 ]);
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: control chars are intentionally rejected for filesystem safety
-const FILESYSTEM_UNSAFE_REGEX = /[<>:"/\\|?*\x00-\x1f]/;
-
 interface ValidationResult {
 	readonly valid: boolean;
 	readonly error?: string;
@@ -53,13 +50,6 @@ export function validateCommandName(name: string): ValidationResult {
 		return Object.freeze({
 			valid: false,
 			error: `Command name '${name}' conflicts with a built-in OpenCode command. Choose a different name.`,
-		});
-	}
-
-	if (FILESYSTEM_UNSAFE_REGEX.test(name)) {
-		return Object.freeze({
-			valid: false,
-			error: `Command name '${name}' contains characters not safe for filenames.`,
 		});
 	}
 

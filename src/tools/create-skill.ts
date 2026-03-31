@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { generateSkillMarkdown } from "../templates/skill-template";
-import { ensureDir, fileExists } from "../utils/fs-helpers";
+import { ensureDir } from "../utils/fs-helpers";
 import { getGlobalConfigDir } from "../utils/paths";
 import { validateAssetName } from "../utils/validators";
 
@@ -22,10 +22,6 @@ export async function createSkillCore(args: CreateSkillArgs, baseDir: string): P
 	const skillDir = join(baseDir, "skills", args.name);
 	const filePath = join(skillDir, "SKILL.md");
 
-	if (await fileExists(filePath)) {
-		return `Error: Skill '${args.name}' already exists at ${filePath}. Choose a different name or delete the existing skill directory first.`;
-	}
-
 	const markdown = generateSkillMarkdown({
 		name: args.name,
 		description: args.description,
@@ -33,8 +29,20 @@ export async function createSkillCore(args: CreateSkillArgs, baseDir: string): P
 		compatibility: args.compatibility,
 	});
 
-	await ensureDir(skillDir);
-	await writeFile(filePath, markdown, "utf-8");
+	try {
+		await ensureDir(skillDir);
+		await writeFile(filePath, markdown, { encoding: "utf-8", flag: "wx" });
+	} catch (error) {
+		if (
+			error instanceof Error &&
+			"code" in error &&
+			(error as NodeJS.ErrnoException).code === "EEXIST"
+		) {
+			return `Error: Skill '${args.name}' already exists at ${filePath}. Choose a different name or delete the existing skill directory first.`;
+		}
+		const message = error instanceof Error ? error.message : String(error);
+		return `Error: Failed to write skill: ${message}`;
+	}
 
 	return `Skill '${args.name}' created at ${filePath}. Restart OpenCode to use it.`;
 }
@@ -53,8 +61,12 @@ export const ocCreateSkill = tool({
 			.min(1)
 			.max(1024)
 			.describe("What the skill provides to the AI agent"),
-		license: tool.schema.string().optional().describe("License (e.g., 'MIT')"),
-		compatibility: tool.schema.string().optional().describe("Compatibility (e.g., 'opencode')"),
+		license: tool.schema.string().max(64).optional().describe("License (e.g., 'MIT')"),
+		compatibility: tool.schema
+			.string()
+			.max(64)
+			.optional()
+			.describe("Compatibility (e.g., 'opencode')"),
 	},
 	async execute(args) {
 		return createSkillCore(args, getGlobalConfigDir());

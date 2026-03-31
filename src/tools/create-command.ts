@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { generateCommandMarkdown } from "../templates/command-template";
-import { ensureDir, fileExists } from "../utils/fs-helpers";
+import { ensureDir } from "../utils/fs-helpers";
 import { getGlobalConfigDir } from "../utils/paths";
 import { validateCommandName } from "../utils/validators";
 
@@ -22,10 +22,6 @@ export async function createCommandCore(args: CreateCommandArgs, baseDir: string
 	const commandsDir = join(baseDir, "commands");
 	const filePath = join(commandsDir, `${args.name}.md`);
 
-	if (await fileExists(filePath)) {
-		return `Error: Command '${args.name}' already exists at ${filePath}. Choose a different name or delete the existing file first.`;
-	}
-
 	const markdown = generateCommandMarkdown({
 		name: args.name,
 		description: args.description,
@@ -33,8 +29,20 @@ export async function createCommandCore(args: CreateCommandArgs, baseDir: string
 		model: args.model,
 	});
 
-	await ensureDir(commandsDir);
-	await writeFile(filePath, markdown, "utf-8");
+	try {
+		await ensureDir(commandsDir);
+		await writeFile(filePath, markdown, { encoding: "utf-8", flag: "wx" });
+	} catch (error) {
+		if (
+			error instanceof Error &&
+			"code" in error &&
+			(error as NodeJS.ErrnoException).code === "EEXIST"
+		) {
+			return `Error: Command '${args.name}' already exists at ${filePath}. Choose a different name or delete the existing file first.`;
+		}
+		const message = error instanceof Error ? error.message : String(error);
+		return `Error: Failed to write command: ${message}`;
+	}
 
 	return `Command '${args.name}' created at ${filePath}. Restart OpenCode to use it.`;
 }
@@ -55,9 +63,10 @@ export const ocCreateCommand = tool({
 			.describe("What the command does when invoked"),
 		agent: tool.schema
 			.string()
+			.max(64)
 			.optional()
 			.describe("Agent to use when running this command (e.g., 'code-reviewer')"),
-		model: tool.schema.string().optional().describe("Model override for this command"),
+		model: tool.schema.string().max(128).optional().describe("Model override for this command"),
 	},
 	async execute(args) {
 		return createCommandCore(args, getGlobalConfigDir());

@@ -10,15 +10,9 @@ export interface CommandTemplateInput {
 export function generateCommandMarkdown(input: CommandTemplateInput): string {
 	const frontmatter: Record<string, unknown> = {
 		description: input.description,
+		...(input.agent !== undefined && { agent: input.agent }),
+		...(input.model !== undefined && { model: input.model }),
 	};
-
-	if (input.agent !== undefined) {
-		frontmatter.agent = input.agent;
-	}
-
-	if (input.model !== undefined) {
-		frontmatter.model = input.model;
-	}
 
 	return `---
 ${stringify(frontmatter).trim()}

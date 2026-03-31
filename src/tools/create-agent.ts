@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { generateAgentMarkdown } from "../templates/agent-template";
-import { ensureDir, fileExists } from "../utils/fs-helpers";
+import { ensureDir } from "../utils/fs-helpers";
 import { getGlobalConfigDir } from "../utils/paths";
 import { validateAssetName } from "../utils/validators";
 
@@ -23,10 +23,6 @@ export async function createAgentCore(args: CreateAgentArgs, baseDir: string): P
 	const agentsDir = join(baseDir, "agents");
 	const filePath = join(agentsDir, `${args.name}.md`);
 
-	if (await fileExists(filePath)) {
-		return `Error: Agent '${args.name}' already exists at ${filePath}. Choose a different name or delete the existing file first.`;
-	}
-
 	const markdown = generateAgentMarkdown({
 		name: args.name,
 		description: args.description,
@@ -35,8 +31,20 @@ export async function createAgentCore(args: CreateAgentArgs, baseDir: string): P
 		temperature: args.temperature,
 	});
 
-	await ensureDir(agentsDir);
-	await writeFile(filePath, markdown, "utf-8");
+	try {
+		await ensureDir(agentsDir);
+		await writeFile(filePath, markdown, { encoding: "utf-8", flag: "wx" });
+	} catch (error) {
+		if (
+			error instanceof Error &&
+			"code" in error &&
+			(error as NodeJS.ErrnoException).code === "EEXIST"
+		) {
+			return `Error: Agent '${args.name}' already exists at ${filePath}. Choose a different name or delete the existing file first.`;
+		}
+		const message = error instanceof Error ? error.message : String(error);
+		return `Error: Failed to write agent: ${message}`;
+	}
 
 	return `Agent '${args.name}' created at ${filePath}. Restart OpenCode to use it.`;
 }
@@ -55,7 +63,11 @@ export const ocCreateAgent = tool({
 			.enum(["primary", "subagent", "all"])
 			.default("subagent")
 			.describe("Agent mode: primary (main agent), subagent (invoked via @mention), or all (both)"),
-		model: tool.schema.string().optional().describe("Model identifier (omit for model-agnostic)"),
+		model: tool.schema
+			.string()
+			.max(128)
+			.optional()
+			.describe("Model identifier (omit for model-agnostic)"),
 		temperature: tool.schema
 			.number()
 			.min(0)

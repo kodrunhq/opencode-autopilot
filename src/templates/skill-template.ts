@@ -11,15 +11,9 @@ export function generateSkillMarkdown(input: SkillTemplateInput): string {
 	const frontmatter: Record<string, unknown> = {
 		name: input.name,
 		description: input.description,
+		...(input.license !== undefined && { license: input.license }),
+		...(input.compatibility !== undefined && { compatibility: input.compatibility }),
 	};
-
-	if (input.license !== undefined) {
-		frontmatter.license = input.license;
-	}
-
-	if (input.compatibility !== undefined) {
-		frontmatter.compatibility = input.compatibility;
-	}
 
 	return `---
 ${stringify(frontmatter).trim()}
