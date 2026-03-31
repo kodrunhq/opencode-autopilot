@@ -1,0 +1,219 @@
+import { describe, expect, test } from "bun:test";
+import { REVIEW_AGENTS } from "../../src/review/agents/index";
+import {
+	buildCrossVerificationPrompts,
+	condenseFinding,
+} from "../../src/review/cross-verification";
+import { computeDiffRelevance, selectAgents } from "../../src/review/selection";
+import type { ReviewFinding } from "../../src/review/types";
+
+// ---- Helper factories ----
+
+function makeFinding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
+	return {
+		severity: "WARNING",
+		domain: "logic",
+		title: "Missing null check",
+		file: "src/index.ts",
+		line: 42,
+		agent: "logic-auditor",
+		source: "phase1",
+		evidence: "The variable could be null",
+		problem: "Null dereference possible",
+		fix: "Add null check before access",
+		...overrides,
+	};
+}
+
+// A fake agent with a non-matching stack for exclusion tests
+const rustOnlyAgent = Object.freeze({
+	name: "rust-only-agent",
+	description: "A test agent that only applies to Rust",
+	relevantStacks: Object.freeze(["rust"] as readonly string[]),
+	severityFocus: Object.freeze(["CRITICAL"] as readonly string[]),
+	prompt: "Test prompt {{DIFF}} {{PRIOR_FINDINGS}} {{MEMORY}}",
+});
+
+// ---- selectAgents ----
+
+describe("selectAgents", () => {
+	test("with empty detectedStacks returns all universal agents", () => {
+		const result = selectAgents(
+			[],
+			{ hasTests: false, hasAuth: false, hasConfig: false, fileCount: 1 },
+			REVIEW_AGENTS,
+		);
+		// All REVIEW_AGENTS have relevantStacks=[], so all should pass
+		expect(result.selected.length).toBe(REVIEW_AGENTS.length);
+		expect(result.excluded.length).toBe(0);
+	});
+
+	test("with specific stacks still returns all universal agents", () => {
+		const result = selectAgents(
+			["node", "typescript"],
+			{ hasTests: false, hasAuth: false, hasConfig: false, fileCount: 2 },
+			REVIEW_AGENTS,
+		);
+		expect(result.selected.length).toBe(REVIEW_AGENTS.length);
+	});
+
+	test("excludes agent with non-matching stack", () => {
+		const agentsWithRust = [...REVIEW_AGENTS, rustOnlyAgent] as const;
+		const result = selectAgents(
+			["node"],
+			{ hasTests: false, hasAuth: false, hasConfig: false, fileCount: 1 },
+			agentsWithRust,
+		);
+		expect(result.selected.some((a) => a.name === "rust-only-agent")).toBe(false);
+		expect(result.excluded.length).toBe(1);
+		expect(result.excluded[0].agent).toBe("rust-only-agent");
+	});
+
+	test("excluded list includes reason with stack info", () => {
+		const agentsWithRust = [...REVIEW_AGENTS, rustOnlyAgent] as const;
+		const result = selectAgents(
+			["node"],
+			{ hasTests: false, hasAuth: false, hasConfig: false, fileCount: 1 },
+			agentsWithRust,
+		);
+		expect(result.excluded[0].reason).toContain("rust");
+		expect(result.excluded[0].reason).toContain("node");
+	});
+
+	test("returns frozen result", () => {
+		const result = selectAgents(
+			[],
+			{ hasTests: false, hasAuth: false, hasConfig: false, fileCount: 1 },
+			REVIEW_AGENTS,
+		);
+		expect(Object.isFrozen(result)).toBe(true);
+	});
+});
+
+// ---- computeDiffRelevance ----
+
+describe("computeDiffRelevance", () => {
+	const secAgent = REVIEW_AGENTS.find((a) => a.name === "security-auditor");
+	const testAgent = REVIEW_AGENTS.find((a) => a.name === "test-interrogator");
+
+	test("base score is 1.0 for any agent", () => {
+		const agent = REVIEW_AGENTS[0];
+		const score = computeDiffRelevance(agent, {
+			hasTests: false,
+			hasAuth: false,
+			hasConfig: false,
+			fileCount: 1,
+		});
+		expect(score).toBeGreaterThanOrEqual(1.0);
+	});
+
+	test("security-auditor gets higher score when hasAuth", () => {
+		if (!secAgent) throw new Error("security-auditor not found");
+		const withAuth = computeDiffRelevance(secAgent, {
+			hasTests: false,
+			hasAuth: true,
+			hasConfig: false,
+			fileCount: 1,
+		});
+		const withoutAuth = computeDiffRelevance(secAgent, {
+			hasTests: false,
+			hasAuth: false,
+			hasConfig: false,
+			fileCount: 1,
+		});
+		expect(withAuth).toBeGreaterThan(withoutAuth);
+	});
+
+	test("test-interrogator gets higher score when hasTests is false", () => {
+		if (!testAgent) throw new Error("test-interrogator not found");
+		const noTests = computeDiffRelevance(testAgent, {
+			hasTests: false,
+			hasAuth: false,
+			hasConfig: false,
+			fileCount: 1,
+		});
+		const withTests = computeDiffRelevance(testAgent, {
+			hasTests: true,
+			hasAuth: false,
+			hasConfig: false,
+			fileCount: 1,
+		});
+		expect(noTests).toBeGreaterThan(withTests);
+	});
+});
+
+// ---- condenseFinding ----
+
+describe("condenseFinding", () => {
+	test("produces correct 1-line format", () => {
+		const finding = makeFinding({
+			agent: "logic-auditor",
+			severity: "CRITICAL",
+			file: "src/main.ts",
+			line: 10,
+			title: "Null dereference on user input",
+		});
+		const result = condenseFinding(finding);
+		expect(result).toContain("[logic-auditor]");
+		expect(result).toContain("[CRITICAL]");
+		expect(result).toContain("[src/main.ts:10]");
+		expect(result).toContain("Null dereference");
+	});
+
+	test("truncates long titles", () => {
+		const longTitle = "A".repeat(200);
+		const finding = makeFinding({ title: longTitle });
+		const result = condenseFinding(finding);
+		expect(result.length).toBeLessThan(250);
+	});
+});
+
+// ---- buildCrossVerificationPrompts ----
+
+describe("buildCrossVerificationPrompts", () => {
+	test("generates one prompt per agent", () => {
+		const agents = REVIEW_AGENTS.slice(0, 2);
+		const findingsByAgent = new Map<string, readonly ReviewFinding[]>([
+			[agents[0].name, [makeFinding({ agent: agents[0].name })]],
+			[agents[1].name, [makeFinding({ agent: agents[1].name })]],
+		]);
+		const prompts = buildCrossVerificationPrompts(agents, findingsByAgent, "diff content");
+		expect(prompts.length).toBe(2);
+	});
+
+	test("does NOT include agent's own findings in its prompt", () => {
+		const agents = REVIEW_AGENTS.slice(0, 2);
+		const findingsByAgent = new Map<string, readonly ReviewFinding[]>([
+			[agents[0].name, [makeFinding({ agent: agents[0].name, title: "OwnFindingA" })]],
+			[agents[1].name, [makeFinding({ agent: agents[1].name, title: "OwnFindingB" })]],
+		]);
+		const prompts = buildCrossVerificationPrompts(agents, findingsByAgent, "diff content");
+		const prompt0 = prompts.find((p) => p.name === agents[0].name);
+		const prompt1 = prompts.find((p) => p.name === agents[1].name);
+
+		// Agent 0's prompt should contain agent 1's finding, not its own
+		expect(prompt0?.prompt).toContain("OwnFindingB");
+		expect(prompt0?.prompt).not.toContain("OwnFindingA");
+
+		// Agent 1's prompt should contain agent 0's finding, not its own
+		expect(prompt1?.prompt).toContain("OwnFindingA");
+		expect(prompt1?.prompt).not.toContain("OwnFindingB");
+	});
+
+	test("includes PRIOR_FINDINGS section with condensed findings", () => {
+		const agents = REVIEW_AGENTS.slice(0, 2);
+		const findingsByAgent = new Map<string, readonly ReviewFinding[]>([
+			[agents[0].name, [makeFinding({ agent: agents[0].name })]],
+			[agents[1].name, []],
+		]);
+		const prompts = buildCrossVerificationPrompts(agents, findingsByAgent, "some diff");
+		const prompt1 = prompts.find((p) => p.name === agents[1].name);
+		// Agent 1 should see agent 0's findings
+		expect(prompt1?.prompt).toContain(agents[0].name);
+	});
+
+	test("returns frozen array", () => {
+		const prompts = buildCrossVerificationPrompts([], new Map(), "diff");
+		expect(Object.isFrozen(prompts)).toBe(true);
+	});
+});

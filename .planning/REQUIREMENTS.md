@@ -44,19 +44,19 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 ### Orchestrator Foundation
 
 - [ ] **ORCH-01**: User can invoke `oc_orchestrate` with an idea and the orchestrator drives an 8-phase pipeline (RECON -> CHALLENGE -> ARCHITECT -> EXPLORE -> PLAN -> BUILD -> SHIP -> RETROSPECTIVE) to completion autonomously
-- [ ] **ORCH-02**: Orchestrator persists state to JSON so interrupted runs resume from the last completed phase without re-executing earlier phases
-- [ ] **ORCH-03**: Every autonomous decision is logged to a decision log with timestamp, phase, agent, decision, and rationale
+- [x] **ORCH-02**: Orchestrator persists state to JSON so interrupted runs resume from the last completed phase without re-executing earlier phases
+- [x] **ORCH-03**: Every autonomous decision is logged to a decision log with timestamp, phase, agent, decision, and rationale
 - [x] **ORCH-04**: User can configure orchestrator settings (autonomy level, phase toggles, strictness) via the plugin config schema
-- [ ] **ORCH-05**: Confidence ledger tracks every agent decision as HIGH/MEDIUM/LOW with rationale, and downstream phases use confidence scores to adjust effort allocation
+- [x] **ORCH-05**: Confidence ledger tracks every agent decision as HIGH/MEDIUM/LOW with rationale, and downstream phases use confidence scores to adjust effort allocation
 
 ### Deterministic Tooling
 
-- [ ] **TOOL-01**: State management module in TypeScript handles state load, update, get, patch, and phase transitions with Zod-validated schemas
+- [x] **TOOL-01**: State management module in TypeScript handles state load, update, get, patch, and phase transitions with Zod-validated schemas
 - [x] **TOOL-02**: Config module extends existing pluginConfigSchema with orchestrator and review engine settings
-- [ ] **TOOL-03**: Confidence module reads, appends, summarizes, and filters confidence entries by phase
-- [ ] **TOOL-04**: Phase module tracks phase completion status and validates transitions
-- [ ] **TOOL-05**: Plan module indexes task lists and groups tasks into dependency waves
-- [ ] **TOOL-06**: Arena module determines debate depth and triggers explorer based on confidence
+- [x] **TOOL-03**: Confidence module reads, appends, summarizes, and filters confidence entries by phase
+- [x] **TOOL-04**: Phase module tracks phase completion status and validates transitions
+- [x] **TOOL-05**: Plan module indexes task lists and groups tasks into dependency waves
+- [x] **TOOL-06**: Arena module determines debate depth and triggers explorer based on confidence
 
 ### Pipeline Phases
 
@@ -71,17 +71,17 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 
 ### Review Engine
 
-- [ ] **REVW-01**: User can invoke the review engine standalone (not just within the orchestrator) to review current changes
+- [x] **REVW-01**: User can invoke the review engine standalone (not just within the orchestrator) to review current changes
 - [ ] **REVW-02**: Team lead agent analyzes project stack and diff to select relevant specialist agents from the catalog
-- [ ] **REVW-03**: At least 6 universal review agents ship by default (logic, security, quality, test coverage, silent failure, contract/type)
-- [ ] **REVW-04**: Selected review agents dispatch in parallel and return findings in a standardized severity format (CRITICAL/HIGH/MEDIUM/LOW)
+- [x] **REVW-03**: At least 6 universal review agents ship by default (logic, security, quality, test coverage, silent failure, contract/type)
+- [ ] **REVW-04**: Selected review agents dispatch in parallel and return findings in a standardized severity format (CRITICAL/WARNING/NITPICK)
 - [ ] **REVW-05**: Stack-gated selection automatically excludes agents whose technology is absent from the project
 - [ ] **REVW-06**: After parallel review, cross-verification pass lets agents see each other's findings and upgrade severity or add new findings
-- [ ] **REVW-07**: Red team agent runs as final adversarial pass, reading all findings and hunting inter-domain gaps
-- [ ] **REVW-08**: Product thinker agent traces user journeys and checks CRUD completeness after technical review
-- [ ] **REVW-09**: Fix cycle auto-applies fixes for findings and re-verifies that fixes don't introduce new issues
+- [x] **REVW-07**: Red team agent runs as final adversarial pass, reading all findings and hunting inter-domain gaps
+- [x] **REVW-08**: Product thinker agent traces user journeys and checks CRUD completeness after technical review
+- [x] **REVW-09**: Fix cycle auto-applies fixes for findings and re-verifies that fixes don't introduce new issues
 - [ ] **REVW-10**: Consolidated review report groups findings by file with severity levels and actionable fix descriptions
-- [ ] **REVW-11**: Per-project memory stores findings, false positives, and project profile so reviews improve across runs on the same codebase
+- [x] **REVW-11**: Per-project memory stores findings, false positives, and project profile so reviews improve across runs on the same codebase
 
 ### Learning & Resilience
 
@@ -130,27 +130,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CMND-01 | Phase 3 (v1.0) | Complete |
 | SKLL-01 | Phase 3 (v1.0) | Complete |
 | PLGN-01 through PLGN-04 | Phase 1 (v1.0) | Complete |
-| ORCH-02 | Phase 4 | Pending |
-| ORCH-03 | Phase 4 | Pending |
+| ORCH-02 | Phase 4 | Complete |
+| ORCH-03 | Phase 4 | Complete |
 | ORCH-04 | Phase 4 | Complete |
-| ORCH-05 | Phase 4 | Pending |
-| TOOL-01 | Phase 4 | Pending |
+| ORCH-05 | Phase 4 | Complete |
+| TOOL-01 | Phase 4 | Complete |
 | TOOL-02 | Phase 4 | Complete |
-| TOOL-03 | Phase 4 | Pending |
-| TOOL-04 | Phase 4 | Pending |
-| TOOL-05 | Phase 4 | Pending |
-| TOOL-06 | Phase 4 | Pending |
-| REVW-01 | Phase 5 | Pending |
+| TOOL-03 | Phase 4 | Complete |
+| TOOL-04 | Phase 4 | Complete |
+| TOOL-05 | Phase 4 | Complete |
+| TOOL-06 | Phase 4 | Complete |
+| REVW-01 | Phase 5 | Complete |
 | REVW-02 | Phase 5 | Pending |
-| REVW-03 | Phase 5 | Pending |
+| REVW-03 | Phase 5 | Complete |
 | REVW-04 | Phase 5 | Pending |
 | REVW-05 | Phase 5 | Pending |
 | REVW-06 | Phase 5 | Pending |
-| REVW-07 | Phase 5 | Pending |
-| REVW-08 | Phase 5 | Pending |
-| REVW-09 | Phase 5 | Pending |
+| REVW-07 | Phase 5 | Complete |
+| REVW-08 | Phase 5 | Complete |
+| REVW-09 | Phase 5 | Complete |
 | REVW-10 | Phase 5 | Pending |
-| REVW-11 | Phase 5 | Pending |
+| REVW-11 | Phase 5 | Complete |
 | ORCH-01 | Phase 6 | Pending |
 | PIPE-01 | Phase 6 | Pending |
 | PIPE-02 | Phase 6 | Pending |

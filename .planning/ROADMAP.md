@@ -112,7 +112,10 @@ Plans:
   3. At least 6 universal review agents (logic, security, quality, test coverage, silent failure, contract/type) run in parallel and return findings in CRITICAL/HIGH/MEDIUM/LOW format
   4. After parallel review, a cross-verification pass and red team adversarial pass surface inter-domain gaps and upgrade severities where warranted
   5. The fix cycle auto-applies fixes for actionable findings and re-verifies that fixes do not introduce new issues
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [x] 05-01-PLAN.md -- Review engine data layer: schemas, agent catalog, stack gate, team selection, severity, finding builder
 
 ### Phase 6: Orchestrator Pipeline
 **Goal**: Users give the orchestrator an idea and it autonomously drives through all 8 phases -- research, challenge, architect, explore, plan, build, ship, retrospective -- to deliver a completed result
@@ -147,6 +150,6 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 | 2. Creation Tooling | v1.0 | 2/2 | Complete | - |
 | 3. Curated Assets | v1.0 | 2/2 | Complete | - |
 | 4. Foundation Infrastructure | v2.0 | 0/4 | Planning | - |
-| 5. Review Engine | v2.0 | 0/0 | Not started | - |
+| 5. Review Engine | v2.0 | 1/1 | In Progress | - |
 | 6. Orchestrator Pipeline | v2.0 | 0/0 | Not started | - |
 | 7. Learning & Resilience | v2.0 | 0/0 | Not started | - |
