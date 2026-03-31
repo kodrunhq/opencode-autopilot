@@ -13,7 +13,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CRTL-02**: User can type `/new-skill` in-session and get a new skill directory + SKILL.md created with proper frontmatter and structure
 - [ ] **CRTL-03**: User can type `/new-command` in-session and get a new command markdown file created with template and description
 - [ ] **CRTL-04**: Creation tools validate names (lowercase alphanumeric, hyphens, 1-64 chars for skills) and prevent path conflicts
-- [ ] **CRTL-05**: Creation tools support both project-local (`.opencode/`) and global (`~/.config/opencode/`) installation targets
+- [ ] **CRTL-05**: Creation tools write assets to global `~/.config/opencode/` target (user decision D-10: always global for simplicity)
 
 ### Agents
 
