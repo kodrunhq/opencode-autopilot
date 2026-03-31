@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { PipelineState } from "../src/orchestrator/types";
 
 // Minimal state factory for handler tests
@@ -126,7 +126,15 @@ describe("handleArchitect", () => {
 		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
 		const state = makeState({
 			currentPhase: "ARCHITECT",
-			confidence: [{ phase: "RECON", agent: "oc-researcher", level: "HIGH", signal: "strong", timestamp: new Date().toISOString() }],
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "HIGH",
+					signal: "strong",
+					timestamp: new Date().toISOString(),
+				},
+			],
 		});
 		const result = await handleArchitect(state, "/tmp/test-artifacts");
 
@@ -139,21 +147,37 @@ describe("handleArchitect", () => {
 		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
 		const state = makeState({
 			currentPhase: "ARCHITECT",
-			confidence: [{ phase: "RECON", agent: "oc-researcher", level: "MEDIUM", signal: "moderate", timestamp: new Date().toISOString() }],
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "MEDIUM",
+					signal: "moderate",
+					timestamp: new Date().toISOString(),
+				},
+			],
 		});
 		const result = await handleArchitect(state, "/tmp/test-artifacts");
 
 		expect(result.action).toBe("dispatch_multi");
 		expect(result.agents).toHaveLength(2);
-		expect(result.agents![0].agent).toBe("oc-architect");
-		expect(result.agents![1].agent).toBe("oc-architect");
+		expect(result.agents?.[0].agent).toBe("oc-architect");
+		expect(result.agents?.[1].agent).toBe("oc-architect");
 	});
 
 	test("LOW confidence (depth=3) returns dispatch_multi with 3 entries", async () => {
 		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
 		const state = makeState({
 			currentPhase: "ARCHITECT",
-			confidence: [{ phase: "RECON", agent: "oc-researcher", level: "LOW", signal: "weak", timestamp: new Date().toISOString() }],
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "LOW",
+					signal: "weak",
+					timestamp: new Date().toISOString(),
+				},
+			],
 		});
 		const result = await handleArchitect(state, "/tmp/test-artifacts");
 
@@ -162,11 +186,7 @@ describe("handleArchitect", () => {
 	});
 
 	test("after proposals exist, dispatches oc-critic", async () => {
-		// Mock fileExists to simulate proposals existing but no critique
-		const fsHelpers = await import("../src/utils/fs-helpers");
-		const originalFileExists = fsHelpers.fileExists;
-
-		// We need to test with actual files, so create temp structure
+		// Test with actual files to verify artifact-existence idempotency
 		const { mkdirSync, writeFileSync, rmSync } = await import("node:fs");
 		const tmpDir = `/tmp/test-architect-critic-${Date.now()}`;
 		const phaseDir = `${tmpDir}/phases/ARCHITECT`;
@@ -179,7 +199,15 @@ describe("handleArchitect", () => {
 			const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
 			const state = makeState({
 				currentPhase: "ARCHITECT",
-				confidence: [{ phase: "RECON", agent: "oc-researcher", level: "MEDIUM", signal: "moderate", timestamp: new Date().toISOString() }],
+				confidence: [
+					{
+						phase: "RECON",
+						agent: "oc-researcher",
+						level: "MEDIUM",
+						signal: "moderate",
+						timestamp: new Date().toISOString(),
+					},
+				],
 			});
 			const result = await handleArchitect(state, tmpDir);
 
@@ -201,7 +229,15 @@ describe("handleArchitect", () => {
 			const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
 			const state = makeState({
 				currentPhase: "ARCHITECT",
-				confidence: [{ phase: "RECON", agent: "oc-researcher", level: "MEDIUM", signal: "moderate", timestamp: new Date().toISOString() }],
+				confidence: [
+					{
+						phase: "RECON",
+						agent: "oc-researcher",
+						level: "MEDIUM",
+						signal: "moderate",
+						timestamp: new Date().toISOString(),
+					},
+				],
 			});
 			const result = await handleArchitect(state, tmpDir);
 
@@ -216,7 +252,15 @@ describe("handleArchitect", () => {
 		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
 		const state = makeState({
 			currentPhase: "ARCHITECT",
-			confidence: [{ phase: "RECON", agent: "oc-researcher", level: "HIGH", signal: "strong", timestamp: new Date().toISOString() }],
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "HIGH",
+					signal: "strong",
+					timestamp: new Date().toISOString(),
+				},
+			],
 		});
 		const result = await handleArchitect(state, "/tmp/test-artifacts");
 
@@ -228,11 +272,19 @@ describe("handleArchitect", () => {
 		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
 		const state = makeState({
 			currentPhase: "ARCHITECT",
-			confidence: [{ phase: "RECON", agent: "oc-researcher", level: "LOW", signal: "weak", timestamp: new Date().toISOString() }],
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "LOW",
+					signal: "weak",
+					timestamp: new Date().toISOString(),
+				},
+			],
 		});
 		const result = await handleArchitect(state, "/tmp/test-artifacts");
 
-		const prompts = result.agents!.map((a) => a.prompt);
+		const prompts = result.agents?.map((a) => a.prompt) ?? [];
 		expect(prompts[0]).toContain("simplicity");
 		expect(prompts[1]).toContain("extensibility");
 		expect(prompts[2]).toContain("performance");
@@ -242,7 +294,15 @@ describe("handleArchitect", () => {
 		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
 		const state = makeState({
 			currentPhase: "ARCHITECT",
-			confidence: [{ phase: "RECON", agent: "oc-researcher", level: "HIGH", signal: "strong", timestamp: new Date().toISOString() }],
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "HIGH",
+					signal: "strong",
+					timestamp: new Date().toISOString(),
+				},
+			],
 		});
 		const result = await handleArchitect(state, "/tmp/test-artifacts");
 
