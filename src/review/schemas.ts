@@ -33,6 +33,8 @@ export const reviewReportSchema = z.object({
 	verdict: verdictSchema,
 	findings: z.array(reviewFindingSchema).max(500),
 	agentResults: z.array(agentResultSchema).max(500),
+	scope: z.string().max(128).default("unknown"),
+	agentsRan: z.array(z.string().max(128)).max(32).default([]),
 	totalDurationMs: z.number(),
 	completedAt: z.string().max(128),
 	summary: z.string().max(4096),
@@ -50,7 +52,7 @@ export const reviewMemorySchema = z.object({
 		stacks: z.array(z.string().max(128)).max(32),
 		lastDetectedAt: z.string().max(128),
 	}),
-	recentFindings: z.array(reviewFindingSchema).max(500),
+	recentFindings: z.array(reviewFindingSchema).max(100),
 	falsePositives: z.array(falsePositiveSchema).max(50),
 	lastReviewedAt: z.string().max(128).nullable(),
 });

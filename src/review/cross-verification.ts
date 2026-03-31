@@ -6,14 +6,8 @@
  * Uses a 1-line condensed format to prevent token budget explosion (Pitfall 2).
  */
 
+import { sanitizeTemplateContent } from "./sanitize";
 import type { ReviewAgent, ReviewFinding } from "./types";
-
-/**
- * Strip {{PLACEHOLDER}} tokens from untrusted content before template substitution.
- */
-function sanitizeTemplateContent(content: string): string {
-	return content.replace(/\{\{[A-Z_]+\}\}/g, "[REDACTED]");
-}
 
 /**
  * Condense a finding to a single line for cross-verification context.

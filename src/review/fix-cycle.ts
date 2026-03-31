@@ -7,14 +7,8 @@
  * or very short suggestions are filtered out.
  */
 
+import { sanitizeTemplateContent } from "./sanitize";
 import type { ReviewAgent, ReviewFinding } from "./types";
-
-/**
- * Strip {{PLACEHOLDER}} tokens from untrusted content before template substitution.
- */
-function sanitizeTemplateContent(content: string): string {
-	return content.replace(/\{\{[A-Z_]+\}\}/g, "[REDACTED]");
-}
 
 export interface FixInstructions {
 	readonly fixable: readonly ReviewFinding[];

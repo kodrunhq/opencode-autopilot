@@ -48,6 +48,15 @@ async function loadReviewState(artifactDir: string): Promise<ReviewState | null>
 		return reviewStateSchema.parse(parsed) as ReviewState;
 	} catch (error: unknown) {
 		if (isEnoentError(error)) return null;
+		// Treat parse/schema errors as recoverable — delete corrupt file
+		if (error instanceof SyntaxError || (error && typeof error === "object" && "issues" in error)) {
+			try {
+				await unlink(statePath);
+			} catch {
+				/* ignore cleanup errors */
+			}
+			return null;
+		}
 		throw error;
 	}
 }
@@ -57,9 +66,11 @@ async function loadReviewState(artifactDir: string): Promise<ReviewState | null>
  */
 async function saveReviewState(state: ReviewState, artifactDir: string): Promise<void> {
 	await ensureDir(artifactDir);
+	// Validate before writing (bidirectional validation, same as orchestrator state)
+	const validated = reviewStateSchema.parse(state);
 	const statePath = join(artifactDir, STATE_FILE);
 	const tmpPath = `${statePath}.tmp.${Date.now()}`;
-	await writeFile(tmpPath, JSON.stringify(state, null, 2), "utf-8");
+	await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
 	await rename(tmpPath, statePath);
 }
 

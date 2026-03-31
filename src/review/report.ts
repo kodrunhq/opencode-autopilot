@@ -17,7 +17,7 @@ export const SEVERITY_ORDER = Object.freeze({
 } as const);
 
 /**
- * Deduplicate findings by agent:file:line:severity key.
+ * Deduplicate findings by agent:file:line key.
  * On collision (same agent, file, line), keeps the higher severity version.
  * Returns a new array (no mutation).
  */
@@ -87,8 +87,8 @@ function buildSummary(findings: readonly ReviewFinding[]): string {
  */
 export function buildReport(
 	findings: readonly ReviewFinding[],
-	_scope: string,
-	_agentsRan: readonly string[],
+	scope: string,
+	agentsRan: readonly string[],
 ): ReviewReport {
 	// 1. Deduplicate
 	const deduped = deduplicateFindings(findings);
@@ -124,6 +124,8 @@ export function buildReport(
 		verdict,
 		findings: sorted,
 		agentResults: [],
+		scope,
+		agentsRan: [...agentsRan],
 		totalDurationMs: 0,
 		completedAt: new Date().toISOString(),
 		summary,

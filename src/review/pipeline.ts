@@ -20,13 +20,7 @@ import type { ReviewFinding, ReviewReport, ReviewState } from "./types";
 
 export type { ReviewState };
 
-/**
- * Strip {{PLACEHOLDER}} tokens from untrusted content before template substitution.
- * Prevents prompt injection via user-controlled diff/findings/memory content.
- */
-function sanitizeTemplateContent(content: string): string {
-	return content.replace(/\{\{[A-Z_]+\}\}/g, "[REDACTED]");
-}
+import { sanitizeTemplateContent } from "./sanitize";
 
 /** Result of a pipeline step -- either dispatch more agents or return the final report. */
 export interface ReviewStageResult {
@@ -129,9 +123,10 @@ function extractJson(raw: string): string | null {
 export function advancePipeline(
 	findingsJson: string,
 	currentState: ReviewState,
+	agentName = "unknown",
 ): ReviewStageResult {
 	// Parse new findings
-	const newFindings = parseAgentFindings(findingsJson, "unknown");
+	const newFindings = parseAgentFindings(findingsJson, agentName);
 	const accumulated = [...currentState.accumulatedFindings, ...newFindings];
 
 	const nextStage = currentState.stage + 1;
