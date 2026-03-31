@@ -26,14 +26,14 @@ export function validateAssetName(name: string): ValidationResult {
 	if (name.length === 0 || name.length > MAX_NAME_LENGTH) {
 		return Object.freeze({
 			valid: false,
-			error: `Name must be 1-64 characters. Got ${name.length}.`,
+			error: `Name must be 1-${MAX_NAME_LENGTH} characters. Got ${name.length}.`,
 		});
 	}
 
 	if (!ASSET_NAME_REGEX.test(name)) {
 		return Object.freeze({
 			valid: false,
-			error: `Name '${name}' is invalid. Names must be 1-64 lowercase alphanumeric characters with hyphens (e.g., 'my-agent').`,
+			error: `Name '${name}' is invalid. Names must be 1-${MAX_NAME_LENGTH} lowercase alphanumeric characters with hyphens (e.g., 'my-agent').`,
 		});
 	}
 
