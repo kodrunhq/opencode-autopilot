@@ -2,10 +2,15 @@ import type { Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
 import { installAssets } from "./installer";
+import { ocConfidence } from "./tools/confidence";
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
+import { ocOrchestrate } from "./tools/orchestrate";
+import { ocPhase } from "./tools/phase";
 import { ocPlaceholder } from "./tools/placeholder";
+import { ocPlan } from "./tools/plan";
+import { ocState } from "./tools/state";
 
 const plugin: Plugin = async (_input) => {
 	// Self-healing asset installation on every load
@@ -23,6 +28,11 @@ const plugin: Plugin = async (_input) => {
 			oc_create_agent: ocCreateAgent,
 			oc_create_skill: ocCreateSkill,
 			oc_create_command: ocCreateCommand,
+			oc_state: ocState,
+			oc_confidence: ocConfidence,
+			oc_phase: ocPhase,
+			oc_plan: ocPlan,
+			oc_orchestrate: ocOrchestrate,
 		},
 		event: async ({ event }) => {
 			if (event.type === "session.created" && isFirstLoad(config)) {
