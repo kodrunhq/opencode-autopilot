@@ -187,10 +187,7 @@ describe("createChatMessageHandler", () => {
 		// biome-ignore lint/suspicious/noExplicitAny: mock manager type
 		const handler = createChatMessageHandler(mockManager as any);
 
-		await handler(
-			{ sessionID: "sess-1" },
-			{ message: { model: undefined }, parts: [] },
-		);
+		await handler({ sessionID: "sess-1" }, { message: { model: undefined }, parts: [] });
 
 		const recoverCall = mockManager.calls.find((c) => c.method === "tryRecoverToOriginal");
 		expect(recoverCall).toBeDefined();

@@ -126,8 +126,7 @@ export function createEventHandler(deps: EventHandlerDeps) {
 				if (!sessionID) return;
 
 				const error = properties.error;
-				const modelStr =
-					typeof properties.model === "string" ? properties.model : undefined;
+				const modelStr = typeof properties.model === "string" ? properties.model : undefined;
 
 				await handleFallbackError(manager, sdk, config, sessionID, error, modelStr);
 				return;
