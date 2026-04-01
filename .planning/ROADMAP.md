@@ -153,7 +153,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8
+Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -180,3 +180,22 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8
 Plans:
 - [x] 08-01-PLAN.md -- Fix TypeScript errors, add coverage thresholds, add tool registration smoke test
 - [x] 08-02-PLAN.md -- Create GitHub Actions CI workflow
+
+### Phase 9: Model Fallback Integration
+
+**Goal:** Per-agent model fallback absorbed from the opencode-fallback plugin (MIT) into our single plugin -- error classification, immutable state machine, 3-tier message replay, and hook-based model override integrated with the existing orchestrator
+**Requirements**: FLLB-01, FLLB-02, FLLB-03, FLLB-04, FLLB-05, FLLB-06, FLLB-07, FLLB-08
+**Depends on:** Phase 8
+**Success Criteria** (what must be TRUE):
+  1. Error classifier detects retryable model errors (rate limit, quota, unavailable) using battle-tested regex patterns from opencode-fallback
+  2. Fallback state machine tracks per-session model state with immutable plan-then-commit transitions and cooldown recovery
+  3. Message replay degrades content across 3 tiers (all parts, text+images, text only) to maximize cross-provider compatibility
+  4. Plugin config v3 adds fallback settings with auto-migration from v2
+  5. FallbackManager prevents duplicate dispatches via per-session concurrency guards (retry-in-flight lock, self-abort suppression, TTFT timeout)
+  6. Plugin entry registers chat.message and tool.execute.after hooks alongside existing tool/config/event hooks
+**Plans:** 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md -- Pure function ports: types, error classifier, fallback state machine, message replay, config v3
+- [ ] 09-02-PLAN.md -- FallbackManager class with concurrency guards and session lifecycle
+- [ ] 09-03-PLAN.md -- Plugin hook handlers (event, chat.message, tool.execute.after) and index.ts wiring
