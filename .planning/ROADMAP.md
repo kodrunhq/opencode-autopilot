@@ -198,4 +198,4 @@ Plans:
 Plans:
 - [x] 09-01-PLAN.md -- Pure function ports: types, error classifier, fallback state machine, message replay, config v3
 - [x] 09-02-PLAN.md -- FallbackManager class with concurrency guards and session lifecycle
-- [ ] 09-03-PLAN.md -- Plugin hook handlers (event, chat.message, tool.execute.after) and index.ts wiring
+- [x] 09-03-PLAN.md -- Plugin hook handlers (event, chat.message, tool.execute.after) and index.ts wiring

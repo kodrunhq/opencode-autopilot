@@ -98,8 +98,8 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 - [x] **FLLB-04**: Fallback config schema (enabled, retryOnErrors, maxAttempts, cooldown, timeout) integrates into pluginConfigSchema as v3 with auto-migration from v2
 - [x] **FLLB-05**: Fallback manager encapsulates per-session concurrency guards (retry-in-flight lock, self-abort suppression, TTFT timeout) to prevent duplicate dispatches
 - [x] **FLLB-06**: Event hook detects model failures (session.error, message.updated) and triggers fallback plan-commit-replay cycle
-- [ ] **FLLB-07**: chat.message hook overrides outgoing model to the fallback model when fallback state differs from original, with plugin-initiated dispatch detection to prevent state reset
-- [ ] **FLLB-08**: Plugin entry (index.ts) registers chat.message, enhanced event handler, and tool.execute.after hooks alongside existing tool/config/event hooks
+- [x] **FLLB-07**: chat.message hook overrides outgoing model to the fallback model when fallback state differs from original, with plugin-initiated dispatch detection to prevent state reset
+- [x] **FLLB-08**: Plugin entry (index.ts) registers chat.message, enhanced event handler, and tool.execute.after hooks alongside existing tool/config/event hooks
 
 ## Future Requirements
 
@@ -181,8 +181,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLLB-04 | Phase 9 | Complete |
 | FLLB-05 | Phase 9 | Complete |
 | FLLB-06 | Phase 9 | Complete |
-| FLLB-07 | Phase 9 | Pending |
-| FLLB-08 | Phase 9 | Pending |
+| FLLB-07 | Phase 9 | Complete |
+| FLLB-08 | Phase 9 | Complete |
 
 **Coverage:**
 - v1 requirements: 15 total (all Complete)
