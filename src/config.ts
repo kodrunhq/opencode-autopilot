@@ -77,7 +77,7 @@ export const pluginConfigSchema = pluginConfigSchemaV3;
 
 export type PluginConfig = z.infer<typeof pluginConfigSchemaV3>;
 
-export const CONFIG_PATH = join(getGlobalConfigDir(), "opencode-assets.json");
+export const CONFIG_PATH = join(getGlobalConfigDir(), "opencode-autopilot.json");
 
 // --- Migration ---
 

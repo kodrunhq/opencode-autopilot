@@ -14,7 +14,7 @@ Post-run intelligence: the system extracts structured lessons from completed pip
 ## Implementation Decisions
 
 ### Lesson Memory Structure
-- **D-01:** Lesson memory is project-local, stored at `.opencode-assets/lesson-memory.json`. Follows the review memory pattern: Zod schema, atomic writes (tmp + rename), load/prune/save lifecycle.
+- **D-01:** Lesson memory is project-local, stored at `.opencode-autopilot/lesson-memory.json`. Follows the review memory pattern: Zod schema, atomic writes (tmp + rename), load/prune/save lifecycle.
 - **D-02:** Lessons are tagged with one of 4 fixed domain categories: `architecture`, `testing`, `review`, `planning`. This matches LRNR-02 exactly. No catch-all or free-form tags.
 - **D-03:** Lessons are injected into future pipeline runs via prompt context. When dispatching a phase handler, load lessons filtered by matching domain (e.g., ARCHITECT gets `architecture` lessons, BUILD gets `testing` + `review` lessons) and append to the agent dispatch prompt as "Prior lessons: [...]". No schema changes to DispatchResult needed.
 

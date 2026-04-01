@@ -37,7 +37,7 @@ describe("reviewCore", () => {
 
 	test("saves review state to current-review.json after start", async () => {
 		await reviewCore({ scope: "staged" }, tempDir);
-		const statePath = join(tempDir, ".opencode-assets", "current-review.json");
+		const statePath = join(tempDir, ".opencode-autopilot", "current-review.json");
 		const raw = await readFile(statePath, "utf-8");
 		const state = JSON.parse(raw);
 		expect(state.stage).toBe(1);
@@ -79,7 +79,7 @@ describe("reviewCore", () => {
 		await reviewCore({ findings: '{"findings": []}' }, tempDir);
 
 		// After stage 3 with no critical findings, pipeline should complete
-		const statePath = join(tempDir, ".opencode-assets", "current-review.json");
+		const statePath = join(tempDir, ".opencode-autopilot", "current-review.json");
 		const { access } = await import("node:fs/promises");
 		let exists = true;
 		try {
@@ -98,7 +98,7 @@ describe("reviewCore", () => {
 		await reviewCore({ findings: '{"findings": []}' }, tempDir);
 		await reviewCore({ findings: '{"findings": []}' }, tempDir);
 
-		const memoryPath = join(tempDir, ".opencode-assets", "review-memory.json");
+		const memoryPath = join(tempDir, ".opencode-autopilot", "review-memory.json");
 		const raw = await readFile(memoryPath, "utf-8");
 		const memory = JSON.parse(raw);
 		expect(memory.schemaVersion).toBe(1);
@@ -131,7 +131,7 @@ describe("reviewCore", () => {
 
 	test("state file contains selectedAgentNames with specialized agents", async () => {
 		await reviewCore({ scope: "staged" }, tempDir);
-		const statePath = join(tempDir, ".opencode-assets", "current-review.json");
+		const statePath = join(tempDir, ".opencode-autopilot", "current-review.json");
 		const raw = await readFile(statePath, "utf-8");
 		const state = JSON.parse(raw);
 		// Should include universal specialized agents

@@ -15,7 +15,7 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| Project-local | Store at .opencode-assets/lesson-memory.json per project. Matches review memory pattern. | ✓ |
+| Project-local | Store at .opencode-autopilot/lesson-memory.json per project. Matches review memory pattern. | ✓ |
 | Global + project | Global store for cross-project wisdom + per-project store. More complex. | |
 | Project-local only, promote later | Start project-local, add global promotion in future phase. | |
 

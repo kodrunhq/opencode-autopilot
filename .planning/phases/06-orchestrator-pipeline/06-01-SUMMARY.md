@@ -20,7 +20,7 @@ tech-stack:
   patterns:
     - "Pipeline agent configs as Readonly<AgentConfig> + Object.freeze()"
     - "AGENT_NAMES as single source of truth for agent name strings"
-    - "Artifact paths resolved via getPhaseDir under .opencode-assets/phases/{PHASE}/"
+    - "Artifact paths resolved via getPhaseDir under .opencode-autopilot/phases/{PHASE}/"
 
 key-files:
   created:

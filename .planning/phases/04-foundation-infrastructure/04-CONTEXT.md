@@ -17,7 +17,7 @@ Requirements: ORCH-02, ORCH-03, ORCH-04, ORCH-05, TOOL-01, TOOL-02, TOOL-03, TOO
 
 ### State Persistence (TOOL-01, ORCH-02)
 - **D-01:** Single JSON file (`state.json`) with full pipeline state: current phase, phase history, decisions array, confidence entries array. Zod schema validates on every read. Matches existing `config.ts` pattern.
-- **D-02:** State file lives at `.opencode-assets/state.json` in the project root. The `.opencode-assets/` directory is the orchestrator's working directory (per-project, gitignored).
+- **D-02:** State file lives at `.opencode-autopilot/state.json` in the project root. The `.opencode-autopilot/` directory is the orchestrator's working directory (per-project, gitignored).
 - **D-03:** State module provides: load, update, get, patch, and phase transition functions. All return Zod-validated typed objects. Failed validation throws (fail-fast).
 
 ### Agent Dispatch Pattern (Hard Gate)
@@ -30,8 +30,8 @@ Requirements: ORCH-02, ORCH-03, ORCH-04, ORCH-05, TOOL-01, TOOL-02, TOOL-03, TOO
 - **D-08:** Migration function auto-upgrades v1 configs on load: adds defaults for all new fields, preserves existing `models` and `configured` values. Old `version: 1` files become `version: 2` after first load+save cycle.
 
 ### Artifact Storage
-- **D-09:** `.opencode-assets/` in the project root. Structure: `state.json`, `phases/RECON/`, `phases/BUILD/`, etc. The directory is auto-created on first orchestrator invocation.
-- **D-10:** Add `.opencode-assets/` to `.gitignore` automatically on first run (same pattern as hands-free's `.hands-free/` handling).
+- **D-09:** `.opencode-autopilot/` in the project root. Structure: `state.json`, `phases/RECON/`, `phases/BUILD/`, etc. The directory is auto-created on first orchestrator invocation.
+- **D-10:** Add `.opencode-autopilot/` to `.gitignore` automatically on first run (same pattern as hands-free's `.hands-free/` handling).
 
 ### Decision Logging (ORCH-03)
 - **D-11:** Decisions are entries in the `decisions` array inside `state.json`. Each entry: `{timestamp, phase, agent, decision, rationale}`. No separate file -- keeps single-file simplicity.
@@ -95,8 +95,8 @@ Requirements: ORCH-02, ORCH-03, ORCH-04, ORCH-05, TOOL-01, TOOL-02, TOOL-03, TOO
 
 ### Reusable Assets
 - `src/config.ts` (loadConfig, saveConfig, pluginConfigSchema) -- extend schema, reuse load/save pattern with migration
-- `src/utils/fs-helpers.ts` (ensureDir) -- reuse for creating .opencode-assets/ directory
-- `src/utils/paths.ts` (getGlobalConfigDir) -- extend with getProjectArtifactDir() for .opencode-assets/
+- `src/utils/fs-helpers.ts` (ensureDir) -- reuse for creating .opencode-autopilot/ directory
+- `src/utils/paths.ts` (getGlobalConfigDir) -- extend with getProjectArtifactDir() for .opencode-autopilot/
 - `src/utils/validators.ts` (validateAssetName) -- reuse pattern for phase name validation
 
 ### Established Patterns

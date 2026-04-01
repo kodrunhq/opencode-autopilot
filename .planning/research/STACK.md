@@ -229,7 +229,7 @@ const waves: readonly ReviewDimension[][] = [
 |------------|---------|---------|-----|
 | JSON files + Zod | existing deps | Cross-project learning, pattern library, pitfall database | Same persistence pattern, start simple |
 
-**Location:** `~/.config/opencode/opencode-assets/memory/`
+**Location:** `~/.config/opencode/opencode-autopilot/memory/`
 
 **Schema versioning:** Include a `version` field (already done in `config.ts` with `version: z.literal(1)`). When schemas evolve, add migration functions inline.
 

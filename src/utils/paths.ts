@@ -13,5 +13,5 @@ export function getAssetsDir(): string {
 }
 
 export function getProjectArtifactDir(projectRoot: string): string {
-	return join(projectRoot, ".opencode-assets");
+	return join(projectRoot, ".opencode-autopilot");
 }

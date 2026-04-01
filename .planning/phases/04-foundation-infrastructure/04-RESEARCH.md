@@ -17,15 +17,15 @@ The existing codebase provides clear, well-tested patterns to follow: `*Core` fu
 
 ### Locked Decisions
 - D-01: Single JSON file (`state.json`) with full pipeline state: current phase, phase history, decisions array, confidence entries array. Zod schema validates on every read.
-- D-02: State file lives at `.opencode-assets/state.json` in the project root.
+- D-02: State file lives at `.opencode-autopilot/state.json` in the project root.
 - D-03: State module provides: load, update, get, patch, and phase transition functions. All return Zod-validated typed objects. Failed validation throws (fail-fast).
 - D-04: Tool-returns-instruction pattern. `oc_orchestrate` returns structured JSON: `{action: 'dispatch', agent: 'researcher', prompt: '...'}` or `{action: 'complete'}`.
 - D-05: Orchestrator agent (injected via config hook, mode: subagent) has lean prompt: "call oc_orchestrate, parse JSON, dispatch named agent via Agent tool, repeat until complete." All state machine logic lives in TypeScript.
 - D-06: Phase 4 must prove a FULL LOOP end-to-end. Hard gate -- architecture changes before Phase 5 if it fails.
 - D-07: Version bump from 1 to 2. New schema includes orchestrator, review, confidence namespaces with Zod sub-schemas.
 - D-08: Migration function auto-upgrades v1 configs on load.
-- D-09: `.opencode-assets/` in project root for artifacts. Structure: `state.json`, `phases/RECON/`, etc.
-- D-10: Add `.opencode-assets/` to `.gitignore` automatically on first run.
+- D-09: `.opencode-autopilot/` in project root for artifacts. Structure: `state.json`, `phases/RECON/`, etc.
+- D-10: Add `.opencode-autopilot/` to `.gitignore` automatically on first run.
 - D-11: Decisions are entries in the `decisions` array inside `state.json`. Each: `{timestamp, phase, agent, decision, rationale}`.
 - D-12: Confidence entries in `confidence` array inside `state.json`. Each: `{timestamp, phase, agent, area, level: HIGH|MEDIUM|LOW, rationale}`.
 - D-13: Phase module validates transitions against allowed state machine graph (RECON -> CHALLENGE -> ARCHITECT -> EXPLORE -> PLAN -> BUILD -> SHIP -> RETROSPECTIVE). Invalid transitions throw.
@@ -70,7 +70,7 @@ None -- discussion stayed within phase scope.
 - **No standalone Zod install:** Use `import { z } from "zod"` (transitive dep of `@opencode-ai/plugin`)
 - **No `Bun.file()`/`Bun.write()`:** Use `node:fs/promises` for portability and testability
 - **Model agnostic:** Never hardcode model identifiers in bundled agents
-- **Global target for assets:** `~/.config/opencode/` (but orchestrator artifacts go to project-local `.opencode-assets/`)
+- **Global target for assets:** `~/.config/opencode/` (but orchestrator artifacts go to project-local `.opencode-autopilot/`)
 - **`oc_` prefix:** All plugin tool names must start with `oc_`
 - **Immutability:** Build objects declaratively with conditional spreads, never mutate after creation
 - **Tool registration pattern:** `*Core` function (testable, accepts `baseDir`) + `tool()` wrapper
@@ -148,7 +148,7 @@ src/
 
 ### Pattern 1: State Store (JSON + Zod + Atomic Write)
 
-**What:** A single module handles all reads/writes to `.opencode-assets/state.json` with Zod validation on every load and atomic write-temp-rename on every save.
+**What:** A single module handles all reads/writes to `.opencode-autopilot/state.json` with Zod validation on every load and atomic write-temp-rename on every save.
 
 **When to use:** Any state mutation in the pipeline.
 
@@ -283,7 +283,7 @@ export const ocOrchestrate = tool({
     result: tool.schema.string().optional().describe("Result from the last dispatched agent"),
   },
   async execute(args) {
-    const artifactDir = join(process.cwd(), ".opencode-assets");
+    const artifactDir = join(process.cwd(), ".opencode-autopilot");
     return orchestrateCore(args, artifactDir);
   },
 });
@@ -451,7 +451,7 @@ export function validateTransition(from: Phase, to: Phase): void {
 
 ### Pitfall 2: Config Migration Breaks Existing v1 Users
 
-**What goes wrong:** Existing users have `opencode-assets.json` with `version: 1`. If the v2 schema rejects v1 format, the plugin fails to load.
+**What goes wrong:** Existing users have `opencode-autopilot.json` with `version: 1`. If the v2 schema rejects v1 format, the plugin fails to load.
 **Why it happens:** `pluginConfigSchema.parse()` is called on every plugin load. If it only accepts v2, existing configs throw.
 **How to avoid:** Use a version-discriminated union: try v2 parse first, fall back to v1 parse + migration. Save the migrated v2 config back to disk. Test with fixture v1 configs.
 **Warning signs:** Plugin crashes on load for existing users after upgrade.
@@ -470,12 +470,12 @@ export function validateTransition(from: Phase, to: Phase): void {
 **How to avoid:** Use `.default([])` for arrays, `.optional()` for fields populated by later phases, and `.catch()` for graceful degradation. The schema should accept the state at any point in the pipeline, not just after completion.
 **Warning signs:** `loadState()` throws on a state.json that was valid when written.
 
-### Pitfall 5: `.opencode-assets/` Not Added to .gitignore
+### Pitfall 5: `.opencode-autopilot/` Not Added to .gitignore
 
 **What goes wrong:** Users commit their pipeline state, confidence ledger, and intermediate artifacts to version control.
-**Why it happens:** The auto-gitignore logic (D-10) is easy to forget or implement incorrectly (e.g., file already has content but no `.opencode-assets/` entry, or `.gitignore` doesn't exist).
-**How to avoid:** Implement gitignore-appending in the state initialization path. Check if `.opencode-assets/` is already in any `.gitignore` in the project hierarchy before appending.
-**Warning signs:** `git status` shows `.opencode-assets/` as untracked after first run.
+**Why it happens:** The auto-gitignore logic (D-10) is easy to forget or implement incorrectly (e.g., file already has content but no `.opencode-autopilot/` entry, or `.gitignore` doesn't exist).
+**How to avoid:** Implement gitignore-appending in the state initialization path. Check if `.opencode-autopilot/` is already in any `.gitignore` in the project hierarchy before appending.
+**Warning signs:** `git status` shows `.opencode-autopilot/` as untracked after first run.
 
 ## Code Examples
 
@@ -635,7 +635,7 @@ export const ocState = tool({
     rationale: tool.schema.string().optional().describe("Rationale text"),
   },
   async execute(args) {
-    const artifactDir = join(process.cwd(), ".opencode-assets");
+    const artifactDir = join(process.cwd(), ".opencode-autopilot");
     return stateCore(args, artifactDir);
   },
 });
@@ -710,7 +710,7 @@ The config hook mutates `config.agent` directly. This is the intended API -- not
 
 ### Plugin Input (PluginInput type)
 
-The plugin receives `directory` and `worktree` in its input, which provide the project root. Use `directory` (the project root) for constructing the `.opencode-assets/` path rather than `process.cwd()`.
+The plugin receives `directory` and `worktree` in its input, which provide the project root. Use `directory` (the project root) for constructing the `.opencode-autopilot/` path rather than `process.cwd()`.
 
 ## State of the Art
 

@@ -156,7 +156,7 @@ describe("loadLessonMemory", () => {
 	});
 
 	test("returns null on malformed JSON (SyntaxError)", async () => {
-		const dir = join(tmpDir, ".opencode-assets");
+		const dir = join(tmpDir, ".opencode-autopilot");
 		await ensureDir(dir);
 		await writeFile(join(dir, LESSON_FILE), "not json!!!", "utf-8");
 
@@ -165,7 +165,7 @@ describe("loadLessonMemory", () => {
 	});
 
 	test("returns null on Zod validation failure", async () => {
-		const dir = join(tmpDir, ".opencode-assets");
+		const dir = join(tmpDir, ".opencode-autopilot");
 		await ensureDir(dir);
 		await writeFile(
 			join(dir, LESSON_FILE),
@@ -186,7 +186,7 @@ describe("loadLessonMemory", () => {
 			makeLesson({ extractedAt: newDate }),
 		]);
 
-		const dir = join(tmpDir, ".opencode-assets");
+		const dir = join(tmpDir, ".opencode-autopilot");
 		await ensureDir(dir);
 		await writeFile(join(dir, LESSON_FILE), JSON.stringify(memory), "utf-8");
 
@@ -211,7 +211,7 @@ describe("loadLessonMemory", () => {
 			lastUpdatedAt: null,
 		};
 
-		const dir = join(tmpDir, ".opencode-assets");
+		const dir = join(tmpDir, ".opencode-autopilot");
 		await ensureDir(dir);
 		await writeFile(join(dir, LESSON_FILE), JSON.stringify(rawMemory), "utf-8");
 
@@ -225,7 +225,7 @@ describe("loadLessonMemory", () => {
 	test("loads valid memory and returns frozen object", async () => {
 		const memory = makeLessonMemory([makeLesson()], new Date().toISOString());
 
-		const dir = join(tmpDir, ".opencode-assets");
+		const dir = join(tmpDir, ".opencode-autopilot");
 		await ensureDir(dir);
 		await writeFile(join(dir, LESSON_FILE), JSON.stringify(memory), "utf-8");
 
@@ -251,7 +251,7 @@ describe("saveLessonMemory", () => {
 		const memory = makeLessonMemory([makeLesson()], new Date().toISOString());
 		await saveLessonMemory(memory, tmpDir);
 
-		const filePath = join(tmpDir, ".opencode-assets", LESSON_FILE);
+		const filePath = join(tmpDir, ".opencode-autopilot", LESSON_FILE);
 		const raw = await readFile(filePath, "utf-8");
 		const parsed = JSON.parse(raw);
 
@@ -269,11 +269,11 @@ describe("saveLessonMemory", () => {
 		expect(saveLessonMemory(invalidMemory, tmpDir)).rejects.toThrow();
 	});
 
-	test("creates .opencode-assets directory if missing", async () => {
+	test("creates .opencode-autopilot directory if missing", async () => {
 		const memory = makeLessonMemory([], new Date().toISOString());
 		await saveLessonMemory(memory, tmpDir);
 
-		const filePath = join(tmpDir, ".opencode-assets", LESSON_FILE);
+		const filePath = join(tmpDir, ".opencode-autopilot", LESSON_FILE);
 		const raw = await readFile(filePath, "utf-8");
 		expect(JSON.parse(raw).schemaVersion).toBe(1);
 	});

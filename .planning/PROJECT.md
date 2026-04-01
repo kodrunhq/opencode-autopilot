@@ -10,7 +10,7 @@ A single command transforms an idea into a shipped, reviewed, tested result — 
 
 ## Current Milestone: v2.0 Autonomous Orchestrator
 
-**Goal:** Transform opencode-assets from a utility plugin into an autonomous SDLC orchestration engine with embedded code review.
+**Goal:** Transform opencode-autopilot from a utility plugin into an autonomous SDLC orchestration engine with embedded code review.
 
 **Target features:**
 - Tool-based orchestrator (`oc_orchestrate`) driving an 8-phase state machine

@@ -1,7 +1,7 @@
 ---
-description: Configure the opencode-assets plugin -- assign models to agents
+description: Configure the opencode-autopilot plugin -- assign models to agents
 ---
-The opencode-assets plugin supports configuration for model mapping. You can assign specific models to each agent provided by the plugin by editing the config file at `~/.config/opencode/opencode-assets.json`.
+The opencode-autopilot plugin supports configuration for model mapping. You can assign specific models to each agent provided by the plugin by editing the config file at `~/.config/opencode/opencode-autopilot.json`.
 
 The config file uses this format:
 ```json

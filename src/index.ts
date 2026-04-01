@@ -31,7 +31,7 @@ const plugin: Plugin = async (input) => {
 	// Self-healing asset installation on every load
 	const installResult = await installAssets();
 	if (installResult.errors.length > 0) {
-		console.error("[opencode-assets] Asset installation errors:", installResult.errors);
+		console.error("[opencode-autopilot] Asset installation errors:", installResult.errors);
 	}
 
 	// Load config for first-load detection and fallback settings

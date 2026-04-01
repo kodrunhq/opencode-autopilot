@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-OpenCode Assets Plugin — an npm package that provides curated agents, skills, and commands for the OpenCode AI coding CLI, plus in-session creation tools (`/new-agent`, `/new-skill`, `/new-command`) so users can scaffold new extensions without leaving the TUI.
+OpenCode Autopilot Plugin — an npm package that provides curated agents, skills, and commands for the OpenCode AI coding CLI, plus in-session creation tools (`/new-agent`, `/new-skill`, `/new-command`) so users can scaffold new extensions without leaving the TUI.
 
-Installed via one line in `opencode.json`: `{ "plugin": ["opencode-assets"] }`
+Installed via one line in `opencode.json`: `{ "plugin": ["@kodrunhq/opencode-autopilot"] }`
 
 ## Commands
 

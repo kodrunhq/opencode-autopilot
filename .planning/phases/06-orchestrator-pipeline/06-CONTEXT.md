@@ -31,8 +31,8 @@ Requirements: ORCH-01, PIPE-01, PIPE-02, PIPE-03, PIPE-04, PIPE-05, PIPE-06, PIP
 - **D-09:** `oc-critic` is a configHook subagent (visible). Used by the Arena and potentially by users for ad-hoc architecture evaluation.
 
 ### Artifact Management
-- **D-10:** Phase artifacts stored at `.opencode-assets/phases/{PHASE_NAME}/`. Each phase writes to its own directory (e.g., `.opencode-assets/phases/RECON/report.md`, `.opencode-assets/phases/ARCHITECT/design.md`, `.opencode-assets/phases/BUILD/tasks.json`).
-- **D-11:** File reference context flow. The dispatch prompt tells the agent "read .opencode-assets/phases/RECON/report.md for context." The agent reads the file itself. No content serialized into the dispatch prompt. Minimal token cost.
+- **D-10:** Phase artifacts stored at `.opencode-autopilot/phases/{PHASE_NAME}/`. Each phase writes to its own directory (e.g., `.opencode-autopilot/phases/RECON/report.md`, `.opencode-autopilot/phases/ARCHITECT/design.md`, `.opencode-autopilot/phases/BUILD/tasks.json`).
+- **D-11:** File reference context flow. The dispatch prompt tells the agent "read .opencode-autopilot/phases/RECON/report.md for context." The agent reads the file itself. No content serialized into the dispatch prompt. Minimal token cost.
 - **D-12:** The `oc_orchestrate` tool manages artifact directory creation and references. Each phase handler in the tool creates the directory, constructs the dispatch prompt with file references, and expects the subagent to write its output to the designated location.
 
 ### Orchestrate Tool Enhancement
@@ -124,7 +124,7 @@ Requirements: ORCH-01, PIPE-01, PIPE-02, PIPE-03, PIPE-04, PIPE-05, PIPE-06, PIP
 - The hands-free orchestrator command is 2400+ lines of markdown. Phase 6 puts that logic in TypeScript (per-phase handler functions), keeping agent prompts lean.
 - BUILD phase should call reviewCore() directly (typed function call), not dispatch oc_review as a separate tool call. This avoids the JSON serialization round-trip flagged in the Phase 5 architecture review.
 - EXPLORE phase is optional per the state machine. Implementation can be deferred to Phase 7 if it's too complex. The shouldTriggerExplorer() function from arena.ts determines if it's needed.
-- SHIP phase should produce markdown files (walkthrough, decisions, changelog) in .opencode-assets/phases/SHIP/, not JSON.
+- SHIP phase should produce markdown files (walkthrough, decisions, changelog) in .opencode-autopilot/phases/SHIP/, not JSON.
 
 </specifics>
 

@@ -356,7 +356,7 @@ description: Universal coding standards and best practices that the LLM referenc
 
 3. **Model configuration for agents**
    - What we know: `AgentConfig.model` is optional. If unset, agents inherit the session's default model. The plugin has a `config.ts` with model mappings.
-   - What's unclear: Should we read from `opencode-assets.json` model mappings and inject them into each agent's `model` field during the config hook?
+   - What's unclear: Should we read from `opencode-autopilot.json` model mappings and inject them into each agent's `model` field during the config hook?
    - Recommendation: Leave `model` unset in agent configs. Users can override via `opencode.json` agent config. The Phase 1 config module can be integrated in a future enhancement.
 
 ## Sources

@@ -15,8 +15,8 @@ describe("getPhaseDir", () => {
 	});
 
 	test("returns correct path for BUILD phase", () => {
-		expect(getPhaseDir("/tmp/project/.opencode-assets", "BUILD")).toBe(
-			"/tmp/project/.opencode-assets/phases/BUILD",
+		expect(getPhaseDir("/tmp/project/.opencode-autopilot", "BUILD")).toBe(
+			"/tmp/project/.opencode-autopilot/phases/BUILD",
 		);
 	});
 });

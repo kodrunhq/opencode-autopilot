@@ -63,7 +63,7 @@ Five orchestrator tools (oc_state, oc_confidence, oc_phase, oc_plan, oc_orchestr
 - **oc_orchestrate tool** drives the 8-phase dispatch loop via PHASE_AGENTS map
 - Dispatch flow: no state + idea -> create state + dispatch RECON; state + result -> complete phase + dispatch next; terminal phase -> return complete
 - **orchestratorAgent** with mode: subagent, maxSteps: 50, lean prompt (<2000 chars) describing the loop-call-return pattern
-- **ensureGitignore** utility: creates or appends `.opencode-assets/` to .gitignore idempotently
+- **ensureGitignore** utility: creates or appends `.opencode-autopilot/` to .gitignore idempotently
 - **src/agents/index.ts** updated with orchestrator agent (preserving all existing agents)
 - **src/index.ts** updated with all 5 new tools (preserving all existing tools)
 - **11 tests** for orchestrate tool, gitignore helper, and agent config validation

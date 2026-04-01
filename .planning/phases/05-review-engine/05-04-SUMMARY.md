@@ -41,7 +41,7 @@ key-decisions:
   - "Fix cycle filters CRITICAL-only (not CRITICAL+HIGH as originally planned) matching pipeline stage-4 behavior"
 
 patterns-established:
-  - "Stateful tool pattern: state persisted at .opencode-assets/*.json between invocations, cleared on completion"
+  - "Stateful tool pattern: state persisted at .opencode-autopilot/*.json between invocations, cleared on completion"
   - "Memory prune-on-load: cap + age-based pruning happens at read time, not write time"
 
 requirements-completed: [REVW-01, REVW-09, REVW-11]

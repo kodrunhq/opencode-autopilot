@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 6 transforms the Phase 4 dispatch skeleton (`orchestrateCore` in `src/tools/orchestrate.ts`) into a fully functional 8-phase pipeline. The current skeleton handles state creation, phase transitions, and generic dispatch prompts. Phase 6 adds: (1) per-phase handler functions with phase-specific prompt construction and artifact management, (2) nine new pipeline subagent definitions injected via configHook, (3) Arena logic for the ARCHITECT phase with confidence-gated debate depth, (4) BUILD phase task-cycling with wave-based execution and review integration via `reviewCore()`, and (5) artifact directory management under `.opencode-assets/phases/`.
+Phase 6 transforms the Phase 4 dispatch skeleton (`orchestrateCore` in `src/tools/orchestrate.ts`) into a fully functional 8-phase pipeline. The current skeleton handles state creation, phase transitions, and generic dispatch prompts. Phase 6 adds: (1) per-phase handler functions with phase-specific prompt construction and artifact management, (2) nine new pipeline subagent definitions injected via configHook, (3) Arena logic for the ARCHITECT phase with confidence-gated debate depth, (4) BUILD phase task-cycling with wave-based execution and review integration via `reviewCore()`, and (5) artifact directory management under `.opencode-autopilot/phases/`.
 
 The source plugin (claude-hands-free) has a 2400-line markdown orchestrator command and 12 markdown agent definitions. Phase 6 ports the LOGIC (phase handlers, dispatch prompts, artifact flow) into TypeScript functions while keeping agent prompts lean (200-500 chars per D-02). The key architectural insight: hands-free puts all orchestration logic in a massive system prompt that the LLM interprets; our design puts orchestration logic in TypeScript handler functions that deterministically construct dispatch instructions. This is more reliable and cheaper.
 
@@ -25,8 +25,8 @@ The source plugin (claude-hands-free) has a 2400-line markdown orchestrator comm
 - **D-07:** Confidence-gated activation. Arena activates based on confidence from RECON phase. LOW confidence -> 3 proposals + critic. MEDIUM -> 2 proposals + critic. HIGH -> single proposal (no debate). Uses `getDebateDepth()` from the Phase 4 arena module.
 - **D-08:** Adversarial critic agent evaluates competing proposals. A dedicated `oc-critic` agent receives all proposals and stress-tests each against criteria (feasibility, complexity, risk). Produces ranked recommendation. The `oc_orchestrate` tool picks the winner based on the critic's ranking.
 - **D-09:** `oc-critic` is a configHook subagent (visible). Used by the Arena and potentially by users for ad-hoc architecture evaluation.
-- **D-10:** Phase artifacts stored at `.opencode-assets/phases/{PHASE_NAME}/`. Each phase writes to its own directory (e.g., `.opencode-assets/phases/RECON/report.md`, `.opencode-assets/phases/ARCHITECT/design.md`, `.opencode-assets/phases/BUILD/tasks.json`).
-- **D-11:** File reference context flow. The dispatch prompt tells the agent "read .opencode-assets/phases/RECON/report.md for context." The agent reads the file itself. No content serialized into the dispatch prompt. Minimal token cost.
+- **D-10:** Phase artifacts stored at `.opencode-autopilot/phases/{PHASE_NAME}/`. Each phase writes to its own directory (e.g., `.opencode-autopilot/phases/RECON/report.md`, `.opencode-autopilot/phases/ARCHITECT/design.md`, `.opencode-autopilot/phases/BUILD/tasks.json`).
+- **D-11:** File reference context flow. The dispatch prompt tells the agent "read .opencode-autopilot/phases/RECON/report.md for context." The agent reads the file itself. No content serialized into the dispatch prompt. Minimal token cost.
 - **D-12:** The `oc_orchestrate` tool manages artifact directory creation and references. Each phase handler in the tool creates the directory, constructs the dispatch prompt with file references, and expects the subagent to write its output to the designated location.
 - **D-13:** The existing `orchestrateCore` in `src/tools/orchestrate.ts` needs significant enhancement. Currently it has a simple dispatch skeleton. Phase 6 adds: per-phase prompt templates, artifact directory management, BUILD task cycling, Arena logic, and review integration.
 - **D-14:** Each phase handler is a separate function (e.g., `handleRecon()`, `handleChallenge()`, `handleArchitect()`, `handlePlan()`, `handleBuild()`, `handleShip()`, `handleRetrospective()`) called from the main switch in `orchestrateCore`. Keeps the switch clean.
@@ -54,7 +54,7 @@ None -- discussion stayed within phase scope
 | ID | Description | Research Support |
 |----|-------------|------------------|
 | ORCH-01 | User can invoke `oc_orchestrate` with an idea and the orchestrator drives an 8-phase pipeline to completion autonomously | Per-phase handler functions route each phase; existing state machine handles transitions; enhanced `orchestrateCore` adds phase-specific logic |
-| PIPE-01 | RECON phase dispatches a researcher subagent that produces a structured domain research report | `handleRecon()` creates `.opencode-assets/phases/RECON/` dir, dispatches `oc-researcher` with idea + file reference instructions |
+| PIPE-01 | RECON phase dispatches a researcher subagent that produces a structured domain research report | `handleRecon()` creates `.opencode-autopilot/phases/RECON/` dir, dispatches `oc-researcher` with idea + file reference instructions |
 | PIPE-02 | CHALLENGE phase proposes enhancements the user did not articulate, capped at 3 additions | `handleChallenge()` dispatches `oc-challenger` with references to RECON artifacts |
 | PIPE-03 | ARCHITECT phase produces a system design; when Arena is enabled, 2-3 parallel proposals evaluated by adversarial critic | `handleArchitect()` uses `getDebateDepth()` to determine proposal count, dispatches `oc-architect` (single) or multiple proposals + `oc-critic` |
 | PIPE-04 | PLAN phase decomposes architecture into ordered tasks with wave numbers, max 300-line diffs | `handlePlan()` dispatches `oc-planner` with references to architecture artifacts |
@@ -311,7 +311,7 @@ Completeness over brevity. Present options with tradeoffs, do not make implement
 
 ### Anti-Patterns to Avoid
 
-- **Embedding content in dispatch prompts:** D-11 explicitly forbids this. Use file references ("read .opencode-assets/phases/RECON/report.md") not content injection ("Here are the research findings: ..."). The hands-free source injects up to 3000 chars of content per dispatch -- do NOT port this pattern.
+- **Embedding content in dispatch prompts:** D-11 explicitly forbids this. Use file references ("read .opencode-autopilot/phases/RECON/report.md") not content injection ("Here are the research findings: ..."). The hands-free source injects up to 3000 chars of content per dispatch -- do NOT port this pattern.
 
 - **Giant handler functions:** Each handler should be 50-100 lines max. If a handler needs sub-steps (like ARCHITECT Arena), use artifact-existence checks for state, not a massive function with nested conditionals.
 
@@ -508,7 +508,7 @@ export const PHASE_ARTIFACTS: Readonly<Record<string, readonly string[]>> = Obje
 
 ## State of the Art
 
-| Old Approach (hands-free) | New Approach (opencode-assets) | Impact |
+| Old Approach (hands-free) | New Approach (opencode-autopilot) | Impact |
 |---------------------------|-------------------------------|--------|
 | 2400-line markdown system prompt | TypeScript handler functions | Logic is deterministic, not LLM-interpreted |
 | 130-line agent markdown files | 10-line AgentConfig objects | 90% prompt reduction per D-02 |

@@ -2,7 +2,7 @@
  * Per-project lesson memory persistence.
  *
  * Stores lessons extracted from pipeline runs at
- * {projectRoot}/.opencode-assets/lesson-memory.json
+ * {projectRoot}/.opencode-autopilot/lesson-memory.json
  *
  * Memory is pruned on load to remove stale entries (>90 days)
  * and cap at 50 lessons. All writes are atomic (tmp file + rename)
@@ -40,7 +40,7 @@ export function createEmptyLessonMemory(): LessonMemory {
  * Prunes on load to remove stale entries and cap storage.
  */
 export async function loadLessonMemory(projectRoot: string): Promise<LessonMemory | null> {
-	const memoryPath = join(projectRoot, ".opencode-assets", LESSON_FILE);
+	const memoryPath = join(projectRoot, ".opencode-autopilot", LESSON_FILE);
 	try {
 		const raw = await readFile(memoryPath, "utf-8");
 		const parsed = JSON.parse(raw);
@@ -73,7 +73,7 @@ export async function loadLessonMemory(projectRoot: string): Promise<LessonMemor
  */
 export async function saveLessonMemory(memory: LessonMemory, projectRoot: string): Promise<void> {
 	const validated = lessonMemorySchema.parse(memory);
-	const dir = join(projectRoot, ".opencode-assets");
+	const dir = join(projectRoot, ".opencode-autopilot");
 	await ensureDir(dir);
 	const memoryPath = join(dir, LESSON_FILE);
 	const tmpPath = `${memoryPath}.tmp.${Date.now()}`;

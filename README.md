@@ -1,1 +1,1 @@
-# opencode-assets
+# @kodrunhq/opencode-autopilot
