@@ -92,10 +92,10 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 
 ### Model Fallback
 
-- [ ] **FLLB-01**: Error classifier detects retryable model errors (rate limits, quota, unavailable) from error objects and message text using battle-tested regex patterns
-- [ ] **FLLB-02**: Fallback state machine tracks per-session model state (primary, fallback chain, exhausted) with immutable plan-then-commit transitions
-- [ ] **FLLB-03**: Message replay with 3-tier content degradation (all parts, text+images, text only) maximizes compatibility across providers
-- [ ] **FLLB-04**: Fallback config schema (enabled, retryOnErrors, maxAttempts, cooldown, timeout) integrates into pluginConfigSchema as v3 with auto-migration from v2
+- [x] **FLLB-01**: Error classifier detects retryable model errors (rate limits, quota, unavailable) from error objects and message text using battle-tested regex patterns
+- [x] **FLLB-02**: Fallback state machine tracks per-session model state (primary, fallback chain, exhausted) with immutable plan-then-commit transitions
+- [x] **FLLB-03**: Message replay with 3-tier content degradation (all parts, text+images, text only) maximizes compatibility across providers
+- [x] **FLLB-04**: Fallback config schema (enabled, retryOnErrors, maxAttempts, cooldown, timeout) integrates into pluginConfigSchema as v3 with auto-migration from v2
 - [ ] **FLLB-05**: Fallback manager encapsulates per-session concurrency guards (retry-in-flight lock, self-abort suppression, TTFT timeout) to prevent duplicate dispatches
 - [ ] **FLLB-06**: Event hook detects model failures (session.error, message.updated) and triggers fallback plan-commit-replay cycle
 - [ ] **FLLB-07**: chat.message hook overrides outgoing model to the fallback model when fallback state differs from original, with plugin-initiated dispatch detection to prevent state reset
@@ -175,10 +175,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LRNR-02 | Phase 7 | Pending |
 | LRNR-03 | Phase 7 | Pending |
 | LRNR-04 | Phase 7 | Pending |
-| FLLB-01 | Phase 9 | Pending |
-| FLLB-02 | Phase 9 | Pending |
-| FLLB-03 | Phase 9 | Pending |
-| FLLB-04 | Phase 9 | Pending |
+| FLLB-01 | Phase 9 | Complete |
+| FLLB-02 | Phase 9 | Complete |
+| FLLB-03 | Phase 9 | Complete |
+| FLLB-04 | Phase 9 | Complete |
 | FLLB-05 | Phase 9 | Pending |
 | FLLB-06 | Phase 9 | Pending |
 | FLLB-07 | Phase 9 | Pending |
