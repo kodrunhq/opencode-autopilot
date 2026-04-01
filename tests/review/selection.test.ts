@@ -11,7 +11,7 @@ import type { ReviewFinding } from "../../src/review/types";
 
 function makeFinding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
 	return {
-		severity: "WARNING",
+		severity: "HIGH",
 		domain: "logic",
 		title: "Missing null check",
 		file: "src/index.ts",

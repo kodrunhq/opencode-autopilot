@@ -25,16 +25,16 @@ describe("determineFixableFindings", () => {
 		expect(result.fixable[0].severity).toBe("CRITICAL");
 	});
 
-	test("skips NITPICK findings", () => {
-		const findings = [makeFinding({ severity: "NITPICK" })];
+	test("skips LOW findings", () => {
+		const findings = [makeFinding({ severity: "LOW" })];
 		const result = determineFixableFindings(findings);
 		expect(result.fixable.length).toBe(0);
 		expect(result.skipped.length).toBe(1);
 		expect(result.skipped[0].reason).toContain("severity");
 	});
 
-	test("skips WARNING findings (only CRITICAL allowed)", () => {
-		const findings = [makeFinding({ severity: "WARNING" })];
+	test("skips HIGH findings (only CRITICAL allowed)", () => {
+		const findings = [makeFinding({ severity: "HIGH" })];
 		const result = determineFixableFindings(findings);
 		expect(result.fixable.length).toBe(0);
 	});
@@ -78,10 +78,7 @@ describe("determineFixableFindings", () => {
 	});
 
 	test("builds skipped with reason for each non-fixable finding", () => {
-		const findings = [
-			makeFinding({ severity: "NITPICK" }),
-			makeFinding({ fix: "consider something" }),
-		];
+		const findings = [makeFinding({ severity: "LOW" }), makeFinding({ fix: "consider something" })];
 		const result = determineFixableFindings(findings);
 		expect(result.skipped.length).toBe(2);
 		for (const s of result.skipped) {
