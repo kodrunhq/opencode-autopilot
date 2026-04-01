@@ -85,7 +85,7 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 
 ### Learning & Resilience
 
-- [ ] **LRNR-01**: Institutional memory persists lessons from completed runs to a global store, with decay mechanism for stale entries
+- [x] **LRNR-01**: Institutional memory persists lessons from completed runs to a global store, with decay mechanism for stale entries
 - [ ] **LRNR-02**: Retrospective agent extracts lessons categorized by domain (architecture, testing, review, planning) after each run
 - [ ] **LRNR-03**: Forensics tool analyzes failed runs: identifies failing phase, agent, root cause, and classifies as recoverable vs. terminal
 - [ ] **LRNR-04**: User can invoke forensics via a `--forensics` flag on the orchestrator tool
@@ -160,7 +160,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PIPE-06 | Phase 6 | Pending |
 | PIPE-07 | Phase 6 | Pending |
 | PIPE-08 | Phase 6 | Pending |
-| LRNR-01 | Phase 7 | Pending |
+| LRNR-01 | Phase 7 | Complete |
 | LRNR-02 | Phase 7 | Pending |
 | LRNR-03 | Phase 7 | Pending |
 | LRNR-04 | Phase 7 | Pending |
