@@ -89,7 +89,7 @@ describe("handleRetrospective", () => {
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe(AGENT_NAMES.RETROSPECTIVE);
 		expect(result.prompt).toContain("phases/");
-		expect(result.prompt).toContain("lessons.md");
+		expect(result.prompt).toContain("lessons.json");
 		expect(result.phase).toBe("RETROSPECTIVE");
 	});
 

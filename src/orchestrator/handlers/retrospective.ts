@@ -1,11 +1,7 @@
 import { join } from "node:path";
 import { getArtifactRef, PHASE_ARTIFACTS } from "../artifacts";
+import { createEmptyLessonMemory, loadLessonMemory, saveLessonMemory } from "../lesson-memory";
 import { lessonSchema } from "../lesson-schemas";
-import {
-	createEmptyLessonMemory,
-	loadLessonMemory,
-	saveLessonMemory,
-} from "../lesson-memory";
 import type { Lesson } from "../lesson-types";
 import type { Phase } from "../types";
 import type { DispatchResult, PhaseHandler } from "./types";
