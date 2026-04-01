@@ -83,8 +83,9 @@ export function createEventHandler(deps: EventHandlerDeps) {
 				const parentID = info.parentID !== undefined ? info.parentID : undefined;
 				manager.initSession(info.id, model, parentID);
 
-				// Start TTFT timeout if model present and timeout configured
-				if (model && config.timeoutSeconds > 0) {
+				// Start TTFT timeout only when fallback is enabled and timeout configured.
+				// Without a fallback chain, a TTFT abort would just fail the session.
+				if (model && config.enabled && config.timeoutSeconds > 0) {
 					manager.startTtftTimeout(info.id, () => {
 						// Guard: skip if session was cleaned up before timer fires
 						if (!manager.getSessionState(info.id as string)) return;

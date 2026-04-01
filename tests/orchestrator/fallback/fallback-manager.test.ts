@@ -127,12 +127,26 @@ describe("FallbackManager", () => {
 
 		test("isSelfAbortError returns false after 2000ms window expires", () => {
 			const manager = createManager();
-			// We test this by using the internal mechanism:
-			// recordSelfAbort records Date.now(), isSelfAbortError checks Date.now() - timestamp < 2000
-			// Since we cannot easily mock Date.now in bun:test, we verify the logic boundary
-			// by checking that a fresh record IS within window
+			const originalNow = Date.now;
+			const baseTime = originalNow.call(Date);
+
+			// Record self-abort at baseTime
+			Date.now = () => baseTime;
 			manager.recordSelfAbort("sess-1");
+
+			// Within window — should return true (and consume the timestamp)
+			Date.now = () => baseTime + 1000;
 			expect(manager.isSelfAbortError("sess-1")).toBe(true);
+
+			// Re-record for the expiry test
+			Date.now = () => baseTime + 1500;
+			manager.recordSelfAbort("sess-1");
+
+			// After 2000ms from re-record — should return false
+			Date.now = () => baseTime + 1500 + 2001;
+			expect(manager.isSelfAbortError("sess-1")).toBe(false);
+
+			Date.now = originalNow;
 		});
 	});
 
@@ -355,10 +369,14 @@ describe("FallbackManager", () => {
 
 	describe("tryRecoverToOriginal", () => {
 		test("resets session to primary model when cooldown expired", () => {
-			const manager = createManager({ cooldownSeconds: 0 }); // 0 cooldown
+			const manager = createManager({ cooldownSeconds: 1 }); // 1s cooldown (min valid)
+			const originalNow = Date.now;
+			const baseTime = originalNow.call(Date);
+
 			manager.initSession("sess-1", "model-a");
 
-			// First fallback
+			// First fallback — commit at baseTime
+			Date.now = () => baseTime;
 			const plan: FallbackPlan = {
 				failedModel: "model-a",
 				newModel: "openai/gpt-4",
@@ -367,11 +385,15 @@ describe("FallbackManager", () => {
 			};
 			manager.commitAndUpdateState("sess-1", plan);
 
+			// Advance past cooldown (1001ms > 1000ms)
+			Date.now = () => baseTime + 1001;
 			const recovered = manager.tryRecoverToOriginal("sess-1");
 			expect(recovered).toBe(true);
 
 			const state = manager.getSessionState("sess-1");
 			expect(state?.currentModel).toBe("model-a");
+
+			Date.now = originalNow;
 		});
 
 		test("returns false when session is unknown", () => {

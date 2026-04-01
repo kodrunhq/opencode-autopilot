@@ -29,7 +29,7 @@ export function createToolExecuteAfterHandler(manager: FallbackManager) {
 		) {
 			// Check if child session had a parent
 			const parentID = manager.getParentID(input.sessionID);
-			if (parentID !== undefined) {
+			if (parentID != null) {
 				// Mark for the orchestrator to retry -- the child session's fallback
 				// will complete asynchronously. Add metadata flag.
 				output.metadata = {

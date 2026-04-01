@@ -52,6 +52,14 @@ describe("createToolExecuteAfterHandler", () => {
 		expect(output.metadata).toEqual({});
 	});
 
+	test("task tool with empty output and null parentID does NOT set flag", async () => {
+		mockManager.parentIDs.set("sess-1", null);
+		const handler = createToolExecuteAfterHandler(mockManager);
+		const output = { title: "task", output: "", metadata: {} };
+		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
+		expect(output.metadata).toEqual({});
+	});
+
 	test("task_result sentinel string is treated as empty", async () => {
 		mockManager.parentIDs.set("sess-1", "parent-1");
 		const handler = createToolExecuteAfterHandler(mockManager);
