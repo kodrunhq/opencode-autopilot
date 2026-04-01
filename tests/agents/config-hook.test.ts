@@ -1,4 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Config } from "@opencode-ai/plugin";
 import { configHook } from "../../src/agents";
 
@@ -47,5 +50,112 @@ describe("configHook", () => {
 
 		expect(config.agent?.build).toBe(buildAgent);
 		expect(config.agent?.plan).toBe(planAgent);
+	});
+});
+
+describe("configHook with model resolution", () => {
+	let tmpDir: string;
+	let configPath: string;
+
+	beforeEach(async () => {
+		tmpDir = await mkdtemp(join(tmpdir(), "config-hook-test-"));
+		configPath = join(tmpDir, "opencode-autopilot.json");
+	});
+
+	afterEach(async () => {
+		await rm(tmpDir, { recursive: true, force: true });
+	});
+
+	test("assigns model from group config to registered agent", async () => {
+		const pluginConfig = {
+			version: 4,
+			configured: true,
+			groups: {
+				architects: { primary: "anthropic/claude-opus-4", fallbacks: [] },
+			},
+			overrides: {},
+		};
+		await writeFile(configPath, JSON.stringify(pluginConfig), "utf-8");
+
+		const config = { agent: {} } as Config;
+		await configHook(config, configPath);
+
+		// autopilot is in the "architects" group
+		const autopilotConfig = config.agent?.autopilot as Record<string, unknown>;
+		expect(autopilotConfig).toBeDefined();
+		expect(autopilotConfig.model).toBe("anthropic/claude-opus-4");
+	});
+
+	test("assigns fallback_models from group config", async () => {
+		const pluginConfig = {
+			version: 4,
+			configured: true,
+			groups: {
+				architects: {
+					primary: "anthropic/claude-opus-4",
+					fallbacks: ["openai/gpt-5.4", "google/gemini-3-pro"],
+				},
+			},
+			overrides: {},
+		};
+		await writeFile(configPath, JSON.stringify(pluginConfig), "utf-8");
+
+		const config = { agent: {} } as Config;
+		await configHook(config, configPath);
+
+		const autopilotConfig = config.agent?.autopilot as Record<string, unknown>;
+		expect(autopilotConfig).toBeDefined();
+		expect(autopilotConfig.model).toBe("anthropic/claude-opus-4");
+		expect(autopilotConfig.fallback_models).toEqual(["openai/gpt-5.4", "google/gemini-3-pro"]);
+	});
+
+	test("agents without group assignment get no model field", async () => {
+		const pluginConfig = {
+			version: 4,
+			configured: true,
+			groups: {},
+			overrides: {},
+		};
+		await writeFile(configPath, JSON.stringify(pluginConfig), "utf-8");
+
+		const config = { agent: {} } as Config;
+		await configHook(config, configPath);
+
+		const researcherConfig = config.agent?.researcher as Record<string, unknown>;
+		expect(researcherConfig).toBeDefined();
+		expect(researcherConfig.model).toBeUndefined();
+		expect(researcherConfig.fallback_models).toBeUndefined();
+	});
+
+	test("per-agent override takes precedence over group", async () => {
+		const pluginConfig = {
+			version: 4,
+			configured: true,
+			groups: {
+				architects: { primary: "anthropic/claude-opus-4", fallbacks: [] },
+			},
+			overrides: {
+				autopilot: { primary: "openai/gpt-5.4", fallbacks: ["google/gemini-3-pro"] },
+			},
+		};
+		await writeFile(configPath, JSON.stringify(pluginConfig), "utf-8");
+
+		const config = { agent: {} } as Config;
+		await configHook(config, configPath);
+
+		const autopilotConfig = config.agent?.autopilot as Record<string, unknown>;
+		expect(autopilotConfig.model).toBe("openai/gpt-5.4");
+		expect(autopilotConfig.fallback_models).toEqual(["google/gemini-3-pro"]);
+	});
+
+	test("no config file results in no model assignments", async () => {
+		// configPath points to a nonexistent file — loadConfig returns null
+		const noFilePath = join(tmpDir, "nonexistent.json");
+		const config = { agent: {} } as Config;
+		await configHook(config, noFilePath);
+
+		const researcherConfig = config.agent?.researcher as Record<string, unknown>;
+		expect(researcherConfig).toBeDefined();
+		expect(researcherConfig.model).toBeUndefined();
 	});
 });

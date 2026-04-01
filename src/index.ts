@@ -77,7 +77,8 @@ const plugin: Plugin = async (input) => {
 			const agentConfigs = openCodeConfig?.agent as
 				| Record<string, Record<string, unknown>>
 				| undefined;
-			// TODO(task-8): resolve per-group fallbacks via resolveModelForAgent
+			// Per-agent fallback_models are populated by configHook from group/override config.
+			// resolveChain reads config.agent[agentName].fallback_models (tier 1).
 			return resolveChain(agentName ?? "", agentConfigs, undefined);
 		},
 	});
