@@ -58,6 +58,7 @@ describe("phaseCore", () => {
 	});
 
 	test("unknown subcommand returns error", async () => {
+		// biome-ignore lint/suspicious/noExplicitAny: testing invalid subcommand
 		const result = await phaseCore({ subcommand: "nonexistent" as any }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.error).toContain("unknown subcommand");

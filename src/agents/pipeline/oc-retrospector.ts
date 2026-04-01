@@ -13,5 +13,5 @@ Domains: architecture=design/API, testing=coverage/quality, review=findings/fixe
 Rules: generalizations only, one domain each, no markdown, no project-specific identifiers.`,
 	permission: {
 		edit: "allow",
-	},
+	} as const,
 });

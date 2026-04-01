@@ -135,7 +135,12 @@ describe("handleExplore", () => {
 // --- BUILD handler ---
 describe("handleBuild", () => {
 	function makeBuildState(
-		tasks: Array<{ id: number; title: string; status: string; wave: number }>,
+		tasks: Array<{
+			id: number;
+			title: string;
+			status: "PENDING" | "IN_PROGRESS" | "DONE" | "SKIPPED" | "FAILED" | "BLOCKED";
+			wave: number;
+		}>,
 		buildProgress?: Partial<PipelineState["buildProgress"]>,
 	): PipelineState {
 		return makeState({

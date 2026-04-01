@@ -7,7 +7,7 @@ import type { FailureContext, PipelineState } from "../../src/orchestrator/types
 
 // ---------- helpers ----------
 
-function makeMinimalState(overrides: Partial<PipelineState> = {}): PipelineState {
+function makeMinimalState(overrides: Record<string, unknown> = {}): PipelineState {
 	const now = new Date().toISOString();
 	return pipelineStateSchema.parse({
 		schemaVersion: 2,

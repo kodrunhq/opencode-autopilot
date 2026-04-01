@@ -108,7 +108,7 @@ export function pruneMemory(memory: ReviewMemory): ReviewMemory {
 
 	return Object.freeze({
 		...memory,
-		recentFindings: Object.freeze(cappedFindings),
-		falsePositives: Object.freeze(cappedFP),
+		recentFindings: [...cappedFindings],
+		falsePositives: [...cappedFP],
 	});
 }

@@ -35,7 +35,39 @@ describe("plugin entry point", () => {
 
 	test("event handler handles session.created gracefully", async () => {
 		const result = await plugin(mockInput);
-		// biome-ignore lint/suspicious/noExplicitAny: SDK event mock requires any
-		await result.event?.({ event: { type: "session.created", properties: {} } } as any);
+		const eventResult = await result.event?.(
+			// biome-ignore lint/suspicious/noExplicitAny: SDK event mock requires any
+			{ event: { type: "session.created", properties: {} } } as any,
+		);
+		expect(eventResult).toBeUndefined();
+	});
+
+	test("registers all expected tools", async () => {
+		const result = await plugin(mockInput);
+		expect(result.tool).toBeDefined();
+		const toolNames = [...Object.keys(result.tool ?? {})].sort();
+		const expected = [
+			"oc_placeholder",
+			"oc_create_agent",
+			"oc_create_skill",
+			"oc_create_command",
+			"oc_state",
+			"oc_confidence",
+			"oc_phase",
+			"oc_plan",
+			"oc_orchestrate",
+			"oc_forensics",
+			"oc_review",
+		];
+		expect(toolNames).toEqual([...expected].sort());
+	});
+
+	test("every registered tool has a valid execute function", async () => {
+		const result = await plugin(mockInput);
+		expect(result.tool).toBeDefined();
+		for (const [_name, tool] of Object.entries(result.tool ?? {})) {
+			expect(typeof tool.execute).toBe("function");
+			expect(tool.description).toBeDefined();
+		}
 	});
 });

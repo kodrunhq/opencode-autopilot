@@ -10,6 +10,7 @@
 /** Minimal agent shape needed for selection (compatible with ReviewAgent from agents/). */
 interface SelectableAgent {
 	readonly name: string;
+	readonly prompt: string;
 	readonly relevantStacks: readonly string[];
 	readonly [key: string]: unknown;
 }

@@ -39,5 +39,5 @@ Numbered list of every URL you consulted, with a brief note on what each source 
 		webfetch: "allow",
 		edit: "allow",
 		bash: "deny",
-	},
+	} as const,
 });

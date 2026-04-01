@@ -3,7 +3,7 @@ import type { Lesson, LessonDomain, LessonMemory } from "../../../src/orchestrat
 
 // Mock lesson-memory module before importing handler
 const mockLoadLessonMemory = mock(() => Promise.resolve(null as LessonMemory | null));
-const mockSaveLessonMemory = mock(() => Promise.resolve());
+const mockSaveLessonMemory = mock((_memory: LessonMemory, _dir?: string) => Promise.resolve());
 const mockCreateEmptyLessonMemory = mock(
 	(): LessonMemory => ({
 		schemaVersion: 1 as const,
@@ -139,7 +139,7 @@ describe("handleRetrospective", () => {
 
 		const savedMemory = mockSaveLessonMemory.mock.calls[0][0] as LessonMemory;
 		expect(savedMemory.lessons).toHaveLength(2);
-		expect(savedMemory.lessons.every((l) => l.domain !== "invalid-domain")).toBe(true);
+		expect(savedMemory.lessons.every((l) => (l.domain as string) !== "invalid-domain")).toBe(true);
 	});
 
 	test("without result returns dispatch action with oc-retrospector agent", async () => {

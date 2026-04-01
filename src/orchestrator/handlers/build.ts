@@ -203,7 +203,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			phase: "BUILD",
 			progress: `Wave ${nextWave} — ${pendingTasks.length} concurrent tasks`,
 			_stateUpdates: {
-				tasks: markTasksInProgress(tasks, dispatchedIds),
+				tasks: [...markTasksInProgress(tasks, dispatchedIds)],
 				buildProgress: { ...updatedProgress, currentTask: null },
 			},
 		} satisfies DispatchResult);
@@ -227,7 +227,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 				phase: "BUILD",
 				progress: `Wave ${currentWave} complete — review pending`,
 				_stateUpdates: {
-					tasks: updatedTasks,
+					tasks: [...updatedTasks],
 					buildProgress: {
 						...buildProgress,
 						currentTask: null,
@@ -248,7 +248,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 				phase: "BUILD",
 				progress: `Wave ${currentWave} — task ${next.id}`,
 				_stateUpdates: {
-					tasks: updatedTasks,
+					tasks: [...updatedTasks],
 					buildProgress: {
 						...buildProgress,
 						currentTask: next.id,
@@ -267,7 +267,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 				phase: "BUILD",
 				progress: `Wave ${currentWave} — waiting for ${inProgressInWave.length} in-progress task(s)`,
 				_stateUpdates: {
-					tasks: updatedTasks,
+					tasks: [...updatedTasks],
 					buildProgress: {
 						...buildProgress,
 						currentTask: null,
@@ -350,7 +350,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 		phase: "BUILD",
 		progress: `Wave ${currentWave} — ${pendingTasks.length} concurrent tasks`,
 		_stateUpdates: {
-			tasks: markTasksInProgress(tasks, dispatchedIds),
+			tasks: [...markTasksInProgress(tasks, dispatchedIds)],
 			buildProgress: {
 				...buildProgress,
 				currentTask: null,

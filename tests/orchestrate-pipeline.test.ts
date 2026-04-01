@@ -220,9 +220,11 @@ describe("configHook pipeline agents", () => {
 		const config = { agent: {} } as import("@opencode-ai/plugin").Config;
 		await configHook(config);
 
+		expect(config.agent).toBeDefined();
+		const agents = config.agent as Record<string, unknown>;
 		const pipelineNames = Object.values(AGENT_NAMES);
 		for (const name of pipelineNames) {
-			expect(config.agent[name]).toBeDefined();
+			expect(agents[name]).toBeDefined();
 		}
 	});
 
@@ -231,19 +233,21 @@ describe("configHook pipeline agents", () => {
 		const config = { agent: {} } as import("@opencode-ai/plugin").Config;
 		await configHook(config);
 
+		expect(config.agent).toBeDefined();
+		const agents = config.agent as Record<string, unknown>;
 		// v1 agents
-		expect(config.agent.researcher).toBeDefined();
-		expect(config.agent.metaprompter).toBeDefined();
-		expect(config.agent.documenter).toBeDefined();
-		expect(config.agent["pr-reviewer"]).toBeDefined();
-		expect(config.agent.orchestrator).toBeDefined();
+		expect(agents.researcher).toBeDefined();
+		expect(agents.metaprompter).toBeDefined();
+		expect(agents.documenter).toBeDefined();
+		expect(agents["pr-reviewer"]).toBeDefined();
+		expect(agents.orchestrator).toBeDefined();
 
 		// pipeline agents
-		expect(config.agent["oc-researcher"]).toBeDefined();
-		expect(config.agent["oc-implementer"]).toBeDefined();
+		expect(agents["oc-researcher"]).toBeDefined();
+		expect(agents["oc-implementer"]).toBeDefined();
 
 		// Total: 5 v1 + 10 pipeline = 15
-		expect(Object.keys(config.agent).length).toBe(15);
+		expect(Object.keys(agents).length).toBe(15);
 	});
 
 	test("pipeline agents have mode subagent", async () => {
@@ -251,10 +255,11 @@ describe("configHook pipeline agents", () => {
 		const config = { agent: {} } as import("@opencode-ai/plugin").Config;
 		await configHook(config);
 
+		expect(config.agent).toBeDefined();
+		const agents = config.agent as Record<string, Record<string, unknown>>;
 		const pipelineNames = Object.values(AGENT_NAMES);
 		for (const name of pipelineNames) {
-			const agent = config.agent[name] as Record<string, unknown>;
-			expect(agent.mode).toBe("subagent");
+			expect(agents[name].mode).toBe("subagent");
 		}
 	});
 
@@ -266,12 +271,12 @@ describe("configHook pipeline agents", () => {
 		} as unknown as import("@opencode-ai/plugin").Config;
 		await configHook(config);
 
+		expect(config.agent).toBeDefined();
+		const agents = config.agent as Record<string, Record<string, unknown>>;
 		// Should preserve user's custom config
-		expect((config.agent["oc-researcher"] as Record<string, unknown>).prompt).toBe(
-			"my custom researcher",
-		);
-		expect((config.agent["oc-researcher"] as Record<string, unknown>).mode).toBe("primary");
+		expect(agents["oc-researcher"].prompt).toBe("my custom researcher");
+		expect(agents["oc-researcher"].mode).toBe("primary");
 		// Other pipeline agents still registered
-		expect(config.agent["oc-implementer"]).toBeDefined();
+		expect(agents["oc-implementer"]).toBeDefined();
 	});
 });

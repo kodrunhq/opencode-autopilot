@@ -46,5 +46,5 @@ Provide the complete file content as a single markdown code block, ready to be s
 		edit: "deny",
 		bash: "deny",
 		webfetch: "deny",
-	},
+	} as const,
 });

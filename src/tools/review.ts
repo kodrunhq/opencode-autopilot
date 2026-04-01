@@ -110,12 +110,11 @@ function startNewReview(
 
 	// Build stage 1 prompts (specialist review with diff placeholder)
 	const agentPrompts = selection.selected.map((agent) => {
-		const a = agent as { readonly name: string; readonly prompt: string };
-		const prompt = a.prompt
+		const prompt = agent.prompt
 			.replace("{{DIFF}}", `[Diff for scope: ${scope}]`)
 			.replace("{{PRIOR_FINDINGS}}", "No prior findings yet.")
 			.replace("{{MEMORY}}", "");
-		return Object.freeze({ name: a.name, prompt });
+		return Object.freeze({ name: agent.name, prompt });
 	});
 
 	const state: ReviewState = {
