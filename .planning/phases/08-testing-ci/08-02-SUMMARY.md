@@ -50,7 +50,7 @@ completed: 2026-04-01
 
 ## Accomplishments
 - Created CI workflow that runs on push to main and PRs to main
-- Workflow enforces lint (Biome), type-check (tsc --noEmit), and test+coverage (bun test --coverage --bail 1)
+- Workflow enforces lint (Biome), type-check (tsc --noEmit), and test+coverage (bun test --coverage --bail=1)
 - Bun version pinned to 1.3.11 with frozen lockfile for reproducibility
 
 ## Task Commits
@@ -63,11 +63,16 @@ Each task was committed atomically:
 - `.github/workflows/ci.yml` - GitHub Actions CI pipeline with lint, type-check, and test+coverage steps
 
 ## Decisions Made
-None - followed plan as specified.
+- Added explicit `permissions: contents: read` block for least-privilege security
+- Pinned GitHub Actions to commit SHAs instead of version tags for supply-chain hardening
+- Renamed CI job from `check` to `quality-gate` for clarity
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+- Original plan specified `check` job using version-tagged actions without a `permissions` block
+- Shipped workflow uses `quality-gate` job name, pinned SHAs, and explicit permissions
+- Changed `--bail 1` to `--bail=1` (Bun requires `=` syntax; space-separated form fails)
+- These are intentional security/naming improvements that do not change CI behavior
 
 ## Issues Encountered
 None.
