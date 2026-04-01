@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { FallbackManager } from "../../../src/orchestrator/fallback/fallback-manager";
-import type { FallbackManagerOptions } from "../../../src/orchestrator/fallback/fallback-manager";
 import type { FallbackConfig } from "../../../src/orchestrator/fallback/fallback-config";
-import type { FallbackPlan, FallbackState } from "../../../src/orchestrator/fallback/types";
+import { FallbackManager } from "../../../src/orchestrator/fallback/fallback-manager";
+import type { FallbackPlan } from "../../../src/orchestrator/fallback/types";
 
 const DEFAULT_CONFIG: FallbackConfig = {
 	enabled: true,
@@ -283,7 +282,9 @@ describe("FallbackManager", () => {
 				message: "rate limited",
 			});
 			expect(firstPlan).not.toBeNull();
-			manager.commitAndUpdateState("sess-1", firstPlan!);
+			if (firstPlan) {
+				manager.commitAndUpdateState("sess-1", firstPlan);
+			}
 			manager.releaseRetryLock("sess-1");
 
 			// Now stale error from model-a arrives

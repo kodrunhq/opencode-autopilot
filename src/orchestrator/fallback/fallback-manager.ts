@@ -1,5 +1,5 @@
-import type { FallbackConfig } from "./fallback-config";
 import { isRetryableError } from "./error-classifier";
+import type { FallbackConfig } from "./fallback-config";
 import {
 	commitFallback,
 	createFallbackState,
@@ -33,8 +33,7 @@ export class FallbackManager {
 	private readonly sessionAwaitingFallbackResult: Set<string> = new Set();
 	private readonly sessionSelfAbortTimestamp: Map<string, number> = new Map();
 	private readonly sessionFirstTokenReceived: Map<string, boolean> = new Map();
-	private readonly sessionFallbackTimeouts: Map<string, ReturnType<typeof setTimeout>> =
-		new Map();
+	private readonly sessionFallbackTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
 	private readonly sessionParentID: Map<string, string | null> = new Map();
 	private readonly sessionCompactionInFlight: Set<string> = new Set();
 
@@ -104,8 +103,7 @@ export class FallbackManager {
 	 */
 	isDispatchInFlight(sessionID: string): boolean {
 		return (
-			this.sessionRetryInFlight.has(sessionID) ||
-			this.sessionAwaitingFallbackResult.has(sessionID)
+			this.sessionRetryInFlight.has(sessionID) || this.sessionAwaitingFallbackResult.has(sessionID)
 		);
 	}
 
@@ -213,13 +211,7 @@ export class FallbackManager {
 		}
 
 		// Check if error is retryable
-		if (
-			!isRetryableError(
-				error,
-				this.config.retryOnErrors,
-				this.config.retryableErrorPatterns,
-			)
-		) {
+		if (!isRetryableError(error, this.config.retryOnErrors, this.config.retryableErrorPatterns)) {
 			return null;
 		}
 
