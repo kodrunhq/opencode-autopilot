@@ -1,11 +1,15 @@
 import { tool } from "@opencode-ai/plugin";
 
+/**
+ * @deprecated Stub retained only to avoid breaking src/index.ts imports.
+ * Will be removed in Task 10 when index.ts is rewired to use oc_configure.
+ */
 export const ocPlaceholder = tool({
-	description: "Verifies that the OpenCode Assets plugin is loaded and working",
+	description: "[DEPRECATED] Placeholder tool — will be replaced by oc_configure",
 	args: {
-		message: tool.schema.string().max(1000).describe("A test message to echo back"),
+		message: tool.schema.string().max(1000).describe("Unused"),
 	},
-	async execute(args) {
-		return `OpenCode Assets plugin is active. Your message: ${args.message}`;
+	async execute() {
+		return "This tool is deprecated. Use /configure to set up model assignments.";
 	},
 });
