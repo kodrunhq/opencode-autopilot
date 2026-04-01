@@ -33,7 +33,7 @@ async function applyStateUpdates(
 }
 
 /**
- * When a handler dispatches "oc-review", call reviewCore directly instead
+ * When a handler dispatches "oc-reviewer", call reviewCore directly instead
  * of returning the dispatch instruction. This avoids the JSON round-trip
  * for the review integration in BUILD phase (per CONTEXT.md).
  */

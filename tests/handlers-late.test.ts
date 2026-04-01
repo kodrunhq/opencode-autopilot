@@ -182,7 +182,7 @@ describe("handleBuild", () => {
 		expect(["dispatch", "dispatch_multi"]).toContain(result.action);
 	});
 
-	test("multiple tasks in same wave returns dispatch_multi", async () => {
+	test("multiple tasks in same wave returns dispatch_multi with tasks marked IN_PROGRESS", async () => {
 		const state = makeBuildState([
 			{ id: 1, title: "Task A", status: "PENDING", wave: 1 },
 			{ id: 2, title: "Task B", status: "PENDING", wave: 1 },
@@ -193,6 +193,18 @@ describe("handleBuild", () => {
 		expect(result.action).toBe("dispatch_multi");
 		expect(result.agents).toBeDefined();
 		expect(result.agents?.length).toBe(2);
+		// dispatch_multi should set currentTask to null (results come back individually)
+		expect(result._stateUpdates?.buildProgress?.currentTask).toBeNull();
+		// dispatch_multi should mark dispatched tasks as IN_PROGRESS
+		const updatedTasks = result._stateUpdates?.tasks as
+			| Array<{ id: number; status: string }>
+			| undefined;
+		expect(updatedTasks).toBeDefined();
+		if (updatedTasks) {
+			expect(updatedTasks.find((t) => t.id === 1)?.status).toBe("IN_PROGRESS");
+			expect(updatedTasks.find((t) => t.id === 2)?.status).toBe("IN_PROGRESS");
+			expect(updatedTasks.find((t) => t.id === 3)?.status).toBe("PENDING");
+		}
 	});
 
 	test("all tasks in current wave DONE sets reviewPending", async () => {
@@ -278,6 +290,44 @@ describe("handleBuild", () => {
 		if (result.action === "dispatch") {
 			expect(result.prompt).toContain("Task B");
 			expect(result.prompt).not.toContain("Task A");
+		}
+	});
+
+	test("resume with only IN_PROGRESS tasks does not return complete", async () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 },
+				{ id: 2, title: "Task B", status: "IN_PROGRESS", wave: 1 },
+			],
+			{ currentTask: null, currentWave: 1 },
+		);
+		// No result — this is a resume call
+		const result = await handleBuild(state, "/tmp/artifacts");
+
+		// Must NOT return complete — work is still in progress
+		expect(result.action).not.toBe("complete");
+		expect(result.action).toBe("dispatch");
+		expect(result.progress).toContain("in-progress");
+	});
+
+	test("dispatch_multi result marks first IN_PROGRESS task DONE", async () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 },
+				{ id: 2, title: "Task B", status: "IN_PROGRESS", wave: 1 },
+			],
+			{ currentTask: null, currentWave: 1 },
+		);
+		const result = await handleBuild(state, "/tmp/artifacts", "task A completed");
+
+		// Should mark first IN_PROGRESS task (id:1) as DONE, dispatch next or wave complete
+		expect(["dispatch", "dispatch_multi"]).toContain(result.action);
+		const updatedTasks = result._stateUpdates?.tasks as
+			| Array<{ id: number; status: string }>
+			| undefined;
+		expect(updatedTasks).toBeDefined();
+		if (updatedTasks) {
+			expect(updatedTasks.find((t) => t.id === 1)?.status).toBe("DONE");
 		}
 	});
 

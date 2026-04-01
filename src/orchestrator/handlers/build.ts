@@ -33,6 +33,25 @@ function findPendingTasks(
 }
 
 /**
+ * Get in-progress tasks for a specific wave.
+ */
+function findInProgressTasks(
+	waveMap: ReadonlyMap<number, readonly Task[]>,
+	wave: number,
+): readonly Task[] {
+	const tasks = waveMap.get(wave) ?? [];
+	return tasks.filter((t) => t.status === "IN_PROGRESS");
+}
+
+/**
+ * Mark multiple tasks as IN_PROGRESS immutably.
+ */
+function markTasksInProgress(tasks: readonly Task[], taskIds: readonly number[]): readonly Task[] {
+	const idSet = new Set(taskIds);
+	return tasks.map((t) => (idSet.has(t.id) ? { ...t, status: "IN_PROGRESS" as const } : t));
+}
+
+/**
  * Build a prompt for a single task dispatch.
  */
 function buildTaskPrompt(task: Task): string {
@@ -174,6 +193,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			} satisfies DispatchResult);
 		}
 
+		const dispatchedIds = pendingTasks.map((t) => t.id);
 		return Object.freeze({
 			action: "dispatch_multi",
 			agents: pendingTasks.map((task) => ({
@@ -183,14 +203,18 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			phase: "BUILD",
 			progress: `Wave ${nextWave} — ${pendingTasks.length} concurrent tasks`,
 			_stateUpdates: {
-				buildProgress: { ...updatedProgress, currentTask: pendingTasks[0].id },
+				tasks: markTasksInProgress(tasks, dispatchedIds),
+				buildProgress: { ...updatedProgress, currentTask: null },
 			},
 		} satisfies DispatchResult);
 	}
 
 	// Case 2: Result provided + not review pending -> mark task done
-	if (result && !buildProgress.reviewPending && buildProgress.currentTask !== null) {
-		const updatedTasks = markTaskDone(tasks, buildProgress.currentTask);
+	// For dispatch_multi, currentTask may be null — find the first IN_PROGRESS task instead
+	const taskToComplete =
+		buildProgress.currentTask ?? tasks.find((t) => t.status === "IN_PROGRESS")?.id ?? null;
+	if (result && !buildProgress.reviewPending && taskToComplete !== null) {
+		const updatedTasks = markTaskDone(tasks, taskToComplete);
 		const waveMap = groupByWave(updatedTasks);
 		const currentWave = buildProgress.currentWave ?? 1;
 
@@ -213,7 +237,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			} satisfies DispatchResult);
 		}
 
-		// Wave not complete -> dispatch next pending task in wave
+		// Wave not complete -> dispatch next pending task or wait for in-progress
 		const pendingInWave = findPendingTasks(waveMap, currentWave);
 		if (pendingInWave.length > 0) {
 			const next = pendingInWave[0];
@@ -228,6 +252,25 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 					buildProgress: {
 						...buildProgress,
 						currentTask: next.id,
+					},
+				},
+			} satisfies DispatchResult);
+		}
+
+		// No pending tasks but wave not complete — other tasks are still IN_PROGRESS
+		const inProgressInWave = findInProgressTasks(waveMap, currentWave);
+		if (inProgressInWave.length > 0) {
+			return Object.freeze({
+				action: "dispatch",
+				agent: AGENT_NAMES.BUILD,
+				prompt: `Wave ${currentWave} has ${inProgressInWave.length} task(s) still in progress. Continue working on remaining tasks.`,
+				phase: "BUILD",
+				progress: `Wave ${currentWave} — waiting for ${inProgressInWave.length} in-progress task(s)`,
+				_stateUpdates: {
+					tasks: updatedTasks,
+					buildProgress: {
+						...buildProgress,
+						currentTask: null,
 					},
 				},
 			} satisfies DispatchResult);
@@ -248,9 +291,29 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 	}
 
 	const pendingTasks = findPendingTasks(waveMap, currentWave);
+	const inProgressTasks = findInProgressTasks(waveMap, currentWave);
+
+	if (pendingTasks.length === 0 && inProgressTasks.length > 0) {
+		// Wave has only IN_PROGRESS tasks (e.g., resume after dispatch_multi).
+		// Return a dispatch instruction so the orchestrator knows work is underway.
+		return Object.freeze({
+			action: "dispatch",
+			agent: AGENT_NAMES.BUILD,
+			prompt: `Resume: wave ${currentWave} has ${inProgressTasks.length} task(s) still in progress. Wait for agent results and pass them back.`,
+			phase: "BUILD",
+			progress: `Wave ${currentWave} — waiting for ${inProgressTasks.length} in-progress task(s)`,
+			_stateUpdates: {
+				buildProgress: {
+					...buildProgress,
+					currentWave,
+					currentTask: null,
+				},
+			},
+		} satisfies DispatchResult);
+	}
 
 	if (pendingTasks.length === 0) {
-		// All tasks in this wave done, check next
+		// All tasks in all waves DONE (findCurrentWave already checked PENDING + IN_PROGRESS)
 		return Object.freeze({
 			action: "complete",
 			phase: "BUILD",
@@ -277,6 +340,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 	}
 
 	// Multiple pending tasks in wave -> dispatch_multi
+	const dispatchedIds = pendingTasks.map((t) => t.id);
 	return Object.freeze({
 		action: "dispatch_multi",
 		agents: pendingTasks.map((task) => ({
@@ -286,9 +350,10 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 		phase: "BUILD",
 		progress: `Wave ${currentWave} — ${pendingTasks.length} concurrent tasks`,
 		_stateUpdates: {
+			tasks: markTasksInProgress(tasks, dispatchedIds),
 			buildProgress: {
 				...buildProgress,
-				currentTask: pendingTasks[0].id,
+				currentTask: null,
 				currentWave,
 			},
 		},
