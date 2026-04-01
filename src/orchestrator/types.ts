@@ -3,6 +3,7 @@ import type {
 	buildProgressSchema,
 	confidenceEntrySchema,
 	decisionEntrySchema,
+	failureContextSchema,
 	phaseSchema,
 	phaseStatusSchema,
 	pipelineStateSchema,
@@ -16,3 +17,4 @@ export type DecisionEntry = z.infer<typeof decisionEntrySchema>;
 export type ConfidenceEntry = z.infer<typeof confidenceEntrySchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type BuildProgress = z.infer<typeof buildProgressSchema>;
+export type FailureContext = z.infer<typeof failureContextSchema>;

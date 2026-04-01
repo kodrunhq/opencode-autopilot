@@ -6,6 +6,7 @@ import { ocConfidence } from "./tools/confidence";
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
+import { ocForensics } from "./tools/forensics";
 import { ocOrchestrate } from "./tools/orchestrate";
 import { ocPhase } from "./tools/phase";
 import { ocPlaceholder } from "./tools/placeholder";
@@ -34,6 +35,7 @@ const plugin: Plugin = async (_input) => {
 			oc_phase: ocPhase,
 			oc_plan: ocPlan,
 			oc_orchestrate: ocOrchestrate,
+			oc_forensics: ocForensics,
 			oc_review: ocReview,
 		},
 		event: async ({ event }) => {
