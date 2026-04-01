@@ -2,9 +2,12 @@ import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
 import type { DispatchResult } from "../orchestrator/handlers/types";
+import { buildLessonContext } from "../orchestrator/lesson-injection";
+import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { completePhase, getNextPhase } from "../orchestrator/phase";
 import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
 import type { Phase } from "../orchestrator/types";
+import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
 import { getProjectArtifactDir } from "../utils/paths";
 import { reviewCore } from "./review";
@@ -54,6 +57,44 @@ async function maybeInlineReview(
 }
 
 /**
+ * Attempt to inject lesson context into a dispatch prompt.
+ * Best-effort: failures are silently swallowed to avoid breaking dispatch.
+ */
+async function injectLessonContext(
+	prompt: string,
+	phase: string,
+	artifactDir: string,
+): Promise<string> {
+	try {
+		const projectRoot = join(artifactDir, "..");
+		const memory = await loadLessonMemory(projectRoot);
+		if (memory && memory.lessons.length > 0) {
+			const ctx = buildLessonContext(memory.lessons, phase as Phase);
+			if (ctx) {
+				return prompt + ctx;
+			}
+		}
+	} catch (error: unknown) {
+		if (
+			isEnoentError(error) ||
+			error instanceof SyntaxError ||
+			(error !== null && typeof error === "object" && "issues" in error)
+		) {
+			return prompt; // I/O, parse, or validation error -- non-critical
+		}
+		// Treat any NodeJS.ErrnoException (EACCES, EPERM, etc.) as non-critical
+		if (error !== null && typeof error === "object") {
+			const errWithCode = error as { code?: unknown };
+			if (typeof errWithCode.code === "string") {
+				return prompt;
+			}
+		}
+		throw error; // re-throw programmer errors
+	}
+	return prompt;
+}
+
+/**
  * Process a handler's DispatchResult, handling complete/dispatch/dispatch_multi/error.
  * On complete, advances the phase and invokes the next handler.
  */
@@ -81,11 +122,39 @@ async function processHandlerResult(
 					return processHandlerResult(nextResult, reloadedState, artifactDir);
 				}
 			}
+			// Inject lesson context into dispatch prompt (best-effort)
+			if (handlerResult.prompt && handlerResult.phase) {
+				const enrichedPrompt = await injectLessonContext(
+					handlerResult.prompt,
+					handlerResult.phase,
+					artifactDir,
+				);
+				if (enrichedPrompt !== handlerResult.prompt) {
+					return JSON.stringify({ ...handlerResult, prompt: enrichedPrompt });
+				}
+			}
 			return JSON.stringify(handlerResult);
 		}
 
-		case "dispatch_multi":
+		case "dispatch_multi": {
+			// Inject lesson context into each agent's prompt (best-effort)
+			// Load lesson context once and reuse for all agents in the batch
+			if (handlerResult.agents && handlerResult.phase) {
+				const lessonSuffix = await injectLessonContext(
+					"",
+					handlerResult.phase as string,
+					artifactDir,
+				);
+				if (lessonSuffix) {
+					const enrichedAgents = handlerResult.agents.map((entry) => ({
+						...entry,
+						prompt: entry.prompt + lessonSuffix,
+					}));
+					return JSON.stringify({ ...handlerResult, agents: enrichedAgents });
+				}
+			}
 			return JSON.stringify(handlerResult);
+		}
 
 		case "complete": {
 			if (currentState.currentPhase === null) {
@@ -116,7 +185,10 @@ async function processHandlerResult(
 		}
 
 		default:
-			return JSON.stringify({ action: "error", message: "Unknown handler action" });
+			return JSON.stringify({
+				action: "error",
+				message: `Unknown handler action: "${String((handlerResult as Record<string, unknown>).action)}"`,
+			});
 	}
 }
 
@@ -169,7 +241,31 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 		return JSON.stringify({ action: "error", message: "Unexpected state" });
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
-		return JSON.stringify({ action: "error", message });
+		const safeMessage = message.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 4096);
+
+		// Persist failure metadata for forensics (best-effort)
+		try {
+			const currentState = await loadState(artifactDir);
+			if (currentState?.currentPhase) {
+				const lastDone = currentState.phases.filter((p) => p.status === "DONE").pop();
+				const failureContext = {
+					failedPhase: currentState.currentPhase,
+					failedAgent: null as string | null,
+					errorMessage: safeMessage,
+					timestamp: new Date().toISOString(),
+					lastSuccessfulPhase: lastDone?.name ?? null,
+				};
+				const failed = patchState(currentState, {
+					status: "FAILED" as const,
+					failureContext,
+				});
+				await saveState(failed, artifactDir);
+			}
+		} catch {
+			// Swallow save errors -- original error takes priority
+		}
+
+		return JSON.stringify({ action: "error", message: safeMessage });
 	}
 }
 
@@ -177,9 +273,14 @@ export const ocOrchestrate = tool({
 	description:
 		"Drive the orchestrator pipeline. Provide an idea to start a new run, or a result to advance the current phase. Returns JSON with action (dispatch/dispatch_multi/complete/error).",
 	args: {
-		idea: tool.schema.string().optional().describe("Idea to start a new orchestration run"),
+		idea: tool.schema
+			.string()
+			.max(4096)
+			.optional()
+			.describe("Idea to start a new orchestration run"),
 		result: tool.schema
 			.string()
+			.max(1_048_576)
 			.optional()
 			.describe("Result from previous agent to advance the pipeline"),
 	},

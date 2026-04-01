@@ -89,16 +89,21 @@ describe("handleRetrospective", () => {
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe(AGENT_NAMES.RETROSPECTIVE);
 		expect(result.prompt).toContain("phases/");
-		expect(result.prompt).toContain("lessons.md");
+		expect(result.prompt).not.toContain("RETROSPECTIVE");
 		expect(result.phase).toBe("RETROSPECTIVE");
 	});
 
 	test("returns complete when result provided", async () => {
 		const state = makeState({ currentPhase: "RETROSPECTIVE" });
-		const result = await handleRetrospective(state, "/tmp/artifacts", "lessons extracted");
+		const result = await handleRetrospective(
+			state,
+			"/tmp/artifacts",
+			JSON.stringify({ lessons: [] }),
+		);
 
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("RETROSPECTIVE");
+		expect(result.progress).toContain("0 lessons");
 	});
 });
 

@@ -13,7 +13,7 @@ const MAX_STRIKES = 3;
 function findCurrentWave(waveMap: ReadonlyMap<number, readonly Task[]>): number | null {
 	const sortedWaves = [...waveMap.keys()].sort((a, b) => a - b);
 	for (const wave of sortedWaves) {
-		const tasks = waveMap.get(wave)!;
+		const tasks = waveMap.get(wave) ?? [];
 		if (tasks.some((t) => t.status === "PENDING" || t.status === "IN_PROGRESS")) {
 			return wave;
 		}

@@ -143,7 +143,12 @@ Plans:
   1. After a completed run, lessons are extracted and persisted to institutional memory with domain categorization (architecture, testing, review, planning)
   2. Stale lessons decay over time so the memory store does not grow unbounded
   3. User can invoke forensics on a failed run and receive a diagnosis identifying the failing phase, agent, root cause, and whether the failure is recoverable or terminal
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [x] 07-01-PLAN.md -- Lesson memory data layer: Zod schemas, types, load/save/prune with atomic writes
+- [x] 07-02-PLAN.md -- Retrospective handler enhancement and lesson injection into phase dispatch
+- [x] 07-03-PLAN.md -- Failure metadata capture and oc_forensics diagnostic tool
 
 ## Progress
 
@@ -155,7 +160,7 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 | 1. Plugin Infrastructure | v1.0 | 2/2 | Complete | - |
 | 2. Creation Tooling | v1.0 | 2/2 | Complete | - |
 | 3. Curated Assets | v1.0 | 2/2 | Complete | - |
-| 4. Foundation Infrastructure | v2.0 | 0/4 | Planning | - |
-| 5. Review Engine | v2.0 | 1/1 | In Progress | - |
-| 6. Orchestrator Pipeline | v2.0 | 2/4 | In Progress | - |
-| 7. Learning & Resilience | v2.0 | 0/0 | Not started | - |
+| 4. Foundation Infrastructure | v2.0 | 4/4 | Complete | - |
+| 5. Review Engine | v2.0 | 4/4 | Complete | - |
+| 6. Orchestrator Pipeline | v2.0 | 4/4 | Complete | - |
+| 7. Learning & Resilience | v2.0 | 3/3 | Complete | - |
