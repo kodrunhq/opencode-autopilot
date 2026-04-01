@@ -54,6 +54,14 @@ export const buildProgressSchema = z.object({
 	reviewPending: z.boolean().default(false),
 });
 
+export const failureContextSchema = z.object({
+	failedPhase: phaseSchema,
+	failedAgent: z.string().max(128).nullable(),
+	errorMessage: z.string().max(4096),
+	timestamp: z.string().max(128),
+	lastSuccessfulPhase: phaseSchema.nullable(),
+});
+
 export const pipelineStateSchema = z.object({
 	schemaVersion: z.literal(2),
 	status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"]),
@@ -74,4 +82,5 @@ export const pipelineStateSchema = z.object({
 		strikeCount: 0,
 		reviewPending: false,
 	}),
+	failureContext: failureContextSchema.nullable().default(null),
 });

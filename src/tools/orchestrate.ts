@@ -169,6 +169,29 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 		return JSON.stringify({ action: "error", message: "Unexpected state" });
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
+
+		// Persist failure metadata for forensics (best-effort)
+		try {
+			const currentState = await loadState(artifactDir);
+			if (currentState?.currentPhase) {
+				const lastDone = currentState.phases.filter((p) => p.status === "DONE").pop();
+				const failureContext = {
+					failedPhase: currentState.currentPhase,
+					failedAgent: null as string | null,
+					errorMessage: message.slice(0, 4096),
+					timestamp: new Date().toISOString(),
+					lastSuccessfulPhase: lastDone?.name ?? null,
+				};
+				const failed = patchState(currentState, {
+					status: "FAILED" as const,
+					failureContext,
+				});
+				await saveState(failed, artifactDir);
+			}
+		} catch {
+			// Swallow save errors -- original error takes priority
+		}
+
 		return JSON.stringify({ action: "error", message });
 	}
 }
