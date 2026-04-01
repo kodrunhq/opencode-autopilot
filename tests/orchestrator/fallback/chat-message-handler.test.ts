@@ -48,7 +48,6 @@ function createFallbackState(overrides: Partial<FallbackState> = {}): FallbackSt
 		fallbackIndex: -1,
 		failedModels: new Map(),
 		attemptCount: 0,
-		pendingFallbackModel: undefined,
 		...overrides,
 	};
 }

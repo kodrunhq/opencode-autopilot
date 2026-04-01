@@ -16,7 +16,6 @@ export interface FallbackState {
 	readonly fallbackIndex: number; // -1 = primary
 	readonly failedModels: ReadonlyMap<string, number>; // model -> timestamp
 	readonly attemptCount: number;
-	readonly pendingFallbackModel: string | undefined;
 }
 
 export interface FallbackPlan {

@@ -150,3 +150,64 @@ describe("RETRYABLE_ERROR_PATTERNS", () => {
 		}
 	});
 });
+
+describe("isRetryableError additional coverage", () => {
+	const DEFAULT_RETRY_CODES = [401, 402, 429, 500, 502, 503, 504];
+
+	test("content_filter errors are NOT retryable", () => {
+		expect(isRetryableError(new Error("content filter triggered"), DEFAULT_RETRY_CODES)).toBe(
+			false,
+		);
+	});
+
+	test("context_length errors are NOT retryable", () => {
+		expect(isRetryableError(new Error("context length exceeded"), DEFAULT_RETRY_CODES)).toBe(false);
+	});
+
+	test("overloaded pattern is retryable", () => {
+		expect(isRetryableError(new Error("server is overloaded"), DEFAULT_RETRY_CODES)).toBe(true);
+	});
+
+	test("temporarily unavailable is retryable", () => {
+		expect(isRetryableError(new Error("temporarily unavailable"), DEFAULT_RETRY_CODES)).toBe(true);
+	});
+
+	test("try again is retryable", () => {
+		expect(isRetryableError(new Error("please try again later"), DEFAULT_RETRY_CODES)).toBe(true);
+	});
+
+	test("credit balance too low is retryable", () => {
+		expect(isRetryableError(new Error("credit balance is too low"), DEFAULT_RETRY_CODES)).toBe(
+			true,
+		);
+	});
+
+	test("insufficient credits is retryable", () => {
+		expect(isRetryableError(new Error("insufficient credits"), DEFAULT_RETRY_CODES)).toBe(true);
+	});
+
+	test("key limit exceeded is retryable", () => {
+		expect(isRetryableError(new Error("key limit exceeded"), DEFAULT_RETRY_CODES)).toBe(true);
+	});
+
+	test("usage limit reached is retryable", () => {
+		expect(isRetryableError(new Error("usage limit has been reached"), DEFAULT_RETRY_CODES)).toBe(
+			true,
+		);
+	});
+
+	test("non-retryable status code as object property returns null", () => {
+		expect(extractStatusCode({ status: 404 }, DEFAULT_RETRY_CODES)).toBeNull();
+	});
+
+	test("200 as statusCode returns null", () => {
+		expect(extractStatusCode({ statusCode: 200 }, DEFAULT_RETRY_CODES)).toBeNull();
+	});
+
+	test("ReDoS-like pattern in userPatterns is skipped", () => {
+		const dangerousPatterns = ["(a+)+$", "(x|x)+y"];
+		expect(
+			isRetryableError(new Error("normal error message"), DEFAULT_RETRY_CODES, dangerousPatterns),
+		).toBe(false);
+	});
+});

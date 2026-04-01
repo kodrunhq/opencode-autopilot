@@ -86,6 +86,8 @@ export function createEventHandler(deps: EventHandlerDeps) {
 				// Start TTFT timeout if model present and timeout configured
 				if (model && config.timeoutSeconds > 0) {
 					manager.startTtftTimeout(info.id, () => {
+						// Guard: skip if session was cleaned up before timer fires
+						if (!manager.getSessionState(info.id as string)) return;
 						// On TTFT timeout, abort session to trigger fallback via session.error
 						sdk.abortSession(info.id as string).catch(() => {
 							// Best-effort abort; session.error will handle the result
@@ -116,6 +118,7 @@ export function createEventHandler(deps: EventHandlerDeps) {
 				const sessionID = extractSessionID(properties);
 				if (sessionID) {
 					manager.recordFirstToken(sessionID);
+					manager.clearAwaitingResult(sessionID);
 				}
 				return;
 			}
@@ -161,13 +164,7 @@ async function handleFallbackError(
 	error: unknown,
 	modelStr?: string,
 ): Promise<void> {
-	// Pitfall 2: Suppress self-abort errors
-	if (manager.isSelfAbortError(sessionID)) return;
-
-	// Pitfall 5: Suppress stale errors from previous models
-	if (manager.isStaleError(sessionID, modelStr)) return;
-
-	// Delegate to manager's guard chain (retryable check, lock, state, plan)
+	// All guards (self-abort, stale, retryable, lock) are inside manager.handleError
 	const plan = manager.handleError(sessionID, error, modelStr);
 	if (!plan) return;
 
@@ -178,16 +175,32 @@ async function handleFallbackError(
 		// Abort current request
 		await sdk.abortSession(sessionID);
 
+		// Session may have been cleaned up during await — verify before continuing
+		if (!manager.getSessionState(sessionID)) {
+			manager.releaseRetryLock(sessionID);
+			return;
+		}
+
 		// Get messages for replay
 		const messages = await sdk.getSessionMessages(sessionID);
+
+		// Session existence check after second await
+		if (!manager.getSessionState(sessionID)) {
+			manager.releaseRetryLock(sessionID);
+			return;
+		}
 
 		// Get current state for attempt-based degradation
 		const state = manager.getSessionState(sessionID);
 		const attemptCount = state?.attemptCount ?? 0;
 		const { parts: replayedParts } = replayWithDegradation(messages, attemptCount);
 
-		// Commit fallback state
-		manager.commitAndUpdateState(sessionID, plan);
+		// Commit fallback state — abort dispatch if commit fails (stale plan)
+		const committed = manager.commitAndUpdateState(sessionID, plan);
+		if (!committed) {
+			manager.releaseRetryLock(sessionID);
+			return;
+		}
 
 		// Parse the new model for the SDK call
 		const parsedModel = parseModelString(plan.newModel);
@@ -209,8 +222,9 @@ async function handleFallbackError(
 			await sdk.promptAsync(sessionID, parsedModel, replayedParts);
 		}
 
-		// Release lock after successful dispatch
+		// Release lock and mark awaiting result for isDispatchInFlight guard
 		manager.releaseRetryLock(sessionID);
+		manager.markAwaitingResult(sessionID);
 	} catch {
 		// On failure, release the lock to allow future retries
 		manager.releaseRetryLock(sessionID);

@@ -19,7 +19,7 @@ describe("createFallbackState", () => {
 		expect(state.fallbackIndex).toBe(-1);
 		expect(state.failedModels.size).toBe(0);
 		expect(state.attemptCount).toBe(0);
-		expect(state.pendingFallbackModel).toBeUndefined();
+		expect(Object.keys(state)).not.toContain("pendingFallbackModel");
 	});
 });
 
@@ -46,7 +46,6 @@ describe("planFallback", () => {
 			fallbackIndex: 0,
 			failedModels: new Map([["openai/gpt-4", Date.now()]]),
 			attemptCount: 1,
-			pendingFallbackModel: undefined,
 		};
 		const result = planFallback(state, chain, maxAttempts, cooldownMs);
 		expect(result.success).toBe(true);
@@ -67,7 +66,6 @@ describe("planFallback", () => {
 				["google/gemini-pro", Date.now()],
 			]),
 			attemptCount: 3,
-			pendingFallbackModel: undefined,
 		};
 		const result = planFallback(state, chain, maxAttempts, cooldownMs);
 		expect(result.success).toBe(false);
@@ -83,7 +81,6 @@ describe("planFallback", () => {
 			fallbackIndex: 0,
 			failedModels: new Map(),
 			attemptCount: 10,
-			pendingFallbackModel: undefined,
 		};
 		const result = planFallback(state, chain, 10, cooldownMs);
 		expect(result.success).toBe(false);
@@ -100,7 +97,6 @@ describe("planFallback", () => {
 			fallbackIndex: -1,
 			failedModels: new Map([["openai/gpt-4", now]]),
 			attemptCount: 1,
-			pendingFallbackModel: undefined,
 		};
 		const result = planFallback(state, chain, maxAttempts, cooldownMs);
 		expect(result.success).toBe(true);
@@ -119,7 +115,6 @@ describe("planFallback", () => {
 			fallbackIndex: -1,
 			failedModels: new Map([["openai/gpt-4", expiredTime]]),
 			attemptCount: 1,
-			pendingFallbackModel: undefined,
 		};
 		const result = planFallback(state, chain, maxAttempts, cooldownMs);
 		expect(result.success).toBe(true);
@@ -127,6 +122,48 @@ describe("planFallback", () => {
 			expect(result.plan.newModel).toBe("openai/gpt-4");
 			expect(result.plan.newFallbackIndex).toBe(0);
 		}
+	});
+
+	test("skips currentModel in fallback chain to prevent self-selection", () => {
+		const chain = ["primary/model", "backup/model"];
+		const state: import("../../../src/orchestrator/fallback/types").FallbackState = {
+			originalModel: "primary/model",
+			currentModel: "primary/model",
+			fallbackIndex: -1,
+			failedModels: new Map(),
+			attemptCount: 0,
+		};
+		const result = planFallback(state, chain, 3, 60000);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.plan.newModel).toBe("backup/model");
+			expect(result.plan.newModel).not.toBe(state.currentModel);
+		}
+	});
+
+	test("returns failure when only currentModel is in chain", () => {
+		const chain = ["primary/model"];
+		const state: import("../../../src/orchestrator/fallback/types").FallbackState = {
+			originalModel: "primary/model",
+			currentModel: "primary/model",
+			fallbackIndex: -1,
+			failedModels: new Map(),
+			attemptCount: 0,
+		};
+		const result = planFallback(state, chain, 3, 60000);
+		expect(result.success).toBe(false);
+	});
+
+	test("returns failure when chain is empty", () => {
+		const state: import("../../../src/orchestrator/fallback/types").FallbackState = {
+			originalModel: "primary/model",
+			currentModel: "primary/model",
+			fallbackIndex: -1,
+			failedModels: new Map(),
+			attemptCount: 0,
+		};
+		const result = planFallback(state, [], 3, 60000);
+		expect(result.success).toBe(false);
 	});
 });
 
@@ -172,7 +209,6 @@ describe("commitFallback", () => {
 			fallbackIndex: 0,
 			failedModels: new Map(),
 			attemptCount: 1,
-			pendingFallbackModel: undefined,
 		};
 		const plan: FallbackPlan = {
 			failedModel: "primary/model",
@@ -196,7 +232,6 @@ describe("recoverToOriginal", () => {
 			fallbackIndex: 0,
 			failedModels: new Map([["primary/model", expiredTime]]),
 			attemptCount: 1,
-			pendingFallbackModel: undefined,
 		};
 		const result = recoverToOriginal(state, cooldownMs);
 		expect(result).not.toBeNull();
@@ -212,7 +247,6 @@ describe("recoverToOriginal", () => {
 			fallbackIndex: 0,
 			failedModels: new Map([["primary/model", recentTime]]),
 			attemptCount: 1,
-			pendingFallbackModel: undefined,
 		};
 		const result = recoverToOriginal(state, cooldownMs);
 		expect(result).toBeNull();
@@ -231,7 +265,6 @@ describe("recoverToOriginal", () => {
 			fallbackIndex: 0,
 			failedModels: new Map(),
 			attemptCount: 1,
-			pendingFallbackModel: undefined,
 		};
 		const result = recoverToOriginal(state, cooldownMs);
 		expect(result).not.toBeNull();

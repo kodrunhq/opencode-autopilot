@@ -1,19 +1,5 @@
+import { parseModelString } from "./event-handler";
 import type { FallbackManager } from "./fallback-manager";
-
-/**
- * Parses a "provider/model" string into { providerID, modelID }.
- * Splits on the first "/" only. Returns null if no "/" found.
- */
-function parseModelString(
-	model: string,
-): { readonly providerID: string; readonly modelID: string } | null {
-	const slashIndex = model.indexOf("/");
-	if (slashIndex <= 0) return null;
-	return {
-		providerID: model.slice(0, slashIndex),
-		modelID: model.slice(slashIndex + 1),
-	};
-}
 
 /**
  * Factory that creates a chat.message hook handler bound to the FallbackManager.

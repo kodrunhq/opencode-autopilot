@@ -28,7 +28,11 @@ describe("fallbackConfigSchema validation", () => {
 		expect(() => fallbackConfigSchema.parse({ maxFallbackAttempts: 0 })).toThrow();
 	});
 
-	test("rejects cooldownSeconds=-1 (min 0)", () => {
+	test("rejects cooldownSeconds=0 (min 1)", () => {
+		expect(() => fallbackConfigSchema.parse({ cooldownSeconds: 0 })).toThrow();
+	});
+
+	test("rejects cooldownSeconds=-1", () => {
 		expect(() => fallbackConfigSchema.parse({ cooldownSeconds: -1 })).toThrow();
 	});
 

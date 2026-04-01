@@ -16,7 +16,6 @@ export function createFallbackState(model: string): FallbackState {
 		fallbackIndex: -1,
 		failedModels: new Map(),
 		attemptCount: 0,
-		pendingFallbackModel: undefined,
 	};
 }
 
@@ -46,6 +45,9 @@ export function planFallback(
 	for (let i = 0; i < fallbackChain.length; i++) {
 		const index = (state.fallbackIndex + 1 + i) % fallbackChain.length;
 		const model = fallbackChain[index];
+
+		// Skip current model — can't fall back to the model that just failed
+		if (model === state.currentModel) continue;
 
 		// Skip models still in cooldown
 		const failedAt = state.failedModels.get(model);
@@ -88,7 +90,6 @@ export function commitFallback(state: Readonly<FallbackState>, plan: FallbackPla
 			failedModels: new Map([...state.failedModels, [plan.failedModel, Date.now()]]),
 			attemptCount: state.attemptCount + 1,
 			currentModel: plan.newModel,
-			pendingFallbackModel: undefined,
 		},
 	};
 }

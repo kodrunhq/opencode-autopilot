@@ -61,11 +61,11 @@ export function extractStatusCode(error: unknown, retryOnErrors: readonly number
 		}
 	}
 
-	// Extract from message text
+	// Extract from message text — restrict to 4xx/5xx to avoid false positives
 	const message = getErrorMessage(error);
-	const match = message.match(/\b(\d{3})\b/);
-	if (match) {
-		const code = Number.parseInt(match[1], 10);
+	const matches = message.matchAll(/\b([45]\d{2})\b/g);
+	for (const m of matches) {
+		const code = Number.parseInt(m[1], 10);
 		if (retryOnErrors.includes(code)) return code;
 	}
 
@@ -117,6 +117,11 @@ export function isRetryableError(
 	userPatterns?: readonly string[],
 ): boolean {
 	const errorType = classifyErrorType(error);
+
+	// content_filter: same content will fail on any model.
+	// context_length: replay would fail without truncation; caller must truncate first.
+	if (errorType === "content_filter" || errorType === "context_length") return false;
+
 	if (errorType === "missing_api_key" || errorType === "model_not_found") return true;
 
 	const statusCode = extractStatusCode(error, retryOnErrors);
@@ -127,6 +132,9 @@ export function isRetryableError(
 
 	if (userPatterns) {
 		for (const patternStr of userPatterns) {
+			// ReDoS protection: reject patterns with nested quantifiers or backtracking risk
+			if (/(\+|\*|\{)\s*\)(\+|\*|\{|\?)/.test(patternStr)) continue;
+			if (/\(.*\|.*\)(\+|\*|\{)/.test(patternStr)) continue;
 			try {
 				const re = new RegExp(patternStr, "i");
 				if (re.test(message)) return true;

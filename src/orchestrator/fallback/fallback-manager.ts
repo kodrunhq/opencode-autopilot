@@ -138,6 +138,8 @@ export class FallbackManager {
 			return false;
 		}
 		if (Date.now() - timestamp < SELF_ABORT_WINDOW_MS) {
+			// Consume on match — prevents silencing subsequent legitimate errors
+			this.sessionSelfAbortTimestamp.delete(sessionID);
 			return true;
 		}
 		this.sessionSelfAbortTimestamp.delete(sessionID);
