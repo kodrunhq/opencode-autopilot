@@ -44,8 +44,13 @@ export async function loadLessonMemory(projectRoot: string): Promise<LessonMemor
 	try {
 		const raw = await readFile(memoryPath, "utf-8");
 		const parsed = JSON.parse(raw);
-		const validated = lessonMemorySchema.parse(parsed);
-		return pruneLessons(validated);
+		// Prune before schema validation so files with >50 lessons
+		// (manual edit, older version) are capped rather than rejected
+		const pruned = pruneLessons({
+			...parsed,
+			lessons: Array.isArray(parsed.lessons) ? parsed.lessons : [],
+		});
+		return lessonMemorySchema.parse(pruned);
 	} catch (error: unknown) {
 		if (isEnoentError(error)) {
 			return null;

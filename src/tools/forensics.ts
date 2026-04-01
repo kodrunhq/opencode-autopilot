@@ -26,7 +26,17 @@ export async function forensicsCore(
 	projectRoot: string,
 ): Promise<string> {
 	const artifactDir = getProjectArtifactDir(projectRoot);
-	const state = await loadState(artifactDir);
+	let state: Awaited<ReturnType<typeof loadState>>;
+	try {
+		state = await loadState(artifactDir);
+	} catch {
+		return JSON.stringify({
+			action: "error",
+			message: "Pipeline state is corrupt or unreadable",
+			recoverable: false,
+			suggestedAction: "manual",
+		});
+	}
 
 	if (state === null) {
 		return JSON.stringify({ action: "error", message: "No pipeline state found" });

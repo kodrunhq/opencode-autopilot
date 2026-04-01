@@ -147,8 +147,8 @@ Plans:
 
 Plans:
 - [x] 07-01-PLAN.md -- Lesson memory data layer: Zod schemas, types, load/save/prune with atomic writes
-- [ ] 07-02-PLAN.md -- TBD
-- [ ] 07-03-PLAN.md -- TBD
+- [x] 07-02-PLAN.md -- Retrospective handler enhancement and lesson injection into phase dispatch
+- [x] 07-03-PLAN.md -- Failure metadata capture and oc_forensics diagnostic tool
 
 ## Progress
 
@@ -160,7 +160,7 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 | 1. Plugin Infrastructure | v1.0 | 2/2 | Complete | - |
 | 2. Creation Tooling | v1.0 | 2/2 | Complete | - |
 | 3. Curated Assets | v1.0 | 2/2 | Complete | - |
-| 4. Foundation Infrastructure | v2.0 | 0/4 | Planning | - |
-| 5. Review Engine | v2.0 | 1/1 | In Progress | - |
-| 6. Orchestrator Pipeline | v2.0 | 2/4 | In Progress | - |
-| 7. Learning & Resilience | v2.0 | 1/3 | In Progress | - |
+| 4. Foundation Infrastructure | v2.0 | 4/4 | Complete | - |
+| 5. Review Engine | v2.0 | 4/4 | Complete | - |
+| 6. Orchestrator Pipeline | v2.0 | 4/4 | Complete | - |
+| 7. Learning & Resilience | v2.0 | 3/3 | Complete | - |

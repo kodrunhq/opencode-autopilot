@@ -82,6 +82,13 @@ async function injectLessonContext(
 		) {
 			return prompt; // I/O, parse, or validation error -- non-critical
 		}
+		// Treat any NodeJS.ErrnoException (EACCES, EPERM, etc.) as non-critical
+		if (error !== null && typeof error === "object") {
+			const errWithCode = error as { code?: unknown };
+			if (typeof errWithCode.code === "string") {
+				return prompt;
+			}
+		}
 		throw error; // re-throw programmer errors
 	}
 	return prompt;

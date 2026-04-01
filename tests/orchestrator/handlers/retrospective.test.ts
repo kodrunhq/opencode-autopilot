@@ -26,7 +26,7 @@ function makeState(overrides: Partial<PipelineState> = {}): PipelineState {
 		schemaVersion: 2 as const,
 		idea: "Test idea",
 		currentPhase: "RETROSPECTIVE",
-		status: "ACTIVE",
+		status: "IN_PROGRESS",
 		phaseResults: {},
 		decisions: [],
 		confidence: { overall: "HIGH", entries: [] },
