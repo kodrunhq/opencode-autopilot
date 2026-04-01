@@ -1,6 +1,11 @@
 import { join } from "node:path";
 import { getArtifactRef, PHASE_ARTIFACTS } from "../artifacts";
-import { createEmptyLessonMemory, loadLessonMemory, saveLessonMemory } from "../lesson-memory";
+import {
+	createEmptyLessonMemory,
+	loadLessonMemory,
+	pruneLessons,
+	saveLessonMemory,
+} from "../lesson-memory";
 import { lessonSchema } from "../lesson-schemas";
 import type { Lesson } from "../lesson-types";
 import type { Phase } from "../types";
@@ -17,7 +22,9 @@ function parseAndValidateLessons(raw: string): {
 } {
 	let parsed: unknown;
 	try {
-		parsed = JSON.parse(raw);
+		// Strip markdown code fences before parsing
+		const cleaned = raw.replace(/^```(?:json)?\s*\n?([\s\S]*?)```\s*$/m, "$1").trim();
+		parsed = JSON.parse(cleaned);
 	} catch {
 		return { valid: Object.freeze([]), parseError: true };
 	}
@@ -67,20 +74,21 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 			} satisfies DispatchResult);
 		}
 
-		// Persist lessons to memory
-		const projectRoot = join(artifactDir, "..");
-		const existing = await loadLessonMemory(projectRoot);
-		const memory = existing ?? createEmptyLessonMemory();
-		const merged = [...memory.lessons, ...valid];
-
-		await saveLessonMemory(
-			{
+		// Persist lessons to memory (best-effort: failure should not mark pipeline as FAILED)
+		try {
+			const projectRoot = join(artifactDir, "..");
+			const existing = await loadLessonMemory(projectRoot);
+			const memory = existing ?? createEmptyLessonMemory();
+			const merged = [...memory.lessons, ...valid];
+			const pruned = pruneLessons({
 				...memory,
 				lessons: merged,
 				lastUpdatedAt: new Date().toISOString(),
-			},
-			projectRoot,
-		);
+			});
+			await saveLessonMemory(pruned, projectRoot);
+		} catch {
+			// Lesson save failure is non-critical -- swallow to avoid FAILED pipeline
+		}
 
 		return Object.freeze({
 			action: "complete",

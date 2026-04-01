@@ -7,6 +7,7 @@ import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { completePhase, getNextPhase } from "../orchestrator/phase";
 import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
 import type { Phase } from "../orchestrator/types";
+import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
 import { getProjectArtifactDir } from "../utils/paths";
 import { reviewCore } from "./review";
@@ -73,8 +74,15 @@ async function injectLessonContext(
 				return prompt + ctx;
 			}
 		}
-	} catch {
-		// Best-effort: lesson injection failure should not break dispatch
+	} catch (error: unknown) {
+		if (
+			isEnoentError(error) ||
+			error instanceof SyntaxError ||
+			(error !== null && typeof error === "object" && "issues" in error)
+		) {
+			return prompt; // I/O, parse, or validation error -- non-critical
+		}
+		throw error; // re-throw programmer errors
 	}
 	return prompt;
 }
@@ -221,6 +229,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 		return JSON.stringify({ action: "error", message: "Unexpected state" });
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
+		const safeMessage = message.replace(/\/[^\s"']+/g, "[PATH]").slice(0, 4096);
 
 		// Persist failure metadata for forensics (best-effort)
 		try {
@@ -230,7 +239,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 				const failureContext = {
 					failedPhase: currentState.currentPhase,
 					failedAgent: null as string | null,
-					errorMessage: message.slice(0, 4096),
+					errorMessage: safeMessage,
 					timestamp: new Date().toISOString(),
 					lastSuccessfulPhase: lastDone?.name ?? null,
 				};
@@ -244,7 +253,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 			// Swallow save errors -- original error takes priority
 		}
 
-		return JSON.stringify({ action: "error", message });
+		return JSON.stringify({ action: "error", message: safeMessage });
 	}
 }
 
@@ -252,7 +261,11 @@ export const ocOrchestrate = tool({
 	description:
 		"Drive the orchestrator pipeline. Provide an idea to start a new run, or a result to advance the current phase. Returns JSON with action (dispatch/dispatch_multi/complete/error).",
 	args: {
-		idea: tool.schema.string().optional().describe("Idea to start a new orchestration run"),
+		idea: tool.schema
+			.string()
+			.max(4096)
+			.optional()
+			.describe("Idea to start a new orchestration run"),
 		result: tool.schema
 			.string()
 			.optional()

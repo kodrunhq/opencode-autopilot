@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PHASES } from "./schemas";
 
 export const LESSON_DOMAINS = Object.freeze([
 	"architecture",
@@ -13,7 +14,7 @@ export const lessonSchema = z.object({
 	content: z.string().max(1024),
 	domain: lessonDomainSchema,
 	extractedAt: z.string().max(128),
-	sourcePhase: z.string().max(128),
+	sourcePhase: z.enum(PHASES),
 });
 
 export const lessonMemorySchema = z.object({

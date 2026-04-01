@@ -95,7 +95,7 @@ describe("failureContext schema", () => {
 			},
 		});
 		expect(state.failureContext).not.toBeNull();
-		expect(state.failureContext!.failedPhase).toBe("ARCHITECT");
+		expect(state.failureContext?.failedPhase).toBe("ARCHITECT");
 	});
 });
 
