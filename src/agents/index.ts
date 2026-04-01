@@ -9,6 +9,11 @@ import { pipelineAgents } from "./pipeline/index";
 import { prReviewerAgent } from "./pr-reviewer";
 import { researcherAgent } from "./researcher";
 
+interface AgentConfig {
+	readonly [key: string]: unknown;
+	readonly permission?: Record<string, unknown>;
+}
+
 const agents = {
 	researcher: researcherAgent,
 	metaprompter: metaprompterAgent,
@@ -16,6 +21,37 @@ const agents = {
 	"pr-reviewer": prReviewerAgent,
 	autopilot: autopilotAgent,
 } as const;
+
+/**
+ * Register a set of agents into the OpenCode config, resolving model
+ * assignments from groups/overrides. Skips agents already defined
+ * to preserve user customizations.
+ *
+ * Mutation of config.agent is intentional: the OpenCode plugin configHook
+ * API requires mutating the provided Config object to register agents.
+ */
+function registerAgents(
+	agentMap: Readonly<Record<string, Readonly<AgentConfig>>>,
+	config: Config,
+	groups: Readonly<Record<string, GroupModelAssignment>>,
+	overrides: Readonly<Record<string, AgentOverride>>,
+): void {
+	for (const [name, agentConfig] of Object.entries(agentMap)) {
+		if (config.agent![name] === undefined) {
+			// Deep-copy agent config including nested permission to avoid shared references.
+			const resolved = resolveModelForAgent(name, groups, overrides);
+			config.agent![name] = {
+				...agentConfig,
+				...(agentConfig.permission && { permission: { ...agentConfig.permission } }),
+				...(resolved && { model: resolved.primary }),
+				...(resolved &&
+					resolved.fallbacks.length > 0 && {
+						fallback_models: [...resolved.fallbacks],
+					}),
+			};
+		}
+	}
+}
 
 export async function configHook(config: Config, configPath?: string): Promise<void> {
 	if (!config.agent) {
@@ -27,40 +63,9 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 	const groups: Readonly<Record<string, GroupModelAssignment>> = pluginConfig?.groups ?? {};
 	const overrides: Readonly<Record<string, AgentOverride>> = pluginConfig?.overrides ?? {};
 
-	for (const [name, agentConfig] of Object.entries(agents)) {
-		// Only set if not already defined — preserve user customizations (Pitfall 2)
-		if (config.agent[name] === undefined) {
-			// Mutation of config.agent is intentional: the OpenCode plugin configHook
-			// API requires mutating the provided Config object to register agents.
-			// We deep-copy agent config including nested permission to avoid shared references.
-			const resolved = resolveModelForAgent(name, groups, overrides);
-			config.agent[name] = {
-				...agentConfig,
-				...(agentConfig.permission && { permission: { ...agentConfig.permission } }),
-				...(resolved && { model: resolved.primary }),
-				...(resolved &&
-					resolved.fallbacks.length > 0 && {
-						fallback_models: [...resolved.fallbacks],
-					}),
-			};
-		}
-	}
-
-	// Register pipeline agents (v2 orchestrator subagents)
-	for (const [name, agentConfig] of Object.entries(pipelineAgents)) {
-		if (config.agent[name] === undefined) {
-			const resolved = resolveModelForAgent(name, groups, overrides);
-			config.agent[name] = {
-				...agentConfig,
-				...(agentConfig.permission && { permission: { ...agentConfig.permission } }),
-				...(resolved && { model: resolved.primary }),
-				...(resolved &&
-					resolved.fallbacks.length > 0 && {
-						fallback_models: [...resolved.fallbacks],
-					}),
-			};
-		}
-	}
+	// Register standard agents and pipeline agents (v2 orchestrator subagents)
+	registerAgents(agents, config, groups, overrides);
+	registerAgents(pipelineAgents, config, groups, overrides);
 }
 
 export { autopilotAgent } from "./autopilot";

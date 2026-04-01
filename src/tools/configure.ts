@@ -2,6 +2,7 @@ import type { Config } from "@opencode-ai/plugin";
 import { tool } from "@opencode-ai/plugin";
 import { createDefaultConfig, loadConfig, saveConfig } from "../config";
 import { checkDiversity } from "../registry/diversity";
+import { diagnose } from "../registry/doctor";
 import {
 	AGENT_REGISTRY,
 	ALL_GROUP_IDS,
@@ -12,6 +13,10 @@ import { extractFamily } from "../registry/resolver";
 import type { GroupModelAssignment } from "../registry/types";
 
 // --- Module-level state ---
+
+// Module-level mutable state is intentional: oc_configure is a session-scoped
+// workflow where assignments accumulate across multiple "assign" calls before
+// being persisted by "commit". The Map is cleared on commit and reset.
 
 /**
  * In-progress group assignments, keyed by GroupId.
@@ -45,45 +50,52 @@ interface ConfigureArgs {
 	readonly fallbacks?: string;
 }
 
-function handleStart(): string {
-	// Extract available models from openCodeConfig
+/**
+ * Extract available models from the OpenCode host config, grouped by family.
+ * Returns a map of family -> model IDs.
+ */
+function discoverAvailableModels(config: Config | null): Map<string, string[]> {
 	const modelsByFamily = new Map<string, string[]>();
+	if (!config) return modelsByFamily;
 
-	if (openCodeConfig) {
-		const seen = new Set<string>();
+	const seen = new Set<string>();
 
-		// Collect from agent configs
-		const agentConfigs = openCodeConfig.agent as
-			| Record<string, Record<string, unknown>>
-			| undefined;
-		if (agentConfigs) {
-			for (const agentCfg of Object.values(agentConfigs)) {
-				const model = agentCfg.model as string | undefined;
-				if (model && !seen.has(model)) {
-					seen.add(model);
-					const family = extractFamily(model);
-					const list = modelsByFamily.get(family) ?? [];
-					list.push(model);
-					modelsByFamily.set(family, list);
-				}
-			}
-		}
-
-		// Also include top-level model and small_model
-		const topModel = (openCodeConfig as Record<string, unknown>).model as string | undefined;
-		const smallModel = (openCodeConfig as Record<string, unknown>).small_model as
-			| string
-			| undefined;
-		for (const m of [topModel, smallModel]) {
-			if (m && !seen.has(m)) {
-				seen.add(m);
-				const family = extractFamily(m);
+	// Collect from agent configs
+	const agentConfigs = config.agent as Record<string, Record<string, unknown>> | undefined;
+	if (agentConfigs) {
+		for (const agentCfg of Object.values(agentConfigs)) {
+			const model = agentCfg.model as string | undefined;
+			if (model && !seen.has(model)) {
+				seen.add(model);
+				const family = extractFamily(model);
 				const list = modelsByFamily.get(family) ?? [];
-				list.push(m);
+				list.push(model);
 				modelsByFamily.set(family, list);
 			}
 		}
 	}
+
+	// Also include top-level model and small_model
+	const topModel = (config as Record<string, unknown>).model as string | undefined;
+	const smallModel = (config as Record<string, unknown>).small_model as string | undefined;
+	for (const m of [topModel, smallModel]) {
+		if (m && !seen.has(m)) {
+			seen.add(m);
+			const family = extractFamily(m);
+			const list = modelsByFamily.get(family) ?? [];
+			list.push(m);
+			modelsByFamily.set(family, list);
+		}
+	}
+
+	return modelsByFamily;
+}
+
+async function handleStart(configPath?: string): Promise<string> {
+	const modelsByFamily = discoverAvailableModels(openCodeConfig);
+
+	// Load current plugin config to show existing assignments
+	const currentConfig = await loadConfig(configPath);
 
 	// Build groups with agents derived from AGENT_REGISTRY
 	const groups = ALL_GROUP_IDS.map((groupId) => {
@@ -100,18 +112,18 @@ function handleStart(): string {
 			tier: def.tier,
 			order: def.order,
 			agents,
-			currentAssignment: null as GroupModelAssignment | null,
+			currentAssignment: currentConfig?.groups[groupId] ?? null,
 		};
 	});
 
-	// Load current config synchronously is not possible — return null for now
-	// The AI can call doctor separately to see current state
 	return JSON.stringify({
 		action: "configure",
 		stage: "start",
 		availableModels: Object.fromEntries(modelsByFamily),
 		groups,
-		currentConfig: null,
+		currentConfig: currentConfig
+			? { configured: currentConfig.configured, groups: currentConfig.groups }
+			: null,
 		diversityRules: DIVERSITY_RULES,
 	});
 }
@@ -222,63 +234,24 @@ async function handleCommit(configPath?: string): Promise<string> {
 
 async function handleDoctor(configPath?: string): Promise<string> {
 	const config = await loadConfig(configPath);
-
-	const configExists = config !== null;
-	let schemaValid = false;
-	let configured = false;
-	const groupsAssigned: Record<
-		string,
-		{
-			assigned: boolean;
-			primary: string | null;
-			fallbacks: readonly string[];
-		}
-	> = {};
-
-	if (config) {
-		schemaValid = true;
-		configured = config.configured;
-
-		for (const groupId of ALL_GROUP_IDS) {
-			const assignment = config.groups[groupId];
-			groupsAssigned[groupId] = assignment
-				? { assigned: true, primary: assignment.primary, fallbacks: assignment.fallbacks }
-				: { assigned: false, primary: null, fallbacks: [] };
-		}
-	} else {
-		for (const groupId of ALL_GROUP_IDS) {
-			groupsAssigned[groupId] = { assigned: false, primary: null, fallbacks: [] };
-		}
-	}
-
-	// Diversity check on assigned groups
-	const assignedGroups: Record<string, GroupModelAssignment> = {};
-	if (config) {
-		for (const [key, val] of Object.entries(config.groups)) {
-			assignedGroups[key] = val;
-		}
-	}
-
-	const diversityWarnings = checkDiversity(assignedGroups).map((w) => ({
-		groups: w.groups,
-		severity: w.rule.severity,
-		sharedFamily: w.sharedFamily,
-		reason: w.rule.reason,
-	}));
-
-	const allPassed = configExists && schemaValid && configured && diversityWarnings.length === 0;
+	const result = diagnose(config);
 
 	return JSON.stringify({
 		action: "configure",
 		stage: "doctor",
 		checks: {
-			configExists,
-			schemaValid,
-			configured,
-			groupsAssigned,
+			configExists: result.configExists,
+			schemaValid: result.schemaValid,
+			configured: result.configured,
+			groupsAssigned: result.groupsAssigned,
 		},
-		diversityWarnings,
-		allPassed,
+		diversityWarnings: result.diversityWarnings.map((w) => ({
+			groups: w.groups,
+			severity: w.rule.severity,
+			sharedFamily: w.sharedFamily,
+			reason: w.rule.reason,
+		})),
+		allPassed: result.allPassed,
 	});
 }
 
@@ -296,7 +269,7 @@ function handleReset(): string {
 export async function configureCore(args: ConfigureArgs, configPath?: string): Promise<string> {
 	switch (args.subcommand) {
 		case "start":
-			return handleStart();
+			return handleStart(configPath);
 		case "assign":
 			return handleAssign(args);
 		case "commit":

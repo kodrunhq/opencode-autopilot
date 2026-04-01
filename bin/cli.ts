@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 
 import { execFile as execFileCb } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { CONFIG_PATH, createDefaultConfig, loadConfig, saveConfig } from "../src/config";
-import { checkDiversity } from "../src/registry/diversity";
-import { ALL_GROUP_IDS, GROUP_DEFINITIONS } from "../src/registry/model-groups";
+import { diagnose } from "../src/registry/doctor";
+import { ALL_GROUP_IDS, DIVERSITY_RULES, GROUP_DEFINITIONS } from "../src/registry/model-groups";
 import type { GroupId } from "../src/registry/types";
 import { fileExists } from "../src/utils/fs-helpers";
 
@@ -68,7 +68,14 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 
 	if (await fileExists(jsonPath)) {
 		const raw = await readFile(jsonPath, "utf-8");
-		opencodeJson = JSON.parse(raw) as typeof opencodeJson;
+		try {
+			opencodeJson = JSON.parse(raw) as typeof opencodeJson;
+		} catch {
+			console.error(
+				`  ${red("✗")} ${OPENCODE_JSON} contains invalid JSON. Please fix it and try again.`,
+			);
+			process.exit(1);
+		}
 		console.log(`  ${green("✓")} Found ${OPENCODE_JSON}`);
 	} else {
 		opencodeJson = { plugin: [] };
@@ -88,7 +95,9 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 		console.log(`  ${green("✓")} Plugin registered`);
 	}
 
-	await writeFile(jsonPath, JSON.stringify(opencodeJson, null, 2), "utf-8");
+	const tmpJsonPath = `${jsonPath}.tmp.${Date.now()}`;
+	await writeFile(tmpJsonPath, JSON.stringify(opencodeJson, null, 2), "utf-8");
+	await rename(tmpJsonPath, jsonPath);
 
 	// 4. Create starter config (skip if exists)
 	if (await fileExists(configPath)) {
@@ -119,19 +128,13 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 	console.log("");
 }
 
-// ── runDoctor ───────────────────────────────────────────────────────
+// ── runDoctor helpers ──────────────────────────────────────────────
 
-export async function runDoctor(options: CliOptions = {}): Promise<void> {
-	const cwd = options.cwd ?? process.cwd();
-	const configPath = options.configDir ?? CONFIG_PATH;
+async function printSystemChecks(
+	cwd: string,
+	configPath: string,
+): Promise<{ hasFailure: boolean; config: Awaited<ReturnType<typeof loadConfig>> }> {
 	let hasFailure = false;
-
-	console.log("");
-	console.log(bold("opencode-autopilot doctor"));
-	console.log("─────────────────────────");
-	console.log("");
-
-	// ── System checks ──────────────────────────────────────────
 
 	console.log(bold("System"));
 
@@ -168,14 +171,13 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 	}
 
 	// 3. Config file exists + schema valid
-	let config = await loadConfig(configPath);
+	const config = await loadConfig(configPath);
 	if (config) {
 		console.log(`  Config file             ${green("✓")} found`);
 		console.log(`  Config schema           ${green("✓")} v${config.version}`);
 	} else {
 		console.log(`  Config file             ${red("✗")} not found — run install`);
 		hasFailure = true;
-		config = null;
 	}
 
 	// 4. Setup completed
@@ -190,21 +192,22 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 		}
 	}
 
-	// ── Model assignments ──────────────────────────────────────
+	return { hasFailure, config };
+}
 
+function printModelAssignments(result: ReturnType<typeof diagnose>): void {
 	console.log("");
 	console.log(bold("Model Assignments"));
 
-	if (config) {
+	if (result.configExists) {
 		for (const groupId of ALL_GROUP_IDS) {
 			const def = GROUP_DEFINITIONS[groupId];
-			const assignment = config.groups[groupId];
+			const info = result.groupsAssigned[groupId];
 			const label = def.label.padEnd(20);
 
-			if (assignment) {
-				const fallbackStr =
-					assignment.fallbacks.length > 0 ? ` -> ${assignment.fallbacks.join(", ")}` : "";
-				console.log(`  ${label}  ${assignment.primary}${fallbackStr}`);
+			if (info?.assigned && info.primary) {
+				const fallbackStr = info.fallbacks.length > 0 ? ` -> ${info.fallbacks.join(", ")}` : "";
+				console.log(`  ${label}  ${info.primary}${fallbackStr}`);
 			} else {
 				console.log(`  ${label}  ${red("✗")} not assigned`);
 			}
@@ -212,33 +215,30 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 	} else {
 		console.log(`  ${red("✗")} no config loaded`);
 	}
+}
 
-	// ── Adversarial diversity ──────────────────────────────────
-
+function printDiversityResults(
+	result: ReturnType<typeof diagnose>,
+	config: Awaited<ReturnType<typeof loadConfig>>,
+): void {
 	console.log("");
 	console.log(bold("Adversarial Diversity"));
 
 	if (config && Object.keys(config.groups).length > 0) {
-		const warnings = checkDiversity(config.groups);
-
 		// Build a set of warned group pairs for quick lookup
-		const warnedPairs = new Set(warnings.map((w) => [...w.groups].sort().join(",")));
+		const warnedPairs = new Set(
+			result.diversityWarnings.map((w) => [...w.groups].sort().join(",")),
+		);
 
-		// Show results for each diversity rule
-		const rules = [
-			{
-				label: "Architects <-> Challengers",
-				groups: ["architects", "challengers"] as readonly GroupId[],
-			},
-			{
-				label: "Builders <-> Reviewers",
-				groups: ["builders", "reviewers"] as readonly GroupId[],
-			},
-			{
-				label: "Red Team <-> Builders+Rev.",
-				groups: ["red-team", "builders", "reviewers"] as readonly GroupId[],
-			},
-		];
+		// Derive display rules from DIVERSITY_RULES (Fix 6)
+		const rules = DIVERSITY_RULES.map((rule) => {
+			const groupLabels = rule.groups.map((g) => GROUP_DEFINITIONS[g as GroupId].label);
+			const label =
+				groupLabels.length === 2
+					? `${groupLabels[0]} <-> ${groupLabels[1]}`
+					: `${groupLabels[0]} <-> ${groupLabels.slice(1).join("+")}`;
+			return { label, groups: rule.groups };
+		});
 
 		for (const rule of rules) {
 			const key = [...rule.groups].sort().join(",");
@@ -249,7 +249,7 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 				continue;
 			}
 
-			const warning = warnings.find(
+			const warning = result.diversityWarnings.find(
 				(w) => [...w.groups].sort().join(",") === key || warnedPairs.has(key),
 			);
 
@@ -264,6 +264,26 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 	} else {
 		console.log(`  ${yellow("⚠")} no model assignments to check`);
 	}
+}
+
+// ── runDoctor ───────────────────────────────────────────────────────
+
+export async function runDoctor(options: CliOptions = {}): Promise<void> {
+	const cwd = options.cwd ?? process.cwd();
+	const configPath = options.configDir ?? CONFIG_PATH;
+
+	console.log("");
+	console.log(bold("opencode-autopilot doctor"));
+	console.log("─────────────────────────");
+	console.log("");
+
+	const { hasFailure, config } = await printSystemChecks(cwd, configPath);
+
+	// Run shared diagnosis logic
+	const result = diagnose(config);
+
+	printModelAssignments(result);
+	printDiversityResults(result, config);
 
 	// ── Summary ────────────────────────────────────────────────
 
