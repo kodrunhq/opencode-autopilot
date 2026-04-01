@@ -95,6 +95,10 @@ describe("GROUP_DEFINITIONS", () => {
 			expect(["heavy", "medium", "light"]).toContain(def.tier);
 		}
 	});
+
+	test("GROUP_DEFINITIONS is frozen", () => {
+		expect(Object.isFrozen(GROUP_DEFINITIONS)).toBe(true);
+	});
 });
 
 describe("DIVERSITY_RULES", () => {

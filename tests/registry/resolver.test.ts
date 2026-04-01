@@ -23,6 +23,10 @@ describe("extractFamily", () => {
 	test("returns empty string for slash-only", () => {
 		expect(extractFamily("/model")).toBe("");
 	});
+
+	test("returns empty string for empty input", () => {
+		expect(extractFamily("")).toBe("");
+	});
 });
 
 describe("resolveModelForAgent", () => {
@@ -74,6 +78,21 @@ describe("resolveModelForAgent", () => {
 		};
 		const result = resolveModelForAgent("autopilot", groups, overridesNoFallback);
 		expect(result!.fallbacks).toEqual([]);
+	});
+
+	test("override fallbacks replace group fallbacks entirely", () => {
+		const groupsWithFallbacks: Record<string, GroupModelAssignment> = {
+			architects: { primary: "anthropic/claude-opus-4-6", fallbacks: ["google/gemini-3.1-pro"] },
+		};
+		const overridesWithFallbacks: Record<string, AgentOverride> = {
+			"oc-architect": { primary: "openai/gpt-5.4", fallbacks: ["xai/grok-3"] },
+		};
+		const result = resolveModelForAgent(
+			"oc-architect",
+			groupsWithFallbacks,
+			overridesWithFallbacks,
+		);
+		expect(result!.fallbacks).toEqual(["xai/grok-3"]);
 	});
 });
 

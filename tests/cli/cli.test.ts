@@ -2,11 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createDefaultConfig, saveConfig } from "../../src/config";
-import type { PluginConfig } from "../../src/config";
-
 // Import the functions under test
 import { runDoctor, runInstall } from "../../bin/cli";
+import type { PluginConfig } from "../../src/config";
+import { createDefaultConfig, saveConfig } from "../../src/config";
 
 describe("CLI install", () => {
 	let tempDir: string;
@@ -52,9 +51,7 @@ describe("CLI install", () => {
 		await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
 
 		const content = JSON.parse(await readFile(join(tempDir, "opencode.json"), "utf-8"));
-		const count = content.plugin.filter(
-			(p: string) => p === "@kodrunhq/opencode-autopilot",
-		).length;
+		const count = content.plugin.filter((p: string) => p === "@kodrunhq/opencode-autopilot").length;
 		expect(count).toBe(1);
 	});
 
@@ -156,6 +153,66 @@ describe("CLI doctor", () => {
 			"utf-8",
 		);
 		await saveConfig(createDefaultConfig(), configPath);
+
+		const originalExitCode = process.exitCode;
+		process.exitCode = 0;
+
+		await runDoctor({ cwd: tempDir, configDir: configPath });
+
+		expect(process.exitCode).toBe(1);
+		process.exitCode = originalExitCode;
+	});
+
+	test("reports diversity warnings when adversarial pairs share family", async () => {
+		await writeFile(
+			join(tempDir, "opencode.json"),
+			JSON.stringify({ plugin: ["@kodrunhq/opencode-autopilot"] }),
+			"utf-8",
+		);
+
+		const config: PluginConfig = {
+			...createDefaultConfig(),
+			configured: true,
+			groups: {
+				architects: { primary: "anthropic/claude-opus-4-6", fallbacks: [] },
+				challengers: { primary: "anthropic/claude-sonnet-4-6", fallbacks: [] }, // same family
+				builders: { primary: "anthropic/claude-opus-4-6", fallbacks: [] },
+				reviewers: { primary: "openai/gpt-5.4", fallbacks: [] },
+				"red-team": { primary: "google/gemini-3.1-pro", fallbacks: [] },
+				researchers: { primary: "anthropic/claude-sonnet-4-6", fallbacks: [] },
+				communicators: { primary: "anthropic/claude-sonnet-4-6", fallbacks: [] },
+				utilities: { primary: "anthropic/claude-haiku-4-5", fallbacks: [] },
+			},
+		};
+		await saveConfig(config, configPath);
+
+		const originalExitCode = process.exitCode;
+		process.exitCode = 0;
+
+		// Doctor should still run without crashing; diversity warnings are informational
+		await runDoctor({ cwd: tempDir, configDir: configPath });
+
+		process.exitCode = originalExitCode;
+	});
+
+	test("handles malformed opencode.json gracefully", async () => {
+		await writeFile(join(tempDir, "opencode.json"), "{ invalid json }", "utf-8");
+
+		const originalExitCode = process.exitCode;
+		process.exitCode = 0;
+
+		await runDoctor({ cwd: tempDir, configDir: configPath });
+
+		expect(process.exitCode).toBe(1);
+		process.exitCode = originalExitCode;
+	});
+
+	test("reports plugin not in plugin array", async () => {
+		await writeFile(
+			join(tempDir, "opencode.json"),
+			JSON.stringify({ plugin: ["some-other-plugin"] }),
+			"utf-8",
+		);
 
 		const originalExitCode = process.exitCode;
 		process.exitCode = 0;

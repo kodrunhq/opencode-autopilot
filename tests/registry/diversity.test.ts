@@ -66,10 +66,19 @@ describe("checkDiversity", () => {
 			"red-team": { primary: "google/gemini-3.1-pro", fallbacks: [] },
 		};
 		const warnings = checkDiversity(groups);
-		const redTeamWarning = warnings.find((w) =>
-			w.rule.groups.includes("red-team"),
-		);
+		const redTeamWarning = warnings.find((w) => w.rule.groups.includes("red-team"));
 		expect(redTeamWarning).toBeUndefined();
+	});
+
+	test("3-group rule: all same family = warning", () => {
+		const groups: Record<string, GroupModelAssignment> = {
+			builders: { primary: "anthropic/claude-opus-4-6", fallbacks: [] },
+			reviewers: { primary: "anthropic/claude-sonnet-4-6", fallbacks: [] },
+			"red-team": { primary: "anthropic/claude-haiku-4-5", fallbacks: [] },
+		};
+		const warnings = checkDiversity(groups);
+		const softWarning = warnings.find((w) => w.rule.severity === "soft");
+		expect(softWarning).toBeDefined();
 	});
 
 	test("returns frozen array", () => {

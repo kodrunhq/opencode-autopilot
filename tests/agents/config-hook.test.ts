@@ -158,4 +158,44 @@ describe("configHook with model resolution", () => {
 		expect(researcherConfig).toBeDefined();
 		expect(researcherConfig.model).toBeUndefined();
 	});
+
+	test("pipeline agent gets model from group assignment", async () => {
+		const pluginConfig = {
+			version: 4,
+			configured: true,
+			groups: {
+				builders: { primary: "anthropic/claude-sonnet-4-6", fallbacks: [] },
+			},
+			overrides: {},
+		};
+		await writeFile(configPath, JSON.stringify(pluginConfig), "utf-8");
+
+		const config = { agent: {} } as Config;
+		await configHook(config, configPath);
+
+		// oc-implementer is in the "builders" group
+		const implConfig = config.agent?.["oc-implementer"] as Record<string, unknown>;
+		expect(implConfig).toBeDefined();
+		expect(implConfig.model).toBe("anthropic/claude-sonnet-4-6");
+	});
+
+	test("empty fallbacks array does not set fallback_models", async () => {
+		const pluginConfig = {
+			version: 4,
+			configured: true,
+			groups: {
+				architects: { primary: "anthropic/claude-opus-4-6", fallbacks: [] },
+			},
+			overrides: {},
+		};
+		await writeFile(configPath, JSON.stringify(pluginConfig), "utf-8");
+
+		const config = { agent: {} } as Config;
+		await configHook(config, configPath);
+
+		const autopilotConfig = config.agent?.autopilot as Record<string, unknown>;
+		expect(autopilotConfig).toBeDefined();
+		expect(autopilotConfig.model).toBe("anthropic/claude-opus-4-6");
+		expect(autopilotConfig.fallback_models).toBeUndefined();
+	});
 });
