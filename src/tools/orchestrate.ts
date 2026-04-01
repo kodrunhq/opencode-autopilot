@@ -2,6 +2,8 @@ import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
 import type { DispatchResult } from "../orchestrator/handlers/types";
+import { buildLessonContext } from "../orchestrator/lesson-injection";
+import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { completePhase, getNextPhase } from "../orchestrator/phase";
 import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
 import type { Phase } from "../orchestrator/types";
@@ -54,6 +56,30 @@ async function maybeInlineReview(
 }
 
 /**
+ * Attempt to inject lesson context into a dispatch prompt.
+ * Best-effort: failures are silently swallowed to avoid breaking dispatch.
+ */
+async function injectLessonContext(
+	prompt: string,
+	phase: string,
+	artifactDir: string,
+): Promise<string> {
+	try {
+		const projectRoot = join(artifactDir, "..");
+		const memory = await loadLessonMemory(projectRoot);
+		if (memory && memory.lessons.length > 0) {
+			const ctx = buildLessonContext(memory.lessons, phase as Phase);
+			if (ctx) {
+				return prompt + ctx;
+			}
+		}
+	} catch {
+		// Best-effort: lesson injection failure should not break dispatch
+	}
+	return prompt;
+}
+
+/**
  * Process a handler's DispatchResult, handling complete/dispatch/dispatch_multi/error.
  * On complete, advances the phase and invokes the next handler.
  */
@@ -81,11 +107,37 @@ async function processHandlerResult(
 					return processHandlerResult(nextResult, reloadedState, artifactDir);
 				}
 			}
+			// Inject lesson context into dispatch prompt (best-effort)
+			if (handlerResult.prompt && handlerResult.phase) {
+				const enrichedPrompt = await injectLessonContext(
+					handlerResult.prompt,
+					handlerResult.phase,
+					artifactDir,
+				);
+				if (enrichedPrompt !== handlerResult.prompt) {
+					return JSON.stringify({ ...handlerResult, prompt: enrichedPrompt });
+				}
+			}
 			return JSON.stringify(handlerResult);
 		}
 
-		case "dispatch_multi":
+		case "dispatch_multi": {
+			// Inject lesson context into each agent's prompt (best-effort)
+			if (handlerResult.agents && handlerResult.phase) {
+				const enrichedAgents = await Promise.all(
+					handlerResult.agents.map(async (entry) => {
+						const enrichedPrompt = await injectLessonContext(
+							entry.prompt,
+							handlerResult.phase as string,
+							artifactDir,
+						);
+						return enrichedPrompt !== entry.prompt ? { ...entry, prompt: enrichedPrompt } : entry;
+					}),
+				);
+				return JSON.stringify({ ...handlerResult, agents: enrichedAgents });
+			}
 			return JSON.stringify(handlerResult);
+		}
 
 		case "complete": {
 			if (currentState.currentPhase === null) {
