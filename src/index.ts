@@ -1,4 +1,4 @@
-import type { Plugin } from "@opencode-ai/plugin";
+import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
 import { installAssets } from "./installer";
@@ -10,6 +10,7 @@ import {
 	FallbackManager,
 } from "./orchestrator/fallback";
 import { fallbackDefaults } from "./orchestrator/fallback/fallback-config";
+import { resolveChain } from "./orchestrator/fallback/resolve-chain";
 import { ocConfidence } from "./tools/confidence";
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
@@ -21,6 +22,8 @@ import { ocPlaceholder } from "./tools/placeholder";
 import { ocPlan } from "./tools/plan";
 import { ocReview } from "./tools/review";
 import { ocState } from "./tools/state";
+
+let openCodeConfig: Config | null = null;
 
 const plugin: Plugin = async (input) => {
 	const client = input.client;
@@ -70,11 +73,11 @@ const plugin: Plugin = async (input) => {
 
 	const manager = new FallbackManager({
 		config: fallbackConfig,
-		resolveFallbackChain: (_sessionID, _agentName) => {
-			// Returns empty chain -- per-agent resolution requires reading agent
-			// configs from configHook which is addressed in the open question
-			// in research. Global fallback_models can be added in a follow-up.
-			return [];
+		resolveFallbackChain: (_sessionID, agentName) => {
+			const agentConfigs = openCodeConfig?.agent as
+				| Record<string, Record<string, unknown>>
+				| undefined;
+			return resolveChain(agentName ?? "", agentConfigs, config?.fallback_models);
 		},
 	});
 
@@ -111,7 +114,10 @@ const plugin: Plugin = async (input) => {
 				await fallbackEventHandler({ event });
 			}
 		},
-		config: configHook,
+		config: async (cfg: Config) => {
+			openCodeConfig = cfg;
+			await configHook(cfg);
+		},
 		"chat.message": async (
 			hookInput: {
 				readonly sessionID: string;
