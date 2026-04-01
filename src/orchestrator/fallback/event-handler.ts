@@ -220,11 +220,12 @@ async function handleFallbackError(
 
 			// Dispatch replay with fallback model
 			await sdk.promptAsync(sessionID, parsedModel, replayedParts);
+			// Mark awaiting result inside dispatch block — only when prompt was sent
+			manager.markAwaitingResult(sessionID);
 		}
 
-		// Release lock and mark awaiting result for isDispatchInFlight guard
+		// Release lock after dispatch (or skip if model unparseable)
 		manager.releaseRetryLock(sessionID);
-		manager.markAwaitingResult(sessionID);
 	} catch {
 		// On failure, release the lock to allow future retries
 		manager.releaseRetryLock(sessionID);

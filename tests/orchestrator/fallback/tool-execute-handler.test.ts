@@ -26,20 +26,14 @@ describe("createToolExecuteAfterHandler", () => {
 	test("non-task tool returns without touching output", async () => {
 		const handler = createToolExecuteAfterHandler(mockManager);
 		const output = { title: "read", output: "file content", metadata: {} };
-		await handler(
-			{ tool: "read", sessionID: "sess-1", callID: "c1", args: {} },
-			output,
-		);
+		await handler({ tool: "read", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect(output.metadata).toEqual({});
 	});
 
 	test("task tool with non-empty output returns without touching output", async () => {
 		const handler = createToolExecuteAfterHandler(mockManager);
 		const output = { title: "task", output: "result data", metadata: {} };
-		await handler(
-			{ tool: "task", sessionID: "sess-1", callID: "c1", args: {} },
-			output,
-		);
+		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect(output.metadata).toEqual({});
 	});
 
@@ -47,20 +41,14 @@ describe("createToolExecuteAfterHandler", () => {
 		mockManager.parentIDs.set("sess-1", "parent-1");
 		const handler = createToolExecuteAfterHandler(mockManager);
 		const output = { title: "task", output: "", metadata: {} as unknown };
-		await handler(
-			{ tool: "task", sessionID: "sess-1", callID: "c1", args: {} },
-			output,
-		);
+		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect((output.metadata as Record<string, unknown>).fallbackPending).toBe(true);
 	});
 
 	test("task tool with empty output and no parentID does NOT set flag", async () => {
 		const handler = createToolExecuteAfterHandler(mockManager);
 		const output = { title: "task", output: "", metadata: {} };
-		await handler(
-			{ tool: "task", sessionID: "sess-1", callID: "c1", args: {} },
-			output,
-		);
+		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect(output.metadata).toEqual({});
 	});
 
@@ -72,10 +60,7 @@ describe("createToolExecuteAfterHandler", () => {
 			output: "<task_result></task_result>",
 			metadata: {} as unknown,
 		};
-		await handler(
-			{ tool: "task", sessionID: "sess-1", callID: "c1", args: {} },
-			output,
-		);
+		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect((output.metadata as Record<string, unknown>).fallbackPending).toBe(true);
 	});
 
@@ -87,10 +72,7 @@ describe("createToolExecuteAfterHandler", () => {
 			output: "",
 			metadata: { existing: "value" } as unknown,
 		};
-		await handler(
-			{ tool: "task", sessionID: "sess-1", callID: "c1", args: {} },
-			output,
-		);
+		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		const meta = output.metadata as Record<string, unknown>;
 		expect(meta.fallbackPending).toBe(true);
 		expect(meta.existing).toBe("value");
@@ -100,10 +82,7 @@ describe("createToolExecuteAfterHandler", () => {
 		mockManager.parentIDs.set("sess-1", "parent-1");
 		const handler = createToolExecuteAfterHandler(mockManager);
 		const output = { title: "task", output: "   \n\t  ", metadata: {} as unknown };
-		await handler(
-			{ tool: "task", sessionID: "sess-1", callID: "c1", args: {} },
-			output,
-		);
+		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect((output.metadata as Record<string, unknown>).fallbackPending).toBe(true);
 	});
 });
