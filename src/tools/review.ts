@@ -47,7 +47,11 @@ const STATE_FILE = "current-review.json";
  * Uses execFile (not exec) to prevent shell injection.
  * Returns empty array on any error (best-effort).
  */
-async function getChangedFiles(scope: string, directory?: string): Promise<readonly string[]> {
+async function getChangedFiles(
+	scope: string,
+	projectRoot: string,
+	directory?: string,
+): Promise<readonly string[]> {
 	try {
 		let args: string[];
 		switch (scope) {
@@ -58,7 +62,7 @@ async function getChangedFiles(scope: string, directory?: string): Promise<reado
 				args = ["diff", "--name-only"];
 				break;
 			case "branch":
-				args = ["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"];
+				args = ["diff-tree", "--no-commit-id", "--name-only", "--root", "-r", "HEAD"];
 				break;
 			case "directory":
 				args = directory ? ["diff", "--name-only", "--", directory] : ["diff", "--name-only"];
@@ -67,7 +71,7 @@ async function getChangedFiles(scope: string, directory?: string): Promise<reado
 				args = ["diff", "--name-only", "HEAD"];
 				break;
 		}
-		const { stdout } = await execFileAsync("git", args, { timeout: 10000 });
+		const { stdout } = await execFileAsync("git", args, { cwd: projectRoot, timeout: 10000 });
 		return stdout.trim().split("\n").filter(Boolean);
 	} catch {
 		return [];
@@ -128,13 +132,14 @@ async function clearReviewState(artifactDir: string): Promise<void> {
  */
 async function startNewReview(
 	scope: string,
+	projectRoot: string,
 	options?: { readonly filter?: string; readonly directory?: string },
 ): Promise<{
 	readonly state: ReviewState;
 	readonly agents: readonly { readonly name: string; readonly prompt: string }[];
 }> {
-	// Detect stacks from changed files via git
-	const changedFiles = await getChangedFiles(scope, options?.directory);
+	// Detect stacks from changed files via git (run in projectRoot)
+	const changedFiles = await getChangedFiles(scope, projectRoot, options?.directory);
 	const detectedStacks = detectStackTags(changedFiles);
 
 	// Build diff analysis from changed file paths
@@ -182,7 +187,7 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 
 		// Case 1: No state, scope provided -> start new review
 		if (currentState === null && args.scope) {
-			const { state, agents } = await startNewReview(args.scope, {
+			const { state, agents } = await startNewReview(args.scope, projectRoot, {
 				filter: args.filter,
 				directory: args.directory,
 			});

@@ -13,6 +13,10 @@
 
 import { ALL_REVIEW_AGENTS, STAGE3_AGENTS } from "./agents/index";
 import { buildCrossVerificationPrompts, condenseFinding } from "./cross-verification";
+
+/** Derived set of stage-3 agent names — avoids hardcoding names in pipeline logic. */
+const STAGE3_NAMES: ReadonlySet<string> = new Set(STAGE3_AGENTS.map((a) => a.name));
+
 import { buildFixInstructions, determineFixableFindings } from "./fix-cycle";
 import { buildReport } from "./report";
 import { reviewFindingSchema } from "./schemas";
@@ -151,9 +155,7 @@ export function advancePipeline(
 		case 1: {
 			// Stage 1 -> 2: Build cross-verification prompts from all selected agents (excluding stage 3)
 			const agents = ALL_REVIEW_AGENTS.filter(
-				(a) =>
-					currentState.selectedAgentNames.includes(a.name) &&
-					!["red-team", "product-thinker"].includes(a.name),
+				(a) => currentState.selectedAgentNames.includes(a.name) && !STAGE3_NAMES.has(a.name),
 			);
 			const findingsByAgent = groupFindingsByAgent(accumulated);
 			const sanitizedScope = sanitizeTemplateContent(currentState.scope);
@@ -201,9 +203,7 @@ export function advancePipeline(
 			if (fixResult.fixable.length > 0) {
 				// Build fix-cycle prompts for agents whose findings are fixable
 				const allAgents = ALL_REVIEW_AGENTS.filter(
-					(a) =>
-						currentState.selectedAgentNames.includes(a.name) ||
-						["red-team", "product-thinker"].includes(a.name),
+					(a) => currentState.selectedAgentNames.includes(a.name) || STAGE3_NAMES.has(a.name),
 				);
 				const sanitizedScope3 = sanitizeTemplateContent(currentState.scope);
 				const fixAgents = buildFixInstructions(fixResult.fixable, allAgents, sanitizedScope3);
