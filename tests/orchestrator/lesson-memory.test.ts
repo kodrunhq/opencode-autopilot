@@ -2,17 +2,20 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ensureDir } from "../../src/utils/fs-helpers";
-
-// Imports under test
 import {
 	createEmptyLessonMemory,
 	loadLessonMemory,
 	pruneLessons,
 	saveLessonMemory,
 } from "../../src/orchestrator/lesson-memory";
-import { LESSON_DOMAINS, lessonDomainSchema, lessonMemorySchema, lessonSchema } from "../../src/orchestrator/lesson-schemas";
+import {
+	LESSON_DOMAINS,
+	lessonDomainSchema,
+	lessonMemorySchema,
+	lessonSchema,
+} from "../../src/orchestrator/lesson-schemas";
 import type { Lesson, LessonDomain, LessonMemory } from "../../src/orchestrator/lesson-types";
+import { ensureDir } from "../../src/utils/fs-helpers";
 
 const LESSON_FILE = "lesson-memory.json";
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
