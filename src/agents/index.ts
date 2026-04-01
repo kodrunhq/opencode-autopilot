@@ -2,6 +2,7 @@ import type { Config } from "@opencode-ai/plugin";
 import { documenterAgent } from "./documenter";
 import { metaprompterAgent } from "./metaprompter";
 import { orchestratorAgent } from "./orchestrator";
+import { pipelineAgents } from "./pipeline/index";
 import { prReviewerAgent } from "./pr-reviewer";
 import { researcherAgent } from "./researcher";
 
@@ -23,6 +24,16 @@ export async function configHook(config: Config): Promise<void> {
 			// Mutation of config.agent is intentional: the OpenCode plugin configHook
 			// API requires mutating the provided Config object to register agents.
 			// We deep-copy agent config including nested permission to avoid shared references.
+			config.agent[name] = {
+				...agentConfig,
+				...(agentConfig.permission && { permission: { ...agentConfig.permission } }),
+			};
+		}
+	}
+
+	// Register pipeline agents (v2 orchestrator subagents)
+	for (const [name, agentConfig] of Object.entries(pipelineAgents)) {
+		if (config.agent[name] === undefined) {
 			config.agent[name] = {
 				...agentConfig,
 				...(agentConfig.permission && { permission: { ...agentConfig.permission } }),

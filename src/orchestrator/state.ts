@@ -54,11 +54,12 @@ export function patchState(
 	current: Readonly<PipelineState>,
 	updates: Partial<PipelineState>,
 ): PipelineState {
-	return {
+	const merged = {
 		...current,
 		...updates,
 		lastUpdatedAt: new Date().toISOString(),
 	};
+	return pipelineStateSchema.parse(merged);
 }
 
 export function appendDecision(

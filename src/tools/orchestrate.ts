@@ -1,25 +1,123 @@
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
+import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
+import type { DispatchResult } from "../orchestrator/handlers/types";
 import { completePhase, getNextPhase } from "../orchestrator/phase";
-import { createInitialState, loadState, saveState } from "../orchestrator/state";
+import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
 import type { Phase } from "../orchestrator/types";
 import { ensureGitignore } from "../utils/gitignore";
 import { getProjectArtifactDir } from "../utils/paths";
-
-const PHASE_AGENTS: Readonly<Record<Phase, string>> = Object.freeze({
-	RECON: "oc-researcher",
-	CHALLENGE: "oc-challenger",
-	ARCHITECT: "oc-architect",
-	EXPLORE: "oc-explorer",
-	PLAN: "oc-planner",
-	BUILD: "oc-builder",
-	SHIP: "oc-shipper",
-	RETROSPECTIVE: "oc-retrospector",
-});
+import { reviewCore } from "./review";
 
 interface OrchestrateArgs {
 	readonly idea?: string;
 	readonly result?: string;
+}
+
+/**
+ * Apply state updates from a DispatchResult if present, then save.
+ * Returns the updated state.
+ */
+async function applyStateUpdates(
+	state: Readonly<import("../orchestrator/types").PipelineState>,
+	handlerResult: DispatchResult,
+	artifactDir: string,
+): Promise<import("../orchestrator/types").PipelineState> {
+	const updates = handlerResult._stateUpdates;
+	if (updates) {
+		const updated = patchState(state, updates);
+		await saveState(updated, artifactDir);
+		return updated;
+	}
+	return state;
+}
+
+/**
+ * When a handler dispatches "oc-reviewer", call reviewCore directly instead
+ * of returning the dispatch instruction. This avoids the JSON round-trip
+ * for the review integration in BUILD phase (per CONTEXT.md).
+ */
+async function maybeInlineReview(
+	handlerResult: DispatchResult,
+	artifactDir: string,
+): Promise<{ readonly inlined: boolean; readonly reviewResult?: string }> {
+	if (
+		handlerResult.action === "dispatch" &&
+		handlerResult.agent === "oc-reviewer" &&
+		handlerResult.prompt
+	) {
+		const projectRoot = join(artifactDir, "..");
+		const reviewResult = await reviewCore({ scope: "branch" }, projectRoot);
+		return { inlined: true, reviewResult };
+	}
+	return { inlined: false };
+}
+
+/**
+ * Process a handler's DispatchResult, handling complete/dispatch/dispatch_multi/error.
+ * On complete, advances the phase and invokes the next handler.
+ */
+async function processHandlerResult(
+	handlerResult: DispatchResult,
+	state: Readonly<import("../orchestrator/types").PipelineState>,
+	artifactDir: string,
+): Promise<string> {
+	// Apply state updates from handler if present
+	const currentState = await applyStateUpdates(state, handlerResult, artifactDir);
+
+	switch (handlerResult.action) {
+		case "error":
+			return JSON.stringify(handlerResult);
+
+		case "dispatch": {
+			// Check if this is a review dispatch that should be inlined
+			const { inlined, reviewResult } = await maybeInlineReview(handlerResult, artifactDir);
+			if (inlined && reviewResult) {
+				// Feed the review result back into the current phase handler
+				const reloadedState = await loadState(artifactDir);
+				if (reloadedState?.currentPhase) {
+					const handler = PHASE_HANDLERS[reloadedState.currentPhase];
+					const nextResult = await handler(reloadedState, artifactDir, reviewResult);
+					return processHandlerResult(nextResult, reloadedState, artifactDir);
+				}
+			}
+			return JSON.stringify(handlerResult);
+		}
+
+		case "dispatch_multi":
+			return JSON.stringify(handlerResult);
+
+		case "complete": {
+			if (currentState.currentPhase === null) {
+				return JSON.stringify({
+					action: "complete",
+					summary: `Pipeline completed. Idea: ${currentState.idea}`,
+				});
+			}
+
+			const nextPhase = getNextPhase(currentState.currentPhase);
+			const advanced = completePhase(currentState);
+			await saveState(advanced, artifactDir);
+
+			if (nextPhase === null) {
+				// Terminal phase completed
+				const finished = { ...advanced, status: "COMPLETED" as const };
+				await saveState(finished, artifactDir);
+				return JSON.stringify({
+					action: "complete",
+					summary: `Pipeline completed all 8 phases. Idea: ${currentState.idea}`,
+				});
+			}
+
+			// Invoke the next phase handler immediately
+			const nextHandler = PHASE_HANDLERS[nextPhase];
+			const nextResult = await nextHandler(advanced, artifactDir);
+			return processHandlerResult(nextResult, advanced, artifactDir);
+		}
+
+		default:
+			return JSON.stringify({ action: "error", message: "Unknown handler action" });
+	}
 }
 
 export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string): Promise<string> {
@@ -34,12 +132,12 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 			});
 		}
 
-		// No state but idea provided -> create initial state and dispatch RECON
+		// No state but idea provided -> create initial state and dispatch RECON via handler
 		if (state === null && args.idea) {
 			const newState = createInitialState(args.idea);
 			await saveState(newState, artifactDir);
 
-			// Best-effort .gitignore update (don't fail the dispatch if this errors)
+			// Best-effort .gitignore update
 			try {
 				const projectRoot = join(artifactDir, "..");
 				await ensureGitignore(projectRoot);
@@ -47,59 +145,14 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 				// Swallow gitignore errors -- non-critical
 			}
 
-			const agent = PHASE_AGENTS[newState.currentPhase as Phase];
-			return JSON.stringify({
-				action: "dispatch",
-				agent,
-				prompt: `Research: ${args.idea}`,
-				phase: newState.currentPhase,
-				progress: "Starting new orchestration run",
-			});
+			const handler = PHASE_HANDLERS[newState.currentPhase as Phase];
+			const handlerResult = await handler(newState, artifactDir);
+			return processHandlerResult(handlerResult, newState, artifactDir);
 		}
 
 		// State exists
 		if (state !== null) {
-			// If result provided -> complete current phase and advance
-			if (args.result) {
-				const truncatedResult =
-					args.result.length > 4000 ? `${args.result.slice(0, 4000)}... [truncated]` : args.result;
-				const currentPhase = state.currentPhase;
-
-				if (currentPhase === null) {
-					return JSON.stringify({
-						action: "complete",
-						summary: `Pipeline completed. Idea: ${state.idea}`,
-					});
-				}
-
-				// Check if this is the terminal phase
-				const nextPhase = getNextPhase(currentPhase);
-				if (nextPhase === null) {
-					// Complete the terminal phase
-					const updated = completePhase(state);
-					const finishedState = { ...updated, status: "COMPLETED" as const };
-					await saveState(finishedState, artifactDir);
-					return JSON.stringify({
-						action: "complete",
-						summary: `Pipeline completed all 8 phases. Idea: ${state.idea}`,
-					});
-				}
-
-				// Complete current phase and dispatch next
-				const updated = completePhase(state);
-				await saveState(updated, artifactDir);
-
-				const agent = PHASE_AGENTS[nextPhase];
-				return JSON.stringify({
-					action: "dispatch",
-					agent,
-					prompt: `${nextPhase}: Continue pipeline for "${state.idea}". Previous phase result: ${truncatedResult}`,
-					phase: nextPhase,
-					progress: `Advancing from ${currentPhase} to ${nextPhase}`,
-				});
-			}
-
-			// State exists but no result -- return current status
+			// Pipeline already completed
 			if (state.currentPhase === null) {
 				return JSON.stringify({
 					action: "complete",
@@ -107,14 +160,10 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 				});
 			}
 
-			const agent = PHASE_AGENTS[state.currentPhase];
-			return JSON.stringify({
-				action: "dispatch",
-				agent,
-				prompt: `Continue ${state.currentPhase} phase for "${state.idea}"`,
-				phase: state.currentPhase,
-				progress: `Resuming at ${state.currentPhase}`,
-			});
+			// Delegate to current phase handler
+			const handler = PHASE_HANDLERS[state.currentPhase];
+			const handlerResult = await handler(state, artifactDir, args.result);
+			return processHandlerResult(handlerResult, state, artifactDir);
 		}
 
 		return JSON.stringify({ action: "error", message: "Unexpected state" });
@@ -126,7 +175,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 
 export const ocOrchestrate = tool({
 	description:
-		"Drive the orchestrator pipeline. Provide an idea to start a new run, or a result to advance the current phase. Returns JSON with action (dispatch/complete/error).",
+		"Drive the orchestrator pipeline. Provide an idea to start a new run, or a result to advance the current phase. Returns JSON with action (dispatch/dispatch_multi/complete/error).",
 	args: {
 		idea: tool.schema.string().optional().describe("Idea to start a new orchestration run"),
 		result: tool.schema
