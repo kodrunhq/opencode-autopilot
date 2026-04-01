@@ -1,9 +1,9 @@
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test";
-import { pipelineStateSchema, failureContextSchema, PHASES } from "../../src/orchestrator/schemas";
-import type { PipelineState, FailureContext } from "../../src/orchestrator/types";
+import { join } from "node:path";
+import { failureContextSchema, PHASES, pipelineStateSchema } from "../../src/orchestrator/schemas";
+import type { FailureContext, PipelineState } from "../../src/orchestrator/types";
 
 // ---------- helpers ----------
 
@@ -167,8 +167,7 @@ describe("orchestrateCore failure metadata capture", () => {
 						: name === "ARCHITECT"
 							? "IN_PROGRESS"
 							: "PENDING",
-				completedAt:
-					name === "RECON" || name === "CHALLENGE" ? new Date().toISOString() : null,
+				completedAt: name === "RECON" || name === "CHALLENGE" ? new Date().toISOString() : null,
 			})),
 		});
 		await writeState(tmpDir, state);
@@ -221,5 +220,155 @@ describe("orchestrateCore failure metadata capture", () => {
 		}
 
 		expect(originalErrorReturned).toBe(true);
+	});
+});
+
+// ---------- Task 2: forensicsCore ----------
+
+describe("forensicsCore", () => {
+	let tmpDir: string;
+	let projectRoot: string;
+
+	beforeEach(async () => {
+		projectRoot = await mkdtemp(join(tmpdir(), "forensics-project-"));
+		tmpDir = join(projectRoot, ".opencode-assets");
+	});
+
+	afterEach(async () => {
+		await rm(projectRoot, { recursive: true, force: true });
+	});
+
+	test("no state file returns error 'No pipeline state found'", async () => {
+		const { forensicsCore } = await import("../../src/tools/forensics");
+		const result = JSON.parse(await forensicsCore({}, projectRoot));
+		expect(result.action).toBe("error");
+		expect(result.message).toBe("No pipeline state found");
+	});
+
+	test("IN_PROGRESS state returns 'No failure to diagnose'", async () => {
+		const { forensicsCore } = await import("../../src/tools/forensics");
+		const state = makeMinimalState({ status: "IN_PROGRESS" });
+		await writeState(tmpDir, state);
+
+		const result = JSON.parse(await forensicsCore({}, projectRoot));
+		expect(result.action).toBe("error");
+		expect(result.message).toBe("No failure to diagnose -- pipeline status: IN_PROGRESS");
+	});
+
+	test("FAILED state without failureContext returns 'No failure metadata recorded'", async () => {
+		const { forensicsCore } = await import("../../src/tools/forensics");
+		const state = makeMinimalState({ status: "FAILED", failureContext: null });
+		await writeState(tmpDir, state);
+
+		const result = JSON.parse(await forensicsCore({}, projectRoot));
+		expect(result.action).toBe("error");
+		expect(result.message).toBe("No failure metadata recorded");
+	});
+
+	test("FAILED + failureContext with ARCHITECT phase -> recoverable, suggestedAction resume", async () => {
+		const { forensicsCore } = await import("../../src/tools/forensics");
+		const state = makeMinimalState({
+			status: "FAILED",
+			currentPhase: "ARCHITECT",
+			phases: PHASES.map((name) => ({
+				name,
+				status:
+					name === "RECON" || name === "CHALLENGE"
+						? "DONE"
+						: name === "ARCHITECT"
+							? "IN_PROGRESS"
+							: "PENDING",
+				completedAt: name === "RECON" || name === "CHALLENGE" ? new Date().toISOString() : null,
+			})),
+			failureContext: {
+				failedPhase: "ARCHITECT",
+				failedAgent: "oc-architect",
+				errorMessage: "Arena failed",
+				timestamp: new Date().toISOString(),
+				lastSuccessfulPhase: "CHALLENGE",
+			},
+		});
+		await writeState(tmpDir, state);
+
+		const result = JSON.parse(await forensicsCore({}, projectRoot));
+		expect(result.failedPhase).toBe("ARCHITECT");
+		expect(result.failedAgent).toBe("oc-architect");
+		expect(result.errorMessage).toBe("Arena failed");
+		expect(result.lastSuccessfulPhase).toBe("CHALLENGE");
+		expect(result.recoverable).toBe(true);
+		expect(result.suggestedAction).toBe("resume");
+	});
+
+	test("FAILED + failureContext with BUILD phase -> terminal, suggestedAction restart", async () => {
+		const { forensicsCore } = await import("../../src/tools/forensics");
+		const state = makeMinimalState({
+			status: "FAILED",
+			currentPhase: "BUILD",
+			failureContext: {
+				failedPhase: "BUILD",
+				failedAgent: null,
+				errorMessage: "Strike overflow",
+				timestamp: new Date().toISOString(),
+				lastSuccessfulPhase: "PLAN",
+			},
+		});
+		await writeState(tmpDir, state);
+
+		const result = JSON.parse(await forensicsCore({}, projectRoot));
+		expect(result.failedPhase).toBe("BUILD");
+		expect(result.recoverable).toBe(false);
+		expect(result.suggestedAction).toBe("restart");
+	});
+
+	test("FAILED + failureContext with RECON phase -> recoverable, suggestedAction restart", async () => {
+		const { forensicsCore } = await import("../../src/tools/forensics");
+		const state = makeMinimalState({
+			status: "FAILED",
+			failureContext: {
+				failedPhase: "RECON",
+				failedAgent: null,
+				errorMessage: "Recon failed",
+				timestamp: new Date().toISOString(),
+				lastSuccessfulPhase: null,
+			},
+		});
+		await writeState(tmpDir, state);
+
+		const result = JSON.parse(await forensicsCore({}, projectRoot));
+		expect(result.failedPhase).toBe("RECON");
+		expect(result.recoverable).toBe(true);
+		expect(result.suggestedAction).toBe("restart");
+	});
+
+	test("phasesCompleted lists all DONE phases", async () => {
+		const { forensicsCore } = await import("../../src/tools/forensics");
+		const state = makeMinimalState({
+			status: "FAILED",
+			currentPhase: "PLAN",
+			phases: PHASES.map((name) => ({
+				name,
+				status:
+					name === "RECON" || name === "CHALLENGE" || name === "ARCHITECT"
+						? "DONE"
+						: name === "PLAN"
+							? "IN_PROGRESS"
+							: "PENDING",
+				completedAt:
+					name === "RECON" || name === "CHALLENGE" || name === "ARCHITECT"
+						? new Date().toISOString()
+						: null,
+			})),
+			failureContext: {
+				failedPhase: "PLAN",
+				failedAgent: null,
+				errorMessage: "Plan generation failed",
+				timestamp: new Date().toISOString(),
+				lastSuccessfulPhase: "ARCHITECT",
+			},
+		});
+		await writeState(tmpDir, state);
+
+		const result = JSON.parse(await forensicsCore({}, projectRoot));
+		expect(result.phasesCompleted).toEqual(["RECON", "CHALLENGE", "ARCHITECT"]);
 	});
 });
