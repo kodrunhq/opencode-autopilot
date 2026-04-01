@@ -5,7 +5,7 @@
 
 ## Recommended Architecture
 
-The v2.0 architecture merges two distinct systems -- the hands-free orchestrator (state machine + subagent dispatch) and the ace review engine (phased review pipeline) -- into the existing opencode-assets plugin. The core design principle: **everything is a registered tool or config-hook-injected agent**, matching the existing plugin patterns exactly.
+The v2.0 architecture merges two distinct systems -- the hands-free orchestrator (state machine + subagent dispatch) and the ace review engine (phased review pipeline) -- into the existing opencode-autopilot plugin. The core design principle: **everything is a registered tool or config-hook-injected agent**, matching the existing plugin patterns exactly.
 
 ### High-Level Structure
 
@@ -297,7 +297,7 @@ review/verdict.ts
   RETROSPECTIVE/                Lessons learned
 
 ~/.config/opencode/             Global config (existing)
-  opencode-assets.json          Plugin config (MODIFIED: add orchestrator settings)
+  opencode-autopilot.json          Plugin config (MODIFIED: add orchestrator settings)
 
 ~/.claude/hands-free-memory/    Institutional memory (cross-project)
   {domain}/                     Domain-specific lessons
@@ -690,6 +690,6 @@ The build order respects the dependency flow (bottom-up) and provides testable i
 - ace orchestrator agent: `/home/joseibanez/develop/projects/claude-ace/agents/orchestrator.md` -- Programmatic dispatch for review-gateway (HIGH confidence: direct source analysis)
 - ace agent catalog: `/home/joseibanez/develop/projects/claude-ace/references/agent-catalog.md` -- 16 parallel specialists + 2 sequenced + 3 core squad (HIGH confidence: direct source analysis)
 - ace severity definitions: `/home/joseibanez/develop/projects/claude-ace/references/severity-definitions.md` -- Critical/Warning/Nitpick (HIGH confidence: direct source analysis)
-- existing plugin architecture: `/home/joseibanez/develop/projects/opencode-assets/src/` -- Current tool registration, config hook, agent definitions (HIGH confidence: direct source analysis)
+- existing plugin architecture: `/home/joseibanez/develop/projects/opencode-autopilot/src/` -- Current tool registration, config hook, agent definitions (HIGH confidence: direct source analysis)
 - OpenCode plugin API: `@opencode-ai/plugin` dist/index.d.ts -- Hooks interface with tool, config, event, chat.message, chat.params hooks (HIGH confidence: direct type analysis)
 - Tool-returns-instruction pattern: MEDIUM confidence -- this is the logical design given OpenCode's constraints, but untested in this plugin context. May need adjustment based on how OpenCode handles agent dispatch from tool responses.

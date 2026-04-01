@@ -63,11 +63,11 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| .opencode-assets/ in project root | Dedicated directory, clear ownership, easy to .gitignore. | ✓ |
+| .opencode-autopilot/ in project root | Dedicated directory, clear ownership, easy to .gitignore. | ✓ |
 | .opencode/orchestrator/ | Inside OpenCode's config dir. Mixes plugin data with OpenCode data. | |
 | You decide | Claude picks based on conventions. | |
 
-**User's choice:** .opencode-assets/ in project root
+**User's choice:** .opencode-autopilot/ in project root
 **Notes:** Matches hands-free's .hands-free/ pattern.
 
 ---

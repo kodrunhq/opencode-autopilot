@@ -64,7 +64,7 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| .opencode-assets/phases/ | Per-phase directories | ✓ |
+| .opencode-autopilot/phases/ | Per-phase directories | ✓ |
 | Single state.json | All in state file | |
 
 ### Follow-up: Context flow

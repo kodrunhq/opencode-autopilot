@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 5 builds a standalone multi-agent code review engine as an internal subsystem of the opencode-assets plugin. The review engine has no dependency on the orchestrator pipeline for standalone use -- users invoke `oc_review` directly to get findings from specialist agents. The architecture follows all decisions locked in CONTEXT.md: internal agent registry (not configHook), TypeScript objects for agent definitions, two-pass deterministic selection (stack gate + diff heuristic), 4-stage pipeline (parallel dispatch, cross-verification, red team + product thinker, fix cycle), and per-project memory at `.opencode-assets/review-memory.json`.
+Phase 5 builds a standalone multi-agent code review engine as an internal subsystem of the opencode-autopilot plugin. The review engine has no dependency on the orchestrator pipeline for standalone use -- users invoke `oc_review` directly to get findings from specialist agents. The architecture follows all decisions locked in CONTEXT.md: internal agent registry (not configHook), TypeScript objects for agent definitions, two-pass deterministic selection (stack gate + diff heuristic), 4-stage pipeline (parallel dispatch, cross-verification, red team + product thinker, fix cycle), and per-project memory at `.opencode-autopilot/review-memory.json`.
 
 The primary source material is the claude-ace repository (30 review agents, 8-phase pipeline). Phase 5 ports the **logic and behavioral contracts** of 8 essential agents (6 universal specialists + red team + product thinker) into TypeScript objects with inline prompt templates. The team-lead selection mechanism becomes a pure TypeScript function -- no LLM involved in agent picking. All shell scripts (detect-stack.sh, classify-changes.sh) are replaced by TypeScript functions using `node:fs/promises` and `node:child_process` for git operations.
 
@@ -27,13 +27,13 @@ The primary source material is the claude-ace repository (30 review agents, 8-ph
 - D-09: Scope options: `staged` (default), `unstaged`, `branch` (diff vs main), `all` (staged + unstaged), `directory` (review all files in a path). Plus optional file filter pattern.
 - D-10: Standardized finding format: `{ file, line, severity: CRITICAL|HIGH|MEDIUM|LOW, agent, finding, suggestion }`. Zod schema validates all findings before aggregation.
 - D-11: Report groups findings by file, sorted by severity within each file. Includes total counts per severity, list of agents that ran, and scope that was reviewed. Output is JSON.
-- D-12: Review findings, false positive markers, and project profile stored at `.opencode-assets/review-memory.json`. Zod-validated. Updated after each review run.
+- D-12: Review findings, false positive markers, and project profile stored at `.opencode-autopilot/review-memory.json`. Zod-validated. Updated after each review run.
 - D-13: `node:fs/promises` for all I/O (no Bun.file())
 - D-14: Zod for all schema validation
 - D-15: `Object.freeze()` + `Readonly<T>` for immutable configs
 - D-16: `*Core` + `tool()` wrapper for tools
 - D-17: Config hook for agent injection (but NOT for review agents -- only for orchestrator-level agents)
-- D-18: `.opencode-assets/` for per-project artifacts
+- D-18: `.opencode-autopilot/` for per-project artifacts
 
 ### Claude's Discretion
 - Exact prompts for each of the 6+ review agents
@@ -62,7 +62,7 @@ None -- discussion stayed within phase scope
 | REVW-08 | Product thinker traces user journeys after technical review | Stage 3: product-thinker agent runs alongside red-team, checks CRUD completeness |
 | REVW-09 | Fix cycle auto-applies fixes and re-verifies | Stage 4: max 1 cycle, fix CRITICAL/HIGH only, re-run affected agents only |
 | REVW-10 | Consolidated report groups findings by file with severity | Report schema: grouped by file, sorted by severity, includes totals and agent list |
-| REVW-11 | Per-project memory stores findings and false positives | `.opencode-assets/review-memory.json` with Zod schema, updated after each run |
+| REVW-11 | Per-project memory stores findings and false positives | `.opencode-autopilot/review-memory.json` with Zod schema, updated after each run |
 </phase_requirements>
 
 ## Project Constraints (from CLAUDE.md)
@@ -304,7 +304,7 @@ export const reviewReportSchema = z.object({
 **Warning signs:** Go-specific agents selected for a TypeScript project.
 
 ### Pitfall 5: Memory File Unbounded Growth
-**What goes wrong:** Review memory at `.opencode-assets/review-memory.json` grows with every review run. After 50 runs, loading memory into agent prompts consumes substantial tokens.
+**What goes wrong:** Review memory at `.opencode-autopilot/review-memory.json` grows with every review run. After 50 runs, loading memory into agent prompts consumes substantial tokens.
 **Why it happens:** Append-only design without pruning.
 **How to avoid:** Cap findings history at 100 entries. When saving, keep only the most recent 100. Cap false positives at 50 entries. Include a `lastReviewedAt` timestamp and prune entries older than 30 days on load.
 **Warning signs:** Memory file exceeding 50KB.
@@ -614,7 +614,7 @@ The `oc_review` tool is stateless between invocations. Each call either starts a
 | 5th (if fixes) | `{ findings: "[...fix re-verify results...]" }` | Aggregate final findings, return complete report |
 
 **Important:** The tool must track pipeline stage. Options:
-1. **Stateful:** Store pipeline state in `.opencode-assets/current-review.json` (cleared on completion)
+1. **Stateful:** Store pipeline state in `.opencode-autopilot/current-review.json` (cleared on completion)
 2. **Stateless:** Encode stage in the response, caller passes it back
 
 **Recommendation:** Stateful approach. Store minimal state (stage number, selected agents, accumulated findings) in a temp file. The tool reads it on each invocation. Cleared on completion or timeout.
@@ -629,7 +629,7 @@ The `oc_review` tool is stateless between invocations. Each call either starts a
 | Markdown finding format | JSON with Zod validation | Machine-parseable, type-safe |
 | 3 convergence cycles | MAX 1 fix cycle | Prevents cascade bomb |
 | Agent prompts as markdown files | TS objects with template strings | Inline, importable, testable |
-| `~/.claude/ace/<project-key>/` memory | `.opencode-assets/review-memory.json` | Single project artifact dir |
+| `~/.claude/ace/<project-key>/` memory | `.opencode-autopilot/review-memory.json` | Single project artifact dir |
 
 ## Open Questions
 

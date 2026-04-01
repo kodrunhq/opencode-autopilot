@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-OpenCode Assets v2.0 merges two proven systems -- the hands-free autonomous orchestrator (8-phase SDLC pipeline with 12 subagents) and the ace multi-agent review engine (30 review agents, 7-phase review pipeline) -- into the existing opencode-assets plugin. The key architectural insight is that OpenCode's plugin model requires a fundamentally different approach from the source systems: orchestrator logic must live in deterministic TypeScript code (not 2400-line markdown prompts), agents are dispatched indirectly through a tool-returns-instruction pattern (tools compute state, agents execute dispatch), and review specialists should be internal prompt templates rather than config-hook-injected agents. The existing plugin's patterns (tool registration, config hook, Zod validation, immutable data, atomic writes) extend naturally to support the new capabilities.
+OpenCode Assets v2.0 merges two proven systems -- the hands-free autonomous orchestrator (8-phase SDLC pipeline with 12 subagents) and the ace multi-agent review engine (30 review agents, 7-phase review pipeline) -- into the existing opencode-autopilot plugin. The key architectural insight is that OpenCode's plugin model requires a fundamentally different approach from the source systems: orchestrator logic must live in deterministic TypeScript code (not 2400-line markdown prompts), agents are dispatched indirectly through a tool-returns-instruction pattern (tools compute state, agents execute dispatch), and review specialists should be internal prompt templates rather than config-hook-injected agents. The existing plugin's patterns (tool registration, config hook, Zod validation, immutable data, atomic writes) extend naturally to support the new capabilities.
 
 The recommended approach is bottom-up construction across 5 phases: foundation infrastructure (state machine, config, tooling), standalone review engine, orchestrator pipeline phases, adversarial intelligence features, and learning systems. Only one new runtime dependency is needed: mitt (200-byte event emitter). Everything else uses existing deps (Zod, yaml, node:fs/promises) or custom TypeScript. The review engine should ship before the orchestrator because it is simpler, independently useful, and required by the orchestrator's BUILD phase -- delivering value early while de-risking the harder integration.
 
@@ -159,7 +159,7 @@ Phases with standard patterns (skip research-phase):
 ### Primary (HIGH confidence)
 - claude-hands-free source code at `/home/joseibanez/develop/projects/claude-hands-free/` -- 2413-line orchestrator, 12 agents, 3538 lines CJS tooling, 8-phase state machine
 - claude-ace source code at `/home/joseibanez/develop/projects/claude-ace/` -- 30 agents, 8-phase review pipeline, 6 bash scripts, references directory
-- opencode-assets source code at `/home/joseibanez/develop/projects/opencode-assets/src/` -- current plugin architecture, tool registration, config hook, agent definitions
+- opencode-autopilot source code at `/home/joseibanez/develop/projects/opencode-autopilot/src/` -- current plugin architecture, tool registration, config hook, agent definitions
 - OpenCode plugin API (`@opencode-ai/plugin` dist/index.d.ts) -- hooks interface, tool registration, config hook
 - [XState v5 documentation](https://stately.ai/docs/xstate) -- evaluated and rejected
 - [mitt GitHub](https://github.com/developit/mitt) -- 200-byte typed event emitter

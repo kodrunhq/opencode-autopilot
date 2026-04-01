@@ -19,7 +19,7 @@ Features users expect from an autonomous SDLC orchestrator. Missing any of these
 | **Iterative build loop** | Implementing tasks one at a time with branch/commit/PR per task. This is what makes the output professional (not one giant diff). | High | None new -- git operations via Bash tool | hands-free `hf-implementer` (per-task PRs) |
 | **Code review gate** | Every implementation must pass review before proceeding. This is the quality floor. Without it, the orchestrator ships unchecked code. | Medium | Existing `pr-reviewer` subagent (expand scope) | hands-free `hf-reviewer`, ace core squad |
 | **Review-fix loop** | When review finds issues, the implementer fixes and resubmits. Without this loop, review findings are decoration. Max 3 cycles to prevent infinite loops. | Medium | Review gate above | hands-free review dialogue, ace Phase 5 fix cycle |
-| **Decision logging** | Every autonomous decision must be logged with rationale. Users cannot trust a black box. The decision log is the accountability mechanism. | Low | Filesystem write (`.opencode-assets/decision-log.md`) | hands-free `decision-log.md` |
+| **Decision logging** | Every autonomous decision must be logged with rationale. Users cannot trust a black box. The decision log is the accountability mechanism. | Low | Filesystem write (`.opencode-autopilot/decision-log.md`) | hands-free `decision-log.md` |
 | **Deterministic tooling (TypeScript)** | State management, config, phase transitions, plan parsing -- these must be deterministic code, not LLM-generated. LLMs hallucinate state; code does not. | High | Existing TS patterns in `src/utils/`, `src/config.ts` | hands-free `hf-tools.cjs` (13 modules), ported to native TS |
 | **User-configurable settings** | Autonomy level, strictness, phase toggles, model routing. Users will not adopt a tool they cannot tune. | Medium | Existing `pluginConfigSchema` in `config.ts` (extend) | hands-free `config.cjs`, oh-my-opencode config system |
 | **Specialized review agents (core squad)** | At minimum: logic auditor, test coverage checker, contract/type verifier. These catch the most common classes of bugs. A review engine with one generic reviewer is not credible. | High | `configHook` for agent injection | ace core squad (logic-auditor, test-interrogator, contract-verifier) |
@@ -134,7 +134,7 @@ Forensics --- reads state machine history, independent of normal pipeline
 | `configHook` in `src/agents/index.ts` | Injects 12+ orchestrator subagents and review agents. Same pattern, larger agent map. |
 | `pluginConfigSchema` in `src/config.ts` | Extended with orchestrator settings (autonomy, strictness, phase toggles). Same Zod pattern. |
 | `src/utils/paths.ts` (getGlobalConfigDir) | Used for institutional memory path, project memory path, orchestrator artifact storage. |
-| `src/utils/fs-helpers.ts` (ensureDir, copyIfMissing) | Used for creating `.opencode-assets/` run directories and artifact files. |
+| `src/utils/fs-helpers.ts` (ensureDir, copyIfMissing) | Used for creating `.opencode-autopilot/` run directories and artifact files. |
 | `src/utils/validators.ts` | Extended for phase name validation, agent name validation in the orchestrator context. |
 | Tool registration pattern (`src/tools/`) | `oc_orchestrate` follows same pattern: `*Core` function + `tool()` wrapper. |
 | Existing `researcher` subagent | Prompt adapted for RECON phase. Same agent, expanded output contract. |

@@ -60,7 +60,7 @@ completed: 2026-03-31
 - **Files modified:** 8
 
 ## Accomplishments
-- Config module persists plugin state to ~/.config/opencode/opencode-assets.json with first-load detection
+- Config module persists plugin state to ~/.config/opencode/opencode-autopilot.json with first-load detection
 - Asset installer copies agents, commands, and skill directories with no-clobber strategy and graceful error handling
 - Plugin entry point wired to install assets and load config on every initialization
 - Event hook fires on session.created when first load detected

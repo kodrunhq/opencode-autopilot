@@ -48,7 +48,7 @@ Requirements: REVW-01, REVW-02, REVW-03, REVW-04, REVW-05, REVW-06, REVW-07, REV
 - **D-11:** Report groups findings by file, sorted by severity within each file. Includes total counts per severity, list of agents that ran, and scope that was reviewed. Output is JSON (tool response) -- pretty formatting is the caller's responsibility.
 
 ### Per-Project Memory (REVW-11)
-- **D-12:** Review findings, false positive markers, and project profile stored at `.opencode-assets/review-memory.json`. Zod-validated. Updated after each review run. Used to suppress known false positives and track recurring issues.
+- **D-12:** Review findings, false positive markers, and project profile stored at `.opencode-autopilot/review-memory.json`. Zod-validated. Updated after each review run. Used to suppress known false positives and track recurring issues.
 
 ### Carrying Forward from Phase 4
 - **D-13:** `node:fs/promises` for all I/O (no Bun.file())
@@ -56,7 +56,7 @@ Requirements: REVW-01, REVW-02, REVW-03, REVW-04, REVW-05, REVW-06, REVW-07, REV
 - **D-15:** `Object.freeze()` + `Readonly<T>` for immutable configs
 - **D-16:** `*Core` + `tool()` wrapper for tools
 - **D-17:** Config hook for agent injection (but NOT for review agents -- only for orchestrator-level agents)
-- **D-18:** `.opencode-assets/` for per-project artifacts
+- **D-18:** `.opencode-autopilot/` for per-project artifacts
 
 ### Claude's Discretion
 - Exact prompts for each of the 6+ review agents
@@ -119,7 +119,7 @@ Requirements: REVW-01, REVW-02, REVW-03, REVW-04, REVW-05, REVW-06, REVW-07, REV
 ### Integration Points
 - `src/index.ts` -- Register oc_review tool
 - `src/orchestrator/schemas.ts` -- Add review finding/report schemas
-- `.opencode-assets/review-memory.json` -- Per-project review memory
+- `.opencode-autopilot/review-memory.json` -- Per-project review memory
 
 </code_context>
 

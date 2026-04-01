@@ -7,8 +7,8 @@
  * - no args with active state -> return status
  * - no args without state -> error
  *
- * State persisted at {projectRoot}/.opencode-assets/current-review.json
- * Memory persisted at {projectRoot}/.opencode-assets/review-memory.json
+ * State persisted at {projectRoot}/.opencode-autopilot/current-review.json
+ * Memory persisted at {projectRoot}/.opencode-autopilot/review-memory.json
  */
 
 import { execFile } from "node:child_process";

@@ -39,7 +39,7 @@ describe("loadReviewMemory", () => {
 	});
 
 	test("returns parsed memory when file exists and is valid", async () => {
-		const memoryDir = join(tempDir, ".opencode-assets");
+		const memoryDir = join(tempDir, ".opencode-autopilot");
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(memoryDir, { recursive: true });
 		const memory = createEmptyMemory();
@@ -55,7 +55,7 @@ describe("loadReviewMemory", () => {
 	});
 
 	test("returns null on invalid JSON content (recoverable)", async () => {
-		const memoryDir = join(tempDir, ".opencode-assets");
+		const memoryDir = join(tempDir, ".opencode-autopilot");
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(memoryDir, { recursive: true });
 		await writeFile(join(memoryDir, "review-memory.json"), "not valid json {{{", "utf-8");
@@ -65,7 +65,7 @@ describe("loadReviewMemory", () => {
 	});
 
 	test("returns null on valid JSON but invalid schema (recoverable)", async () => {
-		const memoryDir = join(tempDir, ".opencode-assets");
+		const memoryDir = join(tempDir, ".opencode-autopilot");
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(memoryDir, { recursive: true });
 		await writeFile(
@@ -80,21 +80,21 @@ describe("loadReviewMemory", () => {
 });
 
 describe("saveReviewMemory", () => {
-	test("writes to .opencode-assets/review-memory.json with atomic write", async () => {
+	test("writes to .opencode-autopilot/review-memory.json with atomic write", async () => {
 		const memory = createEmptyMemory();
 		await saveReviewMemory(memory, tempDir);
 
-		const filePath = join(tempDir, ".opencode-assets", "review-memory.json");
+		const filePath = join(tempDir, ".opencode-autopilot", "review-memory.json");
 		const raw = await readFile(filePath, "utf-8");
 		const parsed = JSON.parse(raw);
 		expect(parsed.schemaVersion).toBe(1);
 	});
 
-	test("creates .opencode-assets directory if it does not exist", async () => {
+	test("creates .opencode-autopilot directory if it does not exist", async () => {
 		const memory = createEmptyMemory();
 		await saveReviewMemory(memory, tempDir);
 
-		const filePath = join(tempDir, ".opencode-assets", "review-memory.json");
+		const filePath = join(tempDir, ".opencode-autopilot", "review-memory.json");
 		const raw = await readFile(filePath, "utf-8");
 		expect(JSON.parse(raw).schemaVersion).toBe(1);
 	});

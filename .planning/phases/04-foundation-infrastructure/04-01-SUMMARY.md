@@ -42,7 +42,7 @@ patterns-established:
   - "Schema-first types: define Zod schema, infer TypeScript type via z.infer"
   - "Atomic file writes: write to .tmp.{timestamp}, then rename"
   - "Pure state updates: patchState/appendDecision return new objects, never mutate"
-  - "State directory: .opencode-assets/ at project root"
+  - "State directory: .opencode-autopilot/ at project root"
 
 requirements-completed: [TOOL-01, ORCH-02, ORCH-03, ORCH-05, TOOL-03]
 

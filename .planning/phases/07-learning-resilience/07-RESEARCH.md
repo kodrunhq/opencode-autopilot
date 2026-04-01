@@ -8,7 +8,7 @@
 
 Phase 7 adds two capabilities to the orchestrator pipeline: (1) structured lesson extraction from successful runs with time-based decay persistence, and (2) a forensics tool for diagnosing failed runs. Both capabilities follow existing codebase patterns closely -- lesson memory mirrors `review/memory.ts` (load/prune/save with atomic writes and Zod validation), and forensics follows the `*Core` + `tool()` pattern established by every other tool.
 
-The implementation is well-constrained by CONTEXT.md decisions. Lesson memory lives at `.opencode-assets/lesson-memory.json` (project-local), uses 90-day TTL with 50-lesson cap, and categorizes by four fixed domains. The retrospective handler needs enhancement (not creation) to parse structured JSON from the oc-retrospector agent and persist lessons. The forensics tool reads pipeline state and classifies failures as recoverable vs terminal using phase-based heuristics.
+The implementation is well-constrained by CONTEXT.md decisions. Lesson memory lives at `.opencode-autopilot/lesson-memory.json` (project-local), uses 90-day TTL with 50-lesson cap, and categorizes by four fixed domains. The retrospective handler needs enhancement (not creation) to parse structured JSON from the oc-retrospector agent and persist lessons. The forensics tool reads pipeline state and classifies failures as recoverable vs terminal using phase-based heuristics.
 
 **Primary recommendation:** Implement in three waves -- (1) lesson schema + memory module, (2) retrospective handler enhancement + agent prompt update + lesson injection into phase dispatches, (3) forensics tool + failure metadata capture in orchestrateCore.
 
@@ -16,7 +16,7 @@ The implementation is well-constrained by CONTEXT.md decisions. Lesson memory li
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
-- **D-01:** Lesson memory is project-local, stored at `.opencode-assets/lesson-memory.json`. Follows the review memory pattern: Zod schema, atomic writes (tmp + rename), load/prune/save lifecycle.
+- **D-01:** Lesson memory is project-local, stored at `.opencode-autopilot/lesson-memory.json`. Follows the review memory pattern: Zod schema, atomic writes (tmp + rename), load/prune/save lifecycle.
 - **D-02:** Lessons are tagged with one of 4 fixed domain categories: `architecture`, `testing`, `review`, `planning`. This matches LRNR-02 exactly. No catch-all or free-form tags.
 - **D-03:** Lessons are injected into future pipeline runs via prompt context. When dispatching a phase handler, load lessons filtered by matching domain and append to the agent dispatch prompt as "Prior lessons: [...]". No schema changes to DispatchResult needed.
 - **D-04:** The oc-retrospector agent writes structured JSON (not markdown) to the RETROSPECTIVE artifact directory. The RETROSPECTIVE handler reads the JSON output, validates via Zod `lessonSchema`, and calls `saveLessonMemory()` to persist. No markdown parsing needed.
@@ -103,7 +103,7 @@ const MAX_LESSONS = 50;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
 export async function loadLessonMemory(projectRoot: string): Promise<LessonMemory | null> {
-  const memoryPath = join(projectRoot, ".opencode-assets", LESSON_FILE);
+  const memoryPath = join(projectRoot, ".opencode-autopilot", LESSON_FILE);
   try {
     const raw = await readFile(memoryPath, "utf-8");
     const parsed = JSON.parse(raw);
@@ -386,7 +386,7 @@ Rules:
 - **No Bun.file/Bun.write:** Use `node:fs/promises`
 - **No standalone Zod install:** Import `z` from `"zod"` (transitive dep)
 - **Model agnostic:** No model identifiers in agent definitions
-- **Global vs project scope:** Lesson memory writes to `<projectRoot>/.opencode-assets/` (project-local per D-01)
+- **Global vs project scope:** Lesson memory writes to `<projectRoot>/.opencode-autopilot/` (project-local per D-01)
 - **`oc_` prefix:** Forensics tool must be `oc_forensics`
 - **Agent permissions:** oc-retrospector has `edit: "allow"` only (no bash) -- already correct
 - **Immutable frozen returns:** All handler results use `Object.freeze({...} satisfies DispatchResult)`

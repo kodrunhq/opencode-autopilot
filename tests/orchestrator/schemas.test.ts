@@ -209,7 +209,9 @@ describe("pipelineStateSchema", () => {
 });
 
 describe("getProjectArtifactDir", () => {
-	test("returns .opencode-assets path relative to project root", () => {
-		expect(getProjectArtifactDir("/home/user/project")).toBe("/home/user/project/.opencode-assets");
+	test("returns .opencode-autopilot path relative to project root", () => {
+		expect(getProjectArtifactDir("/home/user/project")).toBe(
+			"/home/user/project/.opencode-autopilot",
+		);
 	});
 });

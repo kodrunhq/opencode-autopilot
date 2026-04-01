@@ -67,7 +67,7 @@ describe("saveConfig and loadConfig round-trip", () => {
 	beforeEach(async () => {
 		tempDir = join(tmpdir(), `opencode-config-test-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
-		configPath = join(tempDir, "opencode-assets.json");
+		configPath = join(tempDir, "opencode-autopilot.json");
 	});
 
 	afterEach(async () => {
@@ -94,7 +94,7 @@ describe("saveConfig and loadConfig round-trip", () => {
 	});
 
 	test("saveConfig creates parent directory if missing", async () => {
-		const nestedPath = join(tempDir, "nested", "deep", "opencode-assets.json");
+		const nestedPath = join(tempDir, "nested", "deep", "opencode-autopilot.json");
 		const config = createDefaultConfig();
 		await saveConfig(config, nestedPath);
 
@@ -122,7 +122,7 @@ describe("v1 to v3 migration", () => {
 	beforeEach(async () => {
 		tempDir = join(tmpdir(), `opencode-config-migration-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
-		configPath = join(tempDir, "opencode-assets.json");
+		configPath = join(tempDir, "opencode-autopilot.json");
 	});
 
 	afterEach(async () => {
@@ -172,7 +172,7 @@ describe("v2 to v3 migration", () => {
 	beforeEach(async () => {
 		tempDir = join(tmpdir(), `opencode-config-v2v3-migration-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
-		configPath = join(tempDir, "opencode-assets.json");
+		configPath = join(tempDir, "opencode-autopilot.json");
 	});
 
 	afterEach(async () => {
@@ -262,7 +262,7 @@ describe("v3 direct load", () => {
 	beforeEach(async () => {
 		tempDir = join(tmpdir(), `opencode-config-v3-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
-		configPath = join(tempDir, "opencode-assets.json");
+		configPath = join(tempDir, "opencode-autopilot.json");
 	});
 
 	afterEach(async () => {
@@ -320,7 +320,7 @@ describe("v3 schema validation", () => {
 	beforeEach(async () => {
 		tempDir = join(tmpdir(), `opencode-config-validation-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
-		configPath = join(tempDir, "opencode-assets.json");
+		configPath = join(tempDir, "opencode-autopilot.json");
 	});
 
 	afterEach(async () => {

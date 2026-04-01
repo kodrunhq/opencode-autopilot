@@ -2,7 +2,7 @@
  * Per-project review memory persistence.
  *
  * Stores recent findings and false positives at
- * {projectRoot}/.opencode-assets/review-memory.json
+ * {projectRoot}/.opencode-autopilot/review-memory.json
  *
  * Memory is pruned on load to cap storage and remove stale entries.
  * All writes are atomic (tmp file + rename) to prevent corruption.
@@ -42,7 +42,7 @@ export function createEmptyMemory(): ReviewMemory {
  * Prunes on load to cap storage.
  */
 export async function loadReviewMemory(projectRoot: string): Promise<ReviewMemory | null> {
-	const memoryPath = join(projectRoot, ".opencode-assets", MEMORY_FILE);
+	const memoryPath = join(projectRoot, ".opencode-autopilot", MEMORY_FILE);
 	try {
 		const raw = await readFile(memoryPath, "utf-8");
 		const parsed = JSON.parse(raw);
@@ -70,7 +70,7 @@ export async function loadReviewMemory(projectRoot: string): Promise<ReviewMemor
  */
 export async function saveReviewMemory(memory: ReviewMemory, projectRoot: string): Promise<void> {
 	const validated = reviewMemorySchema.parse(memory);
-	const dir = join(projectRoot, ".opencode-assets");
+	const dir = join(projectRoot, ".opencode-autopilot");
 	await ensureDir(dir);
 	const memoryPath = join(dir, MEMORY_FILE);
 	const tmpPath = `${memoryPath}.tmp.${Date.now()}`;

@@ -231,7 +231,7 @@ describe("forensicsCore", () => {
 
 	beforeEach(async () => {
 		projectRoot = await mkdtemp(join(tmpdir(), "forensics-project-"));
-		tmpDir = join(projectRoot, ".opencode-assets");
+		tmpDir = join(projectRoot, ".opencode-autopilot");
 	});
 
 	afterEach(async () => {

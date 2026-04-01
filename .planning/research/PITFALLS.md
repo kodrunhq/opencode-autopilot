@@ -1,8 +1,8 @@
 # Domain Pitfalls
 
-**Domain:** Porting autonomous SDLC orchestrator (hands-free) + multi-agent review engine (ace) into an existing OpenCode plugin (opencode-assets)
+**Domain:** Porting autonomous SDLC orchestrator (hands-free) + multi-agent review engine (ace) into an existing OpenCode plugin (opencode-autopilot)
 **Researched:** 2026-03-31
-**Source analysis:** claude-hands-free (2413-line orchestrator, 12 agents, 3300 lines CJS tooling, 8-phase state machine), claude-ace (30 agents, 8-phase review pipeline, 6 bash scripts, references directory with hard gates), opencode-assets (924 lines TS, 4 agents, 3 creation tools)
+**Source analysis:** claude-hands-free (2413-line orchestrator, 12 agents, 3300 lines CJS tooling, 8-phase state machine), claude-ace (30 agents, 8-phase review pipeline, 6 bash scripts, references directory with hard gates), opencode-autopilot (924 lines TS, 4 agents, 3 creation tools)
 
 ---
 
@@ -40,7 +40,7 @@ Mistakes that cause rewrites, token budget blowouts, or render the system unusab
 
 **Prevention:**
 1. **Single state machine.** Define one pipeline: the hands-free phases are the top-level flow; ace review is a sub-operation within BUILD phase (and optionally a standalone tool). Do not give ace its own pipeline state when running inside the orchestrator.
-2. **Single config schema.** Port both configs into the existing opencode-assets Zod-validated config system (src/config.ts). One schema, one load/save path.
+2. **Single config schema.** Port both configs into the existing opencode-autopilot Zod-validated config system (src/config.ts). One schema, one load/save path.
 3. **Single working directory.** Use `.opencode/orchestrate/` (or similar) for all runtime state -- not `.hands-free/` and `~/.claude/ace/` separately. Follow OpenCode conventions, not Claude Code conventions.
 4. **Single memory interface.** Ace's project memory (findings, false-positives, fix-failures) and hands-free's institutional memory should share a storage abstraction.
 
@@ -161,9 +161,9 @@ Mistakes that cause rewrites, token budget blowouts, or render the system unusab
 
 ### Pitfall 9: Config Complexity Creates a Three-Layer Override Nightmare
 
-**What goes wrong:** Hands-free has global config (~/.claude/hands-free-config.md), project config (.hands-free/config.md), and runtime flags. Ace has project memory (~/.claude/ace/<project-key>/), script-based detection, and mode flags. The existing opencode-assets has its own Zod-validated config. Merging these creates a three-layer configuration system where the user has no idea which setting wins.
+**What goes wrong:** Hands-free has global config (~/.claude/hands-free-config.md), project config (.hands-free/config.md), and runtime flags. Ace has project memory (~/.claude/ace/<project-key>/), script-based detection, and mode flags. The existing opencode-autopilot has its own Zod-validated config. Merging these creates a three-layer configuration system where the user has no idea which setting wins.
 
-**Why it happens:** Each system solves its own config needs independently. Hands-free's three-branch priority (global > ace auto-detect > defaults) is already confusing. Adding ace's memory directory and opencode-assets' config creates a system where a single setting like "review strictness" could be defined in five different places.
+**Why it happens:** Each system solves its own config needs independently. Hands-free's three-branch priority (global > ace auto-detect > defaults) is already confusing. Adding ace's memory directory and opencode-autopilot' config creates a system where a single setting like "review strictness" could be defined in five different places.
 
 **Prevention:**
 1. **One config schema with clear precedence.** OpenCode-assets' Zod config is the single source of truth. All hands-free and ace settings get fields in this schema.
@@ -295,7 +295,7 @@ Mistakes that cause rewrites, token budget blowouts, or render the system unusab
   - references/agent-catalog.md (200 lines, 16 parallel + 2 sequenced + 9 enforcement agents)
   - references/enforcement-hard-gates.md (52 lines, mandatory gates per enforcement agent)
   - scripts/*.sh (6 bash scripts for pre-flight data gathering)
-- Direct analysis of opencode-assets source code at /home/joseibanez/develop/projects/opencode-assets/
+- Direct analysis of opencode-autopilot source code at /home/joseibanez/develop/projects/opencode-autopilot/
   - src/index.ts (37 lines, plugin entry with tool + config hook registration)
   - src/agents/index.ts (35 lines, config hook pattern for agent injection)
   - src/agents/researcher.ts (43 lines, agent definition pattern -- contrast with hf-researcher.md at 170+ lines)

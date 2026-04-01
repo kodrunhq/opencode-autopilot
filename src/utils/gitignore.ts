@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { isEnoentError } from "./fs-helpers";
 
-const GITIGNORE_ENTRY = ".opencode-assets/";
+const GITIGNORE_ENTRY = ".opencode-autopilot/";
 
 export async function ensureGitignore(projectRoot: string): Promise<void> {
 	const gitignorePath = join(projectRoot, ".gitignore");

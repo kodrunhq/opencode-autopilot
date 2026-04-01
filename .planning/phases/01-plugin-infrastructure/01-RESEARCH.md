@@ -10,7 +10,7 @@ Phase 1 builds the foundational npm package that serves as an OpenCode plugin: i
 
 The critical architectural constraint is that plugins cannot programmatically register agents, skills, or commands -- these must exist as files on disk. Assets in `assets/` are copied to `~/.config/opencode/` (global) on plugin load, with a no-clobber strategy that skips existing files. The configuration wizard for model assignment stores its state in a JSON config file; agent markdown files are written with or without the `model` field based on that configuration.
 
-**Primary recommendation:** Build the plugin as a flat npm package with `src/` and `assets/` directories. The entry point exports a `Plugin` function that (1) copies missing assets on every load (self-healing), (2) registers placeholder tools with `oc_` prefix, and (3) uses a config file at `~/.config/opencode/opencode-assets.json` to track first-load state and model assignments.
+**Primary recommendation:** Build the plugin as a flat npm package with `src/` and `assets/` directories. The entry point exports a `Plugin` function that (1) copies missing assets on every load (self-healing), (2) registers placeholder tools with `oc_` prefix, and (3) uses a config file at `~/.config/opencode/opencode-autopilot.json` to track first-load state and model assignments.
 
 <user_constraints>
 
@@ -45,7 +45,7 @@ None -- discussion stayed within phase scope.
 
 | ID | Description | Research Support |
 |----|-------------|------------------|
-| PLGN-01 | Single npm package installable via one line in `opencode.json` | Plugin array format confirmed: `"plugin": ["opencode-assets"]`. Package needs `main` pointing to entry file, `files` including `src/` and `assets/`. |
+| PLGN-01 | Single npm package installable via one line in `opencode.json` | Plugin array format confirmed: `"plugin": ["opencode-autopilot"]`. Package needs `main` pointing to entry file, `files` including `src/` and `assets/`. |
 | PLGN-02 | Plugin registers creation tools with Zod-validated schemas | `tool()` helper and `tool.schema` (Zod) API fully documented. Tools returned in `tool: {}` property of plugin return object. |
 | PLGN-03 | Bundled assets (agents, skills, commands) are installed to correct filesystem paths | Paths confirmed: `~/.config/opencode/agents/`, `~/.config/opencode/skills/<name>/SKILL.md`, `~/.config/opencode/commands/`. Skills use plural `skills/` directory. |
 | PLGN-04 | Works with any provider configured in OpenCode (model-agnostic agents) | Omitting `model` field from agent frontmatter lets the user's configured default apply. Configuration wizard (D-08) allows optional model assignment per agent. |
@@ -99,7 +99,7 @@ bun add -d @opencode-ai/plugin @types/bun @biomejs/biome
 ### Recommended Project Structure
 
 ```
-opencode-assets/
+opencode-autopilot/
   assets/                     # Bundled markdown files (copied to ~/.config/opencode/)
     agents/                   # Agent .md files (no model field -- provider agnostic)
     skills/                   # Skill directories with SKILL.md
@@ -197,13 +197,13 @@ async function copyIfMissing(source: string, target: string): Promise<boolean> {
 
 **What:** Check for existence of a plugin config file to determine first load.
 **When to use:** To trigger the configuration wizard on first plugin load (D-08).
-**Recommendation (Claude's Discretion):** Use `~/.config/opencode/opencode-assets.json`. If the file does not exist, it is a first load. After the wizard completes, write the config file with model mappings.
+**Recommendation (Claude's Discretion):** Use `~/.config/opencode/opencode-autopilot.json`. If the file does not exist, it is a first load. After the wizard completes, write the config file with model mappings.
 
 ```typescript
 import { join } from "node:path"
 import { homedir } from "node:os"
 
-const CONFIG_PATH = join(homedir(), ".config", "opencode", "opencode-assets.json")
+const CONFIG_PATH = join(homedir(), ".config", "opencode", "opencode-autopilot.json")
 
 interface PluginConfig {
   version: number
@@ -394,7 +394,7 @@ export async function installAssets(assetsDir: string): Promise<{
 
 ```jsonc
 {
-  "name": "opencode-assets",
+  "name": "opencode-autopilot",
   "version": "0.1.0",
   "type": "module",
   "main": "src/index.ts",
@@ -418,7 +418,7 @@ export async function installAssets(assetsDir: string): Promise<{
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-assets"]
+  "plugin": ["opencode-autopilot"]
 }
 ```
 
