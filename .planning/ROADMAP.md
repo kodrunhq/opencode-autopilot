@@ -146,9 +146,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md -- Lesson schemas, types, and memory module (load/save/prune with 90-day TTL)
-- [ ] 07-02-PLAN.md -- Retrospective handler enhancement, agent prompt update, lesson injection
-- [ ] 07-03-PLAN.md -- Failure metadata capture, oc_forensics diagnostic tool
+- [x] 07-01-PLAN.md -- Lesson memory data layer: Zod schemas, types, load/save/prune with atomic writes
+- [ ] 07-02-PLAN.md -- TBD
+- [ ] 07-03-PLAN.md -- TBD
 
 ## Progress
 
@@ -163,4 +163,4 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 | 4. Foundation Infrastructure | v2.0 | 0/4 | Planning | - |
 | 5. Review Engine | v2.0 | 1/1 | In Progress | - |
 | 6. Orchestrator Pipeline | v2.0 | 2/4 | In Progress | - |
-| 7. Learning & Resilience | v2.0 | 0/3 | Planning | - |
+| 7. Learning & Resilience | v2.0 | 1/3 | In Progress | - |
