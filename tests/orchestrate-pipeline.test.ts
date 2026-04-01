@@ -240,7 +240,7 @@ describe("configHook pipeline agents", () => {
 		expect(agents.metaprompter).toBeDefined();
 		expect(agents.documenter).toBeDefined();
 		expect(agents["pr-reviewer"]).toBeDefined();
-		expect(agents.orchestrator).toBeDefined();
+		expect(agents.autopilot).toBeDefined();
 
 		// pipeline agents
 		expect(agents["oc-researcher"]).toBeDefined();

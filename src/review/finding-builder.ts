@@ -67,7 +67,7 @@ export function mergeFindings(findings: readonly ReviewFinding[]): readonly Revi
 		}
 	}
 
-	// Sort by severity: CRITICAL first, then WARNING, then NITPICK
+	// Sort by severity: CRITICAL first, then HIGH, MEDIUM, LOW
 	const sorted = [...deduped.values()].sort((a, b) => compareSeverity(a.severity, b.severity));
 
 	return Object.freeze(sorted);

@@ -1,8 +1,9 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
-export const orchestratorAgent: Readonly<AgentConfig> = Object.freeze({
-	description: "Autonomous pipeline orchestrator that drives an 8-phase SDLC state machine",
-	mode: "subagent",
+export const autopilotAgent: Readonly<AgentConfig> = Object.freeze({
+	description:
+		"Tell me what to build and I'll handle research, architecture, planning, implementation, review, and delivery -- fully autonomous.",
+	mode: "all",
 	maxSteps: 50,
 	prompt: `You are the pipeline orchestrator. You drive a multi-phase SDLC pipeline using the oc_orchestrate tool.
 

@@ -3,6 +3,7 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 export const ocRetrospectorAgent: Readonly<AgentConfig> = Object.freeze({
 	description: "Analyzes pipeline run and extracts lessons for institutional memory",
 	mode: "subagent",
+	hidden: true,
 	maxSteps: 25,
 	prompt: `You are oc-retrospector. Read all phase artifacts. Extract 3-8 generalizable lessons.
 

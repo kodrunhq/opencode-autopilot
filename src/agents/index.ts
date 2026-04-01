@@ -1,7 +1,7 @@
 import type { Config } from "@opencode-ai/plugin";
+import { autopilotAgent } from "./autopilot";
 import { documenterAgent } from "./documenter";
 import { metaprompterAgent } from "./metaprompter";
-import { orchestratorAgent } from "./orchestrator";
 import { pipelineAgents } from "./pipeline/index";
 import { prReviewerAgent } from "./pr-reviewer";
 import { researcherAgent } from "./researcher";
@@ -11,7 +11,7 @@ const agents = {
 	metaprompter: metaprompterAgent,
 	documenter: documenterAgent,
 	"pr-reviewer": prReviewerAgent,
-	orchestrator: orchestratorAgent,
+	autopilot: autopilotAgent,
 } as const;
 
 export async function configHook(config: Config): Promise<void> {
@@ -42,8 +42,8 @@ export async function configHook(config: Config): Promise<void> {
 	}
 }
 
+export { autopilotAgent } from "./autopilot";
 export { documenterAgent } from "./documenter";
 export { metaprompterAgent } from "./metaprompter";
-export { orchestratorAgent } from "./orchestrator";
 export { prReviewerAgent } from "./pr-reviewer";
 export { researcherAgent } from "./researcher";

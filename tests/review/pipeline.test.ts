@@ -13,7 +13,7 @@ describe("parseAgentFindings", () => {
 	});
 
 	test("handles raw array format", () => {
-		const raw = `[{"severity": "WARNING", "domain": "quality", "title": "Long fn", "file": "b.ts", "line": 5, "agent": "code-quality-auditor", "source": "phase1", "evidence": "100 lines", "problem": "too long", "fix": "split"}]`;
+		const raw = `[{"severity": "HIGH", "domain": "quality", "title": "Long fn", "file": "b.ts", "line": 5, "agent": "code-quality-auditor", "source": "phase1", "evidence": "100 lines", "problem": "too long", "fix": "split"}]`;
 		const result = parseAgentFindings(raw, "code-quality-auditor");
 		expect(result.length).toBe(1);
 	});
@@ -35,7 +35,7 @@ describe("parseAgentFindings", () => {
 	});
 
 	test("sets agent field to agentName if missing", () => {
-		const raw = `{"findings": [{"severity": "WARNING", "domain": "logic", "title": "Test", "file": "a.ts", "line": 1, "source": "phase1", "evidence": "e", "problem": "p", "fix": "f"}]}`;
+		const raw = `{"findings": [{"severity": "HIGH", "domain": "logic", "title": "Test", "file": "a.ts", "line": 1, "source": "phase1", "evidence": "e", "problem": "p", "fix": "f"}]}`;
 		const result = parseAgentFindings(raw, "logic-auditor");
 		expect(result.length).toBe(1);
 		expect(result[0].agent).toBe("logic-auditor");
