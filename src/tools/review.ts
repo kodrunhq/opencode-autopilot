@@ -58,7 +58,7 @@ async function getChangedFiles(scope: string, directory?: string): Promise<reado
 				args = ["diff", "--name-only"];
 				break;
 			case "branch":
-				args = ["diff", "--name-only", "HEAD~1..HEAD"];
+				args = ["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"];
 				break;
 			case "directory":
 				args = directory ? ["diff", "--name-only", "--", directory] : ["diff", "--name-only"];

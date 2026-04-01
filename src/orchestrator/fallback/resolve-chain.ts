@@ -13,18 +13,21 @@ export function resolveChain(
 	globalFallbacks: string | readonly string[] | undefined,
 ): string[] {
 	// Tier 1: Per-agent fallback_models
-	if (agentConfigs?.[agentName]) {
+	if (agentName && agentConfigs?.[agentName]) {
 		const perAgent = agentConfigs[agentName].fallback_models;
 		if (perAgent) {
 			if (typeof perAgent === "string") return [perAgent];
-			if (Array.isArray(perAgent)) return [...perAgent];
+			if (Array.isArray(perAgent))
+				return perAgent.filter((m): m is string => typeof m === "string" && m.length > 0);
 		}
+		// Non-string/non-array value (e.g. number, object) — skip to Tier 2
 	}
 
 	// Tier 2: Global fallback_models
 	if (globalFallbacks) {
 		if (typeof globalFallbacks === "string") return [globalFallbacks];
-		if (Array.isArray(globalFallbacks)) return [...globalFallbacks];
+		if (Array.isArray(globalFallbacks))
+			return [...globalFallbacks].filter((m): m is string => typeof m === "string" && m.length > 0);
 	}
 
 	return [];

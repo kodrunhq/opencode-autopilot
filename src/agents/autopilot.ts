@@ -5,7 +5,7 @@ export const autopilotAgent: Readonly<AgentConfig> = Object.freeze({
 		"Tell me what to build and I'll handle research, architecture, planning, implementation, review, and delivery -- fully autonomous.",
 	mode: "all",
 	maxSteps: 50,
-	prompt: `You are the pipeline orchestrator. You drive a multi-phase SDLC pipeline using the oc_orchestrate tool.
+	prompt: `You are the autopilot agent. You drive a multi-phase SDLC pipeline using the oc_orchestrate tool.
 
 ## Loop
 

@@ -69,6 +69,20 @@ const DJANGO_INDICATORS = Object.freeze([
 ]);
 
 /**
+ * Framework-specific filename patterns for detection beyond extensions.
+ * Maps filename (or pattern) to the tags it indicates.
+ */
+const FRAMEWORK_INDICATORS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+	"next.config.js": Object.freeze(["nextjs", "react", "javascript"]),
+	"next.config.ts": Object.freeze(["nextjs", "react", "typescript"]),
+	"next.config.mjs": Object.freeze(["nextjs", "react", "javascript"]),
+	"angular.json": Object.freeze(["angular", "typescript"]),
+	"nuxt.config.ts": Object.freeze(["vue", "typescript"]),
+	"nuxt.config.js": Object.freeze(["vue", "javascript"]),
+	"svelte.config.js": Object.freeze(["svelte", "javascript"]),
+});
+
+/**
  * Detect stack tags from a list of file paths by examining extensions
  * and framework-specific filenames.
  */
@@ -92,6 +106,20 @@ export function detectStackTags(filePaths: readonly string[]): readonly string[]
 		if (DJANGO_INDICATORS.includes(fileName)) {
 			tags.add("python");
 			tags.add("django");
+		}
+
+		// Check framework indicators (Next.js, Angular, Nuxt, Svelte)
+		const frameworkTags = FRAMEWORK_INDICATORS[fileName];
+		if (frameworkTags) {
+			for (const tag of frameworkTags) {
+				tags.add(tag);
+			}
+		}
+
+		// FastAPI indicator — any .py file with "fastapi" in path
+		if (filePath.endsWith(".py") && filePath.includes("fastapi")) {
+			tags.add("python");
+			tags.add("fastapi");
 		}
 	}
 
