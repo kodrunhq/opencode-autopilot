@@ -138,18 +138,20 @@ async function processHandlerResult(
 
 		case "dispatch_multi": {
 			// Inject lesson context into each agent's prompt (best-effort)
+			// Load lesson context once and reuse for all agents in the batch
 			if (handlerResult.agents && handlerResult.phase) {
-				const enrichedAgents = await Promise.all(
-					handlerResult.agents.map(async (entry) => {
-						const enrichedPrompt = await injectLessonContext(
-							entry.prompt,
-							handlerResult.phase as string,
-							artifactDir,
-						);
-						return enrichedPrompt !== entry.prompt ? { ...entry, prompt: enrichedPrompt } : entry;
-					}),
+				const lessonSuffix = await injectLessonContext(
+					"",
+					handlerResult.phase as string,
+					artifactDir,
 				);
-				return JSON.stringify({ ...handlerResult, agents: enrichedAgents });
+				if (lessonSuffix) {
+					const enrichedAgents = handlerResult.agents.map((entry) => ({
+						...entry,
+						prompt: entry.prompt + lessonSuffix,
+					}));
+					return JSON.stringify({ ...handlerResult, agents: enrichedAgents });
+				}
 			}
 			return JSON.stringify(handlerResult);
 		}
@@ -239,7 +241,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 		return JSON.stringify({ action: "error", message: "Unexpected state" });
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
-		const safeMessage = message.replace(/\/[^\s"']+/g, "[PATH]").slice(0, 4096);
+		const safeMessage = message.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 4096);
 
 		// Persist failure metadata for forensics (best-effort)
 		try {

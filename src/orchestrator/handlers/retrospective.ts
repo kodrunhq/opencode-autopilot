@@ -87,7 +87,8 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 			});
 			await saveLessonMemory(pruned, projectRoot);
 		} catch (error: unknown) {
-			const msg = error instanceof Error ? error.message : "unknown error";
+			const raw = error instanceof Error ? error.message : "unknown error";
+			const msg = raw.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 256);
 			return Object.freeze({
 				action: "complete",
 				phase: "RETROSPECTIVE",
@@ -103,7 +104,7 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 	}
 
 	const artifactRefs = Object.entries(PHASE_ARTIFACTS)
-		.filter(([_, files]) => files.length > 0)
+		.filter(([phase, files]) => files.length > 0 && phase !== "RETROSPECTIVE")
 		.flatMap(([phase, files]) => files.map((file) => getArtifactRef(phase as Phase, file)));
 
 	const prompt = [

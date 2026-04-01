@@ -105,6 +105,6 @@ export function pruneLessons(memory: LessonMemory): LessonMemory {
 
 	return Object.freeze({
 		...memory,
-		lessons: capped,
+		lessons: Object.freeze(capped) as unknown as typeof memory.lessons,
 	});
 }
