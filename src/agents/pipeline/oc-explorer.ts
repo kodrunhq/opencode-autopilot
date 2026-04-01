@@ -9,5 +9,5 @@ export const ocExplorerAgent: Readonly<AgentConfig> = Object.freeze({
 	permission: {
 		edit: "allow",
 		bash: "allow",
-	},
+	} as const,
 });

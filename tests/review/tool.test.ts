@@ -52,7 +52,7 @@ describe("reviewCore", () => {
 		const result = await reviewCore({ findings: '{"findings": []}' }, tempDir);
 		const parsed = parseResult(result);
 		// Should advance to stage 2 (cross-verification)
-		expect(["dispatch", "complete", "error"]).toContain(parsed.action);
+		expect(["dispatch", "complete", "error"]).toContain(parsed.action as string);
 		if (parsed.action === "dispatch") {
 			expect(parsed.stage).toBe(2);
 		}

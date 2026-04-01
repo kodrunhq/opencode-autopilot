@@ -43,7 +43,7 @@ describe("lesson-schemas", () => {
 		expect(LESSON_DOMAINS).toEqual(["architecture", "testing", "review", "planning"]);
 		// Frozen
 		expect(() => {
-			(LESSON_DOMAINS as string[]).push("invalid");
+			(LESSON_DOMAINS as unknown as string[]).push("invalid");
 		}).toThrow();
 	});
 

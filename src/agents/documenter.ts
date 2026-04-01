@@ -40,5 +40,5 @@ Write documentation as polished markdown. Use headings, lists, code blocks, tabl
 		edit: "allow",
 		bash: "deny",
 		webfetch: "deny",
-	},
+	} as const,
 });

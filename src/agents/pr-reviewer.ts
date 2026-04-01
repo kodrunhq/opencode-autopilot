@@ -70,5 +70,5 @@ Call out 2-3 things the author did well. Good reviews are balanced.
 		bash: "allow",
 		edit: "deny",
 		webfetch: "deny",
-	},
+	} as const,
 });

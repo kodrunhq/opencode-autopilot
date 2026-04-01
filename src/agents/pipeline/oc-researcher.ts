@@ -9,5 +9,5 @@ export const ocResearcherAgent: Readonly<AgentConfig> = Object.freeze({
 	permission: {
 		edit: "allow",
 		webfetch: "allow",
-	},
+	} as const,
 });

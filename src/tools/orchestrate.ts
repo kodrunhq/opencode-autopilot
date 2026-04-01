@@ -187,7 +187,7 @@ async function processHandlerResult(
 		default:
 			return JSON.stringify({
 				action: "error",
-				message: `Unknown handler action: "${String((handlerResult as Record<string, unknown>).action)}"`,
+				message: `Unknown handler action: "${String((handlerResult as unknown as Record<string, unknown>).action)}"`,
 			});
 	}
 }

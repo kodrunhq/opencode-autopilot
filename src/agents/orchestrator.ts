@@ -37,5 +37,5 @@ Turn 3: oc_orchestrate(result="Research findings: ...")
 		edit: "allow",
 		bash: "allow",
 		webfetch: "allow",
-	},
+	} as const,
 });

@@ -9,5 +9,5 @@ export const ocPlannerAgent: Readonly<AgentConfig> = Object.freeze({
 	permission: {
 		edit: "allow",
 		bash: "allow",
-	},
+	} as const,
 });

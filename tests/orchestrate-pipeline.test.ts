@@ -222,7 +222,7 @@ describe("configHook pipeline agents", () => {
 
 		const pipelineNames = Object.values(AGENT_NAMES);
 		for (const name of pipelineNames) {
-			expect(config.agent[name]).toBeDefined();
+			expect(config.agent![name]).toBeDefined();
 		}
 	});
 
@@ -232,18 +232,18 @@ describe("configHook pipeline agents", () => {
 		await configHook(config);
 
 		// v1 agents
-		expect(config.agent.researcher).toBeDefined();
-		expect(config.agent.metaprompter).toBeDefined();
-		expect(config.agent.documenter).toBeDefined();
-		expect(config.agent["pr-reviewer"]).toBeDefined();
-		expect(config.agent.orchestrator).toBeDefined();
+		expect(config.agent!.researcher).toBeDefined();
+		expect(config.agent!.metaprompter).toBeDefined();
+		expect(config.agent!.documenter).toBeDefined();
+		expect(config.agent!["pr-reviewer"]).toBeDefined();
+		expect(config.agent!.orchestrator).toBeDefined();
 
 		// pipeline agents
-		expect(config.agent["oc-researcher"]).toBeDefined();
-		expect(config.agent["oc-implementer"]).toBeDefined();
+		expect(config.agent!["oc-researcher"]).toBeDefined();
+		expect(config.agent!["oc-implementer"]).toBeDefined();
 
 		// Total: 5 v1 + 10 pipeline = 15
-		expect(Object.keys(config.agent).length).toBe(15);
+		expect(Object.keys(config.agent!).length).toBe(15);
 	});
 
 	test("pipeline agents have mode subagent", async () => {
@@ -253,7 +253,7 @@ describe("configHook pipeline agents", () => {
 
 		const pipelineNames = Object.values(AGENT_NAMES);
 		for (const name of pipelineNames) {
-			const agent = config.agent[name] as Record<string, unknown>;
+			const agent = config.agent![name] as Record<string, unknown>;
 			expect(agent.mode).toBe("subagent");
 		}
 	});
@@ -267,11 +267,11 @@ describe("configHook pipeline agents", () => {
 		await configHook(config);
 
 		// Should preserve user's custom config
-		expect((config.agent["oc-researcher"] as Record<string, unknown>).prompt).toBe(
+		expect((config.agent!["oc-researcher"] as Record<string, unknown>).prompt).toBe(
 			"my custom researcher",
 		);
-		expect((config.agent["oc-researcher"] as Record<string, unknown>).mode).toBe("primary");
+		expect((config.agent!["oc-researcher"] as Record<string, unknown>).mode).toBe("primary");
 		// Other pipeline agents still registered
-		expect(config.agent["oc-implementer"]).toBeDefined();
+		expect(config.agent!["oc-implementer"]).toBeDefined();
 	});
 });
