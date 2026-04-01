@@ -153,7 +153,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 -> 5 -> 6 -> 7
+Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -164,3 +164,19 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 | 5. Review Engine | v2.0 | 4/4 | Complete | - |
 | 6. Orchestrator Pipeline | v2.0 | 4/4 | Complete | - |
 | 7. Learning & Resilience | v2.0 | 3/3 | Complete | - |
+
+### Phase 8: Testing & CI
+
+**Goal:** Zero-regression CI pipeline enforcing type safety, lint compliance, and 90% coverage floor on every push and PR
+**Requirements**: TCID-01, TCID-02, TCID-03, TCID-04
+**Depends on:** Phase 7
+**Success Criteria** (what must be TRUE):
+  1. `bunx tsc --noEmit` passes with zero type errors across the entire codebase
+  2. `bun test --coverage` enforces 90% line and function coverage thresholds via bunfig.toml
+  3. A smoke test verifies all 11 oc_* tools are registered by the plugin entry point
+  4. GitHub Actions CI runs lint, type-check, and test+coverage on every push to main and every PR
+**Plans:** 2 plans
+
+Plans:
+- [ ] 08-01-PLAN.md -- Fix TypeScript errors, add coverage thresholds, add tool registration smoke test
+- [ ] 08-02-PLAN.md -- Create GitHub Actions CI workflow
