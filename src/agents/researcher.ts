@@ -33,7 +33,7 @@ Numbered list of every URL you consulted, with a brief note on what each source 
 - DO gather information from multiple independent sources before drawing conclusions.
 - DO write the final report to a file so it can be referenced later.
 - DO NOT execute code or run shell commands.
-- DO NOT edit existing project files.
+- DO NOT edit existing source files -- only create new files for your research output.
 - DO NOT fabricate sources — only cite URLs you actually fetched.`,
 	permission: {
 		webfetch: "allow",
