@@ -20,9 +20,9 @@ describe("isFirstLoad", () => {
 		expect(isFirstLoad(config)).toBe(false);
 	});
 
-	test("works with v2 configs (configured:false returns true)", () => {
+	test("works with v3 configs (configured:false returns true)", () => {
 		const config = createDefaultConfig();
-		expect(config.version).toBe(2);
+		expect(config.version).toBe(3);
 		expect(isFirstLoad(config)).toBe(true);
 
 		const configured = { ...config, configured: true };
@@ -31,9 +31,9 @@ describe("isFirstLoad", () => {
 });
 
 describe("createDefaultConfig", () => {
-	test("returns v2 config with version:2", () => {
+	test("returns v3 config with version:3", () => {
 		const config = createDefaultConfig();
-		expect(config.version).toBe(2);
+		expect(config.version).toBe(3);
 		expect(config.configured).toBe(false);
 		expect(config.models).toEqual({});
 	});
@@ -85,8 +85,9 @@ describe("saveConfig and loadConfig round-trip", () => {
 
 		const raw = await readFile(configPath, "utf-8");
 		const parsed = JSON.parse(raw);
-		expect(parsed.version).toBe(2);
+		expect(parsed.version).toBe(3);
 		expect(parsed.orchestrator).toBeDefined();
+		expect(parsed.fallback).toBeDefined();
 
 		const loaded = await loadConfig(configPath);
 		expect(loaded).toEqual(config);
@@ -114,7 +115,7 @@ describe("saveConfig and loadConfig round-trip", () => {
 	});
 });
 
-describe("v1 to v2 migration", () => {
+describe("v1 to v3 migration", () => {
 	let tempDir: string;
 	let configPath: string;
 
@@ -128,7 +129,7 @@ describe("v1 to v2 migration", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("loadConfig on a v1 JSON file returns v2 config with migrated defaults", async () => {
+	test("loadConfig on a v1 JSON file returns v3 config with migrated defaults", async () => {
 		const v1Config = {
 			version: 1,
 			configured: true,
@@ -138,7 +139,7 @@ describe("v1 to v2 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result?.version).toBe(2);
+		expect(result?.version).toBe(3);
 		expect(result?.configured).toBe(true);
 		expect(result?.models).toEqual({ default: "gpt-4" });
 		expect(result?.orchestrator.autonomy).toBe("full");
@@ -146,21 +147,39 @@ describe("v1 to v2 migration", () => {
 		expect(result?.confidence.enabled).toBe(true);
 		expect(result?.confidence.thresholds.proceed).toBe("MEDIUM");
 		expect(result?.confidence.thresholds.abort).toBe("LOW");
+		expect(result?.fallback.enabled).toBe(true);
+		expect(result?.fallback.maxFallbackAttempts).toBe(10);
 	});
 
-	test("loadConfig on a v1 JSON file writes migrated v2 back to disk", async () => {
+	test("loadConfig on a v1 JSON file writes migrated v3 back to disk", async () => {
 		const v1Config = { version: 1, configured: true, models: {} };
 		await writeFile(configPath, JSON.stringify(v1Config), "utf-8");
 
 		await loadConfig(configPath);
 
 		const raw = JSON.parse(await readFile(configPath, "utf-8"));
-		expect(raw.version).toBe(2);
+		expect(raw.version).toBe(3);
 		expect(raw.orchestrator).toBeDefined();
 		expect(raw.confidence).toBeDefined();
+		expect(raw.fallback).toBeDefined();
+	});
+});
+
+describe("v2 to v3 migration", () => {
+	let tempDir: string;
+	let configPath: string;
+
+	beforeEach(async () => {
+		tempDir = join(tmpdir(), `opencode-config-v2v3-migration-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+		configPath = join(tempDir, "opencode-assets.json");
 	});
 
-	test("loadConfig on a v2 JSON file returns v2 config as-is", async () => {
+	afterEach(async () => {
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("loadConfig on a v2 JSON file returns v3 config with fallback defaults", async () => {
 		const v2Config = {
 			version: 2,
 			configured: true,
@@ -188,16 +207,113 @@ describe("v1 to v2 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result?.version).toBe(2);
+		expect(result?.version).toBe(3);
 		expect(result?.orchestrator.autonomy).toBe("supervised");
 		expect(result?.orchestrator.strictness).toBe("strict");
 		expect(result?.orchestrator.phases.challenge).toBe(false);
 		expect(result?.confidence.enabled).toBe(false);
 		expect(result?.confidence.thresholds.proceed).toBe("HIGH");
+		expect(result?.fallback.enabled).toBe(true);
+		expect(result?.fallback.retryOnErrors).toEqual([401, 402, 429, 500, 502, 503, 504]);
+		expect(result?.fallback.maxFallbackAttempts).toBe(10);
+		expect(result?.fallback.cooldownSeconds).toBe(60);
+		expect(result?.fallback.timeoutSeconds).toBe(30);
+	});
+
+	test("loadConfig on a v2 JSON file writes migrated v3 back to disk", async () => {
+		const v2Config = {
+			version: 2,
+			configured: true,
+			models: {},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: {
+				enabled: true,
+				thresholds: { proceed: "MEDIUM", abort: "LOW" },
+			},
+		};
+		await writeFile(configPath, JSON.stringify(v2Config), "utf-8");
+
+		await loadConfig(configPath);
+
+		const raw = JSON.parse(await readFile(configPath, "utf-8"));
+		expect(raw.version).toBe(3);
+		expect(raw.fallback).toBeDefined();
+		expect(raw.fallback.enabled).toBe(true);
 	});
 });
 
-describe("v2 schema validation", () => {
+describe("v3 direct load", () => {
+	let tempDir: string;
+	let configPath: string;
+
+	beforeEach(async () => {
+		tempDir = join(tmpdir(), `opencode-config-v3-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+		configPath = join(tempDir, "opencode-assets.json");
+	});
+
+	afterEach(async () => {
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("loadConfig on a v3 JSON file returns v3 config directly", async () => {
+		const v3Config = {
+			version: 3,
+			configured: true,
+			models: { default: "gpt-4" },
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: {
+				enabled: true,
+				thresholds: { proceed: "MEDIUM", abort: "LOW" },
+			},
+			fallback: {
+				enabled: false,
+				retryOnErrors: [429],
+				retryableErrorPatterns: [],
+				maxFallbackAttempts: 5,
+				cooldownSeconds: 30,
+				timeoutSeconds: 15,
+				notifyOnFallback: false,
+			},
+		};
+		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
+
+		const result = await loadConfig(configPath);
+		expect(result).not.toBeNull();
+		expect(result?.version).toBe(3);
+		expect(result?.fallback.enabled).toBe(false);
+		expect(result?.fallback.retryOnErrors).toEqual([429]);
+		expect(result?.fallback.maxFallbackAttempts).toBe(5);
+	});
+});
+
+describe("v3 schema validation", () => {
 	let tempDir: string;
 	let configPath: string;
 

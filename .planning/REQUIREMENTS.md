@@ -90,6 +90,17 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 - [ ] **LRNR-03**: Forensics tool analyzes failed runs: identifies failing phase, agent, root cause, and classifies as recoverable vs. terminal
 - [ ] **LRNR-04**: User can invoke forensics via a `--forensics` flag on the orchestrator tool
 
+### Model Fallback
+
+- [x] **FLLB-01**: Error classifier detects retryable model errors (rate limits, quota, unavailable) from error objects and message text using battle-tested regex patterns
+- [x] **FLLB-02**: Fallback state machine tracks per-session model state (primary, fallback chain, exhausted) with immutable plan-then-commit transitions
+- [x] **FLLB-03**: Message replay with 3-tier content degradation (all parts, text+images, text only) maximizes compatibility across providers
+- [x] **FLLB-04**: Fallback config schema (enabled, retryOnErrors, maxAttempts, cooldown, timeout) integrates into pluginConfigSchema as v3 with auto-migration from v2
+- [x] **FLLB-05**: Fallback manager encapsulates per-session concurrency guards (retry-in-flight lock, self-abort suppression, TTFT timeout) to prevent duplicate dispatches
+- [x] **FLLB-06**: Event hook detects model failures (session.error, message.updated) and triggers fallback plan-commit-replay cycle
+- [x] **FLLB-07**: chat.message hook overrides outgoing model to the fallback model when fallback state differs from original, with plugin-initiated dispatch detection to prevent state reset
+- [x] **FLLB-08**: Plugin entry (index.ts) registers chat.message, enhanced event handler, and tool.execute.after hooks alongside existing tool/config/event hooks
+
 ## Future Requirements
 
 Deferred beyond v2.0. Tracked for future milestones.
@@ -164,13 +175,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LRNR-02 | Phase 7 | Pending |
 | LRNR-03 | Phase 7 | Pending |
 | LRNR-04 | Phase 7 | Pending |
+| FLLB-01 | Phase 9 | Complete |
+| FLLB-02 | Phase 9 | Complete |
+| FLLB-03 | Phase 9 | Complete |
+| FLLB-04 | Phase 9 | Complete |
+| FLLB-05 | Phase 9 | Complete |
+| FLLB-06 | Phase 9 | Complete |
+| FLLB-07 | Phase 9 | Complete |
+| FLLB-08 | Phase 9 | Complete |
 
 **Coverage:**
 - v1 requirements: 15 total (all Complete)
-- v2 requirements: 34 total
-- Mapped to phases: 34/34
+- v2 requirements: 42 total (34 original + 8 fallback)
+- Mapped to phases: 42/42
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 after v2.0 roadmap creation*
+*Last updated: 2026-04-01 after Phase 9 requirement definition*

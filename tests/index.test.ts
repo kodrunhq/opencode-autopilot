@@ -2,8 +2,23 @@ import { describe, expect, test } from "bun:test";
 import plugin from "../src/index";
 
 describe("plugin entry point", () => {
+	// Mock client with the session/tui stubs the fallback subsystem needs
+	const mockClient = {
+		session: {
+			abort: async () => {},
+			messages: async () => ({ data: [] }),
+			promptAsync: async () => {},
+			get: async () => ({}),
+		},
+		tui: {
+			showToast: async () => {},
+		},
+	};
+
 	const mockInput = {
-		client: {} as ReturnType<typeof import("@opencode-ai/sdk").createOpencodeClient>,
+		client: mockClient as unknown as ReturnType<
+			typeof import("@opencode-ai/sdk").createOpencodeClient
+		>,
 		project: {} as import("@opencode-ai/sdk").Project,
 		directory: "/tmp",
 		worktree: "/tmp",
@@ -69,5 +84,31 @@ describe("plugin entry point", () => {
 			expect(typeof tool.execute).toBe("function");
 			expect(tool.description).toBeDefined();
 		}
+	});
+
+	test("returns chat.message hook", async () => {
+		const result = await plugin(mockInput);
+		// biome-ignore lint/suspicious/noExplicitAny: accessing dynamic hook key
+		const chatMessage = (result as any)["chat.message"];
+		expect(chatMessage).toBeDefined();
+		expect(typeof chatMessage).toBe("function");
+	});
+
+	test("returns tool.execute.after hook", async () => {
+		const result = await plugin(mockInput);
+		// biome-ignore lint/suspicious/noExplicitAny: accessing dynamic hook key
+		const toolExecAfter = (result as any)["tool.execute.after"];
+		expect(toolExecAfter).toBeDefined();
+		expect(typeof toolExecAfter).toBe("function");
+	});
+
+	test("plugin return object has all 5 hook keys", async () => {
+		const result = await plugin(mockInput);
+		const keys = Object.keys(result);
+		expect(keys).toContain("tool");
+		expect(keys).toContain("event");
+		expect(keys).toContain("config");
+		expect(keys).toContain("chat.message");
+		expect(keys).toContain("tool.execute.after");
 	});
 });

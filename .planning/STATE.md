@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
 status: Phase complete — ready for verification
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-04-01T11:02:50.491Z"
+stopped_at: Completed 09-03-PLAN.md
+last_updated: "2026-04-01T12:42:53.818Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 23
-  completed_plans: 23
+  total_phases: 9
+  completed_phases: 9
+  total_plans: 26
+  completed_plans: 26
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** A single command transforms an idea into a shipped, reviewed, tested result
-**Current focus:** Phase 07 — learning-resilience
+**Current focus:** Phase 09 — model-fallback-integration
 
 ## Current Position
 
-Phase: 07 (learning-resilience) — EXECUTING
+Phase: 09 (model-fallback-integration) — EXECUTING
 Plan: 3 of 3
 
 ## Performance Metrics
@@ -55,6 +55,9 @@ Plan: 3 of 3
 | Phase 07 P02 | 4min | 2 tasks | 8 files |
 | Phase 08 P01 | 8min | 2 tasks | 28 files |
 | Phase 08 P02 | 1min | 1 tasks | 1 files |
+| Phase 09 P01 | 7min | 2 tasks | 12 files |
+| Phase 09 P02 | 3min | 2 tasks | 3 files |
+| Phase 09 P03 | 6min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -99,6 +102,15 @@ Recent decisions affecting current work:
 - [Phase 07]: Best-effort lesson injection: failures silently swallowed to never break dispatch
 - [Phase 07]: Invalid lesson domains silently skipped via safeParse (graceful degradation)
 - [Phase 08]: Single-job CI: lint->type-check->test ordering, Bun 1.3.11 pinned, no coverage upload service
+- Phase 9 added: Model Fallback Integration — per-agent model fallback from opencode-fallback plugin (MIT)
+- [Phase 09]: Immutable state transitions via spread-based updates for fallback state machine
+- [Phase 09]: Config v3 migration chains v1->v2->v3 reusing existing migration functions
+- [Phase 09]: Pre-computed fallbackDefaults at module level for Zod v4 nested default compatibility
+- [Phase 09]: Callback injection (resolveFallbackChain) keeps FallbackManager testable without OpenCode runtime
+- [Phase 09]: Guard-chain pattern in handleError: self-abort -> stale -> retryable -> lock -> state -> plan
+- [Phase 09]: SdkOperations interface abstracts SDK client calls for testable event handler factories
+- [Phase 09]: output.message.model mutation intentional (OpenCode hook API contract, same as configHook pattern)
+- [Phase 09]: resolveFallbackChain returns empty array placeholder (per-agent resolution deferred to follow-up)
 
 ### Pending Todos
 
@@ -112,6 +124,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T11:02:50.488Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-04-01T12:42:53.815Z
+Stopped at: Completed 09-03-PLAN.md
 Resume file: None

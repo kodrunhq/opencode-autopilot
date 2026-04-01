@@ -1,6 +1,7 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
+import { fallbackConfigSchema, fallbackDefaults } from "./orchestrator/fallback/fallback-config";
 import { ensureDir, isEnoentError } from "./utils/fs-helpers";
 import { getGlobalConfigDir } from "./utils/paths";
 
@@ -47,7 +48,7 @@ export const confidenceConfigSchema = z.object({
 const orchestratorDefaults = orchestratorConfigSchema.parse({});
 const confidenceDefaults = confidenceConfigSchema.parse({});
 
-// --- V2 schema ---
+// --- V2 schema (internal, for migration) ---
 
 const pluginConfigSchemaV2 = z.object({
 	version: z.literal(2),
@@ -57,22 +58,46 @@ const pluginConfigSchemaV2 = z.object({
 	confidence: confidenceConfigSchema.default(confidenceDefaults),
 });
 
-// Export pluginConfigSchema as alias for v2 (preserves import compatibility)
-export const pluginConfigSchema = pluginConfigSchemaV2;
+type PluginConfigV2 = z.infer<typeof pluginConfigSchemaV2>;
 
-export type PluginConfig = z.infer<typeof pluginConfigSchemaV2>;
+// --- V3 schema ---
+
+const pluginConfigSchemaV3 = z.object({
+	version: z.literal(3),
+	configured: z.boolean(),
+	models: z.record(z.string(), z.string()),
+	orchestrator: orchestratorConfigSchema.default(orchestratorDefaults),
+	confidence: confidenceConfigSchema.default(confidenceDefaults),
+	fallback: fallbackConfigSchema.default(fallbackDefaults),
+});
+
+// Export pluginConfigSchema as alias for v3 (preserves import compatibility)
+export const pluginConfigSchema = pluginConfigSchemaV3;
+
+export type PluginConfig = z.infer<typeof pluginConfigSchemaV3>;
 
 export const CONFIG_PATH = join(getGlobalConfigDir(), "opencode-assets.json");
 
 // --- Migration ---
 
-function migrateV1toV2(v1Config: PluginConfigV1): PluginConfig {
+function migrateV1toV2(v1Config: PluginConfigV1): PluginConfigV2 {
 	return {
 		version: 2 as const,
 		configured: v1Config.configured,
 		models: v1Config.models,
 		orchestrator: orchestratorDefaults,
 		confidence: confidenceDefaults,
+	};
+}
+
+function migrateV2toV3(v2Config: PluginConfigV2): PluginConfig {
+	return {
+		version: 3 as const,
+		configured: v2Config.configured,
+		models: v2Config.models,
+		orchestrator: v2Config.orchestrator,
+		confidence: v2Config.confidence,
+		fallback: fallbackDefaults,
 	};
 }
 
@@ -83,23 +108,31 @@ export async function loadConfig(configPath: string = CONFIG_PATH): Promise<Plug
 		const raw = await readFile(configPath, "utf-8");
 		const parsed = JSON.parse(raw);
 
-		// Try v2 first
-		const v2Result = pluginConfigSchemaV2.safeParse(parsed);
-		if (v2Result.success) {
-			return v2Result.data;
+		// Try v3 first
+		const v3Result = pluginConfigSchemaV3.safeParse(parsed);
+		if (v3Result.success) {
+			return v3Result.data;
 		}
 
-		// Try v1 and migrate
-		const v1Result = pluginConfigSchemaV1.safeParse(parsed);
-		if (v1Result.success) {
-			const migrated = migrateV1toV2(v1Result.data);
-			// Persist the migrated config back to disk using atomic save
+		// Try v2 and migrate to v3
+		const v2Result = pluginConfigSchemaV2.safeParse(parsed);
+		if (v2Result.success) {
+			const migrated = migrateV2toV3(v2Result.data);
 			await saveConfig(migrated, configPath);
 			return migrated;
 		}
 
-		// Neither v1 nor v2 -- force v2 parse to get proper error
-		return pluginConfigSchemaV2.parse(parsed);
+		// Try v1 and double-migrate v1->v2->v3
+		const v1Result = pluginConfigSchemaV1.safeParse(parsed);
+		if (v1Result.success) {
+			const v2 = migrateV1toV2(v1Result.data);
+			const migrated = migrateV2toV3(v2);
+			await saveConfig(migrated, configPath);
+			return migrated;
+		}
+
+		// None matched -- force v3 parse to get proper error
+		return pluginConfigSchemaV3.parse(parsed);
 	} catch (error: unknown) {
 		if (isEnoentError(error)) {
 			return null;
@@ -124,10 +157,11 @@ export function isFirstLoad(config: PluginConfig | null): boolean {
 
 export function createDefaultConfig(): PluginConfig {
 	return {
-		version: 2 as const,
+		version: 3 as const,
 		configured: false,
 		models: {},
 		orchestrator: orchestratorDefaults,
 		confidence: confidenceDefaults,
+		fallback: fallbackDefaults,
 	};
 }
