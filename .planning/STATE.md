@@ -6,7 +6,7 @@ status: Phase complete — ready for verification
 stopped_at: Completed 08-02-PLAN.md
 last_updated: "2026-04-01T11:02:50.491Z"
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 8
   total_plans: 23
   completed_plans: 23
@@ -99,6 +99,7 @@ Recent decisions affecting current work:
 - [Phase 07]: Best-effort lesson injection: failures silently swallowed to never break dispatch
 - [Phase 07]: Invalid lesson domains silently skipped via safeParse (graceful degradation)
 - [Phase 08]: Single-job CI: lint->type-check->test ordering, Bun 1.3.11 pinned, no coverage upload service
+- Phase 9 added: Model Fallback Integration — per-agent model fallback from opencode-fallback plugin (MIT)
 
 ### Pending Todos
 

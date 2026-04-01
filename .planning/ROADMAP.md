@@ -180,3 +180,13 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8
 Plans:
 - [x] 08-01-PLAN.md -- Fix TypeScript errors, add coverage thresholds, add tool registration smoke test
 - [x] 08-02-PLAN.md -- Create GitHub Actions CI workflow
+
+### Phase 9: Model Fallback Integration
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 9 to break down)
