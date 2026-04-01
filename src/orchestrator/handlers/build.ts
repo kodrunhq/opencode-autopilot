@@ -61,6 +61,8 @@ function buildTaskPrompt(task: Task): string {
 		`Implement task ${task.id}: ${task.title}.`,
 		`Reference the plan at ${planRef}`,
 		`and architecture at ${designRef}.`,
+		`If a CLAUDE.md file exists in the project root, read it for project-specific conventions.`,
+		`Check ~/.config/opencode/skills/coding-standards/SKILL.md for coding standards.`,
 		`Report completion when done.`,
 	].join(" ");
 }

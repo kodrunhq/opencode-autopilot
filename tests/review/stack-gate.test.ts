@@ -101,4 +101,48 @@ describe("detectStackTags", () => {
 		const unique = [...new Set(tags)];
 		expect(tags.length).toBe(unique.length);
 	});
+
+	test("detects Next.js from next.config.js", () => {
+		const tags = detectStackTags(["next.config.js"]);
+		expect(tags).toContain("nextjs");
+		expect(tags).toContain("react");
+		expect(tags).toContain("javascript");
+	});
+
+	test("detects Next.js from next.config.ts", () => {
+		const tags = detectStackTags(["next.config.ts"]);
+		expect(tags).toContain("nextjs");
+		expect(tags).toContain("react");
+		expect(tags).toContain("typescript");
+	});
+
+	test("detects Angular from angular.json", () => {
+		const tags = detectStackTags(["angular.json"]);
+		expect(tags).toContain("angular");
+		expect(tags).toContain("typescript");
+	});
+
+	test("detects Nuxt from nuxt.config.ts", () => {
+		const tags = detectStackTags(["nuxt.config.ts"]);
+		expect(tags).toContain("vue");
+		expect(tags).toContain("typescript");
+	});
+
+	test("detects Svelte from svelte.config.js", () => {
+		const tags = detectStackTags(["svelte.config.js"]);
+		expect(tags).toContain("svelte");
+		expect(tags).toContain("javascript");
+	});
+
+	test("detects FastAPI from path containing fastapi", () => {
+		const tags = detectStackTags(["fastapi/router.py"]);
+		expect(tags).toContain("python");
+		expect(tags).toContain("fastapi");
+	});
+
+	test("does not detect FastAPI from plain .py file without fastapi in path", () => {
+		const tags = detectStackTags(["app/main.py"]);
+		expect(tags).toContain("python");
+		expect(tags).not.toContain("fastapi");
+	});
 });

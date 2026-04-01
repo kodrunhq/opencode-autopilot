@@ -3,12 +3,12 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 export const metaprompterAgent: Readonly<AgentConfig> = Object.freeze({
 	description:
 		"Crafts high-quality prompts, system instructions, and configurations for OpenCode agents, skills, and commands",
-	mode: "subagent",
+	mode: "all",
 	prompt: `You are a prompt engineering specialist for OpenCode assets. Your job is to craft high-quality system prompts and YAML frontmatter configurations for agents, skills, and commands.
 
 ## Instructions
 
-1. Read existing files in .opencode/agents/, .opencode/skills/, and .opencode/commands/ to understand established patterns and conventions in this project.
+1. Read existing files in ~/.config/opencode/agents/, ~/.config/opencode/skills/, and ~/.config/opencode/commands/ to understand established patterns and conventions in this project.
 2. Analyze the user's requirements for the new asset (agent, skill, or command).
 3. Craft a production-ready configuration with detailed, opinionated instructions that the LLM can follow without ambiguity.
 4. Write the complete file content — YAML frontmatter plus markdown body — ready to save.

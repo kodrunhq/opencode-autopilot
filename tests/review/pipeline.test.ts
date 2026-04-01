@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { parseAgentFindings } from "../../src/review/pipeline";
+import { advancePipeline, parseAgentFindings } from "../../src/review/pipeline";
+import type { ReviewState } from "../../src/review/types";
 
 describe("parseAgentFindings", () => {
 	test("extracts valid JSON from markdown-wrapped output", () => {
@@ -13,7 +14,7 @@ describe("parseAgentFindings", () => {
 	});
 
 	test("handles raw array format", () => {
-		const raw = `[{"severity": "WARNING", "domain": "quality", "title": "Long fn", "file": "b.ts", "line": 5, "agent": "code-quality-auditor", "source": "phase1", "evidence": "100 lines", "problem": "too long", "fix": "split"}]`;
+		const raw = `[{"severity": "HIGH", "domain": "quality", "title": "Long fn", "file": "b.ts", "line": 5, "agent": "code-quality-auditor", "source": "phase1", "evidence": "100 lines", "problem": "too long", "fix": "split"}]`;
 		const result = parseAgentFindings(raw, "code-quality-auditor");
 		expect(result.length).toBe(1);
 	});
@@ -35,7 +36,7 @@ describe("parseAgentFindings", () => {
 	});
 
 	test("sets agent field to agentName if missing", () => {
-		const raw = `{"findings": [{"severity": "WARNING", "domain": "logic", "title": "Test", "file": "a.ts", "line": 1, "source": "phase1", "evidence": "e", "problem": "p", "fix": "f"}]}`;
+		const raw = `{"findings": [{"severity": "HIGH", "domain": "logic", "title": "Test", "file": "a.ts", "line": 1, "source": "phase1", "evidence": "e", "problem": "p", "fix": "f"}]}`;
 		const result = parseAgentFindings(raw, "logic-auditor");
 		expect(result.length).toBe(1);
 		expect(result[0].agent).toBe("logic-auditor");
@@ -55,5 +56,88 @@ describe("parseAgentFindings", () => {
 That concludes my review.`;
 		const result = parseAgentFindings(raw, "security-auditor");
 		expect(result.length).toBe(1);
+	});
+});
+
+describe("advancePipeline with expanded agent set", () => {
+	function makeState(overrides: Partial<ReviewState> = {}): ReviewState {
+		return {
+			stage: 1,
+			selectedAgentNames: [
+				"logic-auditor",
+				"security-auditor",
+				"wiring-inspector",
+				"dead-code-scanner",
+			],
+			accumulatedFindings: [],
+			scope: "all",
+			startedAt: new Date().toISOString(),
+			...overrides,
+		};
+	}
+
+	test("stage 1 -> 2 uses ALL_REVIEW_AGENTS for cross-verification", () => {
+		const state = makeState();
+		const result = advancePipeline('{"findings": []}', state);
+		expect(result.action).toBe("dispatch");
+		expect(result.stage).toBe(2);
+		// Cross-verification prompts should be generated for selected agents
+		if (result.agents) {
+			const agentNames = result.agents.map((a) => a.name);
+			// Should include specialized agents that are selected
+			expect(agentNames).toContain("wiring-inspector");
+			expect(agentNames).toContain("dead-code-scanner");
+			// Should NOT include stage 3 agents
+			expect(agentNames).not.toContain("red-team");
+			expect(agentNames).not.toContain("product-thinker");
+		}
+	});
+
+	test("stage 2 -> 3 dispatches stage 3 agents", () => {
+		const state = makeState({ stage: 2 });
+		const result = advancePipeline('{"findings": []}', state);
+		expect(result.action).toBe("dispatch");
+		expect(result.stage).toBe(3);
+		if (result.agents) {
+			const agentNames = result.agents.map((a) => a.name);
+			expect(agentNames).toContain("red-team");
+			expect(agentNames).toContain("product-thinker");
+		}
+	});
+
+	test("stage 3 -> complete when no fixable findings", () => {
+		const state = makeState({ stage: 3 });
+		const result = advancePipeline('{"findings": []}', state);
+		expect(result.action).toBe("complete");
+		expect(result.report).toBeDefined();
+	});
+
+	test("pipeline handles selectedAgentNames with specialized agents throughout", () => {
+		// Full pipeline traversal with specialized agents
+		let state = makeState({
+			selectedAgentNames: [
+				"logic-auditor",
+				"security-auditor",
+				"wiring-inspector",
+				"concurrency-checker",
+				"database-auditor",
+			],
+		});
+
+		// Stage 1 -> 2
+		const result1 = advancePipeline('{"findings": []}', state);
+		expect(result1.action).toBe("dispatch");
+		expect(result1.state).toBeDefined();
+		state = result1.state as ReviewState;
+
+		// Stage 2 -> 3
+		const result2 = advancePipeline('{"findings": []}', state);
+		expect(result2.action).toBe("dispatch");
+		expect(result2.state).toBeDefined();
+		state = result2.state as ReviewState;
+
+		// Stage 3 -> complete
+		const result3 = advancePipeline('{"findings": []}', state);
+		expect(result3.action).toBe("complete");
 	});
 });

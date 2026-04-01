@@ -5,11 +5,12 @@ import type { DispatchResult } from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { completePhase, getNextPhase } from "../orchestrator/phase";
+import { buildSkillContext, loadSkillContent } from "../orchestrator/skill-injection";
 import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
 import type { Phase } from "../orchestrator/types";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
-import { getProjectArtifactDir } from "../utils/paths";
+import { getGlobalConfigDir, getProjectArtifactDir } from "../utils/paths";
 import { reviewCore } from "./review";
 
 interface OrchestrateArgs {
@@ -95,6 +96,22 @@ async function injectLessonContext(
 }
 
 /**
+ * Attempt to inject coding-standards skill context into a dispatch prompt.
+ * Best-effort: failures are silently swallowed to avoid breaking dispatch.
+ */
+async function injectSkillContext(prompt: string): Promise<string> {
+	try {
+		const baseDir = getGlobalConfigDir();
+		const content = await loadSkillContent(baseDir);
+		const ctx = buildSkillContext(content);
+		if (ctx) return prompt + ctx;
+	} catch {
+		// Best-effort: swallow all errors (same as lesson injection)
+	}
+	return prompt;
+}
+
+/**
  * Process a handler's DispatchResult, handling complete/dispatch/dispatch_multi/error.
  * On complete, advances the phase and invokes the next handler.
  */
@@ -122,33 +139,36 @@ async function processHandlerResult(
 					return processHandlerResult(nextResult, reloadedState, artifactDir);
 				}
 			}
-			// Inject lesson context into dispatch prompt (best-effort)
+			// Inject lesson + skill context into dispatch prompt (best-effort)
 			if (handlerResult.prompt && handlerResult.phase) {
 				const enrichedPrompt = await injectLessonContext(
 					handlerResult.prompt,
 					handlerResult.phase,
 					artifactDir,
 				);
-				if (enrichedPrompt !== handlerResult.prompt) {
-					return JSON.stringify({ ...handlerResult, prompt: enrichedPrompt });
+				const withSkills = await injectSkillContext(enrichedPrompt);
+				if (withSkills !== handlerResult.prompt) {
+					return JSON.stringify({ ...handlerResult, prompt: withSkills });
 				}
 			}
 			return JSON.stringify(handlerResult);
 		}
 
 		case "dispatch_multi": {
-			// Inject lesson context into each agent's prompt (best-effort)
-			// Load lesson context once and reuse for all agents in the batch
+			// Inject lesson + skill context into each agent's prompt (best-effort)
+			// Load lesson and skill context once and reuse for all agents in the batch
 			if (handlerResult.agents && handlerResult.phase) {
 				const lessonSuffix = await injectLessonContext(
 					"",
 					handlerResult.phase as string,
 					artifactDir,
 				);
-				if (lessonSuffix) {
+				const skillSuffix = await injectSkillContext("");
+				const combinedSuffix = lessonSuffix + (skillSuffix || "");
+				if (combinedSuffix) {
 					const enrichedAgents = handlerResult.agents.map((entry) => ({
 						...entry,
-						prompt: entry.prompt + lessonSuffix,
+						prompt: entry.prompt + combinedSuffix,
 					}));
 					return JSON.stringify({ ...handlerResult, agents: enrichedAgents });
 				}

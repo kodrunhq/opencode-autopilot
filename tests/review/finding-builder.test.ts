@@ -40,7 +40,7 @@ describe("createFinding", () => {
 
 	test("includes optional line number", () => {
 		const finding = createFinding({
-			severity: "WARNING",
+			severity: "HIGH",
 			domain: "quality",
 			title: "Long function",
 			file: "src/utils.ts",
@@ -60,7 +60,7 @@ describe("createAgentResult", () => {
 	test("creates result with agent name, findings, and duration", () => {
 		const findings: readonly ReviewFinding[] = [
 			createFinding({
-				severity: "WARNING",
+				severity: "HIGH",
 				domain: "logic",
 				title: "Edge case",
 				file: "src/api.ts",
@@ -101,7 +101,7 @@ describe("mergeFindings", () => {
 	});
 
 	const findingB = createFinding({
-		severity: "NITPICK",
+		severity: "LOW",
 		domain: "quality",
 		title: "Unused import",
 		file: "src/utils.ts",
@@ -113,7 +113,7 @@ describe("mergeFindings", () => {
 	});
 
 	const findingC = createFinding({
-		severity: "WARNING",
+		severity: "HIGH",
 		domain: "logic",
 		title: "Missing null check",
 		file: "src/api.ts",
@@ -127,10 +127,10 @@ describe("mergeFindings", () => {
 	test("combines findings from multiple agents sorted by severity", () => {
 		const merged = mergeFindings([findingC, findingB, findingA]);
 		expect(merged).toHaveLength(3);
-		// CRITICAL first, then WARNING, then NITPICK
+		// CRITICAL first, then HIGH, then LOW
 		expect(merged[0].severity).toBe("CRITICAL");
-		expect(merged[1].severity).toBe("WARNING");
-		expect(merged[2].severity).toBe("NITPICK");
+		expect(merged[1].severity).toBe("HIGH");
+		expect(merged[2].severity).toBe("LOW");
 	});
 
 	test("deduplicates findings with same file+title", () => {
@@ -153,7 +153,7 @@ describe("mergeFindings", () => {
 
 	test("keeps the higher severity when deduplicating", () => {
 		const lowerSeverityDup = createFinding({
-			severity: "WARNING",
+			severity: "HIGH",
 			domain: "security",
 			title: "SQL injection",
 			file: "src/db.ts",

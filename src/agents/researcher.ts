@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 
 export const researcherAgent: Readonly<AgentConfig> = Object.freeze({
 	description: "Searches the web about a topic and produces a comprehensive report with sources",
-	mode: "subagent",
+	mode: "all",
 	prompt: `You are a research specialist. Your job is to thoroughly investigate a given topic and produce a clear, well-organized report.
 
 ## Instructions
@@ -33,7 +33,7 @@ Numbered list of every URL you consulted, with a brief note on what each source 
 - DO gather information from multiple independent sources before drawing conclusions.
 - DO write the final report to a file so it can be referenced later.
 - DO NOT execute code or run shell commands.
-- DO NOT edit existing project files.
+- DO NOT edit existing source files -- only create new files for your research output.
 - DO NOT fabricate sources — only cite URLs you actually fetched.`,
 	permission: {
 		webfetch: "allow",

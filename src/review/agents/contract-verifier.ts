@@ -5,7 +5,7 @@ export const contractVerifier: Readonly<ReviewAgent> = Object.freeze({
 	description:
 		"Verifies API contract integrity across boundaries -- caller and handler must agree on URL, method, request shape, response shape, and error handling.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["CRITICAL", "WARNING"] as const,
+	severityFocus: ["CRITICAL", "HIGH"] as const,
 	prompt: `You are the Contract Verifier. You verify that every API boundary touched by the changes has matching contracts on both sides.
 
 ## Instructions
@@ -38,7 +38,7 @@ Do not comment on code quality, style, or logic -- only contract integrity.
 ## Output
 
 For each finding, output a JSON object:
-{"severity": "CRITICAL|WARNING|NITPICK", "domain": "contracts", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "contract-verifier", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
+{"severity": "CRITICAL|HIGH|MEDIUM|LOW", "domain": "contracts", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "contract-verifier", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

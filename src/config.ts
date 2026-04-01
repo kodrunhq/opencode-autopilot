@@ -69,6 +69,7 @@ const pluginConfigSchemaV3 = z.object({
 	orchestrator: orchestratorConfigSchema.default(orchestratorDefaults),
 	confidence: confidenceConfigSchema.default(confidenceDefaults),
 	fallback: fallbackConfigSchema.default(fallbackDefaults),
+	fallback_models: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 // Export pluginConfigSchema as alias for v3 (preserves import compatibility)

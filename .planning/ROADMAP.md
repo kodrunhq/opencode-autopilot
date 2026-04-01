@@ -199,3 +199,16 @@ Plans:
 - [x] 09-01-PLAN.md -- Pure function ports: types, error classifier, fallback state machine, message replay, config v3
 - [x] 09-02-PLAN.md -- FallbackManager class with concurrency guards and session lifecycle
 - [x] 09-03-PLAN.md -- Plugin hook handlers (event, chat.message, tool.execute.after) and index.ts wiring
+
+### Phase 10: UX Polish & Metaprompting
+
+**Goal:** Six-point improvement pass across the entire plugin before first real-world use: severity alignment (CRITICAL/HIGH/MEDIUM/LOW everywhere), agent modes and rename (orchestrator to autopilot, primary mode for key agents), pipeline agent prompt rewrite (150+ word structured prompts), skill injection (coding-standards into dispatch prompts at runtime), fallback chain resolution (two-tier per-agent-then-global from opencode.json), and smart review agent selection (13 new ReviewAgent implementations with stack-gated dispatch)
+**Requirements**: UXP-01, UXP-02, UXP-03, UXP-04, UXP-05, UXP-06
+**Depends on:** Phase 9
+**Plans:** 4/4 plans executed
+
+Plans:
+- [x] 10-01-PLAN.md -- Severity alignment (CRITICAL/HIGH/MEDIUM/LOW) and agent rename (orchestrator to autopilot) with mode changes
+- [x] 10-02-PLAN.md -- Pipeline agent prompt rewrite (150+ words) and base agent fixes
+- [x] 10-03-PLAN.md -- Skill injection into dispatch prompts and two-tier fallback chain resolution
+- [x] 10-04-PLAN.md -- Smart review agent selection: 13 new ReviewAgent implementations with stack-gated dispatch

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
 status: Phase complete — ready for verification
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-04-01T12:42:53.818Z"
+stopped_at: Completed 10-04-PLAN.md
+last_updated: "2026-04-01T16:20:23.299Z"
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 9
-  total_plans: 26
-  completed_plans: 26
+  total_plans: 30
+  completed_plans: 28
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** A single command transforms an idea into a shipped, reviewed, tested result
-**Current focus:** Phase 09 — model-fallback-integration
+**Current focus:** Phase 10 — ux-polish-metaprompting
 
 ## Current Position
 
-Phase: 09 (model-fallback-integration) — EXECUTING
-Plan: 3 of 3
+Phase: 10 (ux-polish-metaprompting) — EXECUTING
+Plan: 4 of 4
 
 ## Performance Metrics
 
@@ -58,6 +58,10 @@ Plan: 3 of 3
 | Phase 09 P01 | 7min | 2 tasks | 12 files |
 | Phase 09 P02 | 3min | 2 tasks | 3 files |
 | Phase 09 P03 | 6min | 2 tasks | 8 files |
+| Phase 10 P01 | 10min | 2 tasks | 36 files |
+| Phase 10 P02 | 4min | 2 tasks | 14 files |
+| Phase 10 P03 | 5min | 2 tasks | 8 files |
+| Phase 10 P04 | 8min | 2 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -111,6 +115,17 @@ Recent decisions affecting current work:
 - [Phase 09]: SdkOperations interface abstracts SDK client calls for testable event handler factories
 - [Phase 09]: output.message.model mutation intentional (OpenCode hook API contract, same as configHook pattern)
 - [Phase 09]: resolveFallbackChain returns empty array placeholder (per-agent resolution deferred to follow-up)
+- Phase 10 added: UX Polish & Metaprompting — six-point improvement pass (severity alignment, agent modes, prompt rewrite, skill injection, fallback chain resolution, smart review agent selection)
+- [Phase 10]: MEDIUM severity tier for edge cases, minor perf, incomplete error context
+- [Phase 10]: Autopilot agent replaces orchestrator with mode: all for direct user access
+- [Phase 10]: Pipeline agents get hidden: true (internal only, not in autocomplete)
+- [Phase 10]: Structured prompt format: Role, Steps, Output Format, Constraints, Error Recovery for all pipeline agents
+- [Phase 10]: oc-implementer is most detailed (413 words) with CLAUDE.md and coding-standards references
+- [Phase 10]: Skill injection mirrors lesson-injection.ts pattern (best-effort, sanitized, swallowed errors)
+- [Phase 10]: resolveChain extracted as pure function for testable two-tier fallback resolution
+- [Phase 10]: openCodeConfig captured via configHook wrapper for per-agent fallback resolution
+- [Phase 10]: Universal specialized agents (7 of 13) always run; stack-gated agents (6 of 13) filter via relevantStacks
+- [Phase 10]: execFile (not exec) for shell-injection-safe git commands in getChangedFiles helper
 
 ### Pending Todos
 
@@ -124,6 +139,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T12:42:53.815Z
-Stopped at: Completed 09-03-PLAN.md
+Last session: 2026-04-01T16:20:23.296Z
+Stopped at: Completed 10-04-PLAN.md
 Resume file: None

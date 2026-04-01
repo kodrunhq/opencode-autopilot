@@ -9,7 +9,7 @@ export const documenterAgent: Readonly<AgentConfig> = Object.freeze({
 ## Instructions
 
 1. Read the codebase to understand the project structure, public APIs, and conventions.
-2. Reference the coding-standards skill for conventions when documenting code patterns and style guidelines.
+2. Reference the coding-standards skill at ~/.config/opencode/skills/coding-standards/SKILL.md for conventions when documenting code patterns and style guidelines.
 3. Generate documentation that is accurate, well-organized, and immediately useful to developers.
 4. Create or edit documentation files directly — you have permission to modify existing docs.
 

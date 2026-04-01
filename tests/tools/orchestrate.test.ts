@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { orchestratorAgent } from "../../src/agents/orchestrator";
+import { autopilotAgent } from "../../src/agents/autopilot";
 import { createInitialState, saveState } from "../../src/orchestrator/state";
 import { orchestrateCore } from "../../src/tools/orchestrate";
 
@@ -96,20 +96,20 @@ describe("orchestrateCore", () => {
 	});
 });
 
-describe("orchestratorAgent", () => {
-	test("has mode subagent", () => {
-		expect(orchestratorAgent.mode).toBe("subagent");
+describe("autopilotAgent", () => {
+	test("has mode all", () => {
+		expect(autopilotAgent.mode).toBe("all");
 	});
 
 	test("prompt contains oc_orchestrate", () => {
-		expect(orchestratorAgent.prompt).toContain("oc_orchestrate");
+		expect(autopilotAgent.prompt).toContain("oc_orchestrate");
 	});
 
 	test("prompt is lean (under 2000 chars)", () => {
-		expect(orchestratorAgent.prompt?.length).toBeLessThan(2000);
+		expect(autopilotAgent.prompt?.length).toBeLessThan(2000);
 	});
 
 	test("has maxSteps of 50", () => {
-		expect((orchestratorAgent as Record<string, unknown>).maxSteps).toBe(50);
+		expect((autopilotAgent as Record<string, unknown>).maxSteps).toBe(50);
 	});
 });

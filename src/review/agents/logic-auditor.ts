@@ -5,7 +5,7 @@ export const logicAuditor: Readonly<ReviewAgent> = Object.freeze({
 	description:
 		"Audits business logic correctness including edge cases, boundary conditions, race conditions, and error handling.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["CRITICAL", "WARNING"] as const,
+	severityFocus: ["CRITICAL", "HIGH"] as const,
 	prompt: `You are the Logic Auditor. You verify that changed code does what it claims, handles edge cases, and has no subtle logic errors.
 
 ## Instructions
@@ -40,7 +40,7 @@ Do not comment on style, naming, or architecture -- only logic correctness.
 ## Output
 
 For each finding, output a JSON object:
-{"severity": "CRITICAL|WARNING|NITPICK", "domain": "logic", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "logic-auditor", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
+{"severity": "CRITICAL|HIGH|MEDIUM|LOW", "domain": "logic", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "logic-auditor", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

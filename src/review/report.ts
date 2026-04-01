@@ -12,8 +12,9 @@ import type { ReviewFinding, ReviewReport, Severity, Verdict } from "./types";
 
 export const SEVERITY_ORDER = Object.freeze({
 	CRITICAL: 0,
-	WARNING: 1,
-	NITPICK: 2,
+	HIGH: 1,
+	MEDIUM: 2,
+	LOW: 3,
 } as const);
 
 /**
@@ -50,8 +51,11 @@ function determineVerdict(findings: readonly ReviewFinding[]): Verdict {
 	const hasCritical = findings.some((f) => f.severity === "CRITICAL");
 	if (hasCritical) return "BLOCKED";
 
-	const hasWarning = findings.some((f) => f.severity === "WARNING");
-	if (hasWarning) return "CONCERNS";
+	const hasHigh = findings.some((f) => f.severity === "HIGH");
+	if (hasHigh) return "CONCERNS";
+
+	const hasMedium = findings.some((f) => f.severity === "MEDIUM");
+	if (hasMedium) return "CONCERNS";
 
 	return "APPROVED";
 }
@@ -60,7 +64,7 @@ function determineVerdict(findings: readonly ReviewFinding[]): Verdict {
  * Build a summary string with severity counts.
  */
 function buildSummary(findings: readonly ReviewFinding[]): string {
-	const counts: Record<Severity, number> = { CRITICAL: 0, WARNING: 0, NITPICK: 0 };
+	const counts: Record<Severity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
 	for (const f of findings) {
 		counts[f.severity] += 1;
 	}
@@ -70,8 +74,9 @@ function buildSummary(findings: readonly ReviewFinding[]): string {
 
 	const parts: string[] = [];
 	if (counts.CRITICAL > 0) parts.push(`${counts.CRITICAL} CRITICAL`);
-	if (counts.WARNING > 0) parts.push(`${counts.WARNING} WARNING`);
-	if (counts.NITPICK > 0) parts.push(`${counts.NITPICK} NITPICK`);
+	if (counts.HIGH > 0) parts.push(`${counts.HIGH} HIGH`);
+	if (counts.MEDIUM > 0) parts.push(`${counts.MEDIUM} MEDIUM`);
+	if (counts.LOW > 0) parts.push(`${counts.LOW} LOW`);
 
 	return `${total} findings: ${parts.join(", ")}.`;
 }

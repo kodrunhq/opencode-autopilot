@@ -6,10 +6,11 @@ import {
 } from "../../src/review/severity";
 
 describe("SEVERITY_DEFINITIONS", () => {
-	test("has entries for CRITICAL, WARNING, NITPICK", () => {
+	test("has entries for CRITICAL, HIGH, MEDIUM, LOW", () => {
 		expect(SEVERITY_DEFINITIONS.CRITICAL).toBeDefined();
-		expect(SEVERITY_DEFINITIONS.WARNING).toBeDefined();
-		expect(SEVERITY_DEFINITIONS.NITPICK).toBeDefined();
+		expect(SEVERITY_DEFINITIONS.HIGH).toBeDefined();
+		expect(SEVERITY_DEFINITIONS.MEDIUM).toBeDefined();
+		expect(SEVERITY_DEFINITIONS.LOW).toBeDefined();
 	});
 
 	test("each severity has criteria array", () => {
@@ -34,24 +35,28 @@ describe("SEVERITY_DEFINITIONS", () => {
 });
 
 describe("compareSeverity", () => {
-	test("CRITICAL is higher than WARNING (negative)", () => {
-		expect(compareSeverity("CRITICAL", "WARNING")).toBeLessThan(0);
+	test("CRITICAL is higher than HIGH (negative)", () => {
+		expect(compareSeverity("CRITICAL", "HIGH")).toBeLessThan(0);
 	});
 
-	test("NITPICK is lower than CRITICAL (positive)", () => {
-		expect(compareSeverity("NITPICK", "CRITICAL")).toBeGreaterThan(0);
+	test("LOW is lower than CRITICAL (positive)", () => {
+		expect(compareSeverity("LOW", "CRITICAL")).toBeGreaterThan(0);
 	});
 
-	test("WARNING equals WARNING (zero)", () => {
-		expect(compareSeverity("WARNING", "WARNING")).toBe(0);
+	test("HIGH equals HIGH (zero)", () => {
+		expect(compareSeverity("HIGH", "HIGH")).toBe(0);
 	});
 
-	test("CRITICAL is higher than NITPICK", () => {
-		expect(compareSeverity("CRITICAL", "NITPICK")).toBeLessThan(0);
+	test("CRITICAL is higher than LOW", () => {
+		expect(compareSeverity("CRITICAL", "LOW")).toBeLessThan(0);
 	});
 
-	test("WARNING is higher than NITPICK", () => {
-		expect(compareSeverity("WARNING", "NITPICK")).toBeLessThan(0);
+	test("HIGH is higher than MEDIUM", () => {
+		expect(compareSeverity("HIGH", "MEDIUM")).toBeLessThan(0);
+	});
+
+	test("MEDIUM is higher than LOW", () => {
+		expect(compareSeverity("MEDIUM", "LOW")).toBeLessThan(0);
 	});
 });
 
@@ -60,11 +65,15 @@ describe("isBlockingSeverity", () => {
 		expect(isBlockingSeverity("CRITICAL")).toBe(true);
 	});
 
-	test("WARNING is not blocking", () => {
-		expect(isBlockingSeverity("WARNING")).toBe(false);
+	test("HIGH is not blocking", () => {
+		expect(isBlockingSeverity("HIGH")).toBe(false);
 	});
 
-	test("NITPICK is not blocking", () => {
-		expect(isBlockingSeverity("NITPICK")).toBe(false);
+	test("MEDIUM is not blocking", () => {
+		expect(isBlockingSeverity("MEDIUM")).toBe(false);
+	});
+
+	test("LOW is not blocking", () => {
+		expect(isBlockingSeverity("LOW")).toBe(false);
 	});
 });

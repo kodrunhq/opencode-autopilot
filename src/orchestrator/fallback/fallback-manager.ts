@@ -36,6 +36,7 @@ export class FallbackManager {
 	private readonly sessionFallbackTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
 	private readonly sessionParentID: Map<string, string | null> = new Map();
 	private readonly sessionCompactionInFlight: Set<string> = new Set();
+	private readonly sessionAgentName: Map<string, string> = new Map();
 
 	constructor(options: FallbackManagerOptions) {
 		this.config = options.config;
@@ -45,10 +46,18 @@ export class FallbackManager {
 	/**
 	 * Creates fallback state for a session with the given model.
 	 */
-	initSession(sessionID: string, model: string, parentID?: string | null): void {
+	initSession(
+		sessionID: string,
+		model: string,
+		parentID?: string | null,
+		agentName?: string,
+	): void {
 		this.sessionStates.set(sessionID, createFallbackState(model));
 		if (parentID !== undefined) {
 			this.sessionParentID.set(sessionID, parentID);
+		}
+		if (agentName) {
+			this.sessionAgentName.set(sessionID, agentName);
 		}
 	}
 
@@ -69,6 +78,7 @@ export class FallbackManager {
 		this.sessionSelfAbortTimestamp.delete(sessionID);
 		this.sessionFirstTokenReceived.delete(sessionID);
 		this.sessionParentID.delete(sessionID);
+		this.sessionAgentName.delete(sessionID);
 		this.sessionCompactionInFlight.delete(sessionID);
 
 		// Clear TTFT timeout if present
@@ -229,8 +239,9 @@ export class FallbackManager {
 			return null;
 		}
 
-		// Plan fallback via pure function
-		const chain = this.resolveFallbackChain(sessionID);
+		// Plan fallback via pure function — pass agent name for per-agent chain resolution
+		const agentName = this.sessionAgentName.get(sessionID);
+		const chain = this.resolveFallbackChain(sessionID, agentName);
 		const result = planFallback(
 			state,
 			chain,

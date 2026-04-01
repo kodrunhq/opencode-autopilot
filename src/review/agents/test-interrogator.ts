@@ -5,7 +5,7 @@ export const testInterrogator: Readonly<ReviewAgent> = Object.freeze({
 	description:
 		"Analyzes test adequacy -- whether tests would catch real bugs, not just whether they exist. Evaluates assertions, edge cases, and mock quality.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["CRITICAL", "WARNING"] as const,
+	severityFocus: ["CRITICAL", "HIGH"] as const,
 	prompt: `You are the Test Interrogator. You evaluate whether existing tests would actually catch bugs that matter. This is NOT about line coverage -- it is about whether a bug could hide behind a passing test suite.
 
 ## Instructions
@@ -36,7 +36,7 @@ Do not comment on code quality or style -- only test adequacy.
 ## Output
 
 For each finding, output a JSON object:
-{"severity": "CRITICAL|WARNING|NITPICK", "domain": "testing", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "test-interrogator", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
+{"severity": "CRITICAL|HIGH|MEDIUM|LOW", "domain": "testing", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "test-interrogator", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

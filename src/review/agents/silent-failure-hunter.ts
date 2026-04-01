@@ -5,7 +5,7 @@ export const silentFailureHunter: Readonly<ReviewAgent> = Object.freeze({
 	description:
 		"Hunts for silent failures including empty catch blocks, swallowed errors, catch-log-only patterns, and optional chaining that masks real errors.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["CRITICAL", "WARNING"] as const,
+	severityFocus: ["CRITICAL", "HIGH"] as const,
 	prompt: `You are the Silent Failure Hunter. You find every place where errors are silently swallowed, inadequately handled, or masked. Every error must either be handled meaningfully or propagated.
 
 ## Instructions
@@ -38,7 +38,7 @@ Do not comment on code style or architecture -- only error handling quality and 
 ## Output
 
 For each finding, output a JSON object:
-{"severity": "CRITICAL|WARNING|NITPICK", "domain": "reliability", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "silent-failure-hunter", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
+{"severity": "CRITICAL|HIGH|MEDIUM|LOW", "domain": "reliability", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "silent-failure-hunter", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

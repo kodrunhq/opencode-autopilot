@@ -32,11 +32,16 @@ describe("pipelineAgents", () => {
 		}
 	});
 
-	test("all agents have prompt length between 100 and 600 chars", () => {
+	test("all agents have structured prompts with 150+ words", () => {
 		for (const [name, config] of Object.entries(pipelineAgents)) {
-			const len = config.prompt?.length ?? 0;
-			expect(len >= 100, `${name} prompt too short (${len} chars)`).toBe(true);
-			expect(len <= 600, `${name} prompt too long (${len} chars)`).toBe(true);
+			const prompt = config.prompt ?? "";
+			const wordCount = prompt.split(/\s+/).filter(Boolean).length;
+			expect(wordCount >= 150, `${name} prompt too short (${wordCount} words, need 150+)`).toBe(
+				true,
+			);
+			expect(prompt).toContain("## Steps");
+			expect(prompt).toContain("## Constraints");
+			expect(prompt).toContain("## Error Recovery");
 		}
 	});
 

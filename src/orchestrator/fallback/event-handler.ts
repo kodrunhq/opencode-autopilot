@@ -75,13 +75,14 @@ export function createEventHandler(deps: EventHandlerDeps) {
 		switch (event.type) {
 			case "session.created": {
 				const info = properties.info as
-					| { id?: string; model?: string; parentID?: string | null }
+					| { id?: string; model?: string; parentID?: string | null; agent?: string }
 					| undefined;
 				if (!info?.id) return;
 
 				const model = typeof info.model === "string" ? info.model : "";
 				const parentID = info.parentID !== undefined ? info.parentID : undefined;
-				manager.initSession(info.id, model, parentID);
+				const agentName = typeof info.agent === "string" ? info.agent : undefined;
+				manager.initSession(info.id, model, parentID, agentName);
 
 				// Start TTFT timeout only when fallback is enabled and timeout configured.
 				// Without a fallback chain, a TTFT abort would just fail the session.

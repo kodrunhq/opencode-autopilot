@@ -111,4 +111,31 @@ describe("reviewCore", () => {
 		const parsed = parseResult(result);
 		expect(typeof parsed.action).toBe("string");
 	});
+
+	test("dispatched agents include specialized agents for universal scope", async () => {
+		// When starting a review, universal specialized agents should be selected
+		// (stack-gated agents may or may not appear depending on git diff)
+		const result = await reviewCore({ scope: "all" }, tempDir);
+		const parsed = parseResult(result);
+		expect(parsed.action).toBe("dispatch");
+		const agents = parsed.agents as readonly { name: string }[];
+		// Universal agents should always be present
+		const agentNames = agents.map((a) => a.name);
+		expect(agentNames).toContain("logic-auditor");
+		expect(agentNames).toContain("security-auditor");
+		// Universal specialized agents should also be present
+		expect(agentNames).toContain("wiring-inspector");
+		expect(agentNames).toContain("dead-code-scanner");
+		expect(agentNames).toContain("concurrency-checker");
+	});
+
+	test("state file contains selectedAgentNames with specialized agents", async () => {
+		await reviewCore({ scope: "staged" }, tempDir);
+		const statePath = join(tempDir, ".opencode-assets", "current-review.json");
+		const raw = await readFile(statePath, "utf-8");
+		const state = JSON.parse(raw);
+		// Should include universal specialized agents
+		expect(state.selectedAgentNames).toContain("wiring-inspector");
+		expect(state.selectedAgentNames).toContain("database-auditor");
+	});
 });

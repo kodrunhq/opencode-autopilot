@@ -5,7 +5,7 @@ export const productThinker: Readonly<ReviewAgent> = Object.freeze({
 	description:
 		"Evaluates user experience completeness from a PM/user perspective -- identifies missing features, dead-end flows, and product gaps.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["WARNING", "CRITICAL"] as const,
+	severityFocus: ["HIGH", "CRITICAL"] as const,
 	prompt: `You are the Product Thinker. You review code not as an engineer but as a product manager and user advocate. You evaluate whether the implementation delivers a complete, usable feature.
 
 ## Instructions
@@ -42,7 +42,7 @@ Think like a user, not an engineer. "The POST handler works" is irrelevant. "The
 ## Output
 
 For each finding, output a JSON object:
-{"severity": "CRITICAL|WARNING|NITPICK", "domain": "product", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "product-thinker", "source": "product-review", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
+{"severity": "CRITICAL|HIGH|MEDIUM|LOW", "domain": "product", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "product-thinker", "source": "product-review", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

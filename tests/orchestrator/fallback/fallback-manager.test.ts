@@ -75,6 +75,34 @@ describe("FallbackManager", () => {
 			manager.initSession("sess-1", "model-a", null);
 			expect(manager.getParentID("sess-1")).toBeNull();
 		});
+
+		test("handleError passes stored agentName to resolveFallbackChain", () => {
+			let capturedAgentName: string | undefined;
+			const manager = new FallbackManager({
+				config: DEFAULT_CONFIG,
+				resolveFallbackChain: (_sid, agentName) => {
+					capturedAgentName = agentName;
+					return FALLBACK_CHAIN;
+				},
+			});
+			manager.initSession("sess-1", "model-a", undefined, "oc-researcher");
+			manager.handleError("sess-1", { status: 429, message: "rate limited" });
+			expect(capturedAgentName).toBe("oc-researcher");
+		});
+
+		test("handleError passes undefined agentName when none stored", () => {
+			let capturedAgentName: string | undefined = "should-be-overwritten";
+			const manager = new FallbackManager({
+				config: DEFAULT_CONFIG,
+				resolveFallbackChain: (_sid, agentName) => {
+					capturedAgentName = agentName;
+					return FALLBACK_CHAIN;
+				},
+			});
+			manager.initSession("sess-1", "model-a");
+			manager.handleError("sess-1", { status: 429, message: "rate limited" });
+			expect(capturedAgentName).toBeUndefined();
+		});
 	});
 
 	describe("concurrency guards", () => {

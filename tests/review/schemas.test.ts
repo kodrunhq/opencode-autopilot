@@ -9,14 +9,15 @@ import {
 } from "../../src/review/schemas";
 
 describe("SEVERITIES", () => {
-	test("contains CRITICAL, WARNING, NITPICK", () => {
+	test("contains CRITICAL, HIGH, MEDIUM, LOW", () => {
 		expect(SEVERITIES).toContain("CRITICAL");
-		expect(SEVERITIES).toContain("WARNING");
-		expect(SEVERITIES).toContain("NITPICK");
+		expect(SEVERITIES).toContain("HIGH");
+		expect(SEVERITIES).toContain("MEDIUM");
+		expect(SEVERITIES).toContain("LOW");
 	});
 
-	test("has exactly 3 levels", () => {
-		expect(SEVERITIES).toHaveLength(3);
+	test("has exactly 4 levels", () => {
+		expect(SEVERITIES).toHaveLength(4);
 	});
 
 	test("is frozen", () => {
@@ -91,7 +92,7 @@ describe("agentResultSchema", () => {
 			category: "core",
 			findings: [
 				{
-					severity: "WARNING",
+					severity: "HIGH",
 					domain: "logic",
 					title: "Missing edge case",
 					file: "src/utils.ts",
@@ -164,6 +165,10 @@ describe("reviewConfigSchema", () => {
 		const result = reviewConfigSchema.parse({});
 		expect(result.parallel).toBe(true);
 		expect(result.maxFixAttempts).toBe(3);
+		expect(result.severityThreshold).toBe("MEDIUM");
+		expect(result.enableCrossVerification).toBe(true);
+		expect(result.enableRedTeam).toBe(true);
+		expect(result.enableProductReview).toBe(true);
 	});
 
 	test("allows overriding defaults", () => {

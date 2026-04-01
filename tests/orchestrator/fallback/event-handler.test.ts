@@ -11,8 +11,8 @@ function createMockManager() {
 	return {
 		calls,
 		states,
-		initSession(sessionID: string, model: string, parentID?: string | null) {
-			calls.push({ method: "initSession", args: [sessionID, model, parentID] });
+		initSession(sessionID: string, model: string, parentID?: string | null, agentName?: string) {
+			calls.push({ method: "initSession", args: [sessionID, model, parentID, agentName] });
 		},
 		getSessionState(sessionID: string) {
 			calls.push({ method: "getSessionState", args: [sessionID] });
@@ -168,6 +168,55 @@ describe("createEventHandler", () => {
 		const initCall = mockManager.calls.find((c) => c.method === "initSession");
 		expect(initCall).toBeDefined();
 		expect(initCall?.args[2]).toBe("parent-1");
+	});
+
+	test("session.created with agent forwards agentName to initSession", async () => {
+		const handler = createEventHandler({
+			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
+			manager: mockManager as any,
+			sdk: mockSdk,
+			config: defaultConfig,
+		});
+
+		await handler({
+			event: {
+				type: "session.created",
+				properties: {
+					info: {
+						id: "sess-a",
+						model: "anthropic/claude-sonnet-4-5",
+						parentID: null,
+						agent: "oc-researcher",
+					},
+				},
+			},
+		});
+
+		const initCall = mockManager.calls.find((c) => c.method === "initSession");
+		expect(initCall).toBeDefined();
+		expect(initCall?.args[3]).toBe("oc-researcher");
+	});
+
+	test("session.created without agent passes undefined agentName", async () => {
+		const handler = createEventHandler({
+			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
+			manager: mockManager as any,
+			sdk: mockSdk,
+			config: defaultConfig,
+		});
+
+		await handler({
+			event: {
+				type: "session.created",
+				properties: {
+					info: { id: "sess-b", model: "anthropic/claude-sonnet-4-5" },
+				},
+			},
+		});
+
+		const initCall = mockManager.calls.find((c) => c.method === "initSession");
+		expect(initCall).toBeDefined();
+		expect(initCall?.args[3]).toBeUndefined();
 	});
 
 	test("session.deleted calls manager.cleanupSession", async () => {

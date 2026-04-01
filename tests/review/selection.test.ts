@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { REVIEW_AGENTS } from "../../src/review/agents/index";
+import { REVIEW_AGENTS, SPECIALIZED_AGENTS } from "../../src/review/agents/index";
 import {
 	buildCrossVerificationPrompts,
 	condenseFinding,
@@ -11,7 +11,7 @@ import type { ReviewFinding } from "../../src/review/types";
 
 function makeFinding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
 	return {
-		severity: "WARNING",
+		severity: "HIGH",
 		domain: "logic",
 		title: "Missing null check",
 		file: "src/index.ts",
@@ -32,6 +32,15 @@ const rustOnlyAgent = Object.freeze({
 	relevantStacks: Object.freeze(["rust"] as readonly string[]),
 	severityFocus: Object.freeze(["CRITICAL"] as readonly string[]),
 	prompt: "Test prompt {{DIFF}} {{PRIOR_FINDINGS}} {{MEMORY}}",
+});
+
+// A fake agent gated on react
+const reactOnlyAgent = Object.freeze({
+	name: "react-test-agent",
+	description: "A test agent that only applies to React",
+	relevantStacks: Object.freeze(["react"] as readonly string[]),
+	severityFocus: Object.freeze(["HIGH"] as readonly string[]),
+	prompt: "React test prompt {{DIFF}} {{PRIOR_FINDINGS}} {{MEMORY}}",
 });
 
 // ---- selectAgents ----
@@ -87,6 +96,65 @@ describe("selectAgents", () => {
 			REVIEW_AGENTS,
 		);
 		expect(Object.isFrozen(result)).toBe(true);
+	});
+
+	test("includes react-gated agent when detectedStacks contains react", () => {
+		const agents = [...REVIEW_AGENTS, reactOnlyAgent] as const;
+		const result = selectAgents(
+			["typescript", "react"],
+			{ hasTests: false, hasAuth: false, hasConfig: false, fileCount: 3 },
+			agents,
+		);
+		expect(result.selected.some((a) => a.name === "react-test-agent")).toBe(true);
+		expect(result.excluded.length).toBe(0);
+	});
+
+	test("excludes react-gated agent when detectedStacks is typescript only", () => {
+		const agents = [...REVIEW_AGENTS, reactOnlyAgent] as const;
+		const result = selectAgents(
+			["typescript"],
+			{ hasTests: false, hasAuth: false, hasConfig: false, fileCount: 2 },
+			agents,
+		);
+		expect(result.selected.some((a) => a.name === "react-test-agent")).toBe(false);
+		expect(result.excluded.length).toBe(1);
+		expect(result.excluded[0].agent).toBe("react-test-agent");
+	});
+
+	test("with all candidates (universal + specialized) and no stacks, returns only universal agents", () => {
+		const allCandidates = [...REVIEW_AGENTS, ...SPECIALIZED_AGENTS];
+		const result = selectAgents(
+			[],
+			{ hasTests: false, hasAuth: false, hasConfig: false, fileCount: 1 },
+			allCandidates,
+		);
+		// Universal agents pass (empty relevantStacks), stack-gated agents are excluded
+		const stackGatedNames = new Set([
+			"type-soundness",
+			"state-mgmt-auditor",
+			"react-patterns-auditor",
+			"go-idioms-auditor",
+			"python-django-auditor",
+			"rust-safety-auditor",
+		]);
+		for (const agent of result.selected) {
+			expect(stackGatedNames.has(agent.name)).toBe(false);
+		}
+		expect(result.excluded.length).toBe(stackGatedNames.size);
+	});
+
+	test("with typescript stack, includes type-soundness but excludes react/go/python/rust agents", () => {
+		const allCandidates = [...REVIEW_AGENTS, ...SPECIALIZED_AGENTS];
+		const result = selectAgents(
+			["typescript"],
+			{ hasTests: true, hasAuth: false, hasConfig: false, fileCount: 5 },
+			allCandidates,
+		);
+		expect(result.selected.some((a) => a.name === "type-soundness")).toBe(true);
+		expect(result.selected.some((a) => a.name === "react-patterns-auditor")).toBe(false);
+		expect(result.selected.some((a) => a.name === "go-idioms-auditor")).toBe(false);
+		expect(result.selected.some((a) => a.name === "python-django-auditor")).toBe(false);
+		expect(result.selected.some((a) => a.name === "rust-safety-auditor")).toBe(false);
 	});
 });
 

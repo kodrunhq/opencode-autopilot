@@ -16,7 +16,7 @@ export const SEVERITY_DEFINITIONS: Readonly<Record<Severity, SeverityDefinition>
 		]),
 		action: "Must fix before push. Blocks PR.",
 	}),
-	WARNING: Object.freeze({
+	HIGH: Object.freeze({
 		criteria: Object.freeze([
 			"Edge case not handled (null input, empty list, boundary value)",
 			"Test exists but does not actually verify behavior (no assertions, mocked too broadly)",
@@ -26,7 +26,17 @@ export const SEVERITY_DEFINITIONS: Readonly<Record<Severity, SeverityDefinition>
 		]),
 		action: "Should fix before push. Does not block but strongly recommended.",
 	}),
-	NITPICK: Object.freeze({
+	MEDIUM: Object.freeze({
+		criteria: Object.freeze([
+			"Edge case potentially unhandled",
+			"Incomplete error context",
+			"Minor performance concern",
+			"Missing input validation on non-critical path",
+			"Inconsistent error handling pattern",
+		]),
+		action: "Fix when convenient. Noted in report.",
+	}),
+	LOW: Object.freeze({
 		criteria: Object.freeze([
 			"Naming inconsistency with codebase conventions",
 			"Unused import or dead code",
@@ -40,8 +50,9 @@ export const SEVERITY_DEFINITIONS: Readonly<Record<Severity, SeverityDefinition>
 
 const SEVERITY_RANK: Readonly<Record<Severity, number>> = Object.freeze({
 	CRITICAL: 0,
-	WARNING: 1,
-	NITPICK: 2,
+	HIGH: 1,
+	MEDIUM: 2,
+	LOW: 3,
 });
 
 /**
