@@ -165,6 +165,10 @@ describe("reviewConfigSchema", () => {
 		const result = reviewConfigSchema.parse({});
 		expect(result.parallel).toBe(true);
 		expect(result.maxFixAttempts).toBe(3);
+		expect(result.severityThreshold).toBe("MEDIUM");
+		expect(result.enableCrossVerification).toBe(true);
+		expect(result.enableRedTeam).toBe(true);
+		expect(result.enableProductReview).toBe(true);
 	});
 
 	test("allows overriding defaults", () => {

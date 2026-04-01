@@ -76,4 +76,47 @@ describe("resolveChain", () => {
 		expect(result).toEqual(original);
 		expect(result).not.toBe(original);
 	});
+
+	test("filters non-string elements from per-agent array", () => {
+		const result = resolveChain(
+			"agent-a",
+			// biome-ignore lint/suspicious/noExplicitAny: testing runtime type safety
+			{ "agent-a": { fallback_models: [42, null, "valid-model", "", true] as any } },
+			undefined,
+		);
+		expect(result).toEqual(["valid-model"]);
+	});
+
+	test("filters non-string elements from global array", () => {
+		// biome-ignore lint/suspicious/noExplicitAny: testing runtime type safety
+		const result = resolveChain("agent-a", undefined, [42, null, "global-model"] as any);
+		expect(result).toEqual(["global-model"]);
+	});
+
+	test("falls through to global when per-agent fallback_models is a number", () => {
+		const result = resolveChain(
+			"agent-a",
+			// biome-ignore lint/suspicious/noExplicitAny: testing runtime type safety
+			{ "agent-a": { fallback_models: 42 } as any },
+			["global-fallback"],
+		);
+		expect(result).toEqual(["global-fallback"]);
+	});
+
+	test("falls through to global when per-agent fallback_models is boolean true", () => {
+		const result = resolveChain(
+			"agent-a",
+			// biome-ignore lint/suspicious/noExplicitAny: testing runtime type safety
+			{ "agent-a": { fallback_models: true } as any },
+			["global-fallback"],
+		);
+		expect(result).toEqual(["global-fallback"]);
+	});
+
+	test("empty agentName skips tier 1 and uses global", () => {
+		const result = resolveChain("", { "oc-researcher": { fallback_models: ["per-agent"] } }, [
+			"global",
+		]);
+		expect(result).toEqual(["global"]);
+	});
 });
