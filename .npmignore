@@ -1,0 +1,21 @@
+# Planning and docs (not needed at runtime)
+.planning/
+.github/
+.claude/
+
+# Tests
+tests/
+coverage/
+*.lcov
+
+# Config files
+biome.json
+bunfig.toml
+tsconfig.json
+.gitignore
+.editorconfig
+.DS_Store
+
+# Build artifacts
+*.tgz
+*.tsbuildinfo
