@@ -42,7 +42,7 @@ export const PHASE_LESSON_DOMAINS: Readonly<Record<Phase, readonly LessonDomain[
  * Returns empty string if no relevant lessons exist or phase has no mapped domains.
  */
 export function buildLessonContext(lessons: readonly Lesson[], phase: Phase): string {
-	const domains = PHASE_LESSON_DOMAINS[phase];
+	const domains = PHASE_LESSON_DOMAINS[phase] ?? [];
 	if (domains.length === 0) {
 		return "";
 	}

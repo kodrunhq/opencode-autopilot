@@ -105,6 +105,6 @@ export function pruneLessons(memory: LessonMemory): LessonMemory {
 
 	return Object.freeze({
 		...memory,
-		lessons: Object.freeze(capped),
+		lessons: capped,
 	});
 }

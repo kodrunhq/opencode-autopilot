@@ -183,7 +183,10 @@ async function processHandlerResult(
 		}
 
 		default:
-			return JSON.stringify({ action: "error", message: "Unknown handler action" });
+			return JSON.stringify({
+				action: "error",
+				message: `Unknown handler action: "${String((handlerResult as Record<string, unknown>).action)}"`,
+			});
 	}
 }
 
@@ -275,6 +278,7 @@ export const ocOrchestrate = tool({
 			.describe("Idea to start a new orchestration run"),
 		result: tool.schema
 			.string()
+			.max(1_048_576)
 			.optional()
 			.describe("Result from previous agent to advance the pipeline"),
 	},

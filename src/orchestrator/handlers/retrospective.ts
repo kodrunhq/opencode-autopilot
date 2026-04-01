@@ -86,8 +86,13 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 				lastUpdatedAt: new Date().toISOString(),
 			});
 			await saveLessonMemory(pruned, projectRoot);
-		} catch {
-			// Lesson save failure is non-critical -- swallow to avoid FAILED pipeline
+		} catch (error: unknown) {
+			const msg = error instanceof Error ? error.message : "unknown error";
+			return Object.freeze({
+				action: "complete",
+				phase: "RETROSPECTIVE",
+				progress: `Retrospective complete — ${valid.length} lessons extracted (persistence failed: ${msg})`,
+			} satisfies DispatchResult);
 		}
 
 		return Object.freeze({
@@ -105,7 +110,6 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 		"Analyze all phase artifacts:",
 		`${artifactRefs.join(", ")}.`,
 		"Output ONLY valid JSON with lessons categorized by domain.",
-		"Write output to phases/RETROSPECTIVE/lessons.json.",
 	].join(" ");
 
 	return Object.freeze({

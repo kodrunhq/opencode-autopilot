@@ -95,10 +95,15 @@ describe("handleRetrospective", () => {
 
 	test("returns complete when result provided", async () => {
 		const state = makeState({ currentPhase: "RETROSPECTIVE" });
-		const result = await handleRetrospective(state, "/tmp/artifacts", "lessons extracted");
+		const result = await handleRetrospective(
+			state,
+			"/tmp/artifacts",
+			JSON.stringify({ lessons: [] }),
+		);
 
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("RETROSPECTIVE");
+		expect(result.progress).toContain("0 lessons");
 	});
 });
 

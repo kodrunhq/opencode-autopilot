@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Lesson, LessonDomain, LessonMemory } from "../../../src/orchestrator/lesson-types";
 
 // Mock lesson-memory module before importing handler
@@ -178,6 +178,17 @@ describe("handleRetrospective", () => {
 
 		const savedMemory = mockSaveLessonMemory.mock.calls[0][0] as LessonMemory;
 		expect(savedMemory.lessons).toHaveLength(2);
+	});
+
+	test("parses JSON wrapped in markdown code fences", async () => {
+		const lessons = JSON.stringify({
+			lessons: [{ content: "Test lesson", domain: "architecture", sourcePhase: "BUILD" }],
+		});
+		const fenced = `\`\`\`json\n${lessons}\n\`\`\``;
+		const state = makeState();
+		const result = await handleRetrospective(state, "/tmp/test-artifacts", fenced);
+		expect(result.action).toBe("complete");
+		expect(result.progress).toContain("1 lessons extracted");
 	});
 
 	test("returns complete with 0 lessons when all lessons have invalid domains", async () => {

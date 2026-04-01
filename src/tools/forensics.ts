@@ -29,10 +29,16 @@ export async function forensicsCore(
 	let state: Awaited<ReturnType<typeof loadState>>;
 	try {
 		state = await loadState(artifactDir);
-	} catch {
+	} catch (error: unknown) {
+		const detail =
+			error instanceof SyntaxError
+				? "state file contains invalid JSON"
+				: error !== null && typeof error === "object" && "issues" in error
+					? "state file failed schema validation"
+					: "state file is unreadable";
 		return JSON.stringify({
 			action: "error",
-			message: "Pipeline state is corrupt or unreadable",
+			message: `Pipeline state is corrupt: ${detail}`,
 			recoverable: false,
 			suggestedAction: "manual",
 		});
