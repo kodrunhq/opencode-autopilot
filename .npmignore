@@ -2,6 +2,7 @@
 .planning/
 .github/
 .claude/
+docs/
 
 # Tests
 tests/
