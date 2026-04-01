@@ -11,10 +11,12 @@
  * Memory persisted at {projectRoot}/.opencode-assets/review-memory.json
  */
 
+import { execFile } from "node:child_process";
 import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { tool } from "@opencode-ai/plugin";
-import { REVIEW_AGENTS } from "../review/agents/index";
+import { REVIEW_AGENTS, SPECIALIZED_AGENTS } from "../review/agents/index";
 import {
 	createEmptyMemory,
 	loadReviewMemory,
@@ -25,6 +27,7 @@ import type { ReviewState } from "../review/pipeline";
 import { advancePipeline } from "../review/pipeline";
 import { reviewStateSchema } from "../review/schemas";
 import { selectAgents } from "../review/selection";
+import { detectStackTags } from "../review/stack-gate";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
 import { getProjectArtifactDir } from "../utils/paths";
 
@@ -35,7 +38,41 @@ interface ReviewArgs {
 	readonly findings?: string;
 }
 
+const execFileAsync = promisify(execFile);
+
 const STATE_FILE = "current-review.json";
+
+/**
+ * Get changed file paths for the given review scope.
+ * Uses execFile (not exec) to prevent shell injection.
+ * Returns empty array on any error (best-effort).
+ */
+async function getChangedFiles(scope: string, directory?: string): Promise<readonly string[]> {
+	try {
+		let args: string[];
+		switch (scope) {
+			case "staged":
+				args = ["diff", "--cached", "--name-only"];
+				break;
+			case "unstaged":
+				args = ["diff", "--name-only"];
+				break;
+			case "branch":
+				args = ["diff", "--name-only", "HEAD~1..HEAD"];
+				break;
+			case "directory":
+				args = directory ? ["diff", "--name-only", "--", directory] : ["diff", "--name-only"];
+				break;
+			default:
+				args = ["diff", "--name-only", "HEAD"];
+				break;
+		}
+		const { stdout } = await execFileAsync("git", args, { timeout: 10000 });
+		return stdout.trim().split("\n").filter(Boolean);
+	} catch {
+		return [];
+	}
+}
 
 /**
  * Load review state from disk. Returns null if no active review.
@@ -87,24 +124,34 @@ async function clearReviewState(artifactDir: string): Promise<void> {
 }
 
 /**
- * Start a new review -- select agents and build stage 1 dispatch prompts.
+ * Start a new review -- detect stacks, select agents, and build stage 1 dispatch prompts.
  */
-function startNewReview(
+async function startNewReview(
 	scope: string,
-	_options?: { readonly filter?: string; readonly directory?: string },
-): {
+	options?: { readonly filter?: string; readonly directory?: string },
+): Promise<{
 	readonly state: ReviewState;
 	readonly agents: readonly { readonly name: string; readonly prompt: string }[];
-} {
-	// Detect stacks (simplified -- no actual project analysis yet)
-	const detectedStacks: readonly string[] = [];
+}> {
+	// Detect stacks from changed files via git
+	const changedFiles = await getChangedFiles(scope, options?.directory);
+	const detectedStacks = detectStackTags(changedFiles);
 
-	// Select agents via stack gate
-	const selection = selectAgents(
-		detectedStacks,
-		{ hasTests: false, hasAuth: false, hasConfig: false, fileCount: 0 },
-		REVIEW_AGENTS,
-	);
+	// Build diff analysis from changed file paths
+	const diffAnalysis = {
+		hasTests: changedFiles.some((f) => f.includes("test") || f.includes("spec")),
+		hasAuth: changedFiles.some(
+			(f) => f.includes("auth") || f.includes("login") || f.includes("session"),
+		),
+		hasConfig: changedFiles.some(
+			(f) => f.includes("config") || f.includes("settings") || f.includes(".env"),
+		),
+		fileCount: changedFiles.length,
+	};
+
+	// Select agents from all candidates (universal + specialized)
+	const allCandidates = [...REVIEW_AGENTS, ...SPECIALIZED_AGENTS];
+	const selection = selectAgents(detectedStacks, diffAnalysis, allCandidates);
 
 	const selectedNames = selection.selected.map((a) => a.name);
 
@@ -135,7 +182,7 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 
 		// Case 1: No state, scope provided -> start new review
 		if (currentState === null && args.scope) {
-			const { state, agents } = startNewReview(args.scope, {
+			const { state, agents } = await startNewReview(args.scope, {
 				filter: args.filter,
 				directory: args.directory,
 			});

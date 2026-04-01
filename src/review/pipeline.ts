@@ -11,7 +11,7 @@
  * The orchestrator is responsible for sending prompts to agents and collecting results.
  */
 
-import { REVIEW_AGENTS, STAGE3_AGENTS } from "./agents/index";
+import { ALL_REVIEW_AGENTS, STAGE3_AGENTS } from "./agents/index";
 import { buildCrossVerificationPrompts, condenseFinding } from "./cross-verification";
 import { buildFixInstructions, determineFixableFindings } from "./fix-cycle";
 import { buildReport } from "./report";
@@ -149,8 +149,12 @@ export function advancePipeline(
 
 	switch (currentState.stage) {
 		case 1: {
-			// Stage 1 -> 2: Build cross-verification prompts
-			const agents = REVIEW_AGENTS.filter((a) => currentState.selectedAgentNames.includes(a.name));
+			// Stage 1 -> 2: Build cross-verification prompts from all selected agents (excluding stage 3)
+			const agents = ALL_REVIEW_AGENTS.filter(
+				(a) =>
+					currentState.selectedAgentNames.includes(a.name) &&
+					!["red-team", "product-thinker"].includes(a.name),
+			);
 			const findingsByAgent = groupFindingsByAgent(accumulated);
 			const sanitizedScope = sanitizeTemplateContent(currentState.scope);
 			const prompts = buildCrossVerificationPrompts(agents, findingsByAgent, sanitizedScope);
@@ -196,7 +200,11 @@ export function advancePipeline(
 			const fixResult = determineFixableFindings(accumulated);
 			if (fixResult.fixable.length > 0) {
 				// Build fix-cycle prompts for agents whose findings are fixable
-				const allAgents = [...REVIEW_AGENTS, ...STAGE3_AGENTS];
+				const allAgents = ALL_REVIEW_AGENTS.filter(
+					(a) =>
+						currentState.selectedAgentNames.includes(a.name) ||
+						["red-team", "product-thinker"].includes(a.name),
+				);
 				const sanitizedScope3 = sanitizeTemplateContent(currentState.scope);
 				const fixAgents = buildFixInstructions(fixResult.fixable, allAgents, sanitizedScope3);
 				const newState: ReviewState = {
