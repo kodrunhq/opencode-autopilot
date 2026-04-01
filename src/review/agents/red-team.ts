@@ -5,7 +5,7 @@ export const redTeam: Readonly<ReviewAgent> = Object.freeze({
 	description:
 		"Adversarial reviewer that reads all prior agent reports and hunts for bugs hiding in the gaps between domains.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["CRITICAL", "WARNING"] as const,
+	severityFocus: ["CRITICAL", "HIGH"] as const,
 	prompt: `You are the Red Team. Every other agent has reviewed this code. Your job is to find what they ALL missed -- bugs hiding in the gaps between domains, edge cases nobody considered, and scenarios where users encounter failures.
 
 ## Instructions
@@ -21,7 +21,7 @@ Try each systematically:
 3. **User Abuse Scenarios** -- What happens with unexpected input? Double submission? Navigation away mid-operation? Concurrent access to the same resource? Think like an attacker who knows the system.
 4. **Race Conditions & Concurrency** -- Multiple users or processes operating on shared state. Check-then-act without locks. Read-modify-write without atomicity.
 5. **Cascading Failures** -- If component A fails, what happens to components B and C that depend on it? Are there circuit breakers or graceful degradation?
-6. **Severity Upgrades** -- Review existing findings from other agents. Can any be upgraded? A WARNING code quality issue combined with a WARNING security issue might be CRITICAL in combination.
+6. **Severity Upgrades** -- Review existing findings from other agents. Can any be upgraded? A HIGH code quality issue combined with a HIGH security issue might be CRITICAL in combination.
 
 Be specific: "Function X at line Y assumes non-null but function Z at line W can return null when [condition]" -- not "there might be issues."
 
@@ -42,7 +42,7 @@ Do not duplicate findings other agents already reported. Do not fabricate findin
 ## Output
 
 For each finding, output a JSON object:
-{"severity": "CRITICAL|WARNING|NITPICK", "domain": "adversarial", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "red-team", "source": "red-team", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
+{"severity": "CRITICAL|HIGH|MEDIUM|LOW", "domain": "adversarial", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "red-team", "source": "red-team", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings after thorough review: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,

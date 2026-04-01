@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SEVERITIES = Object.freeze(["CRITICAL", "WARNING", "NITPICK"] as const);
+export const SEVERITIES = Object.freeze(["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const);
 
 export const VERDICTS = Object.freeze(["CLEAN", "APPROVED", "CONCERNS", "BLOCKED"] as const);
 
@@ -68,7 +68,7 @@ export const reviewStateSchema = z.object({
 export const reviewConfigSchema = z.object({
 	parallel: z.boolean().default(true),
 	maxFixAttempts: z.number().int().min(0).max(10).default(3),
-	severityThreshold: severitySchema.default("WARNING"),
+	severityThreshold: severitySchema.default("MEDIUM"),
 	enableCrossVerification: z.boolean().default(true),
 	enableRedTeam: z.boolean().default(true),
 	enableProductReview: z.boolean().default(true),

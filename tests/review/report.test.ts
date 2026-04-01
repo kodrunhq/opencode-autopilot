@@ -4,7 +4,7 @@ import type { ReviewFinding } from "../../src/review/types";
 
 function makeFinding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
 	return {
-		severity: "WARNING",
+		severity: "HIGH",
 		domain: "logic",
 		title: "Missing null check",
 		file: "src/index.ts",
@@ -20,15 +20,16 @@ function makeFinding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
 
 describe("SEVERITY_ORDER", () => {
 	test("CRITICAL has lowest rank (highest priority)", () => {
-		expect(SEVERITY_ORDER.CRITICAL).toBeLessThan(SEVERITY_ORDER.WARNING);
-		expect(SEVERITY_ORDER.WARNING).toBeLessThan(SEVERITY_ORDER.NITPICK);
+		expect(SEVERITY_ORDER.CRITICAL).toBeLessThan(SEVERITY_ORDER.HIGH);
+		expect(SEVERITY_ORDER.HIGH).toBeLessThan(SEVERITY_ORDER.MEDIUM);
+		expect(SEVERITY_ORDER.MEDIUM).toBeLessThan(SEVERITY_ORDER.LOW);
 	});
 });
 
 describe("deduplicateFindings", () => {
 	test("removes same-agent same-file same-line duplicates", () => {
 		const findings: ReviewFinding[] = [
-			makeFinding({ agent: "logic-auditor", file: "a.ts", line: 10, severity: "WARNING" }),
+			makeFinding({ agent: "logic-auditor", file: "a.ts", line: 10, severity: "HIGH" }),
 			makeFinding({ agent: "logic-auditor", file: "a.ts", line: 10, severity: "CRITICAL" }),
 		];
 		const result = deduplicateFindings(findings);
@@ -41,7 +42,7 @@ describe("deduplicateFindings", () => {
 				agent: "logic-auditor",
 				file: "a.ts",
 				line: 10,
-				severity: "NITPICK",
+				severity: "LOW",
 				title: "Low",
 			}),
 			makeFinding({
@@ -75,7 +76,7 @@ describe("deduplicateFindings", () => {
 describe("buildReport", () => {
 	test("groups findings by file", () => {
 		const findings: ReviewFinding[] = [
-			makeFinding({ file: "b.ts", severity: "WARNING" }),
+			makeFinding({ file: "b.ts", severity: "HIGH" }),
 			makeFinding({ file: "a.ts", severity: "CRITICAL" }),
 			makeFinding({ file: "b.ts", severity: "CRITICAL", agent: "security-auditor" }),
 		];
@@ -86,29 +87,29 @@ describe("buildReport", () => {
 
 	test("sorts by severity within file groups (CRITICAL first)", () => {
 		const findings: ReviewFinding[] = [
-			makeFinding({ file: "a.ts", severity: "NITPICK", agent: "a1", line: 1 }),
+			makeFinding({ file: "a.ts", severity: "LOW", agent: "a1", line: 1 }),
 			makeFinding({ file: "a.ts", severity: "CRITICAL", agent: "a2", line: 2 }),
-			makeFinding({ file: "a.ts", severity: "WARNING", agent: "a3", line: 3 }),
+			makeFinding({ file: "a.ts", severity: "HIGH", agent: "a3", line: 3 }),
 		];
 		const report = buildReport(findings, "staged", ["a1", "a2", "a3"]);
 		const aFindings = report.findings.filter((f) => f.file === "a.ts");
 		expect(aFindings[0].severity).toBe("CRITICAL");
-		expect(aFindings[1].severity).toBe("WARNING");
-		expect(aFindings[2].severity).toBe("NITPICK");
+		expect(aFindings[1].severity).toBe("HIGH");
+		expect(aFindings[2].severity).toBe("LOW");
 	});
 
 	test("computes correct summary counts", () => {
 		const findings: ReviewFinding[] = [
 			makeFinding({ severity: "CRITICAL", agent: "a1", file: "a.ts", line: 1 }),
 			makeFinding({ severity: "CRITICAL", agent: "a2", file: "b.ts", line: 2 }),
-			makeFinding({ severity: "WARNING", agent: "a3", file: "c.ts", line: 3 }),
-			makeFinding({ severity: "NITPICK", agent: "a4", file: "d.ts", line: 4 }),
+			makeFinding({ severity: "HIGH", agent: "a3", file: "c.ts", line: 3 }),
+			makeFinding({ severity: "LOW", agent: "a4", file: "d.ts", line: 4 }),
 		];
 		const report = buildReport(findings, "staged", ["a1", "a2", "a3", "a4"]);
 		// The summary should mention counts
 		expect(report.summary).toContain("2 CRITICAL");
-		expect(report.summary).toContain("1 WARNING");
-		expect(report.summary).toContain("1 NITPICK");
+		expect(report.summary).toContain("1 HIGH");
+		expect(report.summary).toContain("1 LOW");
 	});
 
 	test("validates through reviewReportSchema", () => {
@@ -130,8 +131,14 @@ describe("buildReport", () => {
 		expect(report.verdict).toBe("BLOCKED");
 	});
 
-	test("determines CONCERNS verdict when only WARNING findings exist", () => {
-		const findings: ReviewFinding[] = [makeFinding({ severity: "WARNING" })];
+	test("determines CONCERNS verdict when only HIGH findings exist", () => {
+		const findings: ReviewFinding[] = [makeFinding({ severity: "HIGH" })];
+		const report = buildReport(findings, "staged", ["logic-auditor"]);
+		expect(report.verdict).toBe("CONCERNS");
+	});
+
+	test("determines CONCERNS verdict when only MEDIUM findings exist", () => {
+		const findings: ReviewFinding[] = [makeFinding({ severity: "MEDIUM" })];
 		const report = buildReport(findings, "staged", ["logic-auditor"]);
 		expect(report.verdict).toBe("CONCERNS");
 	});

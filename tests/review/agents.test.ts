@@ -79,8 +79,8 @@ describe("review agent registry", () => {
 		}
 	});
 
-	test("every agent has a valid severityFocus array (CRITICAL/WARNING/NITPICK only)", () => {
-		const validSeverities = new Set(["CRITICAL", "WARNING", "NITPICK"]);
+	test("every agent has a valid severityFocus array (CRITICAL/HIGH/MEDIUM/LOW only)", () => {
+		const validSeverities = new Set(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
 		for (const agent of ALL_REVIEW_AGENTS) {
 			expect(agent.severityFocus.length).toBeGreaterThan(0);
 			for (const severity of agent.severityFocus) {

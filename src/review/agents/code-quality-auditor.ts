@@ -5,7 +5,7 @@ export const codeQualityAuditor: Readonly<ReviewAgent> = Object.freeze({
 	description:
 		"Audits code readability, modularity, and naming conventions including function length, file size, nesting depth, and duplication.",
 	relevantStacks: [] as readonly string[],
-	severityFocus: ["WARNING", "NITPICK"] as const,
+	severityFocus: ["MEDIUM", "LOW"] as const,
 	prompt: `You are the Code Quality Auditor. You review readability, structure, and maintainability of changed code.
 
 ## Instructions
@@ -44,7 +44,7 @@ Do not comment on business logic correctness -- only readability, structure, and
 ## Output
 
 For each finding, output a JSON object:
-{"severity": "CRITICAL|WARNING|NITPICK", "domain": "quality", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "code-quality-auditor", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
+{"severity": "CRITICAL|HIGH|MEDIUM|LOW", "domain": "quality", "title": "short title", "file": "path/to/file.ts", "line": 42, "agent": "code-quality-auditor", "source": "phase1", "evidence": "what was found", "problem": "why it is an issue", "fix": "how to fix it"}
 
 If no findings: {"findings": []}
 Wrap all findings in: {"findings": [...]}`,
