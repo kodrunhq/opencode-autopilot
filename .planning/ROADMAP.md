@@ -3,7 +3,8 @@
 ## Milestones
 
 - **v1.0 MVP** - Phases 1-3 (shipped)
-- **v2.0 Autonomous Orchestrator** - Phases 4-7 (in progress)
+- **v2.0 Autonomous Orchestrator** - Phases 4-10 (shipped)
+- **v3.0 Intelligence & Polish** - Phases 11-17 (in progress)
 
 ## Phases
 
@@ -24,10 +25,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 ### v2.0 Autonomous Orchestrator
 
-- [ ] **Phase 4: Foundation Infrastructure** - State machine, deterministic tooling, config schema, and agent dispatch validation
-- [ ] **Phase 5: Review Engine** - Standalone multi-agent code review with parallel dispatch, cross-verification, and fix cycle
-- [ ] **Phase 6: Orchestrator Pipeline** - Full 8-phase autonomous SDLC pipeline integrating review engine
-- [ ] **Phase 7: Learning & Resilience** - Institutional memory, retrospective extraction, and failure forensics
+- [x] **Phase 4: Foundation Infrastructure** - State machine, deterministic tooling, config schema, and agent dispatch validation
+- [x] **Phase 5: Review Engine** - Standalone multi-agent code review with parallel dispatch, cross-verification, and fix cycle
+- [x] **Phase 6: Orchestrator Pipeline** - Full 8-phase autonomous SDLC pipeline integrating review engine
+- [x] **Phase 7: Learning & Resilience** - Institutional memory, retrospective extraction, and failure forensics
+- [x] **Phase 8: Testing & CI** - Zero-regression CI pipeline with type safety, lint, and 90% coverage
+- [x] **Phase 9: Model Fallback Integration** - Per-agent model fallback with error classification and state machine
+- [x] **Phase 10: UX Polish & Metaprompting** - Severity alignment, agent modes, prompt rewrite, skill injection, fallback chain, smart review
 
 ## Phase Details
 
@@ -153,7 +157,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8 -> 9
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> ...
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -164,6 +168,10 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 5. Review Engine | v2.0 | 4/4 | Complete | - |
 | 6. Orchestrator Pipeline | v2.0 | 4/4 | Complete | - |
 | 7. Learning & Resilience | v2.0 | 3/3 | Complete | - |
+| 8. Testing & CI | v2.0 | 2/2 | Complete | - |
+| 9. Model Fallback Integration | v2.0 | 3/3 | Complete | - |
+| 10. UX Polish & Metaprompting | v2.0 | 4/4 | Complete | - |
+| 11. Ecosystem Research | v3.0 | 3/3 | Complete | 2026-04-02 |
 
 ### Phase 8: Testing & CI
 
@@ -212,3 +220,99 @@ Plans:
 - [x] 10-02-PLAN.md -- Pipeline agent prompt rewrite (150+ words) and base agent fixes
 - [x] 10-03-PLAN.md -- Skill injection into dispatch prompts and two-tier fallback chain resolution
 - [x] 10-04-PLAN.md -- Smart review agent selection: 13 new ReviewAgent implementations with stack-gated dispatch
+
+### v3.0 Intelligence & Polish
+
+- [x] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
+- [ ] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research
+- [ ] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing
+- [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
+- [ ] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval
+- [ ] **Phase 16: Autopilot Integration (Skills + Memory)** - Integrate new skills/commands and memory capabilities into the existing Autopilot; no new dedicated agents
+- [ ] **Phase 17: Integration & Polish** - Cross-feature integration, high-value hooks, final production polish
+
+## Phase Details (v3.0)
+
+### Phase 11: Ecosystem Research & Gap Analysis
+**Goal:** Deep competitive research across GSD, superpowers, oh-my-openagent, everything-claude-code, and claude-mem producing a gap matrix that defines the exact implementation scope of subsequent phases
+**Depends on:** Phase 10 (v2.0 complete)
+**Requirements:** TBD (research phase generates requirements for later phases)
+**Success Criteria** (what must be TRUE):
+  1. Gap matrix covers all 5 competitor plugins across skills, commands, hooks, agents, memory, workflows, and observability
+  2. Each gap has a priority rating (CRITICAL/HIGH/MEDIUM/LOW) and a phase assignment
+  3. Memory system patterns analyzed with token-efficiency assessment
+  4. Specialized agent archetypes critically evaluated with clear value/no-value determination
+  5. Research surfaces gaps we hadn't anticipated (creative, forward-looking analysis)
+**Plans:** 3/3 plans executed
+
+Plans:
+- [x] 11-01-PLAN.md -- Five competitor deep-dives (GSD, superpowers, OMO, ECC, claude-mem) with feature catalogs
+- [x] 11-02-PLAN.md -- Broader ecosystem scan and novel opportunities analysis
+- [x] 11-03-PLAN.md -- Gap matrix synthesis, phase scope definitions, memory architecture, agent verdict
+
+### Phase 12: Quick Wins & Fixes
+**Goal:** Fix known bugs and small improvements that don't require research or complex architecture
+**Depends on:** Phase 10
+**Requirements:** TBD
+**Success Criteria** (what must be TRUE):
+  1. CLI configure wizard shows Zen provider prefix on models, matching OpenCode's native /models display
+  2. Users can distinguish Go vs Zen providers when selecting a model
+  3. Any additional quick wins from Phase 11 research are addressed
+**Plans:** TBD
+
+### Phase 13: Session Observability
+**Goal:** Full session observability with structured event logging, human-readable summaries, TUI dashboard, time-based retention, and configurable mock provider for fallback testing
+**Depends on:** Phase 12
+**Requirements:** TBD
+**Success Criteria** (what must be TRUE):
+  1. Every fallback trigger, model error, and autopilot decision is captured as a structured JSON event with timestamp and context
+  2. Human-readable session summaries are generated from structured events
+  3. Logs persist in ~/.config/opencode/logs/ with configurable 30-day default retention
+  4. Rich TUI dashboard shows session timeline, error highlighting, and filterable columns
+  5. Mock provider can simulate specific failure modes (rate limit, quota, timeout, malformed) for fallback chain testing
+**Plans:** TBD
+
+### Phase 14: Skills & Commands
+**Goal:** Implement high-priority skills and commands identified by Phase 11 gap matrix — brainstorming, PR comment review, update-docs, validate-agents-md, and whatever research surfaces
+**Depends on:** Phase 11 (research defines scope)
+**Requirements:** TBD (defined by Phase 11 gap matrix)
+**Success Criteria** (what must be TRUE):
+  1. All CRITICAL and HIGH priority skill gaps from Phase 11 matrix are addressed
+  2. All CRITICAL and HIGH priority command gaps from Phase 11 matrix are addressed
+  3. Every new skill/command follows established plugin patterns and feels native
+  4. PR comment review command retrieves, assesses, fixes/defers, and replies to PR comments
+**Plans:** TBD
+
+### Phase 15: Memory System
+**Goal:** Smart dual-scope memory system that learns project patterns and user preferences, stored globally with relevance-scored retrieval — the plugin gets better the more you use it
+**Depends on:** Phase 11 (research informs architecture)
+**Requirements:** TBD
+**Success Criteria** (what must be TRUE):
+  1. Project-level memories capture coding conventions, architecture decisions, and codebase patterns
+  2. User-level memories capture workflow preferences and communication style across all projects
+  3. All memory stored in ~/.config/opencode/memory/ — never in project repos
+  4. Relevance scoring injects only top-N relevant memories into context, keeping token usage lean
+  5. Memory demonstrably improves agent behavior over multiple sessions
+**Plans:** TBD
+
+### Phase 16: Autopilot Integration (Skills + Memory)
+**Goal:** Integrate new skills/commands (Phase 14) and memory capabilities (Phase 15) into the existing Autopilot agent — no new dedicated agents (Phase 11 research concluded skills > agents for all candidates)
+**Depends on:** Phase 14 (skills), Phase 15 (memory)
+**Requirements:** TBD
+**Success Criteria** (what must be TRUE):
+  1. Memory injection works in autopilot dispatch prompts (relevant memories injected per task)
+  2. Skill-aware routing selects relevant skills per task type during autonomous pipeline
+  3. Confidence threshold tuning adjusts pipeline depth based on learned patterns
+  4. If deliverables are too thin, remaining work merges into Phase 17
+**Plans:** TBD
+
+### Phase 17: Integration & Polish
+**Goal:** Cross-feature integration testing, high-value hooks from research, and final production polish for v3.0 release
+**Depends on:** All prior v3.0 phases
+**Requirements:** TBD
+**Success Criteria** (what must be TRUE):
+  1. All v3.0 features work together as a cohesive system (logging + memory + agents + skills)
+  2. High-value hooks from Phase 11 research are implemented (only if research shows significant gap)
+  3. End-to-end scenario passes: session -> decisions logged -> memories extracted -> next session improved
+  4. Production-ready, best-in-class quality — no rough edges
+**Plans:** TBD
