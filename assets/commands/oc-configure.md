@@ -23,17 +23,18 @@ Combine ALL models from ALL providers into a single numbered list.
 Every model the user has access to must appear. Do NOT filter, summarize,
 or show only "recommended" models. The user decides — you present options.
 
-Example (show ALL of them, not a subset):
+Example (show ALL of them, not a subset). The IDs must match exactly
+what `availableModels` returns (provider prefix comes from the provider):
 ```
 Available models:
- 1. opencode/claude-opus-4-6
- 2. opencode/claude-sonnet-4-6
- 3. opencode/claude-haiku-4-5
- 4. opencode/gpt-5.4
- 5. opencode/gpt-5.4-mini
- 6. opencode/gpt-5.4-codex
- 7. opencode/gemini-3.1-pro
- 8. opencode/gemini-3-flash
+ 1. anthropic/claude-opus-4-6
+ 2. anthropic/claude-sonnet-4-6
+ 3. anthropic/claude-haiku-4-5
+ 4. openai/gpt-5.4
+ 5. openai/gpt-5.4-mini
+ 6. openai/gpt-5.4-codex
+ 7. google/gemini-3.1-pro
+ 8. google/gemini-3-flash
  ...
 ```
 
@@ -45,7 +46,7 @@ For each of the 8 groups (architects first, utilities last):
 2. Show the tier recommendation
 3. For adversarial groups (challengers, reviewers, red-team): explain WHY
    model diversity matters and which group they are adversarial to
-4. Show the full numbered model list again (or reference it)
+4. Show the full numbered model list again whenever asking for selections
 
 ### Collecting models for each group
 
@@ -96,10 +97,10 @@ Then call oc_configure with subcommand "doctor" to verify health.
 Show a final summary table:
 
 ```
-Group          | Primary                    | Fallbacks
-───────────────┼────────────────────────────┼──────────────────
-Architects     | opencode/claude-opus-4-6   | opencode/gpt-5.4
-Challengers    | opencode/gpt-5.4           | opencode/gemini-3.1-pro
+Group          | Primary                      | Fallbacks
+───────────────┼──────────────────────────────┼──────────────────────────
+Architects     | anthropic/claude-opus-4-6    | openai/gpt-5.4
+Challengers    | openai/gpt-5.4              | google/gemini-3.1-pro
 ...
 ```
 

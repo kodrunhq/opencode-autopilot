@@ -96,7 +96,7 @@ and collects an **ordered list of models** for each (primary + fallbacks).
 > OpenCode after installing the plugin, then type `/oc-configure` in
 > the OpenCode chat.
 
-The /oc-configure command presents ALL available models as a numbered
+The `/oc-configure` command presents ALL available models as a numbered
 list, then walks through 8 agent groups:
 
 1. **Architects** — System design, planning, orchestration
