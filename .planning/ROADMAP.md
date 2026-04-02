@@ -224,7 +224,7 @@ Plans:
 ### v3.0 Intelligence & Polish
 
 - [x] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
-- [ ] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research
+- [x] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research (completed 2026-04-02)
 - [ ] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing
 - [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
 - [ ] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval
@@ -258,7 +258,7 @@ Plans:
   1. CLI configure wizard shows Zen provider prefix on models, matching OpenCode's native /models display
   2. Users can distinguish Go vs Zen providers when selecting a model
   3. Any additional quick wins from Phase 11 research are addressed
-**Plans:** TBD
+**Plans:** 2/2 plans complete
 
 ### Phase 13: Session Observability
 **Goal:** Full session observability with structured event logging, human-readable summaries, TUI dashboard, time-based retention, and configurable mock provider for fallback testing

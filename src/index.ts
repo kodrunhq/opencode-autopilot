@@ -1,6 +1,7 @@
 import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
+import { runHealthChecks } from "./health/runner";
 import { installAssets } from "./installer";
 import type { SdkOperations } from "./orchestrator/fallback";
 import {
@@ -21,10 +22,12 @@ import {
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
+import { ocDoctor } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
 import { ocOrchestrate } from "./tools/orchestrate";
 import { ocPhase } from "./tools/phase";
 import { ocPlan } from "./tools/plan";
+import { ocQuick } from "./tools/quick";
 import { ocReview } from "./tools/review";
 import { ocState } from "./tools/state";
 
@@ -61,6 +64,11 @@ const plugin: Plugin = async (input) => {
 	// Load config for first-load detection and fallback settings
 	const config = await loadConfig();
 	const fallbackConfig = config?.fallback ?? fallbackDefaults;
+
+	// Self-healing health checks on every load (non-blocking, <100ms target)
+	runHealthChecks().catch(() => {
+		// Health check failures are non-fatal — oc_doctor provides manual diagnostics
+	});
 
 	// --- Fallback subsystem initialization ---
 	const sdkOps: SdkOperations = {
@@ -126,6 +134,8 @@ const plugin: Plugin = async (input) => {
 			oc_phase: ocPhase,
 			oc_plan: ocPlan,
 			oc_orchestrate: ocOrchestrate,
+			oc_doctor: ocDoctor,
+			oc_quick: ocQuick,
 			oc_forensics: ocForensics,
 			oc_review: ocReview,
 		},

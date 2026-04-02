@@ -261,6 +261,146 @@ describe("configureCore edge cases", () => {
 	});
 });
 
+describe("configureCore Zen provider model discovery", () => {
+	test("Zen provider models include sub-provider prefix in model IDs", async () => {
+		setAvailableProviders([
+			{
+				id: "zen",
+				name: "Zen",
+				models: {
+					"anthropic/claude-opus-4-6": {
+						id: "anthropic/claude-opus-4-6",
+						name: "Claude Opus 4.6",
+					},
+					"anthropic/claude-sonnet-4-6": {
+						id: "anthropic/claude-sonnet-4-6",
+						name: "Claude Sonnet 4.6",
+					},
+					"openai/gpt-5.4": { id: "openai/gpt-5.4", name: "GPT-5.4" },
+				},
+			},
+		]);
+
+		const result = JSON.parse(await configureCore({ subcommand: "start" }));
+
+		// Zen models should include the full path: zen/anthropic/model
+		expect(Object.values(result.modelIndex)).toContain("zen/anthropic/claude-opus-4-6");
+		expect(Object.values(result.modelIndex)).toContain("zen/anthropic/claude-sonnet-4-6");
+		expect(Object.values(result.modelIndex)).toContain("zen/openai/gpt-5.4");
+
+		// displayText should show the full prefixed IDs
+		expect(result.displayText).toContain("zen/anthropic/claude-opus-4-6");
+		expect(result.displayText).toContain("zen/openai/gpt-5.4");
+	});
+
+	test("users can distinguish Go vs Zen providers for same model family", async () => {
+		setAvailableProviders([
+			{
+				id: "anthropic",
+				name: "Anthropic",
+				models: {
+					"claude-opus-4-6": { id: "claude-opus-4-6", name: "Claude Opus 4.6" },
+				},
+			},
+			{
+				id: "zen",
+				name: "Zen",
+				models: {
+					"anthropic/claude-opus-4-6": {
+						id: "anthropic/claude-opus-4-6",
+						name: "Claude Opus 4.6 (Zen)",
+					},
+				},
+			},
+		]);
+
+		const result = JSON.parse(await configureCore({ subcommand: "start" }));
+		const modelIds = Object.values(result.modelIndex) as string[];
+
+		// Both providers should appear with distinct prefixes
+		expect(modelIds).toContain("anthropic/claude-opus-4-6");
+		expect(modelIds).toContain("zen/anthropic/claude-opus-4-6");
+
+		// They should be different entries
+		expect(Object.keys(result.modelIndex).length).toBe(2);
+	});
+
+	test("model id field takes precedence over record key for path construction", async () => {
+		setAvailableProviders([
+			{
+				id: "zen",
+				name: "Zen",
+				models: {
+					// Key might be simplified but id carries the full sub-provider path
+					"claude-opus-4-6": {
+						id: "anthropic/claude-opus-4-6",
+						name: "Claude Opus 4.6",
+					},
+				},
+			},
+		]);
+
+		const result = JSON.parse(await configureCore({ subcommand: "start" }));
+
+		// Should use model.id (anthropic/claude-opus-4-6), not key (claude-opus-4-6)
+		expect(Object.values(result.modelIndex)).toContain("zen/anthropic/claude-opus-4-6");
+		// Should NOT have zen/claude-opus-4-6 (which would use the record key)
+		expect(Object.values(result.modelIndex)).not.toContain("zen/claude-opus-4-6");
+	});
+
+	test("buildNumberedModelList sorts models alphabetically and preserves provider prefix", async () => {
+		setAvailableProviders([
+			{
+				id: "zen",
+				name: "Zen",
+				models: {
+					"openai/gpt-5.4": { id: "openai/gpt-5.4", name: "GPT-5.4" },
+					"anthropic/claude-opus-4-6": {
+						id: "anthropic/claude-opus-4-6",
+						name: "Claude Opus 4.6",
+					},
+				},
+			},
+			{
+				id: "anthropic",
+				name: "Anthropic",
+				models: {
+					"claude-sonnet-4-6": { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+				},
+			},
+		]);
+
+		const result = JSON.parse(await configureCore({ subcommand: "start" }));
+		const modelIds = Object.values(result.modelIndex) as string[];
+
+		// Models should be sorted alphabetically
+		const sorted = [...modelIds].sort();
+		expect(modelIds).toEqual(sorted);
+
+		// All should have provider prefix
+		for (const id of modelIds) {
+			expect(id).toContain("/");
+		}
+	});
+
+	test("falls back to record key when model id is empty", async () => {
+		setAvailableProviders([
+			{
+				id: "local",
+				name: "Local",
+				models: {
+					"llama-3.3": { id: "", name: "Llama 3.3" },
+				},
+			},
+		]);
+
+		const result = JSON.parse(await configureCore({ subcommand: "start" }));
+
+		// Empty id should fall back to record key
+		expect(Object.values(result.modelIndex)).toContain("local/llama-3.3");
+	});
+});
+
 describe("configureCore doctor", () => {
 	test("returns structured diagnostic report", async () => {
 		const result = JSON.parse(await configureCore({ subcommand: "doctor" }));
