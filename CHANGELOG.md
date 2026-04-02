@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.4.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.3.0...opencode-autopilot-v1.4.0) (2026-04-02)
+
+
+### Features
+
+* **13-01:** add structured event logging with session logger ([1af3bd3](https://github.com/kodrunhq/opencode-autopilot/commit/1af3bd3a4e69a3a6f4b035339ae41a5db4e44e61))
+* **13-01:** add time-based log retention with configurable pruning ([6f42279](https://github.com/kodrunhq/opencode-autopilot/commit/6f4227973b62103518c5b4d365cc9a8abf983a77))
+* **13-02:** add event emitters, hook handlers, and event store ([d43a6b1](https://github.com/kodrunhq/opencode-autopilot/commit/d43a6b1e2f69cf9ec3a38fd74a64ae2056550fce))
+* **13-02:** add token tracker and context monitor with TDD ([f8f5ee8](https://github.com/kodrunhq/opencode-autopilot/commit/f8f5ee8845c4a8dacdf81763d388029cb20dd754))
+* **13-03:** add log writer and log reader for session persistence ([7415519](https://github.com/kodrunhq/opencode-autopilot/commit/741551970e235b6063e8337e52f766e2268457d2))
+* **13-03:** add session summary generator and barrel export ([80a101d](https://github.com/kodrunhq/opencode-autopilot/commit/80a101debf7eef07ba3fe9866b28962320a0ce07))
+* **13-04:** add oc_logs, oc_session_stats, oc_pipeline_report tools with TDD ([35c2b4d](https://github.com/kodrunhq/opencode-autopilot/commit/35c2b4d87b983d9658e84e356ed51d60fac9928a))
+* **13-04:** wire observability into plugin entry with 4 new tools and hooks ([5ae995c](https://github.com/kodrunhq/opencode-autopilot/commit/5ae995cffe7d2c3713eb4726a88a74adbd57150a))
+* **13-05:** add mock provider types and error generator ([6f6661a](https://github.com/kodrunhq/opencode-autopilot/commit/6f6661a6e24234aa58572c271653ca8ba0213fa4))
+* **13-05:** add oc_mock_fallback tool for fallback chain testing ([7e94a09](https://github.com/kodrunhq/opencode-autopilot/commit/7e94a09b0c230a751100fb25534ac502262be4a3))
+* **v3.0:** Phase 13 — session observability, token tracking, decision replay ([7ec841b](https://github.com/kodrunhq/opencode-autopilot/commit/7ec841b72c3fd8aa5a3dbc76ebc3a3be901bb733))
+
+
+### Bug Fixes
+
+* address ace review + Copilot findings — type alignment, path validation, error handling, session lifecycle ([4a0c94b](https://github.com/kodrunhq/opencode-autopilot/commit/4a0c94b2a95e844f51acf1b70e44c97a082d10d6))
+* address PR [#29](https://github.com/kodrunhq/opencode-autopilot/issues/29) round 2 — session.error extraction, Zod sanitized write, timestamp guard, table escaping, lint ([dff5965](https://github.com/kodrunhq/opencode-autopilot/commit/dff59658ac810432299f94a0190786ebac1bab8f))
+* reconcile sessionLogSchema after Wave 2 parallel merge ([2c1d914](https://github.com/kodrunhq/opencode-autopilot/commit/2c1d91444032b25bb0e56e4334539bc95267de06))
+* resolve TypeScript errors and CI failures ([2e71af1](https://github.com/kodrunhq/opencode-autopilot/commit/2e71af190df40bf0d2309a9879484ddec65bbf3e))
+
 ## [1.3.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.2.1...opencode-autopilot-v1.3.0) (2026-04-02)
 
 
