@@ -3,6 +3,16 @@ import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
 import { runHealthChecks } from "./health/runner";
 import { installAssets } from "./installer";
+import { ContextMonitor } from "./observability/context-monitor";
+import {
+	createObservabilityEventHandler,
+	createToolExecuteAfterHandler as createObsToolAfterHandler,
+	createToolExecuteBeforeHandler,
+} from "./observability/event-handlers";
+import { SessionEventStore } from "./observability/event-store";
+import { writeSessionLog } from "./observability/log-writer";
+import { pruneOldLogs } from "./observability/retention";
+import type { SessionEvent } from "./observability/types";
 import type { SdkOperations } from "./orchestrator/fallback";
 import {
 	createChatMessageHandler,
@@ -24,11 +34,15 @@ import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
 import { ocDoctor } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
+import { ocLogs } from "./tools/logs";
+import { ocMockFallback } from "./tools/mock-fallback";
 import { ocOrchestrate } from "./tools/orchestrate";
 import { ocPhase } from "./tools/phase";
+import { ocPipelineReport } from "./tools/pipeline-report";
 import { ocPlan } from "./tools/plan";
 import { ocQuick } from "./tools/quick";
 import { ocReview } from "./tools/review";
+import { ocSessionStats } from "./tools/session-stats";
 import { ocState } from "./tools/state";
 
 let openCodeConfig: Config | null = null;
@@ -68,6 +82,15 @@ const plugin: Plugin = async (input) => {
 	// Self-healing health checks on every load (non-blocking, <100ms target)
 	runHealthChecks().catch(() => {
 		// Health check failures are non-fatal — oc_doctor provides manual diagnostics
+	});
+
+	// --- Observability subsystem initialization ---
+	const eventStore = new SessionEventStore();
+	const contextMonitor = new ContextMonitor();
+
+	// Retention pruning on load (non-blocking per D-14)
+	pruneOldLogs().catch((err) => {
+		console.error("[opencode-autopilot]", err);
 	});
 
 	// --- Fallback subsystem initialization ---
@@ -123,6 +146,32 @@ const plugin: Plugin = async (input) => {
 	const chatMessageHandler = createChatMessageHandler(manager);
 	const toolExecuteAfterHandler = createToolExecuteAfterHandler(manager);
 
+	// --- Observability handlers ---
+	const toolStartTimes = new Map<string, number>();
+	const observabilityEventHandler = createObservabilityEventHandler({
+		eventStore,
+		contextMonitor,
+		showToast: sdkOps.showToast,
+		writeSessionLog: async (sessionData) => {
+			if (!sessionData) return;
+			// Filter to schema-valid event types that match SessionEvent discriminated union
+			const schemaEvents: SessionEvent[] = sessionData.events.filter(
+				(e): e is SessionEvent =>
+					e.type === "fallback" ||
+					e.type === "error" ||
+					e.type === "decision" ||
+					e.type === "model_switch",
+			);
+			await writeSessionLog({
+				sessionId: sessionData.sessionId,
+				startedAt: sessionData.startedAt,
+				events: schemaEvents,
+			});
+		},
+	});
+	const obsToolBeforeHandler = createToolExecuteBeforeHandler(toolStartTimes);
+	const obsToolAfterHandler = createObsToolAfterHandler(eventStore, toolStartTimes);
+
 	return {
 		tool: {
 			oc_configure: ocConfigure,
@@ -138,8 +187,16 @@ const plugin: Plugin = async (input) => {
 			oc_quick: ocQuick,
 			oc_forensics: ocForensics,
 			oc_review: ocReview,
+			oc_logs: ocLogs,
+			oc_session_stats: ocSessionStats,
+			oc_pipeline_report: ocPipelineReport,
+			oc_mock_fallback: ocMockFallback,
 		},
 		event: async ({ event }) => {
+			// 1. Observability: collect (pure observer, no side effects on session)
+			await observabilityEventHandler({ event });
+
+			// 2. First-load toast
 			if (event.type === "session.created" && isFirstLoad(config)) {
 				await sdkOps.showToast(
 					"Welcome to OpenCode Autopilot!",
@@ -148,7 +205,7 @@ const plugin: Plugin = async (input) => {
 				);
 			}
 
-			// Fallback event handling (runs for all events)
+			// 3. Fallback event handling
 			if (fallbackConfig.enabled) {
 				await fallbackEventHandler({ event });
 			}
@@ -173,6 +230,12 @@ const plugin: Plugin = async (input) => {
 				await chatMessageHandler(hookInput, output);
 			}
 		},
+		"tool.execute.before": async (
+			input: { tool: string; sessionID: string; callID: string },
+			output: { args: unknown },
+		) => {
+			obsToolBeforeHandler({ ...input, args: output.args });
+		},
 		"tool.execute.after": async (
 			hookInput: {
 				readonly tool: string;
@@ -182,6 +245,10 @@ const plugin: Plugin = async (input) => {
 			},
 			output: { title: string; output: string; metadata: unknown },
 		) => {
+			// Observability: record tool execution (pure observer)
+			obsToolAfterHandler(hookInput, output);
+
+			// Fallback handling
 			if (fallbackConfig.enabled) {
 				await toolExecuteAfterHandler(hookInput, output);
 			}

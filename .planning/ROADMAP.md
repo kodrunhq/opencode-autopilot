@@ -225,7 +225,7 @@ Plans:
 
 - [x] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
 - [x] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research (completed 2026-04-02)
-- [ ] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing
+- [x] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing (completed 2026-04-02)
 - [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
 - [ ] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval
 - [ ] **Phase 16: Autopilot Integration (Skills + Memory)** - Integrate new skills/commands and memory capabilities into the existing Autopilot; no new dedicated agents
@@ -270,7 +270,7 @@ Plans:
   3. Logs persist in ~/.config/opencode/logs/ with configurable 30-day default retention
   4. Rich TUI dashboard shows session timeline, error highlighting, and filterable columns
   5. Mock provider can simulate specific failure modes (rate limit, quota, timeout, malformed) for fallback chain testing
-**Plans:** TBD
+**Plans:** 1/1 plans complete
 
 ### Phase 14: Skills & Commands
 **Goal:** Implement high-priority skills and commands identified by Phase 11 gap matrix — brainstorming, PR comment review, update-docs, validate-agents-md, and whatever research surfaces

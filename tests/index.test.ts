@@ -60,7 +60,7 @@ describe("plugin entry point", () => {
 		expect(eventResult).toBeUndefined();
 	});
 
-	test("registers all expected tools", async () => {
+	test("registers all expected tools (17 total)", async () => {
 		const result = await plugin(mockInput);
 		expect(result.tool).toBeDefined();
 		const toolNames = [...Object.keys(result.tool ?? {})].sort();
@@ -78,8 +78,13 @@ describe("plugin entry point", () => {
 			"oc_quick",
 			"oc_forensics",
 			"oc_review",
+			"oc_logs",
+			"oc_session_stats",
+			"oc_pipeline_report",
+			"oc_mock_fallback",
 		];
 		expect(toolNames).toEqual([...expected].sort());
+		expect(toolNames).toHaveLength(17);
 	});
 
 	test("every registered tool has a valid execute function", async () => {
@@ -107,13 +112,46 @@ describe("plugin entry point", () => {
 		expect(typeof toolExecAfter).toBe("function");
 	});
 
-	test("plugin return object has all 5 hook keys", async () => {
+	test("plugin return object has all 6 hook keys", async () => {
 		const result = await plugin(mockInput);
 		const keys = Object.keys(result);
 		expect(keys).toContain("tool");
 		expect(keys).toContain("event");
 		expect(keys).toContain("config");
 		expect(keys).toContain("chat.message");
+		expect(keys).toContain("tool.execute.before");
 		expect(keys).toContain("tool.execute.after");
+	});
+
+	test("returns tool.execute.before hook", async () => {
+		const result = await plugin(mockInput);
+		// biome-ignore lint/suspicious/noExplicitAny: accessing dynamic hook key
+		const toolExecBefore = (result as any)["tool.execute.before"];
+		expect(toolExecBefore).toBeDefined();
+		expect(typeof toolExecBefore).toBe("function");
+	});
+
+	test("oc_logs tool is registered", async () => {
+		const result = await plugin(mockInput);
+		expect(result.tool?.oc_logs).toBeDefined();
+		expect(typeof result.tool?.oc_logs.execute).toBe("function");
+	});
+
+	test("oc_session_stats tool is registered", async () => {
+		const result = await plugin(mockInput);
+		expect(result.tool?.oc_session_stats).toBeDefined();
+		expect(typeof result.tool?.oc_session_stats.execute).toBe("function");
+	});
+
+	test("oc_pipeline_report tool is registered", async () => {
+		const result = await plugin(mockInput);
+		expect(result.tool?.oc_pipeline_report).toBeDefined();
+		expect(typeof result.tool?.oc_pipeline_report.execute).toBe("function");
+	});
+
+	test("oc_mock_fallback tool is registered", async () => {
+		const result = await plugin(mockInput);
+		expect(result.tool?.oc_mock_fallback).toBeDefined();
+		expect(typeof result.tool?.oc_mock_fallback.execute).toBe("function");
 	});
 });
