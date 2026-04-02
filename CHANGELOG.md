@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.2.1...opencode-autopilot-v1.3.0) (2026-04-02)
+
+
+### Features
+
+* **v3.0:** Phase 12 — self-healing doctor, quick mode, Zen display fix ([d93121d](https://github.com/kodrunhq/opencode-autopilot/commit/d93121d84e37bb8d2d5c9db89bc3fbf804ab7b9f))
+
+
+### Bug Fixes
+
+* address PR [#27](https://github.com/kodrunhq/opencode-autopilot/issues/27) review comments ([572cd42](https://github.com/kodrunhq/opencode-autopilot/commit/572cd422eaf6976915c7f6ac35ee3e900a01c789))
+
 ## [1.2.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.2.0...opencode-autopilot-v1.2.1) (2026-04-02)
 
 
