@@ -55,9 +55,7 @@ describe("resolveDependencyOrder", () => {
 	});
 
 	it("skips references to skills not in the map", () => {
-		const skills = new Map([
-			["a", { requires: ["nonexistent"] }],
-		]);
+		const skills = new Map([["a", { requires: ["nonexistent"] }]]);
 		const result = resolveDependencyOrder(skills);
 		expect(result.ordered).toEqual(["a"]);
 		expect(result.cycles).toEqual([]);

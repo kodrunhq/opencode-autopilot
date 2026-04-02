@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+	buildMultiSkillContext,
 	detectProjectStackTags,
 	filterSkillsByStack,
-	buildMultiSkillContext,
 } from "../../src/skills/adaptive-injector";
 import type { LoadedSkill } from "../../src/skills/loader";
 

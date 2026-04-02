@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { parseSkillFrontmatter, loadAllSkills } from "../../src/skills/loader";
+import { join } from "node:path";
+import { loadAllSkills, parseSkillFrontmatter } from "../../src/skills/loader";
 
 describe("parseSkillFrontmatter", () => {
 	it("parses valid frontmatter with all fields", () => {
@@ -19,10 +19,10 @@ requires:
 
 		const result = parseSkillFrontmatter(content);
 		expect(result).not.toBeNull();
-		expect(result!.name).toBe("test-skill");
-		expect(result!.description).toBe("A test skill");
-		expect(result!.stacks).toEqual(["typescript", "javascript"]);
-		expect(result!.requires).toEqual(["coding-standards"]);
+		expect(result?.name).toBe("test-skill");
+		expect(result?.description).toBe("A test skill");
+		expect(result?.stacks).toEqual(["typescript", "javascript"]);
+		expect(result?.requires).toEqual(["coding-standards"]);
 	});
 
 	it("returns null for content without frontmatter", () => {
@@ -38,10 +38,10 @@ name: minimal
 
 		const result = parseSkillFrontmatter(content);
 		expect(result).not.toBeNull();
-		expect(result!.name).toBe("minimal");
-		expect(result!.description).toBe("");
-		expect(result!.stacks).toEqual([]);
-		expect(result!.requires).toEqual([]);
+		expect(result?.name).toBe("minimal");
+		expect(result?.description).toBe("");
+		expect(result?.stacks).toEqual([]);
+		expect(result?.requires).toEqual([]);
 	});
 
 	it("filters non-string values from stacks array", () => {
@@ -56,7 +56,7 @@ stacks:
 
 		const result = parseSkillFrontmatter(content);
 		expect(result).not.toBeNull();
-		expect(result!.stacks).toEqual(["typescript"]);
+		expect(result?.stacks).toEqual(["typescript"]);
 	});
 
 	it("returns null for malformed YAML", () => {
@@ -90,7 +90,7 @@ requires: []
 		const skills = await loadAllSkills(tempDir);
 		expect(skills.size).toBe(1);
 		expect(skills.has("coding-standards")).toBe(true);
-		expect(skills.get("coding-standards")!.frontmatter.name).toBe("coding-standards");
+		expect(skills.get("coding-standards")?.frontmatter.name).toBe("coding-standards");
 
 		await rm(tempDir, { recursive: true, force: true });
 	});
