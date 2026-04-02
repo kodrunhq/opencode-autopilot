@@ -3,7 +3,8 @@
 ## Milestones
 
 - **v1.0 MVP** - Phases 1-3 (shipped)
-- **v2.0 Autonomous Orchestrator** - Phases 4-7 (in progress)
+- **v2.0 Autonomous Orchestrator** - Phases 4-10 (shipped)
+- **v3.0 Intelligence & Polish** - Phases 11-17 (in progress)
 
 ## Phases
 
@@ -212,3 +213,99 @@ Plans:
 - [x] 10-02-PLAN.md -- Pipeline agent prompt rewrite (150+ words) and base agent fixes
 - [x] 10-03-PLAN.md -- Skill injection into dispatch prompts and two-tier fallback chain resolution
 - [x] 10-04-PLAN.md -- Smart review agent selection: 13 new ReviewAgent implementations with stack-gated dispatch
+
+### v3.0 Intelligence & Polish
+
+- [ ] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
+- [ ] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research
+- [ ] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing
+- [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
+- [ ] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval
+- [ ] **Phase 16: Specialized Agents** - Primary agents if Phase 11 validates value (MasterDebugger, Reviewer candidates)
+- [ ] **Phase 17: Integration & Polish** - Cross-feature integration, high-value hooks, final production polish
+
+## Phase Details (v3.0)
+
+### Phase 11: Ecosystem Research & Gap Analysis
+**Goal:** Deep competitive research across GSD, superpowers, oh-my-openagent, everything-claude-code, and claude-mem producing a gap matrix that defines the exact implementation scope of subsequent phases
+**Depends on:** Phase 10 (v2.0 complete)
+**Requirements:** TBD (research phase generates requirements for later phases)
+**Success Criteria** (what must be TRUE):
+  1. Gap matrix covers all 5 competitor plugins across skills, commands, hooks, agents, memory, workflows, and observability
+  2. Each gap has a priority rating (CRITICAL/HIGH/MEDIUM/LOW) and a phase assignment
+  3. Memory system patterns analyzed with token-efficiency assessment
+  4. Specialized agent archetypes critically evaluated with clear value/no-value determination
+  5. Research surfaces gaps we hadn't anticipated (creative, forward-looking analysis)
+**Plans:** 3 plans
+
+Plans:
+- [ ] 11-01-PLAN.md -- Five competitor deep-dives (GSD, superpowers, OMO, ECC, claude-mem) with feature catalogs
+- [ ] 11-02-PLAN.md -- Broader ecosystem scan and novel opportunities analysis
+- [ ] 11-03-PLAN.md -- Gap matrix synthesis, phase scope definitions, memory architecture, agent verdict
+
+### Phase 12: Quick Wins & Fixes
+**Goal:** Fix known bugs and small improvements that don't require research or complex architecture
+**Depends on:** Phase 10
+**Requirements:** TBD
+**Success Criteria** (what must be TRUE):
+  1. CLI configure wizard shows Zen provider prefix on models, matching OpenCode's native /models display
+  2. Users can distinguish Go vs Zen providers when selecting a model
+  3. Any additional quick wins from Phase 11 research are addressed
+**Plans:** TBD
+
+### Phase 13: Session Observability
+**Goal:** Full session observability with structured event logging, human-readable summaries, TUI dashboard, time-based retention, and configurable mock provider for fallback testing
+**Depends on:** Phase 12
+**Requirements:** TBD
+**Success Criteria** (what must be TRUE):
+  1. Every fallback trigger, model error, and autopilot decision is captured as a structured JSON event with timestamp and context
+  2. Human-readable session summaries are generated from structured events
+  3. Logs persist in ~/.config/opencode/logs/ with configurable 30-day default retention
+  4. Rich TUI dashboard shows session timeline, error highlighting, and filterable columns
+  5. Mock provider can simulate specific failure modes (rate limit, quota, timeout, malformed) for fallback chain testing
+**Plans:** TBD
+
+### Phase 14: Skills & Commands
+**Goal:** Implement high-priority skills and commands identified by Phase 11 gap matrix — brainstorming, PR comment review, update-docs, validate-agents-md, and whatever research surfaces
+**Depends on:** Phase 11 (research defines scope)
+**Requirements:** TBD (defined by Phase 11 gap matrix)
+**Success Criteria** (what must be TRUE):
+  1. All CRITICAL and HIGH priority skill gaps from Phase 11 matrix are addressed
+  2. All CRITICAL and HIGH priority command gaps from Phase 11 matrix are addressed
+  3. Every new skill/command follows established plugin patterns and feels native
+  4. PR comment review command retrieves, assesses, fixes/defers, and replies to PR comments
+**Plans:** TBD
+
+### Phase 15: Memory System
+**Goal:** Smart dual-scope memory system that learns project patterns and user preferences, stored globally with relevance-scored retrieval — the plugin gets better the more you use it
+**Depends on:** Phase 11 (research informs architecture)
+**Requirements:** TBD
+**Success Criteria** (what must be TRUE):
+  1. Project-level memories capture coding conventions, architecture decisions, and codebase patterns
+  2. User-level memories capture workflow preferences and communication style across all projects
+  3. All memory stored in ~/.config/opencode/memory/ — never in project repos
+  4. Relevance scoring injects only top-N relevant memories into context, keeping token usage lean
+  5. Memory demonstrably improves agent behavior over multiple sessions
+**Plans:** TBD
+
+### Phase 16: Specialized Agents
+**Goal:** Implement specialized primary agents if Phase 11 research validates clear value over existing tools — candidates: MasterDebugger, Reviewer
+**Depends on:** Phase 11 (research decides), Phase 15 (memory integration)
+**Requirements:** TBD (defined by Phase 11 research)
+**Success Criteria** (what must be TRUE):
+  1. Each agent passes the "does this meaningfully better than existing tools" test (validated by research)
+  2. Agents are primary mode — directly accessible to users
+  3. Agents integrate with skills and memory system
+  4. Agents support autonomous workflow, not just one-shot interactions
+**Plans:** TBD
+
+### Phase 17: Integration & Polish
+**Goal:** Cross-feature integration testing, high-value hooks from research, and final production polish for v3.0 release
+**Depends on:** All prior v3.0 phases
+**Requirements:** TBD
+**Success Criteria** (what must be TRUE):
+  1. All v3.0 features work together as a cohesive system (logging + memory + agents + skills)
+  2. High-value hooks from Phase 11 research are implemented (only if research shows significant gap)
+  3. End-to-end scenario passes: session -> decisions logged -> memories extracted -> next session improved
+  4. Production-ready, best-in-class quality — no rough edges
+**Plans:** TBD
