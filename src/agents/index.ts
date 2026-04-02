@@ -59,7 +59,15 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 	}
 
 	// Load plugin config for model group resolution
-	const pluginConfig = await loadConfig(configPath);
+	let pluginConfig = null;
+	try {
+		pluginConfig = await loadConfig(configPath);
+	} catch (error: unknown) {
+		console.error(
+			"[opencode-autopilot] Failed to load plugin config:",
+			error instanceof Error ? error.message : String(error),
+		);
+	}
 	const groups: Readonly<Record<string, GroupModelAssignment>> = pluginConfig?.groups ?? {};
 	const overrides: Readonly<Record<string, AgentOverride>> = pluginConfig?.overrides ?? {};
 

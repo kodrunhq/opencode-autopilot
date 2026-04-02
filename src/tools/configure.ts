@@ -10,7 +10,7 @@ import {
 	GROUP_DEFINITIONS,
 } from "../registry/model-groups";
 import { extractFamily } from "../registry/resolver";
-import type { GroupModelAssignment } from "../registry/types";
+import type { DiversityWarning, GroupModelAssignment } from "../registry/types";
 
 // --- Module-level state ---
 
@@ -99,6 +99,20 @@ function discoverAvailableModels(config: Config | null): Map<string, string[]> {
 	return modelsByFamily;
 }
 
+function serializeDiversityWarnings(warnings: readonly DiversityWarning[]): readonly {
+	groups: readonly string[];
+	severity: string;
+	sharedFamily: string;
+	reason: string;
+}[] {
+	return warnings.map((w) => ({
+		groups: w.groups,
+		severity: w.rule.severity,
+		sharedFamily: w.sharedFamily,
+		reason: w.rule.reason,
+	}));
+}
+
 async function handleStart(configPath?: string): Promise<string> {
 	const modelsByFamily = discoverAvailableModels(openCodeConfig);
 
@@ -155,6 +169,8 @@ function handleAssign(args: ConfigureArgs): string {
 		});
 	}
 
+	const trimmedPrimary = primary.trim();
+
 	// Parse fallbacks
 	const parsedFallbacks = fallbacksStr
 		? fallbacksStr
@@ -165,7 +181,7 @@ function handleAssign(args: ConfigureArgs): string {
 
 	// Store assignment
 	const assignment: GroupModelAssignment = Object.freeze({
-		primary,
+		primary: trimmedPrimary,
 		fallbacks: Object.freeze(parsedFallbacks),
 	});
 	pendingAssignments.set(group, assignment);
@@ -173,18 +189,13 @@ function handleAssign(args: ConfigureArgs): string {
 	// Run diversity check on all pending assignments
 	const assignmentRecord: Record<string, GroupModelAssignment> =
 		Object.fromEntries(pendingAssignments);
-	const diversityWarnings = checkDiversity(assignmentRecord).map((w) => ({
-		groups: w.groups,
-		severity: w.rule.severity,
-		sharedFamily: w.sharedFamily,
-		reason: w.rule.reason,
-	}));
+	const diversityWarnings = serializeDiversityWarnings(checkDiversity(assignmentRecord));
 
 	return JSON.stringify({
 		action: "configure",
 		stage: "assigned",
 		group,
-		primary,
+		primary: trimmedPrimary,
 		fallbacks: parsedFallbacks,
 		assignedCount: pendingAssignments.size,
 		totalGroups: ALL_GROUP_IDS.length,
@@ -227,12 +238,7 @@ async function handleCommit(configPath?: string): Promise<string> {
 	pendingAssignments.clear();
 
 	// Final diversity check
-	const diversityWarnings = checkDiversity(savedGroups).map((w) => ({
-		groups: w.groups,
-		severity: w.rule.severity,
-		sharedFamily: w.sharedFamily,
-		reason: w.rule.reason,
-	}));
+	const diversityWarnings = serializeDiversityWarnings(checkDiversity(savedGroups));
 
 	return JSON.stringify({
 		action: "configure",
@@ -256,12 +262,7 @@ async function handleDoctor(configPath?: string): Promise<string> {
 			configured: result.configured,
 			groupsAssigned: result.groupsAssigned,
 		},
-		diversityWarnings: result.diversityWarnings.map((w) => ({
-			groups: w.groups,
-			severity: w.rule.severity,
-			sharedFamily: w.sharedFamily,
-			reason: w.rule.reason,
-		})),
+		diversityWarnings: serializeDiversityWarnings(result.diversityWarnings),
 		allPassed: result.allPassed,
 	});
 }

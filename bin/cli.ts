@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { execFile as execFileCb } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -38,8 +39,15 @@ async function checkOpenCodeInstalled(): Promise<string | null> {
 	try {
 		const { stdout } = await execFile("opencode", ["--version"]);
 		return stdout.trim();
-	} catch {
-		return null;
+	} catch (error: unknown) {
+		if (
+			error instanceof Error &&
+			"code" in error &&
+			(error as NodeJS.ErrnoException).code === "ENOENT"
+		) {
+			return null;
+		}
+		throw error;
 	}
 }
 
@@ -92,12 +100,11 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 			...opencodeJson,
 			plugin: [...existingPlugins, PLUGIN_NAME],
 		};
+		const tmpJsonPath = `${jsonPath}.tmp.${randomBytes(8).toString("hex")}`;
+		await writeFile(tmpJsonPath, JSON.stringify(opencodeJson, null, 2), "utf-8");
+		await rename(tmpJsonPath, jsonPath);
 		console.log(`  ${green("✓")} Plugin registered`);
 	}
-
-	const tmpJsonPath = `${jsonPath}.tmp.${Date.now()}`;
-	await writeFile(tmpJsonPath, JSON.stringify(opencodeJson, null, 2), "utf-8");
-	await rename(tmpJsonPath, jsonPath);
 
 	// 4. Create starter config (skip if exists)
 	if (await fileExists(configPath)) {
@@ -161,8 +168,16 @@ async function printSystemChecks(
 				console.log(`  Plugin registered       ${red("✗")} not in ${OPENCODE_JSON} — run install`);
 				hasFailure = true;
 			}
-		} catch {
-			console.log(`  Plugin registered       ${red("✗")} invalid ${OPENCODE_JSON}`);
+		} catch (error: unknown) {
+			if (error instanceof SyntaxError) {
+				console.log(
+					`  Plugin registered       ${red("✗")} invalid ${OPENCODE_JSON} — fix JSON syntax`,
+				);
+			} else {
+				console.log(
+					`  Plugin registered       ${red("✗")} could not read ${OPENCODE_JSON}: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
 			hasFailure = true;
 		}
 	} else {
@@ -225,12 +240,7 @@ function printDiversityResults(
 	console.log(bold("Adversarial Diversity"));
 
 	if (config && Object.keys(config.groups).length > 0) {
-		// Build a set of warned group pairs for quick lookup
-		const warnedPairs = new Set(
-			result.diversityWarnings.map((w) => [...w.groups].sort().join(",")),
-		);
-
-		// Derive display rules from DIVERSITY_RULES (Fix 6)
+		// Derive display rules from DIVERSITY_RULES
 		const rules = DIVERSITY_RULES.map((rule) => {
 			const groupLabels = rule.groups.map((g) => GROUP_DEFINITIONS[g as GroupId].label);
 			const label =
@@ -249,9 +259,7 @@ function printDiversityResults(
 				continue;
 			}
 
-			const warning = result.diversityWarnings.find(
-				(w) => [...w.groups].sort().join(",") === key || warnedPairs.has(key),
-			);
+			const warning = result.diversityWarnings.find((w) => [...w.groups].sort().join(",") === key);
 
 			if (warning) {
 				console.log(

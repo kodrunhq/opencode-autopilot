@@ -69,7 +69,9 @@ export function diagnose(config: DiagnosableConfig | null): DiagnosticResult {
 
 	const diversityWarnings = checkDiversity(assignedGroups);
 
-	const allPassed = configExists && schemaValid && configured && diversityWarnings.length === 0;
+	const allGroupsAssigned = ALL_GROUP_IDS.every((id) => groupsAssigned[id]?.assigned);
+	// diversityWarnings are advisory — they don't affect allPassed
+	const allPassed = configExists && schemaValid && configured && allGroupsAssigned;
 
 	return Object.freeze({
 		configExists,

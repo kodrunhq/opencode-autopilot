@@ -189,9 +189,11 @@ describe("CLI doctor", () => {
 		const originalExitCode = process.exitCode;
 		process.exitCode = 0;
 
-		// Doctor should still run without crashing; diversity warnings are informational
-		await runDoctor({ cwd: tempDir, configDir: configPath });
+		// Doctor should run without crashing; diversity warnings are advisory (not exit 1)
+		await expect(runDoctor({ cwd: tempDir, configDir: configPath })).resolves.toBeUndefined();
 
+		// Diversity warnings are advisory — exitCode should not be 1 for warnings alone
+		// (opencode binary may not be installed, which would set exitCode = 1 for that check)
 		process.exitCode = originalExitCode;
 	});
 
@@ -249,11 +251,14 @@ describe("CLI doctor", () => {
 		const originalExitCode = process.exitCode;
 		process.exitCode = 0;
 
-		await runDoctor({ cwd: tempDir, configDir: configPath });
+		// Verify doctor completes without throwing
+		await expect(runDoctor({ cwd: tempDir, configDir: configPath })).resolves.toBeUndefined();
 
-		// opencode binary might not be installed, so we can't guarantee exitCode 0
-		// but the config checks should all pass
-		// If opencode is installed, exitCode = 0; if not, exitCode = 1 (only opencode check fails)
+		// Verify the config was actually read correctly (it should still exist and be valid)
+		const reloaded = JSON.parse(await readFile(configPath, "utf-8"));
+		expect(reloaded.configured).toBe(true);
+		expect(Object.keys(reloaded.groups)).toHaveLength(8);
+
 		process.exitCode = originalExitCode;
 	});
 });

@@ -1,9 +1,9 @@
 import type { AgentEntry, DiversityRule, GroupDefinition, GroupId } from "./types";
 
-function deepFreeze<T extends Record<string, unknown>>(obj: T): Readonly<T> {
+function deepFreeze<T extends object>(obj: T): Readonly<T> {
 	for (const value of Object.values(obj)) {
 		if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
-			Object.freeze(value);
+			deepFreeze(value as object);
 		}
 	}
 	return Object.freeze(obj);

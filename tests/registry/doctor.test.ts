@@ -1,7 +1,7 @@
 // tests/registry/doctor.test.ts
 import { describe, expect, test } from "bun:test";
-import { diagnose } from "../../src/registry/doctor";
 import type { DiagnosableConfig } from "../../src/registry/doctor";
+import { diagnose } from "../../src/registry/doctor";
 import type { GroupModelAssignment } from "../../src/registry/types";
 
 /** Helper: build a full groups record with all 8 groups assigned to diverse families. */
@@ -109,7 +109,8 @@ describe("diagnose", () => {
 		const result = diagnose(config);
 
 		expect(result.diversityWarnings.length).toBeGreaterThan(0);
-		expect(result.allPassed).toBe(false);
+		// diversityWarnings are advisory — they don't affect allPassed
+		expect(result.allPassed).toBe(true);
 
 		const architectsChallengersWarning = result.diversityWarnings.find(
 			(w) => w.groups.includes("architects") && w.groups.includes("challengers"),

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
@@ -228,7 +229,7 @@ export async function saveConfig(
 	configPath: string = CONFIG_PATH,
 ): Promise<void> {
 	await ensureDir(dirname(configPath));
-	const tmpPath = `${configPath}.tmp.${Date.now()}`;
+	const tmpPath = `${configPath}.tmp.${randomBytes(8).toString("hex")}`;
 	await writeFile(tmpPath, JSON.stringify(config, null, 2), "utf-8");
 	await rename(tmpPath, configPath);
 }
