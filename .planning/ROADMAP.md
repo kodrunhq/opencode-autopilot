@@ -227,7 +227,7 @@ Plans:
 - [x] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research (completed 2026-04-02)
 - [x] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing (completed 2026-04-02)
 - [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
-- [ ] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval
+- [x] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval (completed 2026-04-02)
 - [ ] **Phase 16: Autopilot Integration (Skills + Memory)** - Integrate new skills/commands and memory capabilities into the existing Autopilot; no new dedicated agents
 - [ ] **Phase 17: Integration & Polish** - Cross-feature integration, high-value hooks, final production polish
 
@@ -302,7 +302,7 @@ Plans:
   3. All memory stored in ~/.config/opencode/memory/ — never in project repos
   4. Relevance scoring injects only top-N relevant memories into context, keeping token usage lean
   5. Memory demonstrably improves agent behavior over multiple sessions
-**Plans:** TBD
+**Plans:** 1/1 plans complete
 
 ### Phase 16: Autopilot Integration (Skills + Memory)
 **Goal:** Integrate new skills/commands (Phase 14) and memory capabilities (Phase 15) into the existing Autopilot agent — no new dedicated agents (Phase 11 research concluded skills > agents for all candidates)
