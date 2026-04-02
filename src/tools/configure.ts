@@ -45,6 +45,7 @@ let availableProviders: ReadonlyArray<{
 
 export function resetPendingAssignments(): void {
 	pendingAssignments = new Map();
+	availableProviders = [];
 }
 
 export function setOpenCodeConfig(config: Config | null): void {
@@ -105,7 +106,7 @@ function serializeDiversityWarnings(warnings: readonly DiversityWarning[]): read
 }
 
 async function handleStart(configPath?: string): Promise<string> {
-	const modelsByFamily = discoverAvailableModels();
+	const modelsByProvider = discoverAvailableModels();
 
 	// Load current plugin config to show existing assignments
 	const currentConfig = await loadConfig(configPath);
@@ -132,7 +133,7 @@ async function handleStart(configPath?: string): Promise<string> {
 	return JSON.stringify({
 		action: "configure",
 		stage: "start",
-		availableModels: Object.fromEntries(modelsByFamily),
+		availableModels: Object.fromEntries(modelsByProvider),
 		groups,
 		currentConfig: currentConfig
 			? { configured: currentConfig.configured, groups: currentConfig.groups }

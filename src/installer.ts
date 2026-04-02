@@ -118,8 +118,11 @@ async function processSkills(sourceDir: string, targetDir: string): Promise<Inst
 	return { copied, skipped, errors };
 }
 
-async function cleanupDeprecatedAssets(targetDir: string): Promise<readonly string[]> {
+async function cleanupDeprecatedAssets(
+	targetDir: string,
+): Promise<{ readonly removed: readonly string[]; readonly errors: readonly string[] }> {
 	const removed: string[] = [];
+	const errors: string[] = [];
 	for (const asset of DEPRECATED_ASSETS) {
 		try {
 			await unlink(join(targetDir, asset));
@@ -127,14 +130,12 @@ async function cleanupDeprecatedAssets(targetDir: string): Promise<readonly stri
 		} catch (error: unknown) {
 			if (!isEnoentError(error)) {
 				const message = error instanceof Error ? error.message : String(error);
-				console.error(
-					`[opencode-autopilot] Failed to remove deprecated asset ${asset}: ${message}`,
-				);
+				errors.push(`cleanup ${asset}: ${message}`);
 			}
 			// ENOENT is expected — asset already gone
 		}
 	}
-	return removed;
+	return { removed, errors };
 }
 
 export async function installAssets(
@@ -142,7 +143,7 @@ export async function installAssets(
 	targetDir: string = getGlobalConfigDir(),
 ): Promise<InstallResult> {
 	// Remove deprecated assets before copying new ones
-	await cleanupDeprecatedAssets(targetDir);
+	const cleanup = await cleanupDeprecatedAssets(targetDir);
 
 	const [agents, commands, skills] = await Promise.all([
 		processFiles(assetsDir, targetDir, "agents"),
@@ -153,6 +154,6 @@ export async function installAssets(
 	return {
 		copied: [...agents.copied, ...commands.copied, ...skills.copied],
 		skipped: [...agents.skipped, ...commands.skipped, ...skills.skipped],
-		errors: [...agents.errors, ...commands.errors, ...skills.errors],
+		errors: [...cleanup.errors, ...agents.errors, ...commands.errors, ...skills.errors],
 	};
 }

@@ -237,8 +237,7 @@ describe("configureCore edge cases", () => {
 		expect(result.availableModels.anthropic).toContain("anthropic/claude-opus-4-6");
 		expect(result.availableModels.anthropic).toContain("anthropic/claude-sonnet-4-6");
 		expect(result.availableModels.openai).toContain("openai/gpt-5.4");
-
-		setAvailableProviders([]);
+		// cleanup handled by beforeEach → resetPendingAssignments() which also clears providers
 	});
 });
 
