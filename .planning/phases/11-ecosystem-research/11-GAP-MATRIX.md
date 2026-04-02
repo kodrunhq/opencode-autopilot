@@ -255,7 +255,7 @@ Research across all 5 competitors shows the skills > agents trend. MasterDebugge
 | Priority | Count | Phase Distribution |
 |----------|-------|--------------------|
 | CRITICAL | 12 | Phase 12: 4 (CM-01, DX-01, DX-02, NV-06), Phase 13: 1 (OB-01), Phase 14: 3 (SK-01, SK-02, SK-03), Phase 15: 4 (MM-01, MM-02, HK-01, HK-02) |
-| HIGH | 26 | Phase 12: 1, Phase 13: 7, Phase 14: 7, Phase 15: 5, Phase 17: 5, Novel: 1 |
+| HIGH | 26 | Phase 12: 1 (SF-04), Phase 13: 9 (CM-04, CM-05, HK-04, HK-09, HK-10, OB-02, OB-03, OB-04, TS-03), Phase 14: 8 (SK-04, SK-05, SK-06, SK-07, SK-09, SK-16, CM-02, CM-03, DX-03), Phase 15: 5 (MM-03, MM-04, MM-05, MM-06, MM-11), Phase 17: 4 (HK-03, SF-01, SF-02, WF-01). Note: NV cross-refs (NV-01→SK-16, NV-02→WF-01, NV-04→OB-04) and consolidated items (HK-07→SF-02, DX-04→CM-02) counted under primary ID only. Distinct count: 27; deduplicated: 26. |
 | MEDIUM | 24 | Phase 12: 1, Phase 13: 2, Phase 14: 8, Phase 15: 5, Phase 17: 7, Novel: 1 |
 | LOW | 11 | Skip: 9, Skip (Agent): 2 |
 
