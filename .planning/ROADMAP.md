@@ -289,7 +289,7 @@ Plans:
 - [ ] 14-02-PLAN.md -- HIGH methodology skills: verification, git worktrees, plan writing, plan executing
 - [x] 14-03-PLAN.md -- MEDIUM methodology skills (code-review, compaction, E2E) + thin wrapper commands
 - [ ] 14-04-PLAN.md -- Language-specific pattern skills: TypeScript/Bun, Go, Python, Rust
-- [ ] 14-05-PLAN.md -- Tool-backed commands (/stocktake, /update-docs), asset linter, template updates
+- [x] 14-05-PLAN.md -- Tool-backed commands (/stocktake, /update-docs), asset linter, template updates
 - [ ] 14-06-PLAN.md -- Adaptive skill loading infrastructure + composable skill chains
 
 ### Phase 15: Memory System
