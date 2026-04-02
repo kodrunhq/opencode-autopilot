@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
 status: Phase complete — ready for verification
-stopped_at: Completed 12-03-PLAN.md (quick task command)
-last_updated: "2026-04-02T13:14:08.163Z"
+stopped_at: Completed 12-02-PLAN.md (doctor tool & Zen fix)
+last_updated: "2026-04-02T13:23:11.765Z"
 progress:
   total_phases: 10
   completed_phases: 10
@@ -65,7 +65,8 @@ Plan: 3 of 3 (all complete)
 | Phase 11 P02 | 5m33s | 2 tasks | 2 files |
 | Phase 11-ecosystem-research P01 | 12min | 2 tasks | 5 files |
 | Phase 11-ecosystem-research P03 | 8min | 2 tasks | 4 files |
-| Phase 12-quick-wins P03 | 3min | 1 tasks | 5 files |
+| Phase 12-quick-wins P01 | 2min | 2 tasks | 2 files |
+| Phase 12-quick-wins P02 | 4min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -142,7 +143,9 @@ Recent decisions affecting current work:
 - [Phase 11]: Phase 16 scoped down to single integration plan (Option A) -- all 6 agent candidates better as skills/commands
 - [Phase 11]: Memory architecture: bun:sqlite + FTS5, 3-layer progressive disclosure, observation-based capture, 90-day decay, 2000-token injection cap
 - [Phase 11]: Self-healing doctor + plugin diagnostics as Phase 12 quick wins (CRITICAL priority)
-- [Phase 12-quick-wins]: quickCore creates skip-ahead state and delegates to orchestrateCore rather than reimplementing pipeline logic
+- [Phase 12-quick-wins]: Use modelData.id field over record key for provider-prefixed model path construction in configure wizard
+- [Phase 12-quick-wins]: Created src/health/ module from scratch as health check infrastructure for oc_doctor
+- [Phase 12-quick-wins]: Hook-registration check is informational only (always pass when oc_doctor callable)
 
 ### Pending Todos
 
@@ -156,6 +159,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T13:14:08.160Z
-Stopped at: Completed 12-03-PLAN.md (quick task command)
+Last session: 2026-04-02T13:23:11.763Z
+Stopped at: Completed 12-02-PLAN.md (doctor tool & Zen fix)
 Resume file: None
