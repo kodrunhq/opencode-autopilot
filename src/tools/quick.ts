@@ -92,11 +92,14 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 		},
 	];
 	for (const stub of stubs) {
+		const phaseDir = await ensurePhaseDir(artifactDir, stub.phase);
 		try {
-			const phaseDir = await ensurePhaseDir(artifactDir, stub.phase);
 			await writeFile(join(phaseDir, stub.file), stub.content, { flag: "wx" });
-		} catch {
-			// File already exists or dir creation failed — safe to skip
+		} catch (error) {
+			const err = error as NodeJS.ErrnoException;
+			if (err.code !== "EEXIST") {
+				throw err;
+			}
 		}
 	}
 

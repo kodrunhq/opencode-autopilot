@@ -1,6 +1,7 @@
 import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
+import { runHealthChecks } from "./health/runner";
 import { installAssets } from "./installer";
 import type { SdkOperations } from "./orchestrator/fallback";
 import {
@@ -63,6 +64,11 @@ const plugin: Plugin = async (input) => {
 	// Load config for first-load detection and fallback settings
 	const config = await loadConfig();
 	const fallbackConfig = config?.fallback ?? fallbackDefaults;
+
+	// Self-healing health checks on every load (non-blocking, <100ms target)
+	runHealthChecks().catch(() => {
+		// Health check failures are non-fatal — oc_doctor provides manual diagnostics
+	});
 
 	// --- Fallback subsystem initialization ---
 	const sdkOps: SdkOperations = {
