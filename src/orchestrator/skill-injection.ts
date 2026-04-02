@@ -10,6 +10,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { sanitizeTemplateContent } from "../review/sanitize";
+import {
+	buildMultiSkillContext,
+	detectProjectStackTags,
+	filterSkillsByStack,
+} from "../skills/adaptive-injector";
+import { loadAllSkills } from "../skills/loader";
 import { isEnoentError } from "../utils/fs-helpers";
 
 const MAX_SKILL_LENGTH = 2048;
@@ -49,4 +55,35 @@ export function buildSkillContext(skillContent: string): string {
 
 	const header = "Coding standards for this project (follow these conventions):";
 	return `\n\n${header}\n${sanitized}`;
+}
+
+// --- Adaptive multi-skill loading ---
+
+/**
+ * Load and inject all matching skills for the current project.
+ * Detects project stack from manifest files, filters skills by stack,
+ * resolves dependencies, and builds a token-budgeted context string.
+ *
+ * Returns empty string on any error (best-effort, same as lesson injection).
+ */
+export async function loadAdaptiveSkillContext(
+	baseDir: string,
+	projectRoot: string,
+	tokenBudget?: number,
+): Promise<string> {
+	try {
+		const skillsDir = join(baseDir, "skills");
+		const [allSkills, projectTags] = await Promise.all([
+			loadAllSkills(skillsDir),
+			detectProjectStackTags(projectRoot),
+		]);
+
+		if (allSkills.size === 0) return "";
+
+		const matchingSkills = filterSkillsByStack(allSkills, projectTags);
+		return buildMultiSkillContext(matchingSkills, tokenBudget);
+	} catch {
+		// Best-effort: never break dispatch due to skill loading failure
+		return "";
+	}
 }

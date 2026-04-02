@@ -1,0 +1,82 @@
+/**
+ * Skill frontmatter parser and file loader.
+ *
+ * Loads SKILL.md files from the global skills directory, parses their
+ * YAML frontmatter, and returns structured skill metadata + content.
+ * Uses the `yaml` package for parsing (not regex — per "Don't Hand-Roll" guideline).
+ */
+
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { parse } from "yaml";
+import { isEnoentError } from "../utils/fs-helpers";
+
+export interface SkillFrontmatter {
+	readonly name: string;
+	readonly description: string;
+	readonly stacks: readonly string[];
+	readonly requires: readonly string[];
+}
+
+export interface LoadedSkill {
+	readonly frontmatter: SkillFrontmatter;
+	readonly content: string;
+	readonly path: string;
+}
+
+/**
+ * Parse YAML frontmatter from SKILL.md content.
+ * Returns null if no valid frontmatter block is found or parsing fails.
+ */
+export function parseSkillFrontmatter(content: string): SkillFrontmatter | null {
+	const match = content.match(/^---\n([\s\S]*?)\n---/);
+	if (!match) return null;
+
+	try {
+		const parsed = parse(match[1]) as Record<string, unknown>;
+		return {
+			name: typeof parsed.name === "string" ? parsed.name : "",
+			description: typeof parsed.description === "string" ? parsed.description : "",
+			stacks: Array.isArray(parsed.stacks)
+				? parsed.stacks.filter((s): s is string => typeof s === "string")
+				: [],
+			requires: Array.isArray(parsed.requires)
+				? parsed.requires.filter((s): s is string => typeof s === "string")
+				: [],
+		};
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Load all skills from a base directory (e.g., ~/.config/opencode/skills/).
+ * Returns a map of skill name -> LoadedSkill. Best-effort: skips invalid skills.
+ */
+export async function loadAllSkills(skillsDir: string): Promise<ReadonlyMap<string, LoadedSkill>> {
+	const skills = new Map<string, LoadedSkill>();
+
+	try {
+		const entries = await readdir(skillsDir, { withFileTypes: true });
+		await Promise.all(
+			entries
+				.filter((e) => e.isDirectory() && e.name !== ".gitkeep")
+				.map(async (dir) => {
+					try {
+						const skillPath = join(skillsDir, dir.name, "SKILL.md");
+						const content = await readFile(skillPath, "utf-8");
+						const fm = parseSkillFrontmatter(content);
+						if (fm?.name) {
+							skills.set(fm.name, { frontmatter: fm, content, path: skillPath });
+						}
+					} catch {
+						/* skip invalid skills */
+					}
+				}),
+		);
+	} catch (error: unknown) {
+		if (!isEnoentError(error)) throw error;
+	}
+
+	return skills;
+}
