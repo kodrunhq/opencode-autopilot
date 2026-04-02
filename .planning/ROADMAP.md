@@ -273,15 +273,24 @@ Plans:
 **Plans:** 1/1 plans complete
 
 ### Phase 14: Skills & Commands
-**Goal:** Implement high-priority skills and commands identified by Phase 11 gap matrix — brainstorming, PR comment review, update-docs, validate-agents-md, and whatever research surfaces
+**Goal:** Implement 22 high-priority skills and commands identified by Phase 11 gap matrix — 14 methodology and language-specific skills, 5 commands, adaptive skill loading, composable skill chains, and an asset linter
 **Depends on:** Phase 11 (research defines scope)
-**Requirements:** TBD (defined by Phase 11 gap matrix)
+**Requirements:** SK-01 through SK-18, CM-02, CM-03, CM-06, CM-07, CM-08, DX-05
 **Success Criteria** (what must be TRUE):
   1. All CRITICAL and HIGH priority skill gaps from Phase 11 matrix are addressed
   2. All CRITICAL and HIGH priority command gaps from Phase 11 matrix are addressed
   3. Every new skill/command follows established plugin patterns and feels native
-  4. PR comment review command retrieves, assesses, fixes/defers, and replies to PR comments
-**Plans:** TBD
+  4. Adaptive skill loading auto-detects project stack and loads matching skills
+  5. Composable skill chains resolve dependencies with cycle detection
+**Plans:** 6 plans
+
+Plans:
+- [ ] 14-01-PLAN.md -- CRITICAL methodology skills: brainstorming, TDD workflow, systematic debugging
+- [ ] 14-02-PLAN.md -- HIGH methodology skills: verification, git worktrees, plan writing, plan executing
+- [ ] 14-03-PLAN.md -- MEDIUM methodology skills (code-review, compaction, E2E) + thin wrapper commands
+- [ ] 14-04-PLAN.md -- Language-specific pattern skills: TypeScript/Bun, Go, Python, Rust
+- [ ] 14-05-PLAN.md -- Tool-backed commands (/stocktake, /update-docs), asset linter, template updates
+- [ ] 14-06-PLAN.md -- Adaptive skill loading infrastructure + composable skill chains
 
 ### Phase 15: Memory System
 **Goal:** Smart dual-scope memory system that learns project patterns and user preferences, stored globally with relevance-scored retrieval — the plugin gets better the more you use it
