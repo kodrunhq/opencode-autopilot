@@ -34,18 +34,19 @@ const plugin: Plugin = async (input) => {
 		console.error("[opencode-autopilot] Asset installation errors:", installResult.errors);
 	}
 
-	// Discover available providers/models from OpenCode SDK
-	try {
-		const providerResponse = await client.provider.list({
-			query: { directory: process.cwd() },
+	// Discover available providers/models in the background (non-blocking).
+	// The data is only needed when oc_configure "start" is called, not at plugin init.
+	client.provider
+		.list({ query: { directory: process.cwd() } })
+		.then((providerResponse) => {
+			const providerData = providerResponse.data;
+			if (providerData?.all) {
+				setAvailableProviders(providerData.all);
+			}
+		})
+		.catch(() => {
+			// Provider discovery is best-effort; configure will show empty models
 		});
-		const providerData = providerResponse.data;
-		if (providerData?.all) {
-			setAvailableProviders(providerData.all);
-		}
-	} catch {
-		// Provider discovery is best-effort; configure will show empty models
-	}
 
 	// Load config for first-load detection and fallback settings
 	const config = await loadConfig();
