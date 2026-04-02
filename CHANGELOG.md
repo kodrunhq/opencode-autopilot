@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.1.2...opencode-autopilot-v1.1.3) (2026-04-02)
+
+
+### Bug Fixes
+
+* pre-format model list in tool response to prevent LLM summarization ([b0f12e7](https://github.com/kodrunhq/opencode-autopilot/commit/b0f12e74cd87b3ffd58503cecc7e3a9036e5ccf7))
+* return pre-formatted model list from oc_configure start ([42d82fd](https://github.com/kodrunhq/opencode-autopilot/commit/42d82fdad6854b5c2e041d7192d0f37a17dc6123))
+
 ## [1.1.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.1.1...opencode-autopilot-v1.1.2) (2026-04-02)
 
 
