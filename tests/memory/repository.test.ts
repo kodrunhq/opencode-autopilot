@@ -1,17 +1,17 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { initMemoryDb } from "../../src/memory/database";
 import {
+	deleteObservation,
+	getAllPreferences,
+	getObservationsByProject,
+	getProjectByPath,
 	insertObservation,
 	searchObservations,
-	upsertProject,
-	getProjectByPath,
-	getObservationsByProject,
-	upsertPreference,
-	getAllPreferences,
-	deleteObservation,
 	updateAccessCount,
+	upsertPreference,
+	upsertProject,
 } from "../../src/memory/repository";
-import { initMemoryDb } from "../../src/memory/database";
 
 describe("repository", () => {
 	let db: Database;
@@ -147,8 +147,8 @@ describe("repository", () => {
 			);
 			const result = getProjectByPath("/home/user/project", db);
 			expect(result).not.toBeNull();
-			expect(result!.id).toBe("proj-1");
-			expect(result!.name).toBe("my-project");
+			expect(result?.id).toBe("proj-1");
+			expect(result?.name).toBe("my-project");
 		});
 
 		test("updates existing project on upsert", () => {
@@ -171,7 +171,7 @@ describe("repository", () => {
 				db,
 			);
 			const result = getProjectByPath("/home/user/project", db);
-			expect(result!.name).toBe("new-name");
+			expect(result?.name).toBe("new-name");
 		});
 	});
 

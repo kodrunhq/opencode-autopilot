@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { initMemoryDb } from "../../src/memory/database";
 import { insertObservation, upsertPreference, upsertProject } from "../../src/memory/repository";
 import { memoryStatusCore, ocMemoryStatus } from "../../src/tools/memory-status";
@@ -19,19 +19,16 @@ describe("memoryStatusCore", () => {
 	test("returns zero stats for empty database", () => {
 		const result = memoryStatusCore({ detail: "summary" }, db);
 		expect(result.stats).toBeDefined();
-		expect(result.stats!.totalObservations).toBe(0);
-		expect(result.stats!.totalProjects).toBe(0);
-		expect(result.stats!.totalPreferences).toBe(0);
+		expect(result.stats?.totalObservations).toBe(0);
+		expect(result.stats?.totalProjects).toBe(0);
+		expect(result.stats?.totalPreferences).toBe(0);
 		expect(result.recentObservations).toEqual([]);
 		expect(result.preferences).toEqual([]);
 	});
 
 	test("returns observation count and breakdown by type", () => {
 		const now = new Date().toISOString();
-		upsertProject(
-			{ id: "proj-1", path: "/tmp/proj", name: "proj", lastUpdated: now },
-			db,
-		);
+		upsertProject({ id: "proj-1", path: "/tmp/proj", name: "proj", lastUpdated: now }, db);
 		insertObservation(
 			{
 				projectId: "proj-1",
@@ -62,18 +59,15 @@ describe("memoryStatusCore", () => {
 		);
 
 		const result = memoryStatusCore({ detail: "summary" }, db);
-		expect(result.stats!.totalObservations).toBe(2);
-		expect(result.stats!.totalProjects).toBe(1);
-		expect(result.stats!.observationsByType.decision).toBe(1);
-		expect(result.stats!.observationsByType.error).toBe(1);
+		expect(result.stats?.totalObservations).toBe(2);
+		expect(result.stats?.totalProjects).toBe(1);
+		expect(result.stats?.observationsByType.decision).toBe(1);
+		expect(result.stats?.observationsByType.error).toBe(1);
 	});
 
 	test("returns recent observations (last 10)", () => {
 		const now = new Date().toISOString();
-		upsertProject(
-			{ id: "proj-1", path: "/tmp/proj", name: "proj", lastUpdated: now },
-			db,
-		);
+		upsertProject({ id: "proj-1", path: "/tmp/proj", name: "proj", lastUpdated: now }, db);
 
 		// Insert 12 observations
 		for (let i = 0; i < 12; i++) {
@@ -117,7 +111,7 @@ describe("memoryStatusCore", () => {
 		);
 
 		const result = memoryStatusCore({ detail: "summary" }, db);
-		expect(result.stats!.totalPreferences).toBe(1);
+		expect(result.stats?.totalPreferences).toBe(1);
 		expect(result.preferences.length).toBe(1);
 		expect(result.preferences[0].key).toBe("editor");
 		expect(result.preferences[0].value).toBe("vim");
@@ -126,7 +120,7 @@ describe("memoryStatusCore", () => {
 	test("returns storage size info", () => {
 		const result = memoryStatusCore({ detail: "summary" }, db);
 		expect(result.stats).toHaveProperty("storageSizeKb");
-		expect(typeof result.stats!.storageSizeKb).toBe("number");
+		expect(typeof result.stats?.storageSizeKb).toBe("number");
 	});
 });
 
