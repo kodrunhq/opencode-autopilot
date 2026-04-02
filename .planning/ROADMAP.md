@@ -258,7 +258,7 @@ Plans:
   1. CLI configure wizard shows Zen provider prefix on models, matching OpenCode's native /models display
   2. Users can distinguish Go vs Zen providers when selecting a model
   3. Any additional quick wins from Phase 11 research are addressed
-**Plans:** 1/1 plans complete
+**Plans:** 2/2 plans complete
 
 ### Phase 13: Session Observability
 **Goal:** Full session observability with structured event logging, human-readable summaries, TUI dashboard, time-based retention, and configurable mock provider for fallback testing
