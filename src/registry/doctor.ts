@@ -43,6 +43,7 @@ export interface DiagnosticResult {
  */
 export function diagnose(config: DiagnosableConfig | null): DiagnosticResult {
 	const configExists = config !== null;
+	// Always true when configExists — loadConfig validates through Zod on load
 	const schemaValid = configExists;
 	const configured = config?.configured ?? false;
 
@@ -68,11 +69,7 @@ export function diagnose(config: DiagnosableConfig | null): DiagnosticResult {
 
 	const diversityWarnings = checkDiversity(assignedGroups);
 
-	const allPassed =
-		configExists &&
-		schemaValid &&
-		configured &&
-		diversityWarnings.length === 0;
+	const allPassed = configExists && schemaValid && configured && diversityWarnings.length === 0;
 
 	return Object.freeze({
 		configExists,

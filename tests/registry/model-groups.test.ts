@@ -9,8 +9,8 @@ import {
 import type { GroupId } from "../../src/registry/types";
 
 describe("ALL_GROUP_IDS", () => {
-	test("contains exactly 8 groups", () => {
-		expect(ALL_GROUP_IDS).toHaveLength(8);
+	test("has one entry per GROUP_DEFINITIONS key", () => {
+		expect(ALL_GROUP_IDS).toHaveLength(Object.keys(GROUP_DEFINITIONS).length);
 	});
 
 	test("is frozen", () => {

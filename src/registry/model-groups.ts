@@ -1,6 +1,15 @@
 import type { AgentEntry, DiversityRule, GroupDefinition, GroupId } from "./types";
 
-export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = Object.freeze({
+function deepFreeze<T extends Record<string, unknown>>(obj: T): Readonly<T> {
+	for (const value of Object.values(obj)) {
+		if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+			Object.freeze(value);
+		}
+	}
+	return Object.freeze(obj);
+}
+
+export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = deepFreeze({
 	// ── Architects ─────────────────────────────────────────────
 	// Deep reasoning: system design, task decomposition, orchestration
 	"oc-architect": { group: "architects" },
@@ -51,22 +60,7 @@ export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = Object.freez
 	"pr-reviewer": { group: "utilities" },
 });
 
-/**
- * All valid group IDs, derived from GROUP_DEFINITIONS keys.
- * Used for iteration and validation.
- */
-export const ALL_GROUP_IDS: readonly GroupId[] = Object.freeze([
-	"architects",
-	"challengers",
-	"builders",
-	"reviewers",
-	"red-team",
-	"researchers",
-	"communicators",
-	"utilities",
-]);
-
-export const GROUP_DEFINITIONS: Readonly<Record<GroupId, GroupDefinition>> = Object.freeze({
+export const GROUP_DEFINITIONS: Readonly<Record<GroupId, GroupDefinition>> = deepFreeze({
 	architects: {
 		id: "architects",
 		label: "Architects",
@@ -137,23 +131,33 @@ export const GROUP_DEFINITIONS: Readonly<Record<GroupId, GroupDefinition>> = Obj
 	},
 });
 
+/**
+ * All valid group IDs, derived from GROUP_DEFINITIONS and sorted by order.
+ * Adding a new group to GROUP_DEFINITIONS auto-includes it here.
+ */
+export const ALL_GROUP_IDS: readonly GroupId[] = Object.freeze(
+	[...(Object.values(GROUP_DEFINITIONS) as GroupDefinition[])]
+		.sort((a: GroupDefinition, b: GroupDefinition) => a.order - b.order)
+		.map((d: GroupDefinition) => d.id),
+);
+
 export const DIVERSITY_RULES: readonly DiversityRule[] = Object.freeze([
-	{
-		groups: ["architects", "challengers"],
-		severity: "strong",
+	Object.freeze({
+		groups: Object.freeze(["architects", "challengers"] as const),
+		severity: "strong" as const,
 		reason:
 			"Challengers critique architect output. Same-model review creates confirmation bias — the model agrees with its own reasoning patterns.",
-	},
-	{
-		groups: ["builders", "reviewers"],
-		severity: "strong",
+	}),
+	Object.freeze({
+		groups: Object.freeze(["builders", "reviewers"] as const),
+		severity: "strong" as const,
 		reason:
 			"Reviewers find bugs in builder code. Same model shares the same blind spots — it won't catch errors it would also make.",
-	},
-	{
-		groups: ["red-team", "builders", "reviewers"],
-		severity: "soft",
+	}),
+	Object.freeze({
+		groups: Object.freeze(["red-team", "builders", "reviewers"] as const),
+		severity: "soft" as const,
 		reason:
 			"Red Team is most effective as a third perspective. If you only have 2 model families, use whichever isn't assigned to Reviewers.",
-	},
+	}),
 ]);

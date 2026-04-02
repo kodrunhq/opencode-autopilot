@@ -19,7 +19,7 @@ describe("configureCore start", () => {
 		const result = JSON.parse(await configureCore({ subcommand: "start" }));
 		expect(result.action).toBe("configure");
 		expect(result.stage).toBe("start");
-		expect(result.groups).toHaveLength(8);
+		expect(result.groups).toHaveLength(ALL_GROUP_IDS.length);
 		expect(result.diversityRules).toHaveLength(3);
 	});
 
@@ -65,7 +65,7 @@ describe("configureCore assign", () => {
 		expect(result.primary).toBe("anthropic/claude-opus-4-6");
 		expect(result.fallbacks).toEqual(["openai/gpt-5.4"]);
 		expect(result.assignedCount).toBe(1);
-		expect(result.totalGroups).toBe(8);
+		expect(result.totalGroups).toBe(ALL_GROUP_IDS.length);
 	});
 
 	test("returns diversity warnings when applicable", async () => {
@@ -114,7 +114,7 @@ describe("configureCore commit", () => {
 		expect(result.message).toContain("missing");
 	});
 
-	test("succeeds when all 8 groups assigned", async () => {
+	test("succeeds when all groups assigned", async () => {
 		// Use a temp dir for config so we don't write to the real config
 		const tempDir = join(tmpdir(), `configure-commit-test-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
@@ -130,7 +130,7 @@ describe("configureCore commit", () => {
 		const result = JSON.parse(await configureCore({ subcommand: "commit" }, configPath));
 		expect(result.action).toBe("configure");
 		expect(result.stage).toBe("committed");
-		expect(Object.keys(result.groups)).toHaveLength(8);
+		expect(Object.keys(result.groups)).toHaveLength(ALL_GROUP_IDS.length);
 
 		await rm(tempDir, { recursive: true, force: true });
 	});
@@ -238,7 +238,7 @@ describe("configureCore doctor", () => {
 });
 
 describe("configureCore full flow", () => {
-	test("full flow: start -> assign all 8 groups -> commit -> doctor", async () => {
+	test("full flow: start -> assign all groups -> commit -> doctor", async () => {
 		const tempDir = join(tmpdir(), `configure-flow-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
 		const configPath = join(tempDir, "opencode-autopilot.json");
@@ -263,7 +263,7 @@ describe("configureCore full flow", () => {
 
 		const commitResult = JSON.parse(await configureCore({ subcommand: "commit" }, configPath));
 		expect(commitResult.stage).toBe("committed");
-		expect(Object.keys(commitResult.groups)).toHaveLength(8);
+		expect(Object.keys(commitResult.groups)).toHaveLength(ALL_GROUP_IDS.length);
 
 		const doctorResult = JSON.parse(await configureCore({ subcommand: "doctor" }, configPath));
 		expect(doctorResult.stage).toBe("doctor");

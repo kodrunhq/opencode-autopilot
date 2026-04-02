@@ -50,6 +50,11 @@ interface ConfigureArgs {
 	readonly fallbacks?: string;
 }
 
+function getStringField(obj: Record<string, unknown>, key: string): string | undefined {
+	const val = obj[key];
+	return typeof val === "string" ? val : undefined;
+}
+
 /**
  * Extract available models from the OpenCode host config, grouped by family.
  * Returns a map of family -> model IDs.
@@ -58,26 +63,29 @@ function discoverAvailableModels(config: Config | null): Map<string, string[]> {
 	const modelsByFamily = new Map<string, string[]>();
 	if (!config) return modelsByFamily;
 
+	const configRecord = config as Record<string, unknown>;
 	const seen = new Set<string>();
 
 	// Collect from agent configs
-	const agentConfigs = config.agent as Record<string, Record<string, unknown>> | undefined;
-	if (agentConfigs) {
-		for (const agentCfg of Object.values(agentConfigs)) {
-			const model = agentCfg.model as string | undefined;
-			if (model && !seen.has(model)) {
-				seen.add(model);
-				const family = extractFamily(model);
-				const list = modelsByFamily.get(family) ?? [];
-				list.push(model);
-				modelsByFamily.set(family, list);
+	const agentConfigs = configRecord.agent;
+	if (agentConfigs && typeof agentConfigs === "object" && agentConfigs !== null) {
+		for (const agentCfg of Object.values(agentConfigs as Record<string, unknown>)) {
+			if (agentCfg && typeof agentCfg === "object" && agentCfg !== null) {
+				const model = getStringField(agentCfg as Record<string, unknown>, "model");
+				if (model && !seen.has(model)) {
+					seen.add(model);
+					const family = extractFamily(model);
+					const list = modelsByFamily.get(family) ?? [];
+					list.push(model);
+					modelsByFamily.set(family, list);
+				}
 			}
 		}
 	}
 
 	// Also include top-level model and small_model
-	const topModel = (config as Record<string, unknown>).model as string | undefined;
-	const smallModel = (config as Record<string, unknown>).small_model as string | undefined;
+	const topModel = getStringField(configRecord, "model");
+	const smallModel = getStringField(configRecord, "small_model");
 	for (const m of [topModel, smallModel]) {
 		if (m && !seen.has(m)) {
 			seen.add(m);
@@ -148,7 +156,7 @@ function handleAssign(args: ConfigureArgs): string {
 	}
 
 	// Parse fallbacks
-	const fallbacks = fallbacksStr
+	const parsedFallbacks = fallbacksStr
 		? fallbacksStr
 				.split(",")
 				.map((s) => s.trim())
@@ -156,7 +164,10 @@ function handleAssign(args: ConfigureArgs): string {
 		: [];
 
 	// Store assignment
-	const assignment: GroupModelAssignment = { primary, fallbacks };
+	const assignment: GroupModelAssignment = Object.freeze({
+		primary,
+		fallbacks: Object.freeze(parsedFallbacks),
+	});
 	pendingAssignments.set(group, assignment);
 
 	// Run diversity check on all pending assignments
@@ -174,7 +185,7 @@ function handleAssign(args: ConfigureArgs): string {
 		stage: "assigned",
 		group,
 		primary,
-		fallbacks,
+		fallbacks: parsedFallbacks,
 		assignedCount: pendingAssignments.size,
 		totalGroups: ALL_GROUP_IDS.length,
 		diversityWarnings,
