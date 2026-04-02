@@ -225,7 +225,7 @@ Plans:
 
 - [x] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
 - [x] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research (completed 2026-04-02)
-- [ ] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing
+- [x] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing (completed 2026-04-02)
 - [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
 - [ ] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval
 - [ ] **Phase 16: Autopilot Integration (Skills + Memory)** - Integrate new skills/commands and memory capabilities into the existing Autopilot; no new dedicated agents
@@ -263,21 +263,14 @@ Plans:
 ### Phase 13: Session Observability
 **Goal:** Full session observability with structured event logging, human-readable summaries, TUI dashboard, time-based retention, and configurable mock provider for fallback testing
 **Depends on:** Phase 12
-**Requirements:** OB-01, OB-02, OB-03, OB-04, OB-06, OB-07, CM-04, CM-05, HK-04, HK-09, HK-10, NV-04, TS-03
+**Requirements:** TBD
 **Success Criteria** (what must be TRUE):
   1. Every fallback trigger, model error, and autopilot decision is captured as a structured JSON event with timestamp and context
   2. Human-readable session summaries are generated from structured events
   3. Logs persist in ~/.config/opencode/logs/ with configurable 30-day default retention
   4. Rich TUI dashboard shows session timeline, error highlighting, and filterable columns
   5. Mock provider can simulate specific failure modes (rate limit, quota, timeout, malformed) for fallback chain testing
-**Plans:** 5 plans
-
-Plans:
-- [ ] 13-01-PLAN.md -- Observability types, event store, config v5, and retention pruning
-- [ ] 13-02-PLAN.md -- Token tracker, context monitor, event emitters, and hook handler factories
-- [ ] 13-03-PLAN.md -- Log writer, log reader, and session summary generator
-- [ ] 13-04-PLAN.md -- Observability tools (oc_logs, oc_session_stats, oc_pipeline_report) and index.ts wiring
-- [ ] 13-05-PLAN.md -- Mock provider for fallback testing and oc_mock_fallback tool
+**Plans:** 1/1 plans complete
 
 ### Phase 14: Skills & Commands
 **Goal:** Implement high-priority skills and commands identified by Phase 11 gap matrix — brainstorming, PR comment review, update-docs, validate-agents-md, and whatever research surfaces
