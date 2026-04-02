@@ -3,7 +3,7 @@ import { readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { fallbackConfigSchema, fallbackDefaults } from "./orchestrator/fallback/fallback-config";
-import { AGENT_REGISTRY } from "./registry/model-groups";
+import { AGENT_REGISTRY, ALL_GROUP_IDS } from "./registry/model-groups";
 import { ensureDir, isEnoentError } from "./utils/fs-helpers";
 import { getGlobalConfigDir } from "./utils/paths";
 
@@ -90,15 +90,27 @@ const agentOverrideSchema = z.object({
 
 // --- V4 schema ---
 
-const pluginConfigSchemaV4 = z.object({
-	version: z.literal(4),
-	configured: z.boolean(),
-	groups: z.record(z.string(), groupModelAssignmentSchema).default({}),
-	overrides: z.record(z.string(), agentOverrideSchema).default({}),
-	orchestrator: orchestratorConfigSchema.default(orchestratorDefaults),
-	confidence: confidenceConfigSchema.default(confidenceDefaults),
-	fallback: fallbackConfigSchema.default(fallbackDefaults),
-});
+const pluginConfigSchemaV4 = z
+	.object({
+		version: z.literal(4),
+		configured: z.boolean(),
+		groups: z.record(z.string(), groupModelAssignmentSchema).default({}),
+		overrides: z.record(z.string(), agentOverrideSchema).default({}),
+		orchestrator: orchestratorConfigSchema.default(orchestratorDefaults),
+		confidence: confidenceConfigSchema.default(confidenceDefaults),
+		fallback: fallbackConfigSchema.default(fallbackDefaults),
+	})
+	.superRefine((config, ctx) => {
+		for (const groupId of Object.keys(config.groups)) {
+			if (!ALL_GROUP_IDS.includes(groupId as (typeof ALL_GROUP_IDS)[number])) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: ["groups", groupId],
+					message: `Unknown group id "${groupId}". Expected one of: ${ALL_GROUP_IDS.join(", ")}`,
+				});
+			}
+		}
+	});
 
 // Export aliases updated to v4
 export const pluginConfigSchema = pluginConfigSchemaV4;

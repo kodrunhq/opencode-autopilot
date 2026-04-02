@@ -114,19 +114,20 @@ describe("CLI doctor", () => {
 	});
 
 	afterEach(async () => {
+		// Reset process.exitCode to prevent test pollution leaking to the test runner
+		process.exitCode = 0;
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
 	test("reports missing opencode.json as failure", async () => {
 		// No opencode.json, no config
 		// doctor should set exitCode = 1
-		const originalExitCode = process.exitCode;
 		process.exitCode = 0;
 
 		await runDoctor({ cwd: tempDir, configDir: configPath });
 
 		expect(process.exitCode).toBe(1);
-		process.exitCode = originalExitCode;
+		// afterEach restores process.exitCode
 	});
 
 	test("reports missing config as failure", async () => {
@@ -137,13 +138,12 @@ describe("CLI doctor", () => {
 			"utf-8",
 		);
 
-		const originalExitCode = process.exitCode;
 		process.exitCode = 0;
 
 		await runDoctor({ cwd: tempDir, configDir: configPath });
 
 		expect(process.exitCode).toBe(1);
-		process.exitCode = originalExitCode;
+		// afterEach restores process.exitCode
 	});
 
 	test("reports unconfigured state as failure", async () => {
@@ -154,13 +154,12 @@ describe("CLI doctor", () => {
 		);
 		await saveConfig(createDefaultConfig(), configPath);
 
-		const originalExitCode = process.exitCode;
 		process.exitCode = 0;
 
 		await runDoctor({ cwd: tempDir, configDir: configPath });
 
 		expect(process.exitCode).toBe(1);
-		process.exitCode = originalExitCode;
+		// afterEach restores process.exitCode
 	});
 
 	test("reports diversity warnings when adversarial pairs share family", async () => {
@@ -186,7 +185,6 @@ describe("CLI doctor", () => {
 		};
 		await saveConfig(config, configPath);
 
-		const originalExitCode = process.exitCode;
 		process.exitCode = 0;
 
 		// Doctor should run without crashing; diversity warnings are advisory (not exit 1)
@@ -194,19 +192,18 @@ describe("CLI doctor", () => {
 
 		// Diversity warnings are advisory — exitCode should not be 1 for warnings alone
 		// (opencode binary may not be installed, which would set exitCode = 1 for that check)
-		process.exitCode = originalExitCode;
+		// afterEach restores process.exitCode
 	});
 
 	test("handles malformed opencode.json gracefully", async () => {
 		await writeFile(join(tempDir, "opencode.json"), "{ invalid json }", "utf-8");
 
-		const originalExitCode = process.exitCode;
 		process.exitCode = 0;
 
 		await runDoctor({ cwd: tempDir, configDir: configPath });
 
 		expect(process.exitCode).toBe(1);
-		process.exitCode = originalExitCode;
+		// afterEach restores process.exitCode
 	});
 
 	test("reports plugin not in plugin array", async () => {
@@ -216,13 +213,12 @@ describe("CLI doctor", () => {
 			"utf-8",
 		);
 
-		const originalExitCode = process.exitCode;
 		process.exitCode = 0;
 
 		await runDoctor({ cwd: tempDir, configDir: configPath });
 
 		expect(process.exitCode).toBe(1);
-		process.exitCode = originalExitCode;
+		// afterEach restores process.exitCode
 	});
 
 	test("passes when fully configured with diverse models", async () => {
@@ -248,7 +244,6 @@ describe("CLI doctor", () => {
 		};
 		await saveConfig(config, configPath);
 
-		const originalExitCode = process.exitCode;
 		process.exitCode = 0;
 
 		// Verify doctor completes without throwing
@@ -259,6 +254,6 @@ describe("CLI doctor", () => {
 		expect(reloaded.configured).toBe(true);
 		expect(Object.keys(reloaded.groups)).toHaveLength(8);
 
-		process.exitCode = originalExitCode;
+		// afterEach restores process.exitCode
 	});
 });

@@ -39,20 +39,35 @@ export function checkDiversity(
 					groups: [...families.keys()],
 				});
 			}
+		} else if (rule.groups.includes("red-team" as GroupId)) {
+			// 3-group rule with red-team: only compare red-team against the others
+			// (builders↔reviewers is already covered by its own 2-group strong rule)
+			const redTeamFamily = families.get("red-team" as GroupId);
+			if (redTeamFamily) {
+				const conflicting = rule.groups.filter(
+					(g) => g !== ("red-team" as GroupId) && families.get(g) === redTeamFamily,
+				);
+				if (conflicting.length > 0) {
+					warnings.push({
+						rule,
+						sharedFamily: redTeamFamily,
+						groups: ["red-team" as GroupId, ...conflicting],
+					});
+				}
+			}
 		} else {
-			// Multi-group rule: check if any pair shares a family
+			// Generic multi-group rule: check if any pair shares a family
 			const entries = [...families.entries()];
 			const seen = new Set<string>();
-			for (const [groupId, family] of entries) {
+			for (const [, family] of entries) {
 				if (seen.has(family)) {
-					// Find which groups share this family
 					const sharing = entries.filter(([, f]) => f === family).map(([g]) => g);
 					warnings.push({
 						rule,
 						sharedFamily: family,
 						groups: sharing,
 					});
-					break; // One warning per rule
+					break;
 				}
 				seen.add(family);
 			}
