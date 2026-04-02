@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadAdaptiveSkillContext } from "../../src/orchestrator/skill-injection";
-import { orchestrateCore } from "../../src/tools/orchestrate";
 import { retrieveMemoryContext } from "../../src/memory/retrieval";
+import { loadAdaptiveSkillContext } from "../../src/orchestrator/skill-injection";
 import { createInitialState, saveState } from "../../src/orchestrator/state";
 import type { Phase } from "../../src/orchestrator/types";
+import { orchestrateCore } from "../../src/tools/orchestrate";
 
 describe("Cross-feature integration: orchestrator + skills + memory", () => {
 	let tempDir: string;
