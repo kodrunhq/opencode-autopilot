@@ -168,7 +168,6 @@ const plugin: Plugin = async (input) => {
 				events: schemaEvents,
 			});
 		},
-		retryOnErrors: fallbackConfig.retryOnErrors ?? [],
 	});
 	const obsToolBeforeHandler = createToolExecuteBeforeHandler(toolStartTimes);
 	const obsToolAfterHandler = createObsToolAfterHandler(eventStore, toolStartTimes);
@@ -231,13 +230,11 @@ const plugin: Plugin = async (input) => {
 				await chatMessageHandler(hookInput, output);
 			}
 		},
-		"tool.execute.before": async (hookInput: {
-			readonly tool: string;
-			readonly sessionID: string;
-			readonly callID: string;
-			readonly args: unknown;
-		}) => {
-			obsToolBeforeHandler(hookInput);
+		"tool.execute.before": async (
+			input: { tool: string; sessionID: string; callID: string },
+			output: { args: unknown },
+		) => {
+			obsToolBeforeHandler({ ...input, args: output.args });
 		},
 		"tool.execute.after": async (
 			hookInput: {

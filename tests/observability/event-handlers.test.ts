@@ -24,7 +24,6 @@ describe("createObservabilityEventHandler", () => {
 			contextMonitor,
 			showToast,
 			writeSessionLog,
-			retryOnErrors: [429, 503, 529],
 		});
 	});
 
@@ -67,7 +66,6 @@ describe("createObservabilityEventHandler", () => {
 		const evt = errorEvents?.[0];
 		if (evt?.type === "error") {
 			expect(evt.errorType).toBe("rate_limit");
-			expect(evt.retryable).toBe(true);
 		}
 	});
 

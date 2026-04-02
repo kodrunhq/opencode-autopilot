@@ -28,10 +28,17 @@ export type ObservabilityEvent =
 			readonly type: "error";
 			readonly timestamp: string;
 			readonly sessionId: string;
-			readonly errorType: string;
+			readonly errorType:
+				| "rate_limit"
+				| "quota_exceeded"
+				| "service_unavailable"
+				| "missing_api_key"
+				| "model_not_found"
+				| "content_filter"
+				| "context_length"
+				| "unknown";
 			readonly message: string;
 			readonly model: string;
-			readonly retryable: boolean;
 			readonly statusCode?: number;
 	  }
 	| {

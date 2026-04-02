@@ -35,9 +35,16 @@ export function emitFallbackEvent(
  */
 export function emitErrorEvent(
 	sessionId: string,
-	errorType: string,
+	errorType:
+		| "rate_limit"
+		| "quota_exceeded"
+		| "service_unavailable"
+		| "missing_api_key"
+		| "model_not_found"
+		| "content_filter"
+		| "context_length"
+		| "unknown",
 	message: string,
-	retryable: boolean,
 	model = "unknown",
 	statusCode?: number,
 ): ObservabilityEvent {
@@ -47,7 +54,6 @@ export function emitErrorEvent(
 		sessionId,
 		errorType,
 		message,
-		retryable,
 		model,
 		...(statusCode !== undefined ? { statusCode } : {}),
 	});

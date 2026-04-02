@@ -12,11 +12,7 @@
  * @module
  */
 
-import {
-	classifyErrorType,
-	getErrorMessage,
-	isRetryableError,
-} from "../orchestrator/fallback/error-classifier";
+import { classifyErrorType, getErrorMessage } from "../orchestrator/fallback/error-classifier";
 import type { ContextMonitor } from "./context-monitor";
 import { emitErrorEvent, emitToolCompleteEvent } from "./event-emitter";
 import type { ObservabilityEvent, SessionEventStore, SessionEvents } from "./event-store";
@@ -34,7 +30,6 @@ export interface ObservabilityHandlerDeps {
 		variant: "info" | "warning" | "error",
 	) => Promise<void>;
 	readonly writeSessionLog: (sessionData: SessionEvents | undefined) => Promise<void>;
-	readonly retryOnErrors: readonly number[];
 }
 
 /**
@@ -88,7 +83,7 @@ function hasTokenShape(obj: unknown): obj is {
  * - session.compacted: append event, intermediate flush
  */
 export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) {
-	const { eventStore, contextMonitor, showToast, writeSessionLog, retryOnErrors } = deps;
+	const { eventStore, contextMonitor, showToast, writeSessionLog } = deps;
 
 	return async (input: {
 		readonly event: { readonly type: string; readonly [key: string]: unknown };
@@ -122,11 +117,30 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 				if (!sessionId) return;
 
 				const error = properties.error;
-				const errorType = classifyErrorType(error);
+				const rawErrorType = classifyErrorType(error);
+				const errorType = (
+					[
+						"rate_limit",
+						"quota_exceeded",
+						"service_unavailable",
+						"missing_api_key",
+						"model_not_found",
+						"content_filter",
+						"context_length",
+					] as const
+				).includes(rawErrorType as never)
+					? (rawErrorType as
+							| "rate_limit"
+							| "quota_exceeded"
+							| "service_unavailable"
+							| "missing_api_key"
+							| "model_not_found"
+							| "content_filter"
+							| "context_length")
+					: ("unknown" as const);
 				const message = getErrorMessage(error);
-				const retryable = isRetryableError(error, retryOnErrors);
 
-				const errorEvent = emitErrorEvent(sessionId, errorType, message, retryable);
+				const errorEvent = emitErrorEvent(sessionId, errorType, message);
 				eventStore.appendEvent(sessionId, errorEvent);
 				return;
 			}
