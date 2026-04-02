@@ -348,6 +348,41 @@ describe("configureCore Zen provider model discovery", () => {
 		expect(Object.values(result.modelIndex)).not.toContain("zen/claude-opus-4-6");
 	});
 
+	test("buildNumberedModelList sorts models alphabetically and preserves provider prefix", async () => {
+		setAvailableProviders([
+			{
+				id: "zen",
+				name: "Zen",
+				models: {
+					"openai/gpt-5.4": { id: "openai/gpt-5.4", name: "GPT-5.4" },
+					"anthropic/claude-opus-4-6": {
+						id: "anthropic/claude-opus-4-6",
+						name: "Claude Opus 4.6",
+					},
+				},
+			},
+			{
+				id: "anthropic",
+				name: "Anthropic",
+				models: {
+					"claude-sonnet-4-6": { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+				},
+			},
+		]);
+
+		const result = JSON.parse(await configureCore({ subcommand: "start" }));
+		const modelIds = Object.values(result.modelIndex) as string[];
+
+		// Models should be sorted alphabetically
+		const sorted = [...modelIds].sort();
+		expect(modelIds).toEqual(sorted);
+
+		// All should have provider prefix
+		for (const id of modelIds) {
+			expect(id).toContain("/");
+		}
+	});
+
 	test("falls back to record key when model id is empty", async () => {
 		setAvailableProviders([
 			{

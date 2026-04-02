@@ -84,9 +84,7 @@ describe("doctorCore", () => {
 		expect(result.action).toBe("doctor");
 		expect(result.allPassed).toBe(false);
 
-		const failedChecks = result.checks.filter(
-			(c: { status: string }) => c.status === "fail",
-		);
+		const failedChecks = result.checks.filter((c: { status: string }) => c.status === "fail");
 		expect(failedChecks.length).toBeGreaterThan(0);
 
 		// Failed checks should have fixSuggestion strings
@@ -111,9 +109,7 @@ describe("doctorCore", () => {
 			expect(["pass", "fail"]).toContain(check.status);
 			expect(typeof check.message).toBe("string");
 			// fixSuggestion is string for failed checks, null for passed
-			expect(check.fixSuggestion === null || typeof check.fixSuggestion === "string").toBe(
-				true,
-			);
+			expect(check.fixSuggestion === null || typeof check.fixSuggestion === "string").toBe(true);
 		}
 	});
 
@@ -126,9 +122,7 @@ describe("doctorCore", () => {
 			}),
 		);
 
-		const hookCheck = result.checks.find(
-			(c: { name: string }) => c.name === "hook-registration",
-		);
+		const hookCheck = result.checks.find((c: { name: string }) => c.name === "hook-registration");
 		expect(hookCheck).toBeDefined();
 		expect(hookCheck.status).toBe("pass");
 		expect(hookCheck.message).toContain("registered");

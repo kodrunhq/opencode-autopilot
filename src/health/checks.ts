@@ -1,5 +1,5 @@
-import type { Config } from "@opencode-ai/plugin";
 import { access } from "node:fs/promises";
+import type { Config } from "@opencode-ai/plugin";
 import { loadConfig } from "../config";
 import type { HealthResult } from "./types";
 
@@ -68,7 +68,8 @@ export async function agentHealthCheck(config: Config | null): Promise<HealthRes
 		"oc-retrospector",
 	];
 
-	const missing = expectedAgents.filter((name) => !(name in config.agent!));
+	const agentMap = config.agent;
+	const missing = expectedAgents.filter((name) => !(name in agentMap));
 
 	if (missing.length > 0) {
 		return Object.freeze({
@@ -92,7 +93,7 @@ export async function agentHealthCheck(config: Config | null): Promise<HealthRes
  * Check that the target asset directory exists and is accessible.
  */
 export async function assetHealthCheck(
-	assetsDir?: string,
+	_assetsDir?: string,
 	targetDir?: string,
 ): Promise<HealthResult> {
 	const target = targetDir ?? (await import("../utils/paths")).getGlobalConfigDir();

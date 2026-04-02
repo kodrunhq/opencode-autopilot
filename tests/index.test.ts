@@ -71,6 +71,7 @@ describe("plugin entry point", () => {
 			"oc_create_command",
 			"oc_state",
 			"oc_confidence",
+			"oc_doctor",
 			"oc_phase",
 			"oc_plan",
 			"oc_orchestrate",

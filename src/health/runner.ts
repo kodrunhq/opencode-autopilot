@@ -20,9 +20,7 @@ export async function runHealthChecks(options?: {
 		assetHealthCheck(options?.assetsDir, options?.targetDir),
 	]);
 
-	const repairs = results
-		.filter((r) => r.repaired)
-		.map((r) => r.name);
+	const repairs = results.filter((r) => r.repaired).map((r) => r.name);
 
 	const allPassed = results.every((r) => r.status === "pass");
 	const duration = Date.now() - start;

@@ -1,3 +1,3 @@
-export { configHealthCheck, agentHealthCheck, assetHealthCheck } from "./checks";
+export { agentHealthCheck, assetHealthCheck, configHealthCheck } from "./checks";
 export { runHealthChecks } from "./runner";
-export type { HealthResult, HealthReport } from "./types";
+export type { HealthReport, HealthResult } from "./types";
