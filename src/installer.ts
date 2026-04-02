@@ -1,5 +1,5 @@
-import { copyFile, readdir, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { access, copyFile, readdir, unlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { copyIfMissing, ensureDir, isEnoentError } from "./utils/fs-helpers";
 import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
 
@@ -152,10 +152,13 @@ async function forceUpdateAssets(
 	const updated: string[] = [];
 	const errors: string[] = [];
 	for (const asset of FORCE_UPDATE_ASSETS) {
+		const source = join(sourceDir, asset);
+		const target = join(targetDir, asset);
 		try {
-			const source = join(sourceDir, asset);
-			const target = join(targetDir, asset);
-			await ensureDir(join(targetDir, asset, ".."));
+			// Verify source exists before attempting copy — skip silently if
+			// the source isn't in the bundle (test environments, partial installs)
+			await access(source);
+			await ensureDir(dirname(target));
 			await copyFile(source, target);
 			updated.push(asset);
 		} catch (error: unknown) {
@@ -163,6 +166,7 @@ async function forceUpdateAssets(
 				const message = error instanceof Error ? error.message : String(error);
 				errors.push(`force-update ${asset}: ${message}`);
 			}
+			// ENOENT = source not in bundle, skip silently
 		}
 	}
 	return { updated, errors };

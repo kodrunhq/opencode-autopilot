@@ -204,7 +204,7 @@ async function handleStart(configPath?: string): Promise<string> {
 		purpose: g.purpose,
 		recommendation: g.recommendation,
 		agents: g.agents,
-		current: g.currentAssignment,
+		currentAssignment: g.currentAssignment,
 	}));
 
 	// Compact diversity rules — just the text the LLM should mention
