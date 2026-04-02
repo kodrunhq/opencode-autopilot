@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { createMockError } from "../../src/observability/mock/mock-provider";
+import type { MockProviderConfig } from "../../src/observability/mock/types";
+import { FAILURE_MODES } from "../../src/observability/mock/types";
 import {
 	classifyErrorType,
 	isRetryableError,
 } from "../../src/orchestrator/fallback/error-classifier";
-import { createMockError } from "../../src/observability/mock/mock-provider";
-import { FAILURE_MODES } from "../../src/observability/mock/types";
-import type { MockFailureMode, MockProviderConfig } from "../../src/observability/mock/types";
 
 const DEFAULT_RETRY_CODES: readonly number[] = [429, 503, 529];
 
