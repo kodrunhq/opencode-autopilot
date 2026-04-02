@@ -10,6 +10,7 @@ import { diagnose } from "../src/registry/doctor";
 import { ALL_GROUP_IDS, DIVERSITY_RULES, GROUP_DEFINITIONS } from "../src/registry/model-groups";
 import type { GroupId } from "../src/registry/types";
 import { fileExists } from "../src/utils/fs-helpers";
+import { runConfigure } from "./configure-tui";
 
 const execFile = promisify(execFileCb);
 
@@ -124,14 +125,12 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 	console.log("");
 	console.log(bold("Next steps:"));
 	console.log("");
-	console.log("  1. Launch OpenCode");
-	console.log("  2. Run /oc-configure to set up your model assignments");
+	console.log("  Run the interactive configuration wizard:");
 	console.log("");
-	console.log("  Or paste this into your AI session for guided setup:");
+	console.log(`    ${bold("bunx @kodrunhq/opencode-autopilot configure")}`);
 	console.log("");
-	console.log(
-		"    https://raw.githubusercontent.com/kodrunhq/opencode-autopilot/main/docs/guide/installation.md",
-	);
+	console.log("  This walks through each agent group with searchable model");
+	console.log("  selection and fallback configuration.");
 	console.log("");
 }
 
@@ -313,6 +312,7 @@ function printUsage(): void {
 	console.log("");
 	console.log("Commands:");
 	console.log("  install     Register the plugin and create starter config");
+	console.log("  configure   Interactive model assignment for each agent group");
 	console.log("  doctor      Check installation health and model assignments");
 	console.log("");
 	console.log("Options:");
@@ -329,6 +329,9 @@ if (import.meta.main) {
 	switch (command) {
 		case "install":
 			await runInstall({ noTui: args.includes("--no-tui") });
+			break;
+		case "configure":
+			await runConfigure();
 			break;
 		case "doctor":
 			await runDoctor();

@@ -51,6 +51,10 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@inquirer/checkbox": "^5.1.2",
+		"@inquirer/confirm": "^6.0.10",
+		"@inquirer/search": "^4.1.6",
+		"@inquirer/select": "^5.1.2",
 		"yaml": "^2.8.3"
 	}
 }

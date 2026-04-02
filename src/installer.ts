@@ -1,6 +1,6 @@
-import { readdir, unlink } from "node:fs/promises";
-import { join } from "node:path";
-import { copyIfMissing, isEnoentError } from "./utils/fs-helpers";
+import { access, copyFile, readdir, unlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { copyIfMissing, ensureDir, isEnoentError } from "./utils/fs-helpers";
 import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
 
 /**
@@ -8,6 +8,13 @@ import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
  * These are cleaned up from the target directory on every install to avoid stale files.
  */
 const DEPRECATED_ASSETS = ["agents/placeholder-agent.md", "commands/configure.md"] as const;
+
+/**
+ * Assets that must be overwritten on every install, even if the user has a copy.
+ * Used when the shipped version has critical fixes that override user customizations.
+ * Remove entries once the fix has been deployed long enough.
+ */
+const FORCE_UPDATE_ASSETS = ["commands/oc-configure.md"] as const;
 
 export interface InstallResult {
 	readonly copied: readonly string[];
@@ -138,12 +145,42 @@ async function cleanupDeprecatedAssets(
 	return { removed, errors };
 }
 
+async function forceUpdateAssets(
+	sourceDir: string,
+	targetDir: string,
+): Promise<{ readonly updated: readonly string[]; readonly errors: readonly string[] }> {
+	const updated: string[] = [];
+	const errors: string[] = [];
+	for (const asset of FORCE_UPDATE_ASSETS) {
+		const source = join(sourceDir, asset);
+		const target = join(targetDir, asset);
+		try {
+			// Verify source exists before attempting copy — skip silently if
+			// the source isn't in the bundle (test environments, partial installs)
+			await access(source);
+			await ensureDir(dirname(target));
+			await copyFile(source, target);
+			updated.push(asset);
+		} catch (error: unknown) {
+			if (!isEnoentError(error)) {
+				const message = error instanceof Error ? error.message : String(error);
+				errors.push(`force-update ${asset}: ${message}`);
+			}
+			// ENOENT = source not in bundle, skip silently
+		}
+	}
+	return { updated, errors };
+}
+
 export async function installAssets(
 	assetsDir: string = getAssetsDir(),
 	targetDir: string = getGlobalConfigDir(),
 ): Promise<InstallResult> {
 	// Remove deprecated assets before copying new ones
 	const cleanup = await cleanupDeprecatedAssets(targetDir);
+
+	// Force-overwrite assets with critical fixes
+	const forceUpdate = await forceUpdateAssets(assetsDir, targetDir);
 
 	const [agents, commands, skills] = await Promise.all([
 		processFiles(assetsDir, targetDir, "agents"),
@@ -152,8 +189,14 @@ export async function installAssets(
 	]);
 
 	return {
-		copied: [...agents.copied, ...commands.copied, ...skills.copied],
+		copied: [...forceUpdate.updated, ...agents.copied, ...commands.copied, ...skills.copied],
 		skipped: [...agents.skipped, ...commands.skipped, ...skills.skipped],
-		errors: [...cleanup.errors, ...agents.errors, ...commands.errors, ...skills.errors],
+		errors: [
+			...cleanup.errors,
+			...forceUpdate.errors,
+			...agents.errors,
+			...commands.errors,
+			...skills.errors,
+		],
 	};
 }
