@@ -132,7 +132,9 @@ function renderErrors(
 	];
 
 	for (const e of events) {
-		lines.push(`| ${e.timestamp} | ${e.errorType} | ${e.model} | ${e.message} |`);
+		const safeMsg = (e.message ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+		const safeModel = (e.model ?? "").replace(/\|/g, "\\|");
+		lines.push(`| ${e.timestamp} | ${e.errorType} | ${safeModel} | ${safeMsg} |`);
 	}
 
 	// Error summary counts

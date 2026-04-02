@@ -77,10 +77,10 @@ export function convertToSessionLog(input: WriteSessionInput): SessionLog {
  * @param logsDir - Optional override for logs directory (for testing)
  */
 export async function writeSessionLog(input: WriteSessionInput, logsDir?: string): Promise<void> {
-	const log = convertToSessionLog(input);
+	const raw = convertToSessionLog(input);
 
-	// Validate before writing (bidirectional validation)
-	sessionLogSchema.parse(log);
+	// Validate and sanitize — use parsed result (strips unknown keys, applies defaults)
+	const log = sessionLogSchema.parse(raw);
 
 	const dir = logsDir ?? getLogsDir();
 	await ensureDir(dir);

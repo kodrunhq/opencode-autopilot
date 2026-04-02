@@ -118,8 +118,7 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 			}
 
 			case "session.error": {
-				const sessionId =
-					typeof properties.sessionID === "string" ? properties.sessionID : undefined;
+				const sessionId = extractSessionId(properties);
 				if (!sessionId) return;
 
 				const error = properties.error;

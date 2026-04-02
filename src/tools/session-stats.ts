@@ -49,6 +49,7 @@ function computePhaseBreakdown(log: SessionLog): readonly PhaseBreakdownEntry[] 
 		phaseMap.set(d.phase, { ...existing, decisions: existing.decisions + 1 });
 
 		const ts = d.timestamp ?? "";
+		if (!ts) continue; // Skip decisions without timestamps — cannot build time windows
 		const window = phaseWindows.get(d.phase);
 		if (!window) {
 			phaseWindows.set(d.phase, { start: ts, end: ts });
