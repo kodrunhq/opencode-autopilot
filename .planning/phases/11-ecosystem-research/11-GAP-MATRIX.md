@@ -6,6 +6,8 @@ Gaps were identified by cross-referencing the feature inventories from all 5 com
 
 Each gap was evaluated against the priority criteria below. Phase assignments follow the logic from 11-RESEARCH.md: quick wins to Phase 12, observability to Phase 13, skills/commands to Phase 14, memory to Phase 15, agents to Phase 16, integration/polish to Phase 17.
 
+**Note on coverage areas:** D-07 specifies 8 coverage areas. This matrix expands to 10 by adding Safety and Developer Experience as distinct areas -- both emerged as significant gap categories during research.
+
 Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive.md, 04-ecc-deep-dive.md, 05-claude-mem-deep-dive.md, 06-broader-ecosystem.md, 07-novel-opportunities.md, 11-RESEARCH.md.
 
 ## Priority Criteria (per D-08)
@@ -42,7 +44,7 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 | SK-13 | Strategic compaction | - | - | - | strategic-compact skill | - | Nothing | MEDIUM | 14 |
 | SK-14 | Writing skills (meta-skill) | - | writing-skills meta-skill | - | skill-create command | - | /new-skill command (scaffolding only) | LOW | Skip |
 | SK-15 | Security review skill | - | - | pre-publish-review | security-review skill | - | 22 review specialists (tool-based) | LOW | Skip |
-| SK-16 | Adaptive skill loading via project fingerprinting | - | - | - | Selective stacks (manual, v1.9.0) | - | Single skill loaded always | HIGH | 14 |
+| SK-16 | Adaptive skill loading via project fingerprinting (See also: NV-01) | - | - | - | Selective stacks (manual, v1.9.0) | - | Single skill loaded always | HIGH | 14 |
 | SK-17 | Composable skill chains (dependency resolution) | - | Independent skills | - | Independent skills | - | Nothing | MEDIUM | 14 |
 | SK-18 | E2E testing patterns | - | - | - | e2e-testing skill | - | Nothing | MEDIUM | 14 |
 
@@ -59,7 +61,7 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 | Gap ID | Feature | GSD | Superpowers | OMO | ECC | claude-mem | We Have | Priority | Phase |
 |--------|---------|-----|-------------|-----|-----|-----------|---------|----------|-------|
 | CM-01 | Doctor / diagnostics | /gsd:health | - | /doctor | /harness-audit | - | Nothing | CRITICAL | 12 |
-| CM-02 | Documentation sync | /gsd:docs-update | - | - | /update-docs, /update-codemaps | - | Nothing | HIGH | 14 |
+| CM-02 | Documentation sync (See also: DX-04) | /gsd:docs-update | - | - | /update-docs, /update-codemaps | - | Nothing | HIGH | 14 |
 | CM-03 | Asset stocktake / audit | /gsd:stats | - | /omomomo | /skill-health, /skill-stocktake | - | Nothing | HIGH | 14 |
 | CM-04 | Session stats / report | /gsd:session-report | - | - | /sessions | /timeline-report | Nothing | HIGH | 13 |
 | CM-05 | Pipeline report (decision replay) | /gsd:progress | - | - | - | - | Nothing | HIGH | 13 |
@@ -89,7 +91,7 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 | HK-04 | Context window monitoring | gsd-context-monitor | - | context-window-monitor | - | - | Nothing | HIGH | 13 |
 | HK-05 | Pre-compaction state preservation | - | - | compaction-context-injector | pre-compact | - | Nothing | MEDIUM | 17 |
 | HK-06 | Comment quality checker (anti-slop) | - | - | comment-checker | - | - | Nothing | MEDIUM | 17 |
-| HK-07 | Secret/env protection | - | - | - | - | - | Nothing (Envsitter Guard ecosystem plugin) | HIGH | 17 |
+| HK-07 | Secret/env protection -> Consolidated into SF-02 | - | - | - | - | - | Nothing (Envsitter Guard ecosystem plugin) | HIGH | 17 |
 | HK-08 | Auto-format after file edit | - | - | - | file.edited hook | - | Nothing | MEDIUM | 17 |
 | HK-09 | Session error structured capture | - | - | session-recovery (10+ modes) | - | - | Event hook (basic) | HIGH | 13 |
 | HK-10 | Tool usage metrics capture | - | - | - | tool.execute.after | - | tool.execute.after (fallback only) | HIGH | 13 |
@@ -114,6 +116,10 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 | AG-04 | Intent gate / pre-routing analysis | - | - | Metis (IntentGate) | - | - | Nothing | LOW | Skip |
 | AG-05 | Background task agents | - | - | Sisyphus-Junior, background agents | loop-operator | - | Pipeline hidden agents | LOW | Skip |
 
+### Agent Archetype Assessment (D-12)
+
+Research across all 5 competitors shows the skills > agents trend. MasterDebugger, Reviewer, Planner, TDD Guide, and Doc Updater are all better served as skills or commands (see 11-AGENT-VERDICT.md). Phase 16 should be scoped down to autopilot agent enhancements or merged into Phase 17.
+
 ---
 
 ## Coverage Area 5: Memory
@@ -132,7 +138,7 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 | MM-04 | AI compression / summarization before storage | - | - | - | - | AI-compressed session summaries | Nothing | HIGH | 15 |
 | MM-05 | System prompt injection of memories | - | - | - | Instinct injection at SessionStart | before_prompt_build hook | Skill injection via config hook (pattern exists) | HIGH | 15 |
 | MM-06 | Confidence-scored pattern extraction | - | - | - | /learn-eval with confidence scoring | - | Lesson memory (no confidence scoring) | HIGH | 15 |
-| MM-07 | Instinct-to-skill evolution pipeline | - | - | - | /evolve clusters instincts into skills (manual) | - | Nothing | MEDIUM | 15 |
+| MM-07 | Instinct-to-skill evolution pipeline (See also: NV-03) | - | - | - | /evolve clusters instincts into skills (manual) | - | Nothing | MEDIUM | 15 |
 | MM-08 | Time-weighted decay / pruning | - | - | - | /prune for expired patterns | Unlimited growth (weakness) | Lesson memory has decay | MEDIUM | 15 |
 | MM-09 | Cross-project knowledge sharing (user-level) | - | - | - | /instinct-import/export (manual) | Project-scoped only | Nothing | MEDIUM | 15 |
 | MM-10 | Timeline reports / narrative history | - | - | - | - | /timeline-report generates narrative docs | Nothing | MEDIUM | 15 |
@@ -150,7 +156,7 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 
 | Gap ID | Feature | GSD | Superpowers | OMO | ECC | claude-mem | We Have | Priority | Phase |
 |--------|---------|-----|-------------|-----|-----|-----------|---------|----------|-------|
-| WF-01 | Confidence-driven progressive autonomy | Fixed autonomy mode | - | - | Fixed hook profiles | - | Confidence ledger (no autonomy connection) | HIGH | 17 |
+| WF-01 | Confidence-driven progressive autonomy (See also: NV-02) | Fixed autonomy mode | - | - | Fixed hook profiles | - | Confidence ledger (no autonomy connection) | HIGH | 17 |
 | WF-02 | Quick task mode (skip full pipeline) | /gsd:quick, /gsd:fast | - | - | - | - | Full pipeline only | MEDIUM | 12 |
 | WF-03 | Session handoff / continuity | - | - | Session recovery hooks | Session save/resume | SessionStart/End capture | Nothing | MEDIUM | 15 |
 | WF-04 | Context window health management | 30-40% main session target | - | Preemptive compaction | suggest-compact hook | - | Nothing | MEDIUM | 17 |
@@ -171,7 +177,7 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 | OB-01 | Structured event logging (JSON) | - | - | Session notifications | Session evaluation | Timeline events | Fallback events only | CRITICAL | 13 |
 | OB-02 | Token / cost tracking per session | - | - | - | - | Token tracking | Nothing | HIGH | 13 |
 | OB-03 | Session summary generation | /gsd:session-report | - | - | - | AI-compressed session summaries | Nothing | HIGH | 13 |
-| OB-04 | Pipeline decision replay | /gsd:progress (state files) | - | - | - | - | Decision log (raw, no replay) | HIGH | 13 |
+| OB-04 | Pipeline decision replay (See also: NV-04) | /gsd:progress (state files) | - | - | - | - | Decision log (raw, no replay) | HIGH | 13 |
 | OB-05 | Context-aware token budgeting | - | - | - | - | - | Nothing | MEDIUM | 17 |
 | OB-06 | Session analysis / post-session report | /gsd:stats | - | - | evaluate-session | Timeline reports | Nothing | MEDIUM | 13 |
 | OB-07 | Context utilization monitoring dashboard | - | - | Context window monitor | - | - | Nothing | MEDIUM | 13 |
@@ -205,7 +211,7 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 | Gap ID | Feature | GSD | Superpowers | OMO | ECC | claude-mem | We Have | Priority | Phase |
 |--------|---------|-----|-------------|-----|-----|-----------|---------|----------|-------|
 | SF-01 | Destructive git/shell command prevention | gsd-prompt-guard | - | write-existing-file-guard | - | - | Nothing | HIGH | 17 |
-| SF-02 | Secret / .env leak protection | - | - | - | - | - | Nothing (Envsitter Guard ecosystem plugin) | HIGH | 17 |
+| SF-02 | Secret / .env leak protection (See also: HK-07) | - | - | - | - | - | Nothing (Envsitter Guard ecosystem plugin) | HIGH | 17 |
 | SF-03 | Input sanitization for hook/prompt injection | gsd-prompt-guard | - | Rules-injector (has vulnerability) | - | - | Nothing | MEDIUM | 17 |
 | SF-04 | Self-healing configuration repair | - | - | - | - | - | Config v3 auto-migration (partial) | HIGH | 12 |
 
@@ -221,10 +227,10 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 
 | Gap ID | Feature | GSD | Superpowers | OMO | ECC | claude-mem | We Have | Priority | Phase |
 |--------|---------|-----|-------------|-----|-----|-----------|---------|----------|-------|
-| DX-01 | Self-healing doctor with auto-repair | /gsd:health | - | /doctor (report only) | /harness-audit, /skill-health | Smart Install | Config v3 migration (partial) | CRITICAL | 12 |
+| DX-01 | Self-healing doctor with auto-repair (See also: NV-06) | /gsd:health | - | /doctor (report only) | /harness-audit, /skill-health | Smart Install | Config v3 migration (partial) | CRITICAL | 12 |
 | DX-02 | Plugin health diagnostics | /gsd:health | - | /doctor | /harness-audit | - | Nothing | CRITICAL | 12 |
 | DX-03 | Installed asset audit / stocktake | /gsd:stats | - | - | /skill-stocktake | - | Nothing | HIGH | 14 |
-| DX-04 | Documentation sync with code changes | /gsd:docs-update | - | - | /update-docs, /update-codemaps | - | Nothing | HIGH | 14 |
+| DX-04 | Documentation sync with code changes -> Consolidated into CM-02 | /gsd:docs-update | - | - | /update-docs, /update-codemaps | - | Nothing | HIGH | 14 |
 | DX-05 | Agent/skill markdown linter | - | skill structure tests | - | - | - | Template validation in creation tools | MEDIUM | 14 |
 | DX-06 | Prompt optimization tooling | - | - | - | /prompt-optimize, /rules-distill | - | Metaprompter agent | LOW | Skip |
 
@@ -234,12 +240,12 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 
 | Gap ID | Opportunity | Feasibility | User Value | Priority | Phase |
 |--------|-------------|-------------|------------|----------|-------|
-| NV-01 | Adaptive skill loading via project fingerprinting | HIGH | HIGH | HIGH | 14 |
-| NV-02 | Confidence-driven progressive autonomy | HIGH | HIGH | HIGH | 17 |
-| NV-03 | Cross-session pattern evolution (instinct-to-skill pipeline) | MEDIUM | HIGH | MEDIUM | 15 |
-| NV-04 | Pipeline observability with decision replay | HIGH | HIGH | HIGH | 13 |
+| NV-01 | Adaptive skill loading via project fingerprinting (See also: SK-16) | HIGH | HIGH | HIGH | 14 |
+| NV-02 | Confidence-driven progressive autonomy (See also: WF-01) | HIGH | HIGH | HIGH | 17 |
+| NV-03 | Cross-session pattern evolution (instinct-to-skill pipeline) (See also: MM-07) | MEDIUM | HIGH | MEDIUM | 15 |
+| NV-04 | Pipeline observability with decision replay (See also: OB-04) | HIGH | HIGH | HIGH | 13 |
 | NV-05 | Composable skill chains (dependency resolution) | MEDIUM | MEDIUM | MEDIUM | 14 |
-| NV-06 | Self-healing configuration with doctor-driven repair | HIGH | HIGH | CRITICAL | 12 |
+| NV-06 | Self-healing configuration with doctor-driven repair (See also: DX-01) | HIGH | HIGH | CRITICAL | 12 |
 | NV-07 | Context-aware token budgeting | MEDIUM | MEDIUM | MEDIUM | 17 |
 
 ---
@@ -248,7 +254,7 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 
 | Priority | Count | Phase Distribution |
 |----------|-------|--------------------|
-| CRITICAL | 10 | Phase 12: 3, Phase 13: 1, Phase 14: 3, Phase 15: 2, Phase 17: 0, Novel: 1 |
+| CRITICAL | 12 | Phase 12: 4 (CM-01, DX-01, DX-02, NV-06), Phase 13: 1 (OB-01), Phase 14: 3 (SK-01, SK-02, SK-03), Phase 15: 4 (MM-01, MM-02, HK-01, HK-02) |
 | HIGH | 26 | Phase 12: 1, Phase 13: 7, Phase 14: 7, Phase 15: 5, Phase 17: 5, Novel: 1 |
 | MEDIUM | 24 | Phase 12: 1, Phase 13: 2, Phase 14: 8, Phase 15: 5, Phase 17: 7, Novel: 1 |
 | LOW | 11 | Skip: 9, Skip (Agent): 2 |
@@ -256,3 +262,5 @@ Data sources: 01-gsd-deep-dive.md, 02-superpowers-deep-dive.md, 03-omo-deep-dive
 **Total gaps identified:** 71
 **Assigned to phases:** 60
 **Deferred/skipped:** 11 (all LOW priority)
+
+**Phase 16 note:** Phase 16 has no directly assigned gaps. Research recommends either (a) assigning autopilot agent enhancements (memory injection, skill-aware routing, confidence tuning) or (b) merging Phase 16 into Phase 17. See 11-AGENT-VERDICT.md.

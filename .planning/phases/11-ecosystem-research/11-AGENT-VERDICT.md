@@ -106,6 +106,15 @@ Phase 16 is eliminated entirely. Its single integration plan is absorbed into Ph
 | Documentation Updater | SKIP agent, BUILD command | /update-docs command | Phase 14 | CM-02 |
 | Background Task Agent | SKIP | Not needed (existing pipeline handles it) | N/A | N/A |
 
+## Phase 16 Scope Resolution
+
+Phase 16 currently has no gap IDs assigned from the gap matrix (all agent gaps were rated LOW and skipped). Two paths forward:
+
+1. **Assign concrete deliverables (recommended):** Memory injection into autopilot dispatch prompts, skill-aware routing logic (select relevant skills per task type), and confidence threshold tuning based on learned patterns. These are integration deliverables that depend on Phase 14 skills and Phase 15 memory being complete.
+2. **Merge into Phase 17:** If the integration deliverables above prove too thin to warrant a standalone phase, absorb them into Phase 17 (Integration & Polish) as additional integration items.
+
+The decision should be made after Phase 14 and Phase 15 planning is complete, when the concrete integration surface area is known.
+
 ## Impact on ROADMAP.md
 
 **Phase 16 description change:** From "Implement specialized primary agents if Phase 11 validates value" to "Autopilot agent integration with Phase 14 skills and Phase 15 memory."

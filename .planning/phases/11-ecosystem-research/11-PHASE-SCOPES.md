@@ -2,9 +2,9 @@
 
 ## Summary
 
-The gap matrix identified 71 total gaps: 10 CRITICAL, 26 HIGH, 24 MEDIUM, 11 LOW. All CRITICAL and HIGH gaps (36 total) are assigned to phases. 18 MEDIUM gaps are assigned where they naturally fit; 6 MEDIUM gaps deferred to post-v3.0. All 11 LOW gaps are skipped (deferred indefinitely or not aligned with value proposition).
+The gap matrix identified 71 total gaps: 12 CRITICAL, 26 HIGH, 24 MEDIUM, 11 LOW. All CRITICAL and HIGH gaps (38 total) are assigned to phases. 18 MEDIUM gaps are assigned where they naturally fit; 6 MEDIUM gaps deferred to post-v3.0. All 11 LOW gaps are skipped (deferred indefinitely or not aligned with value proposition).
 
-Total planned features across Phases 12-17: 54 (36 CRITICAL/HIGH + 18 MEDIUM).
+Total planned features across Phases 12-17: 56 (38 CRITICAL/HIGH + 18 MEDIUM).
 
 ---
 
@@ -54,7 +54,15 @@ Total planned features across Phases 12-17: 54 (36 CRITICAL/HIGH + 18 MEDIUM).
 
 **Scope:** High-impact skills identified by research (brainstorming, TDD, debugging, verification, git worktrees), language-specific skill stacks with adaptive loading, documentation sync commands, and asset auditing.
 
+**Note:** Phase 14 is subdivided into 14a and 14b for planning tractability. This is an internal subdivision, not a new phase per D-03.
+
 **Gap IDs:** SK-01, SK-02, SK-03, SK-04, SK-05, SK-06, SK-07, SK-08, SK-09, SK-10, SK-11, SK-12, SK-13, SK-16, SK-17, SK-18, CM-02, CM-03, CM-06, CM-07, CM-08, DX-03, DX-04, DX-05, NV-01, NV-05
+
+#### Phase 14a: Core Skills & Commands
+
+**Scope:** Methodology skills and their companion commands -- the highest-value gaps that apply to all projects regardless of language or stack.
+
+**Gap IDs:** SK-01, SK-02, SK-03, SK-04, SK-05, SK-06, SK-07, SK-08, SK-13, SK-18, CM-02, CM-03, CM-06, CM-07, CM-08, DX-03, DX-04
 
 **Features:**
 1. Brainstorming skill (SK-01, CRITICAL) -- Socratic design refinement: asks clarifying questions, explores alternatives, presents design in structured sections. The single most impactful skill gap identified across the ecosystem.
@@ -64,23 +72,31 @@ Total planned features across Phases 12-17: 54 (36 CRITICAL/HIGH + 18 MEDIUM).
 5. Git worktrees skill (SK-05, HIGH) -- Isolated development workflow on new branch with clean test baseline. Covers git worktree add, setup, verify baseline, work, and merge/PR decision.
 6. Plan writing skill (SK-06, HIGH) -- User-facing planning methodology: bite-sized tasks (2-5 min each) with exact file paths and acceptance criteria. Exposed via /write-plan command (CM-07).
 7. Plan executing skill (SK-07, HIGH) -- Batch execution methodology with verification after each task group. Integrates with existing orchestrator pipeline.
-8. Adaptive skill loading via project fingerprinting (SK-16, NV-01, HIGH) -- Auto-detect project tech stack (package.json, go.mod, Cargo.toml, pyproject.toml) and load only relevant skill stacks. Extends Phase 10's relevantStacks detection.
-9. TypeScript/Bun patterns skill stack (SK-09, HIGH) -- TypeScript-specific patterns, Bun runtime idioms, testing with bun:test. Loaded automatically for TypeScript projects.
-10. Documentation sync command (CM-02, DX-04, HIGH) -- `/update-docs` command that identifies documentation drift from code changes and generates updates.
-11. Asset stocktake / audit command (CM-03, DX-03, HIGH) -- `/stocktake` command listing all active skills, commands, agents; shows built-in vs user-created; flags conflicts and duplicates.
-12. Code review skills (SK-08, MEDIUM) -- Requesting code review (pre-review checklist) and receiving code review (feedback integration process). Complement the oc_review tool with methodology guidance.
-13. Go patterns skill stack (SK-10, MEDIUM) -- Go idioms, testing patterns, concurrency. Loaded automatically for Go projects.
-14. Python patterns skill stack (SK-11, MEDIUM) -- Python patterns, Django/Flask, pytest. Loaded automatically for Python projects.
-15. Rust patterns skill stack (SK-12, MEDIUM) -- Rust safety patterns, cargo testing, ownership idioms. Loaded automatically for Rust projects.
-16. Strategic compaction skill (SK-13, MEDIUM) -- Teaches when and how to compact context: what to preserve, what to discard, timing decisions.
-17. Composable skill chains (SK-17, NV-05, MEDIUM) -- Skills declare dependencies on other skills via `requires` field in SKILL.md frontmatter. Dependency resolution at injection time with cycle detection and token budget enforcement.
-18. E2E testing patterns skill (SK-18, MEDIUM) -- End-to-end testing methodology with Playwright/Cypress patterns.
-19. Brainstorm command (CM-08, MEDIUM) -- `/brainstorm` command invoking the brainstorming skill with topic argument.
-20. TDD command (CM-06, MEDIUM) -- `/tdd` command invoking the TDD workflow skill with target argument.
-21. Plan command (CM-07, MEDIUM) -- `/write-plan` command invoking the plan writing skill with feature description.
-22. Asset markdown linter (DX-05, MEDIUM) -- Validate user-created AGENTS.md, SKILL.md, and command files for structure correctness and YAML frontmatter validity.
+8. Code review skills (SK-08, MEDIUM) -- Requesting code review (pre-review checklist) and receiving code review (feedback integration process). Complement the oc_review tool with methodology guidance.
+9. Strategic compaction skill (SK-13, MEDIUM) -- Teaches when and how to compact context: what to preserve, what to discard, timing decisions.
+10. E2E testing patterns skill (SK-18, MEDIUM) -- End-to-end testing methodology with Playwright/Cypress patterns.
+11. Documentation sync command (CM-02, DX-04, HIGH) -- `/update-docs` command that identifies documentation drift from code changes and generates updates.
+12. Asset stocktake / audit command (CM-03, DX-03, HIGH) -- `/stocktake` command listing all active skills, commands, agents; shows built-in vs user-created; flags conflicts and duplicates.
+13. Brainstorm command (CM-08, MEDIUM) -- `/brainstorm` command invoking the brainstorming skill with topic argument.
+14. TDD command (CM-06, MEDIUM) -- `/tdd` command invoking the TDD workflow skill with target argument.
+15. Plan command (CM-07, MEDIUM) -- `/write-plan` command invoking the plan writing skill with feature description.
 
-**Estimated Plans:** 6
+#### Phase 14b: Language Stacks & Skill Infrastructure
+
+**Scope:** Language-specific skill stacks, adaptive loading infrastructure, composable skill chains, and the asset linter. Depends on 14a patterns being established.
+
+**Gap IDs:** SK-09, SK-10, SK-11, SK-12, SK-16, SK-17, DX-05, NV-01, NV-05
+
+**Features:**
+1. Adaptive skill loading via project fingerprinting (SK-16, NV-01, HIGH) -- Auto-detect project tech stack (package.json, go.mod, Cargo.toml, pyproject.toml) and load only relevant skill stacks. Extends Phase 10's relevantStacks detection.
+2. TypeScript/Bun patterns skill stack (SK-09, HIGH) -- TypeScript-specific patterns, Bun runtime idioms, testing with bun:test. Loaded automatically for TypeScript projects.
+3. Go patterns skill stack (SK-10, MEDIUM) -- Go idioms, testing patterns, concurrency. Loaded automatically for Go projects.
+4. Python patterns skill stack (SK-11, MEDIUM) -- Python patterns, Django/Flask, pytest. Loaded automatically for Python projects.
+5. Rust patterns skill stack (SK-12, MEDIUM) -- Rust safety patterns, cargo testing, ownership idioms. Loaded automatically for Rust projects.
+6. Composable skill chains (SK-17, NV-05, MEDIUM) -- Skills declare dependencies on other skills via `requires` field in SKILL.md frontmatter. Dependency resolution at injection time with cycle detection and token budget enforcement.
+7. Asset markdown linter (DX-05, MEDIUM) -- Validate user-created AGENTS.md, SKILL.md, and command files for structure correctness and YAML frontmatter validity.
+
+**Estimated Plans:** 6 (3 for 14a, 3 for 14b)
 **Dependencies:** Phase 11 (research defines scope)
 
 ---
@@ -122,10 +138,14 @@ Total planned features across Phases 12-17: 54 (36 CRITICAL/HIGH + 18 MEDIUM).
 **Gap IDs:** (none from gap matrix -- all agent gaps rated LOW and skipped)
 
 **Features:**
-1. Autopilot agent enhancement -- Improve the autopilot primary agent with memory integration, confidence-driven behavior, and skill-aware dispatch. This is integration work between Phase 14 skills, Phase 15 memory, and the existing orchestrator.
+1. Memory injection into autopilot dispatch prompts -- Surface relevant cross-session observations (from Phase 15 memory) in the autopilot agent's system prompt so decisions are informed by prior session context.
+2. Skill-aware routing logic -- Select relevant skills per task type during autopilot dispatch. When the orchestrator identifies a TDD task, brainstorming request, or debugging session, automatically inject the corresponding Phase 14 skill.
+3. Confidence threshold tuning based on learned patterns -- Calibrate the confidence ledger thresholds using accumulated memory data. Patterns with high confidence across sessions raise the autonomy threshold; novel patterns lower it.
+
+If research validates insufficient value for these deliverables, merge remaining work into Phase 17.
 
 **Estimated Plans:** 1
-**Dependencies:** Phase 11 (research decides), Phase 15 (memory integration)
+**Dependencies:** Phase 14 (skills to integrate), Phase 15 (memory to integrate)
 **Verdict:** See 11-AGENT-VERDICT.md -- Option A (Scope Down) recommended. Most "specialized agent" needs better served as skills (Phase 14) or commands.
 
 ---
@@ -169,7 +189,7 @@ Per the assessment in 07-novel-opportunities.md: the existing phase structure ac
 
 | Priority | Total Gaps | Assigned | Unassigned |
 |----------|-----------|----------|------------|
-| CRITICAL | 10 | 10 | 0 |
+| CRITICAL | 12 | 12 | 0 |
 | HIGH | 26 | 26 | 0 |
 | MEDIUM | 24 | 18 | 6 (deferred to post-v3.0) |
 | LOW | 11 | 0 | 11 (skipped) |
