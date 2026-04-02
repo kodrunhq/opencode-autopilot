@@ -84,7 +84,8 @@ export async function loadAdaptiveSkillContext(
 		return buildMultiSkillContext(matchingSkills, tokenBudget);
 	} catch (error: unknown) {
 		// Best-effort for I/O errors; re-throw programmer errors
-		if (error instanceof TypeError || error instanceof RangeError) throw error;
+		if (error instanceof TypeError || error instanceof RangeError || error instanceof SyntaxError)
+			throw error;
 		return "";
 	}
 }

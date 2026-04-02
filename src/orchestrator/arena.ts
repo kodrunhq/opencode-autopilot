@@ -47,7 +47,8 @@ const ERROR_DEPTH_THRESHOLD = 3;
 
 /**
  * Memory-tuned debate depth: adjusts arena depth based on project error history.
- * Projects with 3+ recorded error observations get deeper review (+1, capped at 3).
+ * Scans the 50 most-recent observations (recency window) — older errors are not counted.
+ * Projects with 3+ error observations in the window get deeper review (+1, capped at 3).
  * Best-effort: memory errors never affect pipeline (falls back to standard depth).
  */
 export function getMemoryTunedDepth(
