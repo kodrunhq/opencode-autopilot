@@ -15,7 +15,9 @@ https://raw.githubusercontent.com/kodrunhq/opencode-autopilot/main/docs/guide/in
 bunx @kodrunhq/opencode-autopilot install
 ```
 
-Then launch OpenCode and run `/oc-configure` to set up model assignments.
+Then launch (or restart) OpenCode and run `/oc-configure` to set up model assignments.
+
+> **Note:** `/oc-configure` is an OpenCode slash command, not a shell command. It runs inside the OpenCode TUI, not in a terminal.
 
 ## For LLM Agents
 
@@ -60,17 +62,33 @@ else
 fi
 ```
 
-### Step 2: Run the CLI installer
+### Step 2: Install the plugin
 
-```bash
-bunx @kodrunhq/opencode-autopilot install --no-tui
-```
+If the user is currently in an OpenCode session:
+
+1. Run this in bash:
+   ```bash
+   bunx @kodrunhq/opencode-autopilot install --no-tui
+   ```
+2. Tell the user to **exit and restart OpenCode** — the plugin loads on startup, so the current session will not have it available.
+3. In the **new** OpenCode session, run `/oc-configure`.
+
+If the user is NOT in an OpenCode session:
+
+1. Run:
+   ```bash
+   bunx @kodrunhq/opencode-autopilot install
+   ```
+2. Launch OpenCode.
+3. Run `/oc-configure` inside OpenCode.
+
+> **Important:** `/oc-configure` is an OpenCode slash command, NOT a shell command. It runs inside the OpenCode TUI, not in a terminal.
 
 This registers the plugin in opencode.json and creates a starter config.
 
-### Step 3: Launch OpenCode and configure model assignments
+### Step 3: Configure model assignments
 
-Tell the user to launch OpenCode, then run /oc-configure.
+Tell the user that `/oc-configure` walks through 8 agent groups.
 
 The /oc-configure command will walk through 8 agent groups:
 
