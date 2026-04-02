@@ -85,15 +85,25 @@ interface ConfigureArgs {
 
 /**
  * Discover available models from the stored provider data.
- * Returns a map of provider ID -> list of "providerId/modelId" strings.
+ * Returns a map of provider ID -> list of fully-qualified model ID strings.
+ *
+ * Uses the model's own `id` field (which may contain sub-provider paths like
+ * "anthropic/claude-opus-4-6" for a Zen provider) to construct the full
+ * "provider/model" path. This ensures Zen-proxied models display as
+ * "zen/anthropic/claude-opus-4-6" matching OpenCode's native `/models` output.
  */
 function discoverAvailableModels(): Map<string, string[]> {
 	const modelsByProvider = new Map<string, string[]>();
 
 	for (const provider of availableProviders) {
 		const modelIds: string[] = [];
-		for (const modelKey of Object.keys(provider.models)) {
-			modelIds.push(`${provider.id}/${modelKey}`);
+		for (const [modelKey, modelData] of Object.entries(provider.models)) {
+			// Prefer the model's id field — it carries sub-provider paths
+			// (e.g. "anthropic/claude-opus-4-6" under a "zen" provider).
+			// Fall back to the record key when the id is absent or empty.
+			const modelId = modelData.id || modelKey;
+			const fullId = `${provider.id}/${modelId}`;
+			modelIds.push(fullId);
 		}
 		if (modelIds.length > 0) {
 			modelsByProvider.set(provider.id, modelIds);
