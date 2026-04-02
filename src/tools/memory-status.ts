@@ -49,12 +49,10 @@ export function memoryStatusCore(
 ): MemoryStatusResult {
 	let ownedDb: Database | null = null;
 	try {
-		const db =
-			dbOrPath instanceof Database
-				? dbOrPath
-				: typeof dbOrPath === "string"
-					? (ownedDb = new Database(dbOrPath))
-					: getMemoryDb();
+		if (typeof dbOrPath === "string") {
+			ownedDb = new Database(dbOrPath);
+		}
+		const db = dbOrPath instanceof Database ? dbOrPath : (ownedDb ?? getMemoryDb());
 
 		// Count observations
 		const obsCountRow = db.query("SELECT COUNT(*) as cnt FROM observations").get() as {
