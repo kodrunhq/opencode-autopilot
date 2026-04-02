@@ -40,9 +40,7 @@ export function resolveDependencyOrder(
 		if (visited.has(startName)) continue;
 
 		// Iterative DFS using explicit stack
-		const dfsStack: Array<{ name: string; depIndex: number }> = [
-			{ name: startName, depIndex: 0 },
-		];
+		const dfsStack: Array<{ name: string; depIndex: number }> = [{ name: startName, depIndex: 0 }];
 		inStack.add(startName);
 		visited.add(startName);
 		stackArr.push(startName);
