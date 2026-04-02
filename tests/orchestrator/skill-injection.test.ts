@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { buildSkillContext, loadSkillContent } from "../../src/orchestrator/skill-injection";
+import {
+	buildSkillContext,
+	loadAdaptiveSkillContext,
+	loadSkillContent,
+} from "../../src/orchestrator/skill-injection";
 
 describe("buildSkillContext", () => {
 	test("returns empty string for empty input", () => {
@@ -34,6 +38,9 @@ describe("buildSkillContext", () => {
 		expect(result).toContain("...");
 		// The formatted output should not contain the full 3000-char string
 		expect(result).not.toContain(longContent);
+		// Content portion (after header) must respect the 2048 + "..." limit
+		const headerPrefix = "\n\nCoding standards for this project (follow these conventions):\n";
+		expect(result.length).toBeLessThanOrEqual(headerPrefix.length + 2048 + 3);
 	});
 
 	test("does not truncate content at exactly 2048 chars", () => {
@@ -58,6 +65,31 @@ describe("loadSkillContent", () => {
 
 	test("returns empty string for path without skill file", async () => {
 		const result = await loadSkillContent("/tmp");
+		expect(result).toBe("");
+	});
+});
+
+describe("loadAdaptiveSkillContext", () => {
+	test("returns empty string for non-existent skills dir", async () => {
+		const result = await loadAdaptiveSkillContext(
+			"/tmp/nonexistent-adaptive-skill-dir-12345",
+			"/tmp/nonexistent-project-dir-12345",
+		);
+		expect(result).toBe("");
+	});
+
+	test("returns empty string when no skills match project stack", async () => {
+		// /tmp has no skills subdirectory, so no skills will match
+		const result = await loadAdaptiveSkillContext("/tmp", "/tmp");
+		expect(result).toBe("");
+	});
+
+	test("does not throw on I/O errors (returns empty string)", async () => {
+		// Pass paths that would trigger I/O errors (permission-denied simulation via invalid paths)
+		const result = await loadAdaptiveSkillContext(
+			"/dev/null/impossible-path",
+			"/dev/null/impossible-path",
+		);
 		expect(result).toBe("");
 	});
 });

@@ -5,7 +5,7 @@ import type { DispatchResult } from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { completePhase, getNextPhase } from "../orchestrator/phase";
-import { buildSkillContext, loadSkillContent } from "../orchestrator/skill-injection";
+import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
 import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
 import type { Phase } from "../orchestrator/types";
 import { isEnoentError } from "../utils/fs-helpers";
@@ -96,17 +96,16 @@ async function injectLessonContext(
 }
 
 /**
- * Attempt to inject coding-standards skill context into a dispatch prompt.
+ * Attempt to inject stack-filtered adaptive skill context into a dispatch prompt.
  * Best-effort: failures are silently swallowed to avoid breaking dispatch.
  */
-async function injectSkillContext(prompt: string): Promise<string> {
+async function injectSkillContext(prompt: string, projectRoot?: string): Promise<string> {
 	try {
 		const baseDir = getGlobalConfigDir();
-		const content = await loadSkillContent(baseDir);
-		const ctx = buildSkillContext(content);
+		const ctx = await loadAdaptiveSkillContext(baseDir, projectRoot ?? process.cwd());
 		if (ctx) return prompt + ctx;
-	} catch {
-		// Best-effort: swallow all errors (same as lesson injection)
+	} catch (err) {
+		console.warn("[opencode-autopilot] skill injection failed:", err);
 	}
 	return prompt;
 }
@@ -146,7 +145,7 @@ async function processHandlerResult(
 					handlerResult.phase,
 					artifactDir,
 				);
-				const withSkills = await injectSkillContext(enrichedPrompt);
+				const withSkills = await injectSkillContext(enrichedPrompt, join(artifactDir, ".."));
 				if (withSkills !== handlerResult.prompt) {
 					return JSON.stringify({ ...handlerResult, prompt: withSkills });
 				}
@@ -163,7 +162,7 @@ async function processHandlerResult(
 					handlerResult.phase as string,
 					artifactDir,
 				);
-				const skillSuffix = await injectSkillContext("");
+				const skillSuffix = await injectSkillContext("", join(artifactDir, ".."));
 				const combinedSuffix = lessonSuffix + (skillSuffix || "");
 				if (combinedSuffix) {
 					const enrichedAgents = handlerResult.agents.map((entry) => ({

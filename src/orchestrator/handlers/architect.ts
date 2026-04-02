@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { fileExists } from "../../utils/fs-helpers";
-import { getDebateDepth } from "../arena";
+import { getMemoryTunedDepth } from "../arena";
 import { ensurePhaseDir, getArtifactRef, getPhaseDir } from "../artifacts";
 import { filterByPhase } from "../confidence";
 import type { PipelineState } from "../types";
@@ -62,7 +62,7 @@ export async function handleArchitect(
 	// Step 1: Dispatch architect(s) based on confidence depth
 	await ensurePhaseDir(artifactDir, "ARCHITECT");
 	const reconEntries = filterByPhase(state.confidence, "RECON");
-	const depth = getDebateDepth(reconEntries);
+	const depth = getMemoryTunedDepth(reconEntries, join(artifactDir, ".."));
 	const reconRef = getArtifactRef("RECON", "report.md");
 	const challengeRef = getArtifactRef("CHALLENGE", "brief.md");
 	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");

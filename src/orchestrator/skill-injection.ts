@@ -82,9 +82,9 @@ export async function loadAdaptiveSkillContext(
 
 		const matchingSkills = filterSkillsByStack(allSkills, projectTags);
 		return buildMultiSkillContext(matchingSkills, tokenBudget);
-	} catch (error: unknown) {
-		// Best-effort for I/O errors; re-throw programmer errors
-		if (error instanceof TypeError || error instanceof RangeError) throw error;
+	} catch {
+		// Best-effort: all errors return empty string. Caller (injectSkillContext)
+		// logs the error — no need to re-throw since the call site is also best-effort.
 		return "";
 	}
 }

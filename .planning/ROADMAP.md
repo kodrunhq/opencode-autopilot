@@ -228,8 +228,8 @@ Plans:
 - [x] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing (completed 2026-04-02)
 - [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
 - [x] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval (completed 2026-04-02)
-- [ ] **Phase 16: Autopilot Integration (Skills + Memory)** - Integrate new skills/commands and memory capabilities into the existing Autopilot; no new dedicated agents
-- [ ] **Phase 17: Integration & Polish** - Cross-feature integration, high-value hooks, final production polish
+- [x] **Phase 16: Autopilot Integration (Skills + Memory)** - MERGED INTO PHASE 17 (scope too thin for standalone phase)
+- [ ] **Phase 17: Integration & Polish** - Cross-feature integration, adaptive skill wiring, memory-based confidence tuning, final production polish
 
 ## Phase Details (v3.0)
 
@@ -305,23 +305,25 @@ Plans:
 **Plans:** 1/1 plans complete
 
 ### Phase 16: Autopilot Integration (Skills + Memory)
-**Goal:** Integrate new skills/commands (Phase 14) and memory capabilities (Phase 15) into the existing Autopilot agent — no new dedicated agents (Phase 11 research concluded skills > agents for all candidates)
+**Goal:** MERGED INTO PHASE 17 — scope too thin for standalone phase
 **Depends on:** Phase 14 (skills), Phase 15 (memory)
-**Requirements:** TBD
-**Success Criteria** (what must be TRUE):
-  1. Memory injection works in autopilot dispatch prompts (relevant memories injected per task)
-  2. Skill-aware routing selects relevant skills per task type during autonomous pipeline
-  3. Confidence threshold tuning adjusts pipeline depth based on learned patterns
-  4. If deliverables are too thin, remaining work merges into Phase 17
-**Plans:** TBD
+**Requirements:** Absorbed into Phase 17
+**Status:** MERGED
+**Plans:** 0 plans (all work moved to Phase 17)
 
 ### Phase 17: Integration & Polish
-**Goal:** Cross-feature integration testing, high-value hooks from research, and final production polish for v3.0 release
+**Goal:** Wire adaptive skill routing into orchestrator (absorbed from Phase 16), add memory-based confidence tuning, cross-feature integration testing, and final production polish for release
 **Depends on:** All prior v3.0 phases
-**Requirements:** TBD
+**Requirements:** INT-01, INT-02, INT-03, INT-04, INT-05, INT-06
 **Success Criteria** (what must be TRUE):
   1. All v3.0 features work together as a cohesive system (logging + memory + agents + skills)
-  2. High-value hooks from Phase 11 research are implemented (only if research shows significant gap)
-  3. End-to-end scenario passes: session -> decisions logged -> memories extracted -> next session improved
-  4. Production-ready, best-in-class quality — no rough edges
-**Plans:** TBD
+  2. Adaptive skill routing wired into orchestrator dispatch (replaces single coding-standards injection)
+  3. Memory-based confidence tuning adjusts Arena debate depth based on project error history
+  4. Cross-feature integration tests exercise orchestrator + skills + memory + config migration
+  5. Documentation updated (CLAUDE.md, CHANGELOG), version bumped, CI green
+**Plans:** 2/3 plans executed
+
+Plans:
+- [x] 17-01-PLAN.md -- Wire adaptive skill routing + memory-based confidence tuning
+- [x] 17-02-PLAN.md -- Cross-feature integration tests + config migration chain test
+- [ ] 17-03-PLAN.md -- Documentation polish, CHANGELOG, version bump to 1.6.0
