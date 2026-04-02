@@ -52,7 +52,7 @@ export function memoryStatusCore(
 			dbOrPath instanceof Database
 				? dbOrPath
 				: typeof dbOrPath === "string"
-					? getMemoryDb(dbOrPath)
+					? new Database(dbOrPath)
 					: getMemoryDb();
 
 		// Count observations
@@ -134,12 +134,13 @@ export function memoryStatusCore(
 			recentObservations,
 			preferences,
 		};
-	} catch {
+	} catch (err) {
+		const detail = err instanceof Error ? err.message : String(err);
 		return {
 			stats: null,
 			recentObservations: [],
 			preferences: [],
-			error: "Memory system not initialized",
+			error: `Memory system error: ${detail}`,
 		};
 	}
 }

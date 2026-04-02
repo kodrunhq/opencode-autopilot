@@ -58,11 +58,13 @@ export function pruneStaleObservations(
 	const fetchLimit = MAX_OBSERVATIONS_PER_PROJECT + 1000;
 	const observations = getObservationsByProject(projectId, fetchLimit, db);
 
-	// Score each observation
-	const scored = observations.map((obs) => ({
-		id: obs.id ?? 0,
-		score: computeRelevanceScore(obs.lastAccessed, obs.accessCount, obs.type),
-	}));
+	// Score each observation — skip any without a valid id (schema allows optional)
+	const scored = observations
+		.filter((obs): obs is typeof obs & { id: number } => obs.id !== undefined)
+		.map((obs) => ({
+			id: obs.id,
+			score: computeRelevanceScore(obs.lastAccessed, obs.accessCount, obs.type),
+		}));
 
 	let pruned = 0;
 

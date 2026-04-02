@@ -87,6 +87,7 @@ export function getMemoryDb(dbPath?: string): Database {
 	db = new Database(resolvedPath);
 	db.run("PRAGMA journal_mode=WAL");
 	db.run("PRAGMA foreign_keys=ON");
+	db.run("PRAGMA busy_timeout=5000");
 	initMemoryDb(db);
 	return db;
 }

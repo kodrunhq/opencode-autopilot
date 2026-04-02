@@ -95,8 +95,8 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 				},
 				deps.getDb(),
 			);
-		} catch {
-			// Best-effort per D-14: never break the session
+		} catch (err) {
+			console.warn("[opencode-autopilot] memory capture failed:", err);
 		}
 	}
 
@@ -111,8 +111,10 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 
 		switch (event.type) {
 			case "session.created": {
-				const info = properties.info as { id?: string } | undefined;
-				if (!info?.id) return;
+				const rawInfo = properties.info;
+				if (rawInfo === null || typeof rawInfo !== "object") return;
+				const info = rawInfo as { id?: string };
+				if (!info.id) return;
 
 				currentSessionId = info.id;
 				currentProjectKey = computeProjectKey(deps.projectRoot);

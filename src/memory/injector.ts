@@ -33,9 +33,10 @@ interface InjectorInput {
 
 /**
  * Output shape matching the experimental.chat.system.transform hook signature.
+ * system is mutable — the hook API expects callers to push into it.
  */
 interface InjectorOutput {
-	readonly system: string[];
+	system: string[];
 }
 
 /**
@@ -59,21 +60,26 @@ export function createMemoryInjector(config: MemoryInjectorConfig) {
 			const cached = cache.get(input.sessionID);
 			if (cached !== undefined) {
 				if (cached.length > 0) {
-					(output.system as string[]).push(cached);
+					output.system.push(cached);
 				}
 				return;
 			}
 
 			const db = config.getDb();
-			const context = retrieveMemoryContext(config.projectRoot, config.tokenBudget, db);
+			const context = retrieveMemoryContext(
+				config.projectRoot,
+				config.tokenBudget,
+				db,
+				config.halfLifeDays,
+			);
 
 			cache.set(input.sessionID, context);
 
 			if (context.length > 0) {
-				(output.system as string[]).push(context);
+				output.system.push(context);
 			}
-		} catch {
-			// Best-effort: never break the session
+		} catch (err) {
+			console.warn("[opencode-autopilot] memory injection failed:", err);
 		}
 	};
 }

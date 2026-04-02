@@ -157,18 +157,22 @@ export function buildMemoryContext(options: BuildMemoryContextOptions): string {
 	if (remainingAfterL2 > LAYER_3_THRESHOLD && observations.length > 0) {
 		const topObs = observations.slice(0, 2);
 		const detailLines: string[] = [];
+		const headerOverhead = "\n### Details\n\n".length;
+		let linesBudget = remainingAfterL2 - headerOverhead;
 
 		for (const obs of topObs) {
 			const detail = `**${obs.type}:** ${obs.content}`;
-			if (totalChars + detail.length + 2 > charBudget) break;
+			const cost = detail.length + 1;
+			if (cost > linesBudget) break;
 			detailLines.push(detail);
-			totalChars += detail.length + 1;
+			linesBudget -= cost;
 		}
 
 		if (detailLines.length > 0) {
 			const detailSection = `\n### Details\n${detailLines.join("\n")}\n`;
-			if (totalChars + detailSection.length - detailLines.join("\n").length <= charBudget) {
+			if (totalChars + detailSection.length <= charBudget) {
 				parts.push(detailSection);
+				totalChars += detailSection.length;
 			}
 		}
 	}
@@ -235,13 +239,13 @@ export function retrieveMemoryContext(
 	projectPath: string,
 	tokenBudget?: number,
 	db?: Database,
+	halfLifeDays?: number,
 ): string {
-	const projectKey = computeProjectKey(projectPath);
 	const project = getProjectByPath(projectPath, db);
 	if (!project) return "";
 
-	const observations = getObservationsByProject(projectKey, 100, db);
-	const scored = scoreAndRankObservations(observations);
+	const observations = getObservationsByProject(project.id, 100, db);
+	const scored = scoreAndRankObservations(observations, halfLifeDays);
 	const preferences = getAllPreferences(db);
 
 	return buildMemoryContext({
