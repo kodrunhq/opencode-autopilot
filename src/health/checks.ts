@@ -1,6 +1,8 @@
 import { access } from "node:fs/promises";
 import type { Config } from "@opencode-ai/plugin";
 import { loadConfig } from "../config";
+import { AGENT_NAMES } from "../orchestrator/handlers/types";
+import { getAssetsDir, getGlobalConfigDir } from "../utils/paths";
 import type { HealthResult } from "./types";
 
 /**
@@ -15,14 +17,12 @@ export async function configHealthCheck(configPath?: string): Promise<HealthResu
 				name: "config-validity",
 				status: "fail" as const,
 				message: "Plugin config file not found",
-				repaired: false,
 			});
 		}
 		return Object.freeze({
 			name: "config-validity",
 			status: "pass" as const,
 			message: `Config v${config.version} loaded and valid`,
-			repaired: false,
 		});
 	} catch (error: unknown) {
 		const msg = error instanceof Error ? error.message : String(error);
@@ -30,10 +30,27 @@ export async function configHealthCheck(configPath?: string): Promise<HealthResu
 			name: "config-validity",
 			status: "fail" as const,
 			message: `Config validation failed: ${msg}`,
-			repaired: false,
 		});
 	}
 }
+
+/** Standard agent names, derived from the agents barrel export. */
+const STANDARD_AGENT_NAMES: readonly string[] = Object.freeze([
+	"researcher",
+	"metaprompter",
+	"documenter",
+	"pr-reviewer",
+	"autopilot",
+]);
+
+/** Pipeline agent names, derived from AGENT_NAMES in the orchestrator. */
+const PIPELINE_AGENT_NAMES: readonly string[] = Object.freeze(Object.values(AGENT_NAMES));
+
+/** All expected agent names (standard + pipeline). */
+const EXPECTED_AGENTS: readonly string[] = Object.freeze([
+	...STANDARD_AGENT_NAMES,
+	...PIPELINE_AGENT_NAMES,
+]);
 
 /**
  * Check that all expected agents are injected into the OpenCode config.
@@ -45,38 +62,17 @@ export async function agentHealthCheck(config: Config | null): Promise<HealthRes
 			name: "agent-injection",
 			status: "fail" as const,
 			message: "No OpenCode config or agent map available",
-			repaired: false,
 		});
 	}
 
-	// Standard agents (5) + pipeline agents (10) = 15 expected
-	const expectedAgents = [
-		"researcher",
-		"metaprompter",
-		"documenter",
-		"pr-reviewer",
-		"autopilot",
-		"oc-researcher",
-		"oc-challenger",
-		"oc-architect",
-		"oc-critic",
-		"oc-explorer",
-		"oc-planner",
-		"oc-implementer",
-		"oc-reviewer",
-		"oc-shipper",
-		"oc-retrospector",
-	];
-
 	const agentMap = config.agent;
-	const missing = expectedAgents.filter((name) => !(name in agentMap));
+	const missing = EXPECTED_AGENTS.filter((name) => !(name in agentMap));
 
 	if (missing.length > 0) {
 		return Object.freeze({
 			name: "agent-injection",
 			status: "fail" as const,
 			message: `${missing.length} agent(s) missing: ${missing.join(", ")}`,
-			repaired: false,
 			details: Object.freeze(missing),
 		});
 	}
@@ -84,34 +80,46 @@ export async function agentHealthCheck(config: Config | null): Promise<HealthRes
 	return Object.freeze({
 		name: "agent-injection",
 		status: "pass" as const,
-		message: `All ${expectedAgents.length} agents injected`,
-		repaired: false,
+		message: `All ${EXPECTED_AGENTS.length} agents injected`,
 	});
 }
 
 /**
- * Check that the target asset directory exists and is accessible.
+ * Check that the source and target asset directories exist and are accessible.
  */
 export async function assetHealthCheck(
-	_assetsDir?: string,
+	assetsDir?: string,
 	targetDir?: string,
 ): Promise<HealthResult> {
-	const target = targetDir ?? (await import("../utils/paths")).getGlobalConfigDir();
+	const source = assetsDir ?? getAssetsDir();
+	const target = targetDir ?? getGlobalConfigDir();
+
+	try {
+		await access(source);
+	} catch (error: unknown) {
+		const code = (error as NodeJS.ErrnoException).code;
+		const detail = code === "ENOENT" ? "missing" : `inaccessible (${code})`;
+		return Object.freeze({
+			name: "asset-directories",
+			status: "fail" as const,
+			message: `Asset source directory ${detail}: ${source}`,
+		});
+	}
 
 	try {
 		await access(target);
 		return Object.freeze({
 			name: "asset-directories",
 			status: "pass" as const,
-			message: `Asset target directory exists: ${target}`,
-			repaired: false,
+			message: `Asset directories exist: source=${source}, target=${target}`,
 		});
-	} catch {
+	} catch (error: unknown) {
+		const code = (error as NodeJS.ErrnoException).code;
+		const detail = code === "ENOENT" ? "missing" : `inaccessible (${code})`;
 		return Object.freeze({
 			name: "asset-directories",
 			status: "fail" as const,
-			message: `Asset target directory missing: ${target}`,
-			repaired: false,
+			message: `Asset target directory ${detail}: ${target}`,
 		});
 	}
 }

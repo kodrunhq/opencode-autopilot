@@ -1,5 +1,7 @@
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
+import { ensurePhaseDir } from "../orchestrator/artifacts";
 import { PHASES, pipelineStateSchema } from "../orchestrator/schemas";
 import { loadState, saveState } from "../orchestrator/state";
 import { ensureGitignore } from "../utils/gitignore";
@@ -74,14 +76,38 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 	// 4. Persist quick state to disk
 	await saveState(quickState, artifactDir);
 
-	// 5. Best-effort .gitignore update (same pattern as orchestrateCore)
+	// 5. Create minimal stub artifacts for skipped phases so the PLAN handler
+	//    has something to reference (design.md for ARCHITECT, brief.md for CHALLENGE).
+	//    Uses "wx" flag to avoid overwriting existing files.
+	const stubs: readonly {
+		readonly phase: "ARCHITECT" | "CHALLENGE";
+		readonly file: string;
+		readonly content: string;
+	}[] = [
+		{ phase: "ARCHITECT", file: "design.md", content: "# Design\n\n_Skipped in quick mode._\n" },
+		{
+			phase: "CHALLENGE",
+			file: "brief.md",
+			content: "# Challenge Brief\n\n_Skipped in quick mode._\n",
+		},
+	];
+	for (const stub of stubs) {
+		try {
+			const phaseDir = await ensurePhaseDir(artifactDir, stub.phase);
+			await writeFile(join(phaseDir, stub.file), stub.content, { flag: "wx" });
+		} catch {
+			// File already exists or dir creation failed — safe to skip
+		}
+	}
+
+	// 6. Best-effort .gitignore update (same pattern as orchestrateCore)
 	try {
 		await ensureGitignore(join(artifactDir, ".."));
 	} catch {
 		// Non-critical -- swallow gitignore errors
 	}
 
-	// 6. Delegate to orchestrateCore to continue from PLAN phase
+	// 7. Delegate to orchestrateCore to continue from PLAN phase
 	return orchestrateCore({ result: undefined }, artifactDir);
 }
 

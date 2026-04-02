@@ -42,8 +42,7 @@ function formatCheck(result: HealthResult): DoctorCheck {
 		name: result.name,
 		status: result.status,
 		message: result.message,
-		fixSuggestion:
-			result.status === "fail" && !result.repaired ? getFixSuggestion(result.name) : null,
+		fixSuggestion: result.status === "fail" ? getFixSuggestion(result.name) : null,
 	});
 }
 
@@ -94,7 +93,6 @@ export async function doctorCore(options?: DoctorOptions): Promise<string> {
 		action: "doctor",
 		checks: allChecks,
 		allPassed,
-		repairs: report.repairs,
 		displayText,
 		duration: report.duration,
 	});

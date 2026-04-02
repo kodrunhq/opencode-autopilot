@@ -6,7 +6,6 @@ export interface HealthResult {
 	readonly name: string;
 	readonly status: "pass" | "fail";
 	readonly message: string;
-	readonly repaired: boolean;
 	readonly details?: readonly string[];
 }
 
@@ -16,7 +15,6 @@ export interface HealthResult {
  */
 export interface HealthReport {
 	readonly results: readonly HealthResult[];
-	readonly repairs: readonly string[];
 	readonly allPassed: boolean;
 	readonly duration: number;
 }
