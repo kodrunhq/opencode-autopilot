@@ -5,7 +5,7 @@ import type { DispatchResult } from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { completePhase, getNextPhase } from "../orchestrator/phase";
-import { buildSkillContext, loadSkillContent } from "../orchestrator/skill-injection";
+import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
 import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
 import type { Phase } from "../orchestrator/types";
 import { isEnoentError } from "../utils/fs-helpers";
@@ -96,14 +96,13 @@ async function injectLessonContext(
 }
 
 /**
- * Attempt to inject coding-standards skill context into a dispatch prompt.
+ * Attempt to inject stack-filtered adaptive skill context into a dispatch prompt.
  * Best-effort: failures are silently swallowed to avoid breaking dispatch.
  */
 async function injectSkillContext(prompt: string): Promise<string> {
 	try {
 		const baseDir = getGlobalConfigDir();
-		const content = await loadSkillContent(baseDir);
-		const ctx = buildSkillContext(content);
+		const ctx = await loadAdaptiveSkillContext(baseDir, process.cwd());
 		if (ctx) return prompt + ctx;
 	} catch {
 		// Best-effort: swallow all errors (same as lesson injection)
