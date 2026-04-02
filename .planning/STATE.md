@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
 status: Ready to execute
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-04-02T22:03:55.528Z"
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-04-02T22:07:55.122Z"
 progress:
   total_phases: 10
   completed_phases: 10
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 ## Current Position
 
 Phase: 17 (integration-polish) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Plan: 2 of 3
 | Phase 14-skills-commands P06 | 3min | 2 tasks | 7 files |
 | Phase 15 P03 | 10min | 2 tasks | 10 files |
 | Phase 17 P01 | 3min | 2 tasks | 5 files |
+| Phase 17 P02 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,7 @@ Recent decisions affecting current work:
 - [Phase 17]: loadAdaptiveSkillContext replaces loadSkillContent+buildSkillContext for all dispatch prompts
 - [Phase 17]: Error threshold of 3 observations triggers +1 debate depth (capped at 3)
 - [Phase 17]: getMemoryTunedDepth is best-effort: memory failures silently fall back to standard depth
+- [Phase 17]: Integration tests use real orchestrateCore (not mocks) for true end-to-end validation
 
 ### Pending Todos
 
@@ -173,6 +175,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T22:03:55.526Z
-Stopped at: Completed 17-01-PLAN.md
+Last session: 2026-04-02T22:07:55.119Z
+Stopped at: Completed 17-02-PLAN.md
 Resume file: None
