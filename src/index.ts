@@ -12,7 +12,7 @@ import {
 import { fallbackDefaults } from "./orchestrator/fallback/fallback-config";
 import { resolveChain } from "./orchestrator/fallback/resolve-chain";
 import { ocConfidence } from "./tools/confidence";
-import { ocConfigure, setOpenCodeConfig } from "./tools/configure";
+import { ocConfigure, setAvailableProviders, setOpenCodeConfig } from "./tools/configure";
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
@@ -32,6 +32,19 @@ const plugin: Plugin = async (input) => {
 	const installResult = await installAssets();
 	if (installResult.errors.length > 0) {
 		console.error("[opencode-autopilot] Asset installation errors:", installResult.errors);
+	}
+
+	// Discover available providers/models from OpenCode SDK
+	try {
+		const providerResponse = await client.provider.list({
+			query: { directory: process.cwd() },
+		});
+		const providerData = providerResponse.data;
+		if (providerData?.all) {
+			setAvailableProviders(providerData.all);
+		}
+	} catch {
+		// Provider discovery is best-effort; configure will show empty models
 	}
 
 	// Load config for first-load detection and fallback settings

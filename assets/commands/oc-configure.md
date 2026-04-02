@@ -1,5 +1,6 @@
 ---
 description: Configure opencode-autopilot model assignments for each agent group
+agent: autopilot
 ---
 Help the user configure opencode-autopilot by walking through the model
 assignment process interactively.
@@ -19,7 +20,18 @@ utilities last), explaining for each:
    model diversity matters and which group they're adversarial to
 4. List available models from the user's providers
 
-Ask the user to choose a primary model and optionally 1-3 fallback models.
+For each group, present the available models as a numbered list:
+
+Example format:
+  Primary model for Architects:
+  1. anthropic/claude-opus-4-6
+  2. openai/gpt-5.4
+  3. google/gemini-3.1-pro
+
+  Pick a number (or type a model ID):
+
+If the user sends just a number, map it to the corresponding model.
+Then ask for optional fallbacks the same way (1-3 fallback models).
 Call oc_configure with subcommand "assign" for each group.
 
 If the assign response contains diversityWarnings, explain them

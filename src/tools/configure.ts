@@ -9,7 +9,6 @@ import {
 	DIVERSITY_RULES,
 	GROUP_DEFINITIONS,
 } from "../registry/model-groups";
-import { extractFamily } from "../registry/resolver";
 import type { DiversityWarning, GroupModelAssignment } from "../registry/types";
 
 // --- Module-level state ---
@@ -27,18 +26,40 @@ let pendingAssignments: Map<string, GroupModelAssignment> = new Map();
 
 /**
  * Reference to the OpenCode host config, set by the plugin's config hook.
- * Used by "start" subcommand to discover available models.
+ * Retained for potential future use by subcommands.
  */
+// biome-ignore lint/correctness/noUnusedVariables: retained for API compatibility
 let openCodeConfig: Config | null = null;
+
+/**
+ * Provider data from the OpenCode SDK, set during plugin initialization.
+ * Each entry maps a provider ID to its available models.
+ */
+let availableProviders: ReadonlyArray<{
+	readonly id: string;
+	readonly name: string;
+	readonly models: Readonly<Record<string, { readonly id: string; readonly name: string }>>;
+}> = [];
 
 // --- Exported helpers for test/plugin wiring ---
 
 export function resetPendingAssignments(): void {
 	pendingAssignments = new Map();
+	availableProviders = [];
 }
 
 export function setOpenCodeConfig(config: Config | null): void {
 	openCodeConfig = config;
+}
+
+export function setAvailableProviders(
+	providers: ReadonlyArray<{
+		readonly id: string;
+		readonly name: string;
+		readonly models: Readonly<Record<string, { readonly id: string; readonly name: string }>>;
+	}>,
+): void {
+	availableProviders = providers;
 }
 
 // --- Core logic ---
@@ -50,53 +71,24 @@ interface ConfigureArgs {
 	readonly fallbacks?: string;
 }
 
-function getStringField(obj: Record<string, unknown>, key: string): string | undefined {
-	const val = obj[key];
-	return typeof val === "string" ? val : undefined;
-}
-
 /**
- * Extract available models from the OpenCode host config, grouped by family.
- * Returns a map of family -> model IDs.
+ * Discover available models from the stored provider data.
+ * Returns a map of provider ID -> list of "providerId/modelId" strings.
  */
-function discoverAvailableModels(config: Config | null): Map<string, string[]> {
-	const modelsByFamily = new Map<string, string[]>();
-	if (!config) return modelsByFamily;
+function discoverAvailableModels(): Map<string, string[]> {
+	const modelsByProvider = new Map<string, string[]>();
 
-	const configRecord = config as Record<string, unknown>;
-	const seen = new Set<string>();
-
-	// Collect from agent configs
-	const agentConfigs = configRecord.agent;
-	if (agentConfigs && typeof agentConfigs === "object" && agentConfigs !== null) {
-		for (const agentCfg of Object.values(agentConfigs as Record<string, unknown>)) {
-			if (agentCfg && typeof agentCfg === "object" && agentCfg !== null) {
-				const model = getStringField(agentCfg as Record<string, unknown>, "model");
-				if (model && !seen.has(model)) {
-					seen.add(model);
-					const family = extractFamily(model);
-					const list = modelsByFamily.get(family) ?? [];
-					list.push(model);
-					modelsByFamily.set(family, list);
-				}
-			}
+	for (const provider of availableProviders) {
+		const modelIds: string[] = [];
+		for (const modelKey of Object.keys(provider.models)) {
+			modelIds.push(`${provider.id}/${modelKey}`);
+		}
+		if (modelIds.length > 0) {
+			modelsByProvider.set(provider.id, modelIds);
 		}
 	}
 
-	// Also include top-level model and small_model
-	const topModel = getStringField(configRecord, "model");
-	const smallModel = getStringField(configRecord, "small_model");
-	for (const m of [topModel, smallModel]) {
-		if (m && !seen.has(m)) {
-			seen.add(m);
-			const family = extractFamily(m);
-			const list = modelsByFamily.get(family) ?? [];
-			list.push(m);
-			modelsByFamily.set(family, list);
-		}
-	}
-
-	return modelsByFamily;
+	return modelsByProvider;
 }
 
 function serializeDiversityWarnings(warnings: readonly DiversityWarning[]): readonly {
@@ -114,7 +106,7 @@ function serializeDiversityWarnings(warnings: readonly DiversityWarning[]): read
 }
 
 async function handleStart(configPath?: string): Promise<string> {
-	const modelsByFamily = discoverAvailableModels(openCodeConfig);
+	const modelsByProvider = discoverAvailableModels();
 
 	// Load current plugin config to show existing assignments
 	const currentConfig = await loadConfig(configPath);
@@ -141,7 +133,7 @@ async function handleStart(configPath?: string): Promise<string> {
 	return JSON.stringify({
 		action: "configure",
 		stage: "start",
-		availableModels: Object.fromEntries(modelsByFamily),
+		availableModels: Object.fromEntries(modelsByProvider),
 		groups,
 		currentConfig: currentConfig
 			? { configured: currentConfig.configured, groups: currentConfig.groups }

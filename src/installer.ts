@@ -1,7 +1,13 @@
-import { readdir } from "node:fs/promises";
+import { readdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { copyIfMissing, isEnoentError } from "./utils/fs-helpers";
 import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
+
+/**
+ * Assets that were previously shipped but have since been removed from the source repo.
+ * These are cleaned up from the target directory on every install to avoid stale files.
+ */
+const DEPRECATED_ASSETS = ["agents/placeholder-agent.md", "commands/configure.md"] as const;
 
 export interface InstallResult {
 	readonly copied: readonly string[];
@@ -112,10 +118,33 @@ async function processSkills(sourceDir: string, targetDir: string): Promise<Inst
 	return { copied, skipped, errors };
 }
 
+async function cleanupDeprecatedAssets(
+	targetDir: string,
+): Promise<{ readonly removed: readonly string[]; readonly errors: readonly string[] }> {
+	const removed: string[] = [];
+	const errors: string[] = [];
+	for (const asset of DEPRECATED_ASSETS) {
+		try {
+			await unlink(join(targetDir, asset));
+			removed.push(asset);
+		} catch (error: unknown) {
+			if (!isEnoentError(error)) {
+				const message = error instanceof Error ? error.message : String(error);
+				errors.push(`cleanup ${asset}: ${message}`);
+			}
+			// ENOENT is expected — asset already gone
+		}
+	}
+	return { removed, errors };
+}
+
 export async function installAssets(
 	assetsDir: string = getAssetsDir(),
 	targetDir: string = getGlobalConfigDir(),
 ): Promise<InstallResult> {
+	// Remove deprecated assets before copying new ones
+	const cleanup = await cleanupDeprecatedAssets(targetDir);
+
 	const [agents, commands, skills] = await Promise.all([
 		processFiles(assetsDir, targetDir, "agents"),
 		processFiles(assetsDir, targetDir, "commands"),
@@ -125,6 +154,6 @@ export async function installAssets(
 	return {
 		copied: [...agents.copied, ...commands.copied, ...skills.copied],
 		skipped: [...agents.skipped, ...commands.skipped, ...skills.skipped],
-		errors: [...agents.errors, ...commands.errors, ...skills.errors],
+		errors: [...cleanup.errors, ...agents.errors, ...commands.errors, ...skills.errors],
 	};
 }

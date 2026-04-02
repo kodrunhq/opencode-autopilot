@@ -6,7 +6,7 @@ import { ALL_GROUP_IDS } from "../../src/registry/model-groups";
 import {
 	configureCore,
 	resetPendingAssignments,
-	setOpenCodeConfig,
+	setAvailableProviders,
 } from "../../src/tools/configure";
 
 // Reset state before each test
@@ -213,18 +213,31 @@ describe("configureCore edge cases", () => {
 		expect(result.assignedCount).toBe(1);
 	});
 
-	test("start with openCodeConfig discovers available models", async () => {
-		setOpenCodeConfig({
-			agent: {
-				researcher: { model: "anthropic/claude-sonnet-4-6" },
+	test("start with availableProviders discovers available models", async () => {
+		setAvailableProviders([
+			{
+				id: "anthropic",
+				name: "Anthropic",
+				models: {
+					"claude-opus-4-6": { id: "claude-opus-4-6", name: "Claude Opus 4.6" },
+					"claude-sonnet-4-6": { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+				},
 			},
-			model: "anthropic/claude-opus-4-6",
-		} as any);
+			{
+				id: "openai",
+				name: "OpenAI",
+				models: {
+					"gpt-5.4": { id: "gpt-5.4", name: "GPT-5.4" },
+				},
+			},
+		]);
 
 		const result = JSON.parse(await configureCore({ subcommand: "start" }));
-		expect(Object.keys(result.availableModels).length).toBeGreaterThan(0);
-
-		setOpenCodeConfig(null as any);
+		expect(Object.keys(result.availableModels).length).toBe(2);
+		expect(result.availableModels.anthropic).toContain("anthropic/claude-opus-4-6");
+		expect(result.availableModels.anthropic).toContain("anthropic/claude-sonnet-4-6");
+		expect(result.availableModels.openai).toContain("openai/gpt-5.4");
+		// cleanup handled by beforeEach → resetPendingAssignments() which also clears providers
 	});
 });
 
