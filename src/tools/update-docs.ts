@@ -78,15 +78,14 @@ export async function updateDocsCore(args: UpdateDocsArgs, projectDir: string): 
 
 	// Deduplicate by doc path
 	const uniqueDocs = Array.from(
-		affectedDocs.reduce(
-			(map, item) => {
+		affectedDocs
+			.reduce((map, item) => {
 				if (!map.has(item.doc)) {
 					map.set(item.doc, item);
 				}
 				return map;
-			},
-			new Map<string, AffectedDoc>(),
-		).values(),
+			}, new Map<string, AffectedDoc>())
+			.values(),
 	);
 
 	const nonMdChanged = changedFiles.filter((f) => !f.endsWith(".md"));
@@ -103,8 +102,7 @@ export async function updateDocsCore(args: UpdateDocsArgs, projectDir: string): 
 }
 
 export const ocUpdateDocs = tool({
-	description:
-		"Detect documentation affected by recent code changes and suggest updates.",
+	description: "Detect documentation affected by recent code changes and suggest updates.",
 	args: {
 		scope: tool.schema
 			.enum(["changed", "all"])

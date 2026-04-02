@@ -44,6 +44,8 @@ import { ocQuick } from "./tools/quick";
 import { ocReview } from "./tools/review";
 import { ocSessionStats } from "./tools/session-stats";
 import { ocState } from "./tools/state";
+import { ocStocktake } from "./tools/stocktake";
+import { ocUpdateDocs } from "./tools/update-docs";
 
 let openCodeConfig: Config | null = null;
 
@@ -191,6 +193,8 @@ const plugin: Plugin = async (input) => {
 			oc_session_stats: ocSessionStats,
 			oc_pipeline_report: ocPipelineReport,
 			oc_mock_fallback: ocMockFallback,
+			oc_stocktake: ocStocktake,
+			oc_update_docs: ocUpdateDocs,
 		},
 		event: async ({ event }) => {
 			// 1. Observability: collect (pure observer, no side effects on session)

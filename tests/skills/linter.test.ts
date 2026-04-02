@@ -25,9 +25,7 @@ describe("lintSkill", () => {
 	it("returns invalid for missing description field", () => {
 		const result = lintSkill("---\nname: test\n---\n# Content");
 		expect(result.valid).toBe(false);
-		expect(result.errors).toEqual(
-			expect.arrayContaining(["Missing required field: description"]),
-		);
+		expect(result.errors).toEqual(expect.arrayContaining(["Missing required field: description"]));
 	});
 
 	it("warns about missing stacks field", () => {
@@ -47,9 +45,7 @@ describe("lintSkill", () => {
 			"---\nname: test\ndescription: desc\nstacks: [1, 2]\nrequires: []\n---\n# Content",
 		);
 		expect(result.valid).toBe(false);
-		expect(result.errors).toEqual(
-			expect.arrayContaining(["stacks must contain only strings"]),
-		);
+		expect(result.errors).toEqual(expect.arrayContaining(["stacks must contain only strings"]));
 	});
 
 	it("warns about empty body", () => {
@@ -74,9 +70,7 @@ describe("lintCommand", () => {
 	it("returns invalid for missing description", () => {
 		const result = lintCommand("---\n---\nContent");
 		expect(result.valid).toBe(false);
-		expect(result.errors).toEqual(
-			expect.arrayContaining(["Missing required field: description"]),
-		);
+		expect(result.errors).toEqual(expect.arrayContaining(["Missing required field: description"]));
 	});
 
 	it("warns about empty body", () => {

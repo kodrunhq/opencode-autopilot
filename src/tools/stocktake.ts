@@ -1,4 +1,4 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { lintAgent, lintCommand, lintSkill } from "../skills/linter";
@@ -12,7 +12,11 @@ interface AssetEntry {
 	readonly name: string;
 	readonly type: "skill" | "command" | "agent";
 	readonly origin: "built-in" | "user-created";
-	readonly lint?: { readonly valid: boolean; readonly errors: readonly string[]; readonly warnings: readonly string[] };
+	readonly lint?: {
+		readonly valid: boolean;
+		readonly errors: readonly string[];
+		readonly warnings: readonly string[];
+	};
 }
 
 /** Read directory entries safely, returning empty array on ENOENT. */
@@ -50,7 +54,10 @@ export async function stocktakeCore(args: StocktakeArgs, baseDir: string): Promi
 				const lint = lintSkill(content);
 				skills.push({ ...entry, lint });
 			} catch {
-				skills.push({ ...entry, lint: { valid: false, errors: ["Could not read SKILL.md"], warnings: [] } });
+				skills.push({
+					...entry,
+					lint: { valid: false, errors: ["Could not read SKILL.md"], warnings: [] },
+				});
 			}
 		} else {
 			skills.push(entry);
@@ -70,7 +77,10 @@ export async function stocktakeCore(args: StocktakeArgs, baseDir: string): Promi
 				const lint = lintCommand(content);
 				commands.push({ ...entry, lint });
 			} catch {
-				commands.push({ ...entry, lint: { valid: false, errors: ["Could not read command file"], warnings: [] } });
+				commands.push({
+					...entry,
+					lint: { valid: false, errors: ["Could not read command file"], warnings: [] },
+				});
 			}
 		} else {
 			commands.push(entry);
@@ -90,7 +100,10 @@ export async function stocktakeCore(args: StocktakeArgs, baseDir: string): Promi
 				const lint = lintAgent(content);
 				agents.push({ ...entry, lint });
 			} catch {
-				agents.push({ ...entry, lint: { valid: false, errors: ["Could not read agent file"], warnings: [] } });
+				agents.push({
+					...entry,
+					lint: { valid: false, errors: ["Could not read agent file"], warnings: [] },
+				});
 			}
 		} else {
 			agents.push(entry);

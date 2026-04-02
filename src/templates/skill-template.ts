@@ -5,12 +5,16 @@ export interface SkillTemplateInput {
 	readonly description: string;
 	readonly license?: string;
 	readonly compatibility?: string;
+	readonly stacks?: readonly string[];
+	readonly requires?: readonly string[];
 }
 
 export function generateSkillMarkdown(input: SkillTemplateInput): string {
 	const frontmatter: Record<string, unknown> = {
 		name: input.name,
 		description: input.description,
+		stacks: input.stacks ?? [],
+		requires: input.requires ?? [],
 		...(input.license !== undefined && { license: input.license }),
 		...(input.compatibility !== undefined && { compatibility: input.compatibility }),
 	};
