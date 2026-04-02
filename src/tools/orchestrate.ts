@@ -99,13 +99,13 @@ async function injectLessonContext(
  * Attempt to inject stack-filtered adaptive skill context into a dispatch prompt.
  * Best-effort: failures are silently swallowed to avoid breaking dispatch.
  */
-async function injectSkillContext(prompt: string): Promise<string> {
+async function injectSkillContext(prompt: string, projectRoot?: string): Promise<string> {
 	try {
 		const baseDir = getGlobalConfigDir();
-		const ctx = await loadAdaptiveSkillContext(baseDir, process.cwd());
+		const ctx = await loadAdaptiveSkillContext(baseDir, projectRoot ?? process.cwd());
 		if (ctx) return prompt + ctx;
-	} catch {
-		// Best-effort: swallow all errors (same as lesson injection)
+	} catch (err) {
+		console.warn("[opencode-autopilot] skill injection failed:", err);
 	}
 	return prompt;
 }
@@ -145,7 +145,7 @@ async function processHandlerResult(
 					handlerResult.phase,
 					artifactDir,
 				);
-				const withSkills = await injectSkillContext(enrichedPrompt);
+				const withSkills = await injectSkillContext(enrichedPrompt, join(artifactDir, ".."));
 				if (withSkills !== handlerResult.prompt) {
 					return JSON.stringify({ ...handlerResult, prompt: withSkills });
 				}
@@ -162,7 +162,7 @@ async function processHandlerResult(
 					handlerResult.phase as string,
 					artifactDir,
 				);
-				const skillSuffix = await injectSkillContext("");
+				const skillSuffix = await injectSkillContext("", join(artifactDir, ".."));
 				const combinedSuffix = lessonSuffix + (skillSuffix || "");
 				if (combinedSuffix) {
 					const enrichedAgents = handlerResult.agents.map((entry) => ({

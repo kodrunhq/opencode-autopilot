@@ -38,6 +38,9 @@ describe("buildSkillContext", () => {
 		expect(result).toContain("...");
 		// The formatted output should not contain the full 3000-char string
 		expect(result).not.toContain(longContent);
+		// Content portion (after header) must respect the 2048 + "..." limit
+		const headerPrefix = "\n\nCoding standards for this project (follow these conventions):\n";
+		expect(result.length).toBeLessThanOrEqual(headerPrefix.length + 2048 + 3);
 	});
 
 	test("does not truncate content at exactly 2048 chars", () => {

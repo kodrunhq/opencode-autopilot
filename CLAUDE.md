@@ -11,7 +11,7 @@ Installed via one line in `opencode.json`: `{ "plugin": ["@kodrunhq/opencode-aut
 ## Commands
 
 ```bash
-bun test                    # Run all tests (1143 tests across 94 files)
+bun test                    # Run all tests
 bun test tests/validators   # Run a single test file
 bun run lint                # Lint and check formatting (Biome)
 bun run format              # Auto-format all files (Biome)

@@ -58,9 +58,19 @@ describe("getMemoryTunedDepth", () => {
 		expect(result).toBe(1);
 	});
 
+	test("does NOT increase depth when fewer than 3 errors (below threshold)", () => {
+		upsertProject(TEST_PROJECT, db);
+		// Insert only 2 error observations — below ERROR_DEPTH_THRESHOLD (3)
+		for (let i = 0; i < 2; i++) {
+			insertObservation(makeObservation("error", i), db);
+		}
+		const highEntries = [makeEntry({ level: "HIGH" }), makeEntry({ level: "HIGH" })];
+		expect(getMemoryTunedDepth(highEntries, TEST_PROJECT_PATH, db)).toBe(1); // base depth, no increase
+	});
+
 	test("increases depth by 1 (capped at 3) when memory contains 3+ error-type observations", () => {
 		upsertProject(TEST_PROJECT, db);
-		// Insert 3 error observations
+		// Insert 3 error observations (exact threshold)
 		for (let i = 0; i < 3; i++) {
 			insertObservation(makeObservation("error", i), db);
 		}

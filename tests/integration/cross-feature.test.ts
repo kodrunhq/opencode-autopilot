@@ -1,7 +1,9 @@
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { initMemoryDb } from "../../src/memory/database";
 import { retrieveMemoryContext } from "../../src/memory/retrieval";
 import { loadAdaptiveSkillContext } from "../../src/orchestrator/skill-injection";
 import { createInitialState, saveState } from "../../src/orchestrator/state";
@@ -37,9 +39,12 @@ describe("Cross-feature integration: orchestrator + skills + memory", () => {
 	});
 
 	test("retrieveMemoryContext returns empty string when no project registered (best-effort)", () => {
-		// No DB initialized at tempDir — should return "" without throwing
-		const result = retrieveMemoryContext(tempDir);
+		// Use an in-memory DB to avoid touching global singleton
+		const db = new Database(":memory:");
+		initMemoryDb(db);
+		const result = retrieveMemoryContext(tempDir, undefined, db);
 		expect(result).toBe("");
+		db.close();
 	});
 
 	test("combined enrichment does not corrupt dispatch JSON", async () => {

@@ -65,8 +65,8 @@ export function getMemoryTunedDepth(
 		if (errorCount >= ERROR_DEPTH_THRESHOLD) {
 			return Math.min(baseDepth + 1, 3);
 		}
-	} catch {
-		// Best-effort: memory errors never affect pipeline
+	} catch (err) {
+		console.warn("[opencode-autopilot] memory-tuned depth failed, using base:", err);
 	}
 	return baseDepth;
 }
