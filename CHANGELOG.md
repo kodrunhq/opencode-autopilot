@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.2.0...opencode-autopilot-v1.2.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* address PR [#25](https://github.com/kodrunhq/opencode-autopilot/issues/25) review comments ([3c5d186](https://github.com/kodrunhq/opencode-autopilot/commit/3c5d1868f9b1b6ecd19a5ce7c7ca8569942797c3))
+
 ## [1.2.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.1.3...opencode-autopilot-v1.2.0) (2026-04-02)
 
 
