@@ -58,5 +58,23 @@ export const loggingConfigSchema = z.object({
 	retentionDays: z.number().min(1).max(365).default(30),
 });
 
+export const sessionLogSchema = z.object({
+	schemaVersion: z.number().default(1),
+	sessionId: z.string(),
+	startedAt: z.string(),
+	events: z.array(sessionEventSchema),
+	decisions: z
+		.array(
+			z.object({
+				phase: z.string(),
+				agent: z.string(),
+				decision: z.string(),
+				rationale: z.string(),
+			}),
+		)
+		.default([]),
+	errorSummary: z.record(z.string(), z.number()).default({}),
+});
+
 // Pre-compute defaults for Zod v4 nested default compatibility
 export const loggingDefaults = loggingConfigSchema.parse({});
