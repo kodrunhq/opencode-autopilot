@@ -17,7 +17,7 @@
 import { tool } from "@opencode-ai/plugin";
 import { z } from "zod";
 import { readLatestSessionLog, readSessionLog } from "../observability/log-reader";
-import { computeDuration, formatCost, formatDuration } from "../observability/summary-generator";
+import { computeDuration, formatDuration } from "../observability/summary-generator";
 import type { SessionLog } from "../observability/types";
 
 /**
