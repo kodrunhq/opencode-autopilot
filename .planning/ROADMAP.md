@@ -172,7 +172,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 9. Model Fallback Integration | v2.0 | 3/3 | Complete | - |
 | 10. UX Polish & Metaprompting | v2.0 | 4/4 | Complete | - |
 | 11. Ecosystem Research | v3.0 | 3/3 | Complete | 2026-04-02 |
-| 12. Quick Wins & Fixes | v3.0 | 0/3 | Planning | - |
 
 ### Phase 8: Testing & CI
 
@@ -225,7 +224,7 @@ Plans:
 ### v3.0 Intelligence & Polish
 
 - [x] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
-- [ ] **Phase 12: Quick Wins & Fixes** - Self-healing doctor, config repair, Zen model display fix, quick task mode
+- [x] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research (completed 2026-04-02)
 - [ ] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing
 - [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
 - [ ] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval
@@ -252,21 +251,14 @@ Plans:
 - [x] 11-03-PLAN.md -- Gap matrix synthesis, phase scope definitions, memory architecture, agent verdict
 
 ### Phase 12: Quick Wins & Fixes
-**Goal:** Self-healing plugin diagnostics with auto-repair on every load, oc_doctor tool for manual health checks, config structural repair via Zod, Zen model display fix, and quick task mode for simplified pipeline
+**Goal:** Fix known bugs and small improvements that don't require research or complex architecture
 **Depends on:** Phase 10
-**Requirements:** DX-01, DX-02, CM-01, SF-04, NV-06, WF-02, CM-09
+**Requirements:** TBD
 **Success Criteria** (what must be TRUE):
-  1. Plugin runs health checks on every load and silently auto-repairs missing agents, broken config, and missing assets
-  2. User can invoke oc_doctor and see a pass/fail checklist covering config validity, agent injection, asset health, and hook registration
-  3. CLI configure wizard shows Zen provider prefix on models, matching OpenCode's native /models display
-  4. Users can distinguish Go vs Zen providers when selecting a model
-  5. User can invoke /quick to run a simplified pipeline skipping RECON/CHALLENGE/ARCHITECT while preserving review quality
-**Plans:** 3 plans
-
-Plans:
-- [ ] 12-01-PLAN.md -- Health check infrastructure, config repair, and self-healing on plugin load
-- [ ] 12-02-PLAN.md -- oc_doctor diagnostic tool and Zen model display fix
-- [ ] 12-03-PLAN.md -- Quick task mode (/quick command and oc_quick tool)
+  1. CLI configure wizard shows Zen provider prefix on models, matching OpenCode's native /models display
+  2. Users can distinguish Go vs Zen providers when selecting a model
+  3. Any additional quick wins from Phase 11 research are addressed
+**Plans:** 1/1 plans complete
 
 ### Phase 13: Session Observability
 **Goal:** Full session observability with structured event logging, human-readable summaries, TUI dashboard, time-based retention, and configurable mock provider for fallback testing
