@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-OpenCode Autopilot Plugin — an npm package that provides curated agents, skills, and commands for the OpenCode AI coding CLI, plus in-session creation tools (`/new-agent`, `/new-skill`, `/new-command`) so users can scaffold new extensions without leaving the TUI.
+OpenCode Autopilot Plugin — an npm package that provides autonomous SDLC orchestration, multi-agent code review, smart memory, adaptive skills, session observability, and in-session creation tools for the OpenCode AI coding CLI.
 
 Installed via one line in `opencode.json`: `{ "plugin": ["@kodrunhq/opencode-autopilot"] }`
 
 ## Commands
 
 ```bash
-bun test                    # Run all tests (107 tests across 11 files)
+bun test                    # Run all tests (1143 tests across 94 files)
 bun test tests/validators   # Run a single test file
 bun run lint                # Lint and check formatting (Biome)
 bun run format              # Auto-format all files (Biome)
@@ -43,7 +43,31 @@ src/utils/                Shared utilities (stateless, no internal deps)
   paths.ts                getGlobalConfigDir(), getAssetsDir()
   fs-helpers.ts           ensureDir, copyIfMissing (COPYFILE_EXCL), isEnoentError
 
-src/config.ts             Zod-validated config load/save, first-load detection
+src/memory/               Smart dual-scope memory (project patterns + user preferences)
+  database.ts             bun:sqlite with FTS5, schema initialization
+  capture.ts              Event-driven observation capture from session events
+  retrieval.ts            3-layer progressive disclosure with token-budgeted context
+  injector.ts             System prompt injection via experimental.chat.system.transform
+  decay.ts                Relevance scoring with configurable half-life decay
+  repository.ts           SQLite CRUD for observations, projects, preferences
+
+src/observability/        Session observability and structured event logging
+  event-store.ts          In-memory session event collection
+  event-handlers.ts       Hook handlers for event/tool lifecycle
+  context-monitor.ts      Token tracking and context usage monitoring
+  log-writer.ts           JSON log persistence to ~/.config/opencode/logs/
+  retention.ts            Time-based log pruning (30-day default)
+
+src/skills/               Adaptive skill loading and injection
+  loader.ts               Load all skill directories from assets
+  adaptive-injector.ts    Stack detection, filtering, dependency ordering, token budgeting
+  dependency-resolver.ts  Topological sort for skill execution order
+  linter.ts               Asset validation for skill/agent/command files
+
+src/health/               Plugin self-diagnostics
+  runner.ts               Health check execution and reporting for oc_doctor
+
+src/config.ts             Zod-validated config load/save, first-load detection, v1-v5 migration chain
 src/installer.ts          Self-healing asset copier (never overwrites user files)
 
 assets/                   Bundled markdown files copied to ~/.config/opencode/ on load
@@ -53,7 +77,7 @@ assets/                   Bundled markdown files copied to ~/.config/opencode/ o
 ```
 
 **Dependency flow** (strictly top-down, no cycles):
-`index.ts` → `tools/*` → `templates/*` + `utils/*` → Node built-ins + `yaml`
+`index.ts` → `tools/*` → `templates/*` + `utils/*` + `memory/*` + `skills/*` + `observability/*` → Node built-ins + `yaml`
 
 ## Key Patterns
 
@@ -64,6 +88,10 @@ assets/                   Bundled markdown files copied to ~/.config/opencode/ o
 **Immutability:** Build objects declaratively with conditional spreads — never mutate after creation. Validation results use `Object.freeze()`. Return types use `readonly` arrays.
 
 **Asset name validation:** All names must match `^[a-z0-9]+(-[a-z0-9]+)*$` (1-64 chars). Command names additionally check against `BUILT_IN_COMMANDS` set.
+
+**Best-effort injection:** Memory and skill context injection never blocks or crashes the pipeline. All injection functions swallow errors and return empty strings on failure.
+
+**Token budgeting:** Both memory and skill injection enforce character-per-token limits to prevent context overflow. Memory defaults to 2000-token cap; skills default to 8000-token budget.
 
 ## Constraints
 
