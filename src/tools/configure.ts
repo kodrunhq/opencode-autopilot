@@ -197,17 +197,36 @@ async function handleStart(configPath?: string): Promise<string> {
 					"then type model IDs manually (e.g. anthropic/claude-opus-4-6).",
 				].join("\n");
 
+	// Compact group summaries — only fields the LLM needs for the walkthrough
+	const compactGroups = groups.map((g) => ({
+		id: g.id,
+		label: g.label,
+		purpose: g.purpose,
+		recommendation: g.recommendation,
+		agents: g.agents,
+		current: g.currentAssignment,
+	}));
+
+	// Compact diversity rules — just the text the LLM should mention
+	const compactRules = DIVERSITY_RULES.map((r) => ({
+		groups: r.groups,
+		severity: r.severity,
+		reason: r.reason,
+	}));
+
+	// NOTE: availableModels is intentionally excluded — it's redundant with
+	// displayText/modelIndex and can be 400KB+ with many providers, causing
+	// OpenCode to truncate the tool output and lose everything after it.
 	return JSON.stringify({
 		action: "configure",
 		stage: "start",
-		availableModels: Object.fromEntries(modelsByProvider),
-		modelIndex: indexMap,
 		displayText,
-		groups,
+		modelIndex: indexMap,
+		groups: compactGroups,
+		diversityRules: compactRules,
 		currentConfig: currentConfig
 			? { configured: currentConfig.configured, groups: currentConfig.groups }
 			: null,
-		diversityRules: DIVERSITY_RULES,
 	});
 }
 

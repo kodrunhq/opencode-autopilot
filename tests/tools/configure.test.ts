@@ -233,10 +233,10 @@ describe("configureCore edge cases", () => {
 		]);
 
 		const result = JSON.parse(await configureCore({ subcommand: "start" }));
-		expect(Object.keys(result.availableModels).length).toBe(2);
-		expect(result.availableModels.anthropic).toContain("anthropic/claude-opus-4-6");
-		expect(result.availableModels.anthropic).toContain("anthropic/claude-sonnet-4-6");
-		expect(result.availableModels.openai).toContain("openai/gpt-5.4");
+
+		// availableModels is NOT included — redundant with displayText/modelIndex
+		// and caused 400KB+ responses that OpenCode truncated
+		expect(result.availableModels).toBeUndefined();
 
 		// modelIndex maps numbers to model IDs
 		expect(result.modelIndex).toBeDefined();
@@ -248,6 +248,15 @@ describe("configureCore edge cases", () => {
 		expect(result.displayText).toContain("Available models (3 total)");
 		expect(result.displayText).toContain("anthropic/claude-opus-4-6");
 		expect(result.displayText).toContain("openai/gpt-5.4");
+
+		// groups are compact (no tier/order fields)
+		expect(result.groups[0].id).toBeDefined();
+		expect(result.groups[0].purpose).toBeDefined();
+		expect(result.groups[0].tier).toBeUndefined();
+
+		// diversityRules are compact (no full rule objects)
+		expect(result.diversityRules[0].groups).toBeDefined();
+		expect(result.diversityRules[0].reason).toBeDefined();
 		// cleanup handled by beforeEach → resetPendingAssignments() which also clears providers
 	});
 });
