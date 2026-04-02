@@ -2,22 +2,14 @@
 
 ## For Humans
 
-Paste this into your AI session:
-
-```
-Install and configure opencode-autopilot by following the instructions here:
-https://raw.githubusercontent.com/kodrunhq/opencode-autopilot/main/docs/guide/installation.md
-```
-
-**Alternative — do it yourself:**
-
 ```bash
 bunx @kodrunhq/opencode-autopilot install
+bunx @kodrunhq/opencode-autopilot configure
 ```
 
-Then launch (or restart) OpenCode and run `/oc-configure` to set up model assignments.
-
-> **Note:** `/oc-configure` is an OpenCode slash command, not a shell command. It runs inside the OpenCode TUI, not in a terminal.
+That's it. The `install` command registers the plugin, and `configure`
+walks you through an interactive wizard with searchable model selection
+for each agent group.
 
 ## For LLM Agents
 
@@ -64,81 +56,57 @@ fi
 
 ### Step 2: Install the plugin
 
-If the user is currently in an OpenCode session:
-
-1. Run this in bash:
-   ```bash
-   bunx @kodrunhq/opencode-autopilot install --no-tui
-   ```
-2. Tell the user to **exit and restart OpenCode** — the plugin loads on startup, so the current session will not have it available.
-3. In the **new** OpenCode session, run `/oc-configure`.
-
-If the user is NOT in an OpenCode session:
-
-1. Run:
-   ```bash
-   bunx @kodrunhq/opencode-autopilot install
-   ```
-2. Launch OpenCode.
-3. Run `/oc-configure` inside OpenCode.
-
-> **Important:** `/oc-configure` is an OpenCode slash command, NOT a shell command. It runs inside the OpenCode TUI, not in a terminal.
+```bash
+bunx @kodrunhq/opencode-autopilot install
+```
 
 This registers the plugin in opencode.json and creates a starter config.
 
 ### Step 3: Configure model assignments
 
-Tell the user that `/oc-configure` walks through 8 agent groups
-and collects an **ordered list of models** for each (primary + fallbacks).
+Run the interactive configuration wizard:
 
-> **Important:** `/oc-configure` is a slash command inside the OpenCode
-> TUI. Do NOT try to run it as a shell command. The user must restart
-> OpenCode after installing the plugin, then type `/oc-configure` in
-> the OpenCode chat.
+```bash
+bunx @kodrunhq/opencode-autopilot configure
+```
 
-The `/oc-configure` command presents ALL available models as a numbered
-list, then walks through 8 agent groups:
+This opens a terminal-based wizard that:
+
+1. Discovers all available models from the user's configured providers
+2. Walks through 8 agent groups in order
+3. For each group, presents a **searchable model picker** (type to filter)
+4. Asks for a primary model and optional **fallback models**
+5. Shows adversarial diversity warnings between groups
+6. Saves the configuration
+
+The 8 agent groups are:
 
 1. **Architects** — System design, planning, orchestration
-   - Agents: oc-architect, oc-planner, autopilot
    - Recommendation: Most powerful model (e.g. Claude Opus, GPT-5.4)
 
 2. **Challengers** — Challenge architecture, find design flaws
-   - Agents: oc-critic, oc-challenger
    - Recommendation: Strong model, DIFFERENT FAMILY from Architects
-   - ⚠ Same family = confirmation bias
 
 3. **Builders** — Write production code
-   - Agents: oc-implementer
    - Recommendation: Strong coding model
 
 4. **Reviewers** — Find bugs, security issues, logic errors
-   - Agents: oc-reviewer + 19 internal review agents
    - Recommendation: Strong model, DIFFERENT FAMILY from Builders
-   - ⚠ Same family = shared blind spots
 
 5. **Red Team** — Final adversarial pass, hunt exploits
-   - Agents: red-team, product-thinker
    - Recommendation: DIFFERENT FAMILY from both Builders and Reviewers
-   - ⚠ Most effective as a third perspective
 
 6. **Researchers** — Domain research, feasibility
-   - Agents: oc-researcher, researcher
    - Recommendation: Good comprehension, any family
 
 7. **Communicators** — Docs, changelogs, lessons
-   - Agents: oc-shipper, documenter, oc-retrospector
    - Recommendation: Mid-tier model, clear writing
 
 8. **Utilities** — Fast lookups, scanning
-   - Agents: oc-explorer, metaprompter, pr-reviewer
    - Recommendation: Fastest/cheapest model
 
-For each group, the user picks an **ordered list of models**:
-- First model = primary (used by default)
-- Remaining models = fallbacks (tried in order when primary fails/rate-limits)
-- Minimum 1, recommended 2-3 per group
-- Fallbacks are the core feature — more fallbacks = more resilience
+> **Important:** The configure wizard runs in the terminal, NOT inside
+> the OpenCode TUI. The user must run it in a regular terminal session.
 
 ### Step 4: Verify setup
 
@@ -148,14 +116,16 @@ bunx @kodrunhq/opencode-autopilot doctor
 
 This checks config health, model assignments, and adversarial diversity.
 
-### Step 5: Educate the user
+### Step 5: Launch OpenCode
 
-After configuration, tell the user:
+After configuration, tell the user to launch (or restart) OpenCode.
+The plugin will load with the new model assignments.
 
+Key features to mention:
 - Use the **autopilot** agent for full autonomous pipelines
 - Use **/review-pr** to review pull requests with 21 agents
 - Use **/new-agent**, **/new-skill**, **/new-command** to extend the plugin
-- Run **/oc-configure** any time to change model assignments
+- Run `bunx @kodrunhq/opencode-autopilot configure` to change assignments
 
 ### ⚠ Warning
 
