@@ -117,6 +117,37 @@ function serializeDiversityWarnings(warnings: readonly DiversityWarning[]): read
 	}));
 }
 
+/**
+ * Build a flat numbered list of all available models and an index map.
+ * Returns { numberedList: "1. provider/model\n2. ...", indexMap: { "1": "provider/model", ... } }
+ */
+function buildNumberedModelList(modelsByProvider: Map<string, string[]>): {
+	numberedList: string;
+	indexMap: Record<string, string>;
+	totalCount: number;
+} {
+	const allModels: string[] = [];
+	for (const models of modelsByProvider.values()) {
+		allModels.push(...models);
+	}
+	// Sort alphabetically for stable ordering
+	allModels.sort();
+
+	const indexMap: Record<string, string> = {};
+	const lines: string[] = [];
+	for (let i = 0; i < allModels.length; i++) {
+		const num = String(i + 1);
+		indexMap[num] = allModels[i];
+		lines.push(`  ${num}. ${allModels[i]}`);
+	}
+
+	return {
+		numberedList: lines.join("\n"),
+		indexMap,
+		totalCount: allModels.length,
+	};
+}
+
 async function handleStart(configPath?: string): Promise<string> {
 	// Wait for background provider discovery (up to 5s) before building model list
 	await Promise.race([
@@ -125,6 +156,7 @@ async function handleStart(configPath?: string): Promise<string> {
 	]);
 
 	const modelsByProvider = discoverAvailableModels();
+	const { numberedList, indexMap, totalCount } = buildNumberedModelList(modelsByProvider);
 
 	// Load current plugin config to show existing assignments
 	const currentConfig = await loadConfig(configPath);
@@ -148,10 +180,29 @@ async function handleStart(configPath?: string): Promise<string> {
 		};
 	});
 
+	// Pre-formatted text the LLM should show verbatim — avoids summarization
+	const displayText =
+		totalCount > 0
+			? [
+					`Available models (${totalCount} total):`,
+					numberedList,
+					"",
+					"For each group below, enter model numbers separated by commas (e.g. 1,4,7).",
+					"First number = primary model. Remaining = fallbacks tried in order.",
+					"More fallbacks = more resilience when a model is rate-limited.",
+				].join("\n")
+			: [
+					"No models were discovered from your providers.",
+					"Run `opencode models` in your terminal to see available models,",
+					"then type model IDs manually (e.g. anthropic/claude-opus-4-6).",
+				].join("\n");
+
 	return JSON.stringify({
 		action: "configure",
 		stage: "start",
 		availableModels: Object.fromEntries(modelsByProvider),
+		modelIndex: indexMap,
+		displayText,
 		groups,
 		currentConfig: currentConfig
 			? { configured: currentConfig.configured, groups: currentConfig.groups }
