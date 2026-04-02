@@ -6,17 +6,26 @@ interface LintResult {
 	readonly warnings: readonly string[];
 }
 
-/** Parse YAML frontmatter from markdown content. */
+/** Parse YAML frontmatter from markdown content. Supports LF and CRLF. */
 function extractFrontmatter(content: string): Record<string, unknown> | null {
-	const match = content.match(/^---\n([\s\S]*?\n)?---/);
+	const match = content.match(/^---\r?\n([\s\S]*?\r?\n)?---/);
 	if (!match) return null;
 	try {
 		const parsed = parse(match[1] ?? "");
-		if (parsed === null || typeof parsed !== "object") return {};
+		if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
 		return parsed as Record<string, unknown>;
 	} catch {
 		return null;
 	}
+}
+
+/** Freeze a LintResult including nested arrays. */
+function freezeResult(valid: boolean, errors: string[], warnings: string[]): LintResult {
+	return Object.freeze({
+		valid,
+		errors: Object.freeze(errors),
+		warnings: Object.freeze(warnings),
+	});
 }
 
 /** Lint a skill SKILL.md file for valid YAML frontmatter and required fields. */
@@ -26,7 +35,7 @@ export function lintSkill(content: string): LintResult {
 
 	const fm = extractFrontmatter(content);
 	if (!fm) {
-		return Object.freeze({ valid: false, errors: ["Missing YAML frontmatter"], warnings: [] });
+		return freezeResult(false, ["Missing YAML frontmatter"], []);
 	}
 
 	// Required fields
@@ -55,13 +64,13 @@ export function lintSkill(content: string): LintResult {
 		errors.push("requires must contain only strings");
 	}
 
-	// Content validation
-	const body = content.replace(/^---\n(?:[\s\S]*?\n)?---/, "").trim();
+	// Content validation (CRLF-safe)
+	const body = content.replace(/^---\r?\n(?:[\s\S]*?\r?\n)?---/, "").trim();
 	if (body.length === 0) {
 		warnings.push("Skill has no content after frontmatter");
 	}
 
-	return Object.freeze({ valid: errors.length === 0, errors, warnings });
+	return freezeResult(errors.length === 0, errors, warnings);
 }
 
 /** Lint a command markdown file for valid YAML frontmatter and required fields. */
@@ -71,19 +80,19 @@ export function lintCommand(content: string): LintResult {
 
 	const fm = extractFrontmatter(content);
 	if (!fm) {
-		return Object.freeze({ valid: false, errors: ["Missing YAML frontmatter"], warnings: [] });
+		return freezeResult(false, ["Missing YAML frontmatter"], []);
 	}
 
 	if (typeof fm.description !== "string" || fm.description.length === 0) {
 		errors.push("Missing required field: description");
 	}
 
-	const body = content.replace(/^---\n(?:[\s\S]*?\n)?---/, "").trim();
+	const body = content.replace(/^---\r?\n(?:[\s\S]*?\r?\n)?---/, "").trim();
 	if (body.length === 0) {
 		warnings.push("Command has no content after frontmatter");
 	}
 
-	return Object.freeze({ valid: errors.length === 0, errors, warnings });
+	return freezeResult(errors.length === 0, errors, warnings);
 }
 
 /** Lint an agent markdown file for valid YAML frontmatter and required fields. */
@@ -93,12 +102,12 @@ export function lintAgent(content: string): LintResult {
 
 	const fm = extractFrontmatter(content);
 	if (!fm) {
-		return Object.freeze({ valid: false, errors: ["Missing YAML frontmatter"], warnings: [] });
+		return freezeResult(false, ["Missing YAML frontmatter"], []);
 	}
 
 	if (typeof fm.name !== "string" || fm.name.length === 0) {
 		errors.push("Missing required field: name");
 	}
 
-	return Object.freeze({ valid: errors.length === 0, errors, warnings });
+	return freezeResult(errors.length === 0, errors, warnings);
 }

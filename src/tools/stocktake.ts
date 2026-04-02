@@ -19,20 +19,30 @@ interface AssetEntry {
 	};
 }
 
-/** Read directory entries safely, returning empty array on ENOENT. */
+/** Read directory entries safely, returning empty array on ENOENT only. */
 async function safeReaddir(dirPath: string): Promise<string[]> {
 	try {
 		return await readdir(dirPath);
-	} catch {
-		return [];
+	} catch (error: unknown) {
+		const errObj = error as { code?: unknown };
+		if (errObj?.code === "ENOENT") return [];
+		throw error;
 	}
 }
 
+/** Cache for built-in asset lookups (keyed by assetType). */
+const builtInCache = new Map<string, ReadonlySet<string>>();
+
 /** Check if an asset name exists in the bundled assets directory. */
 async function isBuiltIn(assetType: string, name: string): Promise<boolean> {
-	const assetsDir = getAssetsDir();
-	const entries = await safeReaddir(join(assetsDir, assetType));
-	return entries.includes(name);
+	let cached = builtInCache.get(assetType);
+	if (!cached) {
+		const assetsDir = getAssetsDir();
+		const entries = await safeReaddir(join(assetsDir, assetType));
+		cached = new Set(entries);
+		builtInCache.set(assetType, cached);
+	}
+	return cached.has(name);
 }
 
 export async function stocktakeCore(args: StocktakeArgs, baseDir: string): Promise<string> {
@@ -41,8 +51,13 @@ export async function stocktakeCore(args: StocktakeArgs, baseDir: string): Promi
 	const commands: AssetEntry[] = [];
 	const agents: AssetEntry[] = [];
 
-	// Scan skills (each subdirectory is a skill)
-	const skillDirs = await safeReaddir(join(baseDir, "skills"));
+	// Scan skills (each subdirectory is a skill) — filter to directories only
+	const skillEntries = await readdir(join(baseDir, "skills"), { withFileTypes: true }).catch(
+		() => [],
+	);
+	const skillDirs = skillEntries
+		.filter((e) => e.isDirectory() && e.name !== ".gitkeep")
+		.map((e) => e.name);
 	for (const name of skillDirs) {
 		const skillFile = join(baseDir, "skills", name, "SKILL.md");
 		const origin = (await isBuiltIn("skills", name)) ? "built-in" : "user-created";

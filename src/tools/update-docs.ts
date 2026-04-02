@@ -18,7 +18,7 @@ interface AffectedDoc {
 /** Run a git command and return stdout lines (empty array on error). */
 async function gitLines(args: readonly string[], cwd: string): Promise<readonly string[]> {
 	try {
-		const { stdout } = await execFile("git", args as string[], { cwd });
+		const { stdout } = await execFile("git", [...args], { cwd });
 		return stdout
 			.trim()
 			.split("\n")
@@ -69,8 +69,8 @@ export async function updateDocsCore(args: UpdateDocsArgs, projectDir: string): 
 				seenDocs.add(`${mdFile}:${changedFile}`);
 				affectedDocs.push({
 					doc: mdFile,
-					reason: `references ${changedFile} which changed`,
-					suggestion: `Review and update documentation in ${mdFile} to reflect changes to ${changedFile}`,
+					reason: `may be related to ${changedFile} (heuristic: path/name match)`,
+					suggestion: `Review ${mdFile} — it may need updates to reflect changes to ${changedFile}`,
 				});
 			}
 		}

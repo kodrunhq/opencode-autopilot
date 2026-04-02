@@ -82,8 +82,9 @@ export async function loadAdaptiveSkillContext(
 
 		const matchingSkills = filterSkillsByStack(allSkills, projectTags);
 		return buildMultiSkillContext(matchingSkills, tokenBudget);
-	} catch {
-		// Best-effort: never break dispatch due to skill loading failure
+	} catch (error: unknown) {
+		// Best-effort for I/O errors; re-throw programmer errors
+		if (error instanceof TypeError || error instanceof RangeError) throw error;
 		return "";
 	}
 }

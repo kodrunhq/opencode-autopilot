@@ -107,11 +107,14 @@ export function buildMultiSkillContext(
 		if (!skill) continue;
 
 		const collapsed = skill.content.replace(/[\r\n]+/g, " ");
-		if (totalChars + collapsed.length > charBudget) break;
+		const header = `[Skill: ${name}]\n`;
+		const separator = sections.length > 0 ? 2 : 0; // "\n\n"
+		const sectionCost = collapsed.length + header.length + separator;
+		if (totalChars + sectionCost > charBudget) break;
 
 		const sanitized = sanitizeTemplateContent(collapsed);
-		sections.push(`[Skill: ${name}]\n${sanitized}`);
-		totalChars += collapsed.length;
+		sections.push(`${header}${sanitized}`);
+		totalChars += sectionCost;
 	}
 
 	if (sections.length === 0) return "";

@@ -29,19 +29,21 @@ export interface LoadedSkill {
  * Returns null if no valid frontmatter block is found or parsing fails.
  */
 export function parseSkillFrontmatter(content: string): SkillFrontmatter | null {
-	const match = content.match(/^---\n([\s\S]*?)\n---/);
+	const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
 	if (!match) return null;
 
 	try {
-		const parsed = parse(match[1]) as Record<string, unknown>;
+		const parsed = parse(match[1]);
+		if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+		const fm = parsed as Record<string, unknown>;
 		return {
-			name: typeof parsed.name === "string" ? parsed.name : "",
-			description: typeof parsed.description === "string" ? parsed.description : "",
-			stacks: Array.isArray(parsed.stacks)
-				? parsed.stacks.filter((s): s is string => typeof s === "string")
+			name: typeof fm.name === "string" ? fm.name : "",
+			description: typeof fm.description === "string" ? fm.description : "",
+			stacks: Array.isArray(fm.stacks)
+				? fm.stacks.filter((s): s is string => typeof s === "string")
 				: [],
-			requires: Array.isArray(parsed.requires)
-				? parsed.requires.filter((s): s is string => typeof s === "string")
+			requires: Array.isArray(fm.requires)
+				? fm.requires.filter((s): s is string => typeof s === "string")
 				: [],
 		};
 	} catch {
@@ -69,8 +71,12 @@ export async function loadAllSkills(skillsDir: string): Promise<ReadonlyMap<stri
 						if (fm?.name) {
 							skills.set(fm.name, { frontmatter: fm, content, path: skillPath });
 						}
-					} catch {
-						/* skip invalid skills */
+					} catch (error: unknown) {
+						// Skip ENOENT/IO errors (expected for invalid skills)
+						if (!isEnoentError(error) && !(error instanceof SyntaxError)) {
+							const errObj = error as { code?: unknown };
+							if (typeof errObj?.code !== "string") throw error;
+						}
 					}
 				}),
 		);
