@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.1.1...opencode-autopilot-v1.1.2) (2026-04-02)
+
+
+### Bug Fixes
+
+* rewrite oc-configure instructions to show all models and collect fallbacks ([8988b60](https://github.com/kodrunhq/opencode-autopilot/commit/8988b60f86adb5ab23327655c79582a49c110ad6))
+* show all models and collect fallbacks in oc-configure ([4934a05](https://github.com/kodrunhq/opencode-autopilot/commit/4934a05f9d80546e1c9fc22e720746696fcce175))
+* use real provider IDs in examples, remove ambiguous reference option ([fe66f12](https://github.com/kodrunhq/opencode-autopilot/commit/fe66f1204f0556081b3c3b89d3ed9248a51d6db4))
+
 ## [1.1.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.1.0...opencode-autopilot-v1.1.1) (2026-04-02)
 
 
