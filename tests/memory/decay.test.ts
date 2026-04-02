@@ -1,13 +1,9 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
-import { computeRelevanceScore, pruneStaleObservations } from "../../src/memory/decay";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { DEFAULT_HALF_LIFE_DAYS } from "../../src/memory/constants";
 import { initMemoryDb } from "../../src/memory/database";
+import { computeRelevanceScore, pruneStaleObservations } from "../../src/memory/decay";
 import { insertObservation } from "../../src/memory/repository";
-import {
-	DEFAULT_HALF_LIFE_DAYS,
-	MIN_RELEVANCE_THRESHOLD,
-	MAX_OBSERVATIONS_PER_PROJECT,
-} from "../../src/memory/constants";
 import type { Observation } from "../../src/memory/types";
 
 function makeObservation(

@@ -1,15 +1,17 @@
-export { getMemoryDb, closeMemoryDb, initMemoryDb } from "./database";
-export { computeProjectKey } from "./project-key";
-export * from "./types";
+export { createMemoryCaptureHandler, type MemoryCaptureDeps } from "./capture";
 export * from "./constants";
+export { closeMemoryDb, getMemoryDb, initMemoryDb } from "./database";
+export { computeRelevanceScore, pruneStaleObservations } from "./decay";
+export { computeProjectKey } from "./project-key";
 export {
+	deleteObservation,
+	getAllPreferences,
+	getObservationsByProject,
+	getProjectByPath,
 	insertObservation,
 	searchObservations,
-	upsertProject,
-	getProjectByPath,
-	getObservationsByProject,
-	upsertPreference,
-	getAllPreferences,
-	deleteObservation,
 	updateAccessCount,
+	upsertPreference,
+	upsertProject,
 } from "./repository";
+export * from "./types";

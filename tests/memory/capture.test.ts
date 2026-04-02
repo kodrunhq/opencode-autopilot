@@ -1,8 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach, mock } from "bun:test";
 import { Database } from "bun:sqlite";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { createMemoryCaptureHandler, type MemoryCaptureDeps } from "../../src/memory/capture";
 import { initMemoryDb } from "../../src/memory/database";
-import type { Observation } from "../../src/memory/types";
 
 function createTestDeps(db: Database): MemoryCaptureDeps {
 	return {
@@ -222,9 +221,10 @@ describe("createMemoryCaptureHandler", () => {
 				},
 			});
 
-			const obs = db
-				.query("SELECT * FROM observations WHERE type = 'decision'")
-				.get() as Record<string, unknown>;
+			const obs = db.query("SELECT * FROM observations WHERE type = 'decision'").get() as Record<
+				string,
+				unknown
+			>;
 			expect(obs).not.toBeNull();
 			expect(obs.type).toBe("decision");
 		});
@@ -252,9 +252,10 @@ describe("createMemoryCaptureHandler", () => {
 				},
 			});
 
-			const obs = db
-				.query("SELECT * FROM observations WHERE type = 'pattern'")
-				.get() as Record<string, unknown>;
+			const obs = db.query("SELECT * FROM observations WHERE type = 'pattern'").get() as Record<
+				string,
+				unknown
+			>;
 			expect(obs).not.toBeNull();
 			expect(obs.type).toBe("pattern");
 			expect((obs.content as string).includes("RESEARCH")).toBe(true);
