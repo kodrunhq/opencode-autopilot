@@ -1,46 +1,53 @@
 /**
  * Observability module barrel export.
  *
- * @module
+ * Re-exports all public APIs from the session observability system:
+ * - Schemas and types for structured events
+ * - Session logger for event capture (JSONL append)
+ * - Log writer for complete session persistence (atomic JSON)
+ * - Log reader for querying persisted sessions
+ * - Summary generator for human-readable markdown reports
+ * - Retention for time-based log pruning
  */
 
-// Context monitor (Plan 02)
-export type { ContextUtilizationResult } from "./context-monitor";
-export { ContextMonitor, checkContextUtilization } from "./context-monitor";
-// Event emitters (Plan 02)
+export type { EventSearchFilters, SessionLogEntry } from "./log-reader";
 export {
-	emitDecisionEvent,
-	emitErrorEvent,
-	emitFallbackEvent,
-	emitModelSwitchEvent,
-	emitPhaseTransition,
-	emitToolCompleteEvent,
-} from "./event-emitter";
-// Event handlers (Plan 02)
-export type { ObservabilityHandlerDeps } from "./event-handlers";
-export {
-	createObservabilityEventHandler,
-	createToolExecuteAfterHandler,
-	createToolExecuteBeforeHandler,
-} from "./event-handlers";
-// Event store (Plan 02)
-export type {
-	ObservabilityEvent,
-	SessionEvents,
-	ToolMetrics,
-} from "./event-store";
-export { SessionEventStore } from "./event-store";
-// Retention (Plan 01)
+	listSessionLogs,
+	readLatestSessionLog,
+	readSessionLog,
+	searchEvents,
+} from "./log-reader";
+export { convertToSessionLog, getLogsDir, writeSessionLog } from "./log-writer";
 export { pruneOldLogs } from "./retention";
-export { loggingConfigSchema, loggingDefaults, sessionEventSchema } from "./schemas";
-// Session logger (Plan 01)
-export { getLogsDir, getSessionLog, logEvent } from "./session-logger";
-// Token tracker (Plan 02)
-export type { AssistantMessageTokens, TokenAggregate } from "./token-tracker";
 export {
-	accumulateTokens,
-	accumulateTokensFromMessage,
-	createEmptyTokenAggregate,
-} from "./token-tracker";
-// Types and schemas (Plan 01)
-export type { LoggingConfig, SessionEvent } from "./types";
+	baseEventSchema,
+	decisionEventSchema,
+	errorEventSchema,
+	fallbackEventSchema,
+	loggingConfigSchema,
+	loggingDefaults,
+	modelSwitchEventSchema,
+	sessionDecisionSchema,
+	sessionEventSchema,
+	sessionLogSchema,
+} from "./schemas";
+export { getLogsDir as getEventLogsDir, getSessionLog, logEvent } from "./session-logger";
+
+export {
+	computeDuration,
+	formatCost,
+	formatDuration,
+	generateSessionSummary,
+} from "./summary-generator";
+export type {
+	BaseEvent,
+	DecisionEvent,
+	ErrorEvent,
+	FallbackEvent,
+	LoggingConfig,
+	ModelSwitchEvent,
+	SessionDecision,
+	SessionEvent,
+	SessionEventType,
+	SessionLog,
+} from "./types";
