@@ -76,6 +76,16 @@ const pluginConfigSchemaV3 = z.object({
 
 type PluginConfigV3 = z.infer<typeof pluginConfigSchemaV3>;
 
+// --- Memory sub-schema ---
+
+export const memoryConfigSchema = z.object({
+	enabled: z.boolean().default(true),
+	injectionBudget: z.number().min(500).max(5000).default(2000),
+	decayHalfLifeDays: z.number().min(7).max(365).default(90),
+});
+
+const memoryDefaults = memoryConfigSchema.parse({});
+
 // --- V4 sub-schemas ---
 
 const groupModelAssignmentSchema = z.object({
@@ -112,10 +122,37 @@ const pluginConfigSchemaV4 = z
 		}
 	});
 
-// Export aliases updated to v4
-export const pluginConfigSchema = pluginConfigSchemaV4;
+type PluginConfigV4 = z.infer<typeof pluginConfigSchemaV4>;
 
-export type PluginConfig = z.infer<typeof pluginConfigSchemaV4>;
+// --- V5 schema ---
+
+const pluginConfigSchemaV5 = z
+	.object({
+		version: z.literal(5),
+		configured: z.boolean(),
+		groups: z.record(z.string(), groupModelAssignmentSchema).default({}),
+		overrides: z.record(z.string(), agentOverrideSchema).default({}),
+		orchestrator: orchestratorConfigSchema.default(orchestratorDefaults),
+		confidence: confidenceConfigSchema.default(confidenceDefaults),
+		fallback: fallbackConfigSchema.default(fallbackDefaults),
+		memory: memoryConfigSchema.default(memoryDefaults),
+	})
+	.superRefine((config, ctx) => {
+		for (const groupId of Object.keys(config.groups)) {
+			if (!ALL_GROUP_IDS.includes(groupId as (typeof ALL_GROUP_IDS)[number])) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: ["groups", groupId],
+					message: `Unknown group id "${groupId}". Expected one of: ${ALL_GROUP_IDS.join(", ")}`,
+				});
+			}
+		}
+	});
+
+// Export aliases updated to v5
+export const pluginConfigSchema = pluginConfigSchemaV5;
+
+export type PluginConfig = z.infer<typeof pluginConfigSchemaV5>;
 
 export const CONFIG_PATH = join(getGlobalConfigDir(), "opencode-autopilot.json");
 
@@ -142,7 +179,7 @@ function migrateV2toV3(v2Config: PluginConfigV2): PluginConfigV3 {
 	};
 }
 
-function migrateV3toV4(v3Config: PluginConfigV3): PluginConfig {
+function migrateV3toV4(v3Config: PluginConfigV3): PluginConfigV4 {
 	const groups: Record<string, { primary: string; fallbacks: string[] }> = {};
 	const overrides: Record<string, { primary: string }> = {};
 
@@ -191,6 +228,19 @@ function migrateV3toV4(v3Config: PluginConfigV3): PluginConfig {
 	};
 }
 
+function migrateV4toV5(v4Config: PluginConfigV4): PluginConfig {
+	return {
+		version: 5 as const,
+		configured: v4Config.configured,
+		groups: v4Config.groups,
+		overrides: v4Config.overrides,
+		orchestrator: v4Config.orchestrator,
+		confidence: v4Config.confidence,
+		fallback: v4Config.fallback,
+		memory: memoryDefaults,
+	};
+}
+
 // --- Public API ---
 
 export async function loadConfig(configPath: string = CONFIG_PATH): Promise<PluginConfig | null> {
@@ -198,38 +248,49 @@ export async function loadConfig(configPath: string = CONFIG_PATH): Promise<Plug
 		const raw = await readFile(configPath, "utf-8");
 		const parsed = JSON.parse(raw);
 
-		// Try v4 first
-		const v4Result = pluginConfigSchemaV4.safeParse(parsed);
-		if (v4Result.success) return v4Result.data;
+		// Try v5 first
+		const v5Result = pluginConfigSchemaV5.safeParse(parsed);
+		if (v5Result.success) return v5Result.data;
 
-		// Try v3 and migrate to v4
-		const v3Result = pluginConfigSchemaV3.safeParse(parsed);
-		if (v3Result.success) {
-			const migrated = migrateV3toV4(v3Result.data);
+		// Try v4 and migrate to v5
+		const v4Result = pluginConfigSchemaV4.safeParse(parsed);
+		if (v4Result.success) {
+			const migrated = migrateV4toV5(v4Result.data);
 			await saveConfig(migrated, configPath);
 			return migrated;
 		}
 
-		// Try v2 → v3 → v4
+		// Try v3 → v4 → v5
+		const v3Result = pluginConfigSchemaV3.safeParse(parsed);
+		if (v3Result.success) {
+			const v4 = migrateV3toV4(v3Result.data);
+			const migrated = migrateV4toV5(v4);
+			await saveConfig(migrated, configPath);
+			return migrated;
+		}
+
+		// Try v2 → v3 → v4 → v5
 		const v2Result = pluginConfigSchemaV2.safeParse(parsed);
 		if (v2Result.success) {
 			const v3 = migrateV2toV3(v2Result.data);
-			const migrated = migrateV3toV4(v3);
+			const v4 = migrateV3toV4(v3);
+			const migrated = migrateV4toV5(v4);
 			await saveConfig(migrated, configPath);
 			return migrated;
 		}
 
-		// Try v1 → v2 → v3 → v4
+		// Try v1 → v2 → v3 → v4 → v5
 		const v1Result = pluginConfigSchemaV1.safeParse(parsed);
 		if (v1Result.success) {
 			const v2 = migrateV1toV2(v1Result.data);
 			const v3 = migrateV2toV3(v2);
-			const migrated = migrateV3toV4(v3);
+			const v4 = migrateV3toV4(v3);
+			const migrated = migrateV4toV5(v4);
 			await saveConfig(migrated, configPath);
 			return migrated;
 		}
 
-		return pluginConfigSchemaV4.parse(parsed); // throw with proper error
+		return pluginConfigSchemaV5.parse(parsed); // throw with proper error
 	} catch (error: unknown) {
 		if (isEnoentError(error)) return null;
 		throw error;
@@ -252,12 +313,13 @@ export function isFirstLoad(config: PluginConfig | null): boolean {
 
 export function createDefaultConfig(): PluginConfig {
 	return {
-		version: 4 as const,
+		version: 5 as const,
 		configured: false,
 		groups: {},
 		overrides: {},
 		orchestrator: orchestratorDefaults,
 		confidence: confidenceDefaults,
 		fallback: fallbackDefaults,
+		memory: memoryDefaults,
 	};
 }

@@ -314,7 +314,7 @@ async function handleCommit(configPath?: string): Promise<string> {
 	}
 	const newConfig = {
 		...currentConfig,
-		version: 4 as const,
+		version: 5 as const,
 		configured: true,
 		groups: groupsRecord,
 		overrides: currentConfig.overrides ?? {},

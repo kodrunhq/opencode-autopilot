@@ -3,6 +3,7 @@ import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
 import { runHealthChecks } from "./health/runner";
 import { installAssets } from "./installer";
+import { createMemoryCaptureHandler, createMemoryInjector, getMemoryDb } from "./memory";
 import { ContextMonitor } from "./observability/context-monitor";
 import {
 	createObservabilityEventHandler,
@@ -35,6 +36,7 @@ import { ocCreateSkill } from "./tools/create-skill";
 import { ocDoctor } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
 import { ocLogs } from "./tools/logs";
+import { ocMemoryStatus } from "./tools/memory-status";
 import { ocMockFallback } from "./tools/mock-fallback";
 import { ocOrchestrate } from "./tools/orchestrate";
 import { ocPhase } from "./tools/phase";
@@ -148,6 +150,26 @@ const plugin: Plugin = async (input) => {
 	const chatMessageHandler = createChatMessageHandler(manager);
 	const toolExecuteAfterHandler = createToolExecuteAfterHandler(manager);
 
+	// --- Memory subsystem initialization ---
+	const memoryConfig = config?.memory ?? {
+		enabled: true,
+		injectionBudget: 2000,
+		decayHalfLifeDays: 90,
+	};
+
+	const memoryCaptureHandler = memoryConfig.enabled
+		? createMemoryCaptureHandler({ getDb: () => getMemoryDb(), projectRoot: process.cwd() })
+		: null;
+
+	const memoryInjector = memoryConfig.enabled
+		? createMemoryInjector({
+				projectRoot: process.cwd(),
+				tokenBudget: memoryConfig.injectionBudget,
+				halfLifeDays: memoryConfig.decayHalfLifeDays,
+				getDb: () => getMemoryDb(),
+			})
+		: null;
+
 	// --- Observability handlers ---
 	const toolStartTimes = new Map<string, number>();
 	const observabilityEventHandler = createObservabilityEventHandler({
@@ -195,12 +217,22 @@ const plugin: Plugin = async (input) => {
 			oc_mock_fallback: ocMockFallback,
 			oc_stocktake: ocStocktake,
 			oc_update_docs: ocUpdateDocs,
+			oc_memory_status: ocMemoryStatus,
 		},
 		event: async ({ event }) => {
 			// 1. Observability: collect (pure observer, no side effects on session)
 			await observabilityEventHandler({ event });
 
-			// 2. First-load toast
+			// 2. Memory capture (pure observer, best-effort)
+			if (memoryCaptureHandler) {
+				try {
+					await memoryCaptureHandler({ event });
+				} catch {
+					/* best-effort */
+				}
+			}
+
+			// 3. First-load toast
 			if (event.type === "session.created" && isFirstLoad(config)) {
 				await sdkOps.showToast(
 					"Welcome to OpenCode Autopilot!",
@@ -209,7 +241,7 @@ const plugin: Plugin = async (input) => {
 				);
 			}
 
-			// 3. Fallback event handling
+			// 4. Fallback event handling
 			if (fallbackConfig.enabled) {
 				await fallbackEventHandler({ event });
 			}
@@ -255,6 +287,11 @@ const plugin: Plugin = async (input) => {
 			// Fallback handling
 			if (fallbackConfig.enabled) {
 				await toolExecuteAfterHandler(hookInput, output);
+			}
+		},
+		"experimental.chat.system.transform": async (input, output) => {
+			if (memoryInjector) {
+				await memoryInjector(input, output);
 			}
 		},
 	};

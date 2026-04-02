@@ -26,9 +26,9 @@ describe("isFirstLoad", () => {
 		expect(isFirstLoad(config)).toBe(false);
 	});
 
-	test("works with v4 configs (configured:false returns true)", () => {
+	test("works with v5 configs (configured:false returns true)", () => {
 		const config = createDefaultConfig();
-		expect(config.version).toBe(4);
+		expect(config.version).toBe(5);
 		expect(isFirstLoad(config)).toBe(true);
 
 		const configured = { ...config, configured: true };
@@ -37,9 +37,9 @@ describe("isFirstLoad", () => {
 });
 
 describe("createDefaultConfig", () => {
-	test("returns v4 config with version:4", () => {
+	test("returns v5 config with version:5", () => {
 		const config = createDefaultConfig();
-		expect(config.version).toBe(4);
+		expect(config.version).toBe(5);
 		expect(config.configured).toBe(false);
 		expect(config.groups).toEqual({});
 		expect(config.overrides).toEqual({});
@@ -92,7 +92,7 @@ describe("saveConfig and loadConfig round-trip", () => {
 
 		const raw = await readFile(configPath, "utf-8");
 		const parsed = JSON.parse(raw);
-		expect(parsed.version).toBe(4);
+		expect(parsed.version).toBe(5);
 		expect(parsed.orchestrator).toBeDefined();
 		expect(parsed.fallback).toBeDefined();
 		expect(parsed.groups).toBeDefined();
@@ -124,7 +124,7 @@ describe("saveConfig and loadConfig round-trip", () => {
 	});
 });
 
-describe("v1 to v4 migration", () => {
+describe("v1 to v5 migration", () => {
 	let tempDir: string;
 	let configPath: string;
 
@@ -138,7 +138,7 @@ describe("v1 to v4 migration", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("loadConfig on a v1 JSON file returns v4 config with migrated defaults", async () => {
+	test("loadConfig on a v1 JSON file returns v5 config with migrated defaults", async () => {
 		const v1Config = {
 			version: 1,
 			configured: true,
@@ -148,7 +148,7 @@ describe("v1 to v4 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result?.version).toBe(4);
+		expect(result?.version).toBe(5);
 		expect(result?.configured).toBe(true);
 		// "default" is not in AGENT_REGISTRY, so it becomes an override
 		expect(result?.overrides.default).toBeDefined();
@@ -162,14 +162,14 @@ describe("v1 to v4 migration", () => {
 		expect(result?.fallback.maxFallbackAttempts).toBe(10);
 	});
 
-	test("loadConfig on a v1 JSON file writes migrated v4 back to disk", async () => {
+	test("loadConfig on a v1 JSON file writes migrated v5 back to disk", async () => {
 		const v1Config = { version: 1, configured: true, models: {} };
 		await writeFile(configPath, JSON.stringify(v1Config), "utf-8");
 
 		await loadConfig(configPath);
 
 		const raw = JSON.parse(await readFile(configPath, "utf-8"));
-		expect(raw.version).toBe(4);
+		expect(raw.version).toBe(5);
 		expect(raw.orchestrator).toBeDefined();
 		expect(raw.confidence).toBeDefined();
 		expect(raw.fallback).toBeDefined();
@@ -178,7 +178,7 @@ describe("v1 to v4 migration", () => {
 	});
 });
 
-describe("v2 to v4 migration", () => {
+describe("v2 to v5 migration", () => {
 	let tempDir: string;
 	let configPath: string;
 
@@ -192,7 +192,7 @@ describe("v2 to v4 migration", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("loadConfig on a v2 JSON file returns v4 config with fallback defaults", async () => {
+	test("loadConfig on a v2 JSON file returns v5 config with fallback defaults", async () => {
 		const v2Config = {
 			version: 2,
 			configured: true,
@@ -220,7 +220,7 @@ describe("v2 to v4 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result?.version).toBe(4);
+		expect(result?.version).toBe(5);
 		expect(result?.orchestrator.autonomy).toBe("supervised");
 		expect(result?.orchestrator.strictness).toBe("strict");
 		expect(result?.orchestrator.phases.challenge).toBe(false);
@@ -235,7 +235,7 @@ describe("v2 to v4 migration", () => {
 		expect(result?.overrides).toEqual({});
 	});
 
-	test("loadConfig on a v2 JSON file writes migrated v4 back to disk", async () => {
+	test("loadConfig on a v2 JSON file writes migrated v5 back to disk", async () => {
 		const v2Config = {
 			version: 2,
 			configured: true,
@@ -264,7 +264,7 @@ describe("v2 to v4 migration", () => {
 		await loadConfig(configPath);
 
 		const raw = JSON.parse(await readFile(configPath, "utf-8"));
-		expect(raw.version).toBe(4);
+		expect(raw.version).toBe(5);
 		expect(raw.fallback).toBeDefined();
 		expect(raw.fallback.enabled).toBe(true);
 		expect(raw.groups).toBeDefined();
@@ -272,7 +272,7 @@ describe("v2 to v4 migration", () => {
 	});
 });
 
-describe("v3 migration to v4", () => {
+describe("v3 migration to v5", () => {
 	let tempDir: string;
 	let configPath: string;
 
@@ -286,7 +286,7 @@ describe("v3 migration to v4", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("loadConfig on a v3 JSON file returns v4 config with migration", async () => {
+	test("loadConfig on a v3 JSON file returns v5 config with migration", async () => {
 		const v3Config = {
 			version: 3,
 			configured: true,
@@ -323,7 +323,7 @@ describe("v3 migration to v4", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result?.version).toBe(4);
+		expect(result?.version).toBe(5);
 		expect(result?.fallback.enabled).toBe(false);
 		expect(result?.fallback.retryOnErrors).toEqual([429]);
 		expect(result?.fallback.maxFallbackAttempts).toBe(5);
@@ -333,7 +333,7 @@ describe("v3 migration to v4", () => {
 	});
 });
 
-describe("v3 to v4 migration", () => {
+describe("v3 to v5 migration", () => {
 	let tempDir: string;
 	let configPath: string;
 
@@ -347,7 +347,7 @@ describe("v3 to v4 migration", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("loadConfig on a v3 JSON file returns v4 config with groups", async () => {
+	test("loadConfig on a v3 JSON file returns v5 config with groups", async () => {
 		const v3Config = {
 			version: 3,
 			configured: true,
@@ -385,7 +385,7 @@ describe("v3 to v4 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result!.version).toBe(4);
+		expect(result!.version).toBe(5);
 		expect(result!.configured).toBe(true);
 		// oc-architect and oc-planner are both "architects" group with same model
 		expect(result!.groups.architects).toBeDefined();
@@ -431,7 +431,7 @@ describe("v3 to v4 migration", () => {
 		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
 
 		const result = await loadConfig(configPath);
-		expect(result!.version).toBe(4);
+		expect(result!.version).toBe(5);
 		// First agent sets group primary, second becomes override
 		expect(result!.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
 		expect(result!.overrides["oc-planner"]).toBeDefined();
@@ -512,7 +512,7 @@ describe("v3 to v4 migration", () => {
 		expect(result!.groups.builders.fallbacks).toEqual(["openai/gpt-5.4", "google/gemini-3.1-pro"]);
 	});
 
-	test("v3 config writes migrated v4 back to disk", async () => {
+	test("v3 config writes migrated v5 back to disk", async () => {
 		const v3Config = {
 			version: 3,
 			configured: true,
@@ -546,13 +546,13 @@ describe("v3 to v4 migration", () => {
 		await loadConfig(configPath);
 
 		const raw = JSON.parse(await readFile(configPath, "utf-8"));
-		expect(raw.version).toBe(4);
+		expect(raw.version).toBe(5);
 		expect(raw.groups).toBeDefined();
 		expect(raw.overrides).toBeDefined();
 	});
 });
 
-describe("v4 direct load", () => {
+describe("v4 to v5 migration", () => {
 	let tempDir: string;
 	let configPath: string;
 
@@ -566,7 +566,7 @@ describe("v4 direct load", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("loadConfig on a v4 JSON file returns v4 config directly", async () => {
+	test("loadConfig on a v4 JSON file returns v5 config via migration", async () => {
 		const v4Config = {
 			version: 4,
 			configured: true,
@@ -602,25 +602,25 @@ describe("v4 direct load", () => {
 		await writeFile(configPath, JSON.stringify(v4Config), "utf-8");
 
 		const result = await loadConfig(configPath);
-		expect(result!.version).toBe(4);
+		expect(result!.version).toBe(5);
 		expect(result!.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
 		expect(result!.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
 	});
 
-	test("createDefaultConfig returns v4 with empty groups", () => {
+	test("createDefaultConfig returns v5 with empty groups", () => {
 		const config = createDefaultConfig();
-		expect(config.version).toBe(4);
+		expect(config.version).toBe(5);
 		expect(config.configured).toBe(false);
 		expect(config.groups).toEqual({});
 		expect(config.overrides).toEqual({});
 	});
 
-	test("v1 → v2 → v3 → v4 full chain migration works", async () => {
+	test("v1 → v2 → v3 → v4 → v5 full chain migration works", async () => {
 		const v1Config = { version: 1, configured: true, models: { default: "gpt-4" } };
 		await writeFile(configPath, JSON.stringify(v1Config), "utf-8");
 
 		const result = await loadConfig(configPath);
-		expect(result!.version).toBe(4);
+		expect(result!.version).toBe(5);
 		expect(result!.configured).toBe(true);
 		expect(result!.groups).toBeDefined();
 		expect(result!.overrides).toBeDefined();
