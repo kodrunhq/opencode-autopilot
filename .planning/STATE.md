@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: Intelligence & Polish
+milestone: v2.0
+milestone_name: Autonomous Orchestrator
 status: Phase complete — ready for verification
-stopped_at: Completed 12-02-PLAN.md (doctor tool & Zen fix)
-last_updated: "2026-04-02T13:23:11.765Z"
+stopped_at: Completed 13-01-PLAN.md (session observability foundation)
+last_updated: "2026-04-02T14:38:55.515Z"
 progress:
   total_phases: 10
   completed_phases: 10
@@ -67,6 +67,7 @@ Plan: 3 of 3 (all complete)
 | Phase 11-ecosystem-research P03 | 8min | 2 tasks | 4 files |
 | Phase 12-quick-wins P01 | 2min | 2 tasks | 2 files |
 | Phase 12-quick-wins P02 | 4min | 2 tasks | 11 files |
+| Phase 13 P01 | 3min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,9 @@ Recent decisions affecting current work:
 - [Phase 12-quick-wins]: Use modelData.id field over record key for provider-prefixed model path construction in configure wizard
 - [Phase 12-quick-wins]: Created src/health/ module from scratch as health check infrastructure for oc_doctor
 - [Phase 12-quick-wins]: Hook-registration check is informational only (always pass when oc_doctor callable)
+- [Phase 13]: JSONL format for session log files -- append-only writes, line-by-line parsing
+- [Phase 13]: Discriminated union on type field for event schema (z.discriminatedUnion)
+- [Phase 13]: File mtime-based retention pruning (simpler than content parsing)
 
 ### Pending Todos
 
@@ -159,6 +163,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T13:23:11.763Z
-Stopped at: Completed 12-02-PLAN.md (doctor tool & Zen fix)
+Last session: 2026-04-02T14:38:50.794Z
+Stopped at: Completed 13-01-PLAN.md (session observability foundation)
 Resume file: None
