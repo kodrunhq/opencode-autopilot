@@ -2,7 +2,7 @@
 
 ## Summary
 
-The gap matrix identified 71 total gaps: 12 CRITICAL, 26 HIGH, 24 MEDIUM, 11 LOW. All CRITICAL and HIGH gaps (38 total) are assigned to phases. 18 MEDIUM gaps are assigned where they naturally fit; 6 MEDIUM gaps deferred to post-v3.0. All 11 LOW gaps are skipped (deferred indefinitely or not aligned with value proposition).
+The gap matrix identified 73 total gaps: 12 CRITICAL, 26 HIGH, 24 MEDIUM, 11 LOW. All CRITICAL and HIGH gaps (38 total) are assigned to phases. 18 MEDIUM gaps are assigned where they naturally fit; 6 MEDIUM gaps deferred to post-v3.0. All 11 LOW gaps are skipped (deferred indefinitely or not aligned with value proposition).
 
 Total planned features across Phases 12-17: 56 (38 CRITICAL/HIGH + 18 MEDIUM).
 
@@ -15,9 +15,9 @@ Total planned features across Phases 12-17: 56 (38 CRITICAL/HIGH + 18 MEDIUM).
 **Gap IDs:** CM-01, DX-01, DX-02, SF-04, NV-06, WF-02, CM-09
 
 **Features:**
-1. Self-healing doctor with auto-repair (DX-01, NV-06, CRITICAL) -- On every plugin load, run lightweight health checks and silently repair common issues (missing agents, corrupted config, stale assets). Extends existing config v3 migration and COPYFILE_EXCL installer with a comprehensive health check registry.
-2. Plugin health diagnostics command (CM-01, DX-02, CRITICAL) -- `/doctor` command that verifies plugin registration, agent injection (14 agents present), config validity (v3 schema), model assignments working, asset directory health. Reports pass/fail with fix suggestions.
-3. Self-healing configuration repair (SF-04, HIGH) -- Auto-migrate broken configs, re-inject missing agents, re-install missing assets on load. Log all repairs transparently for user review.
+1. Self-healing doctor with auto-repair (DX-01, NV-06, CRITICAL) -- On every plugin load, run lightweight health checks and silently repair common issues (missing agents, corrupted config, stale assets). Extends existing v1→v2→v3→v4 config migration chain and COPYFILE_EXCL installer with a comprehensive health check registry.
+2. Plugin health diagnostics command (CM-01, DX-02, CRITICAL) -- `/doctor` command that verifies plugin registration, agent injection (14 agents present), config validity (v4 schema), model assignments working, asset directory health. Reports pass/fail with fix suggestions.
+3. Self-healing configuration repair (SF-04, HIGH) -- Auto-migrate broken configs across the v1→v2→v3→v4 chain, re-inject missing agents, re-install missing assets on load. Log all repairs transparently for user review.
 4. Quick task mode (WF-02, CM-09, MEDIUM) -- Lightweight `/quick` command that runs a simplified pipeline (skip exploration, skip planning for simple requests). Detects simple requests automatically.
 
 **Estimated Plans:** 2

@@ -1,40 +1,39 @@
-# Phase 16: Specialized Agents - Context
+# Phase 16: Autopilot Integration (Skills + Memory) - Context
 
 **Gathered:** 2026-04-02
-**Status:** Pending Phase 11 research (research decides scope)
+**Updated:** 2026-04-02 (post Phase 11 research)
+**Status:** Ready for planning (scope defined by 11-AGENT-VERDICT.md)
 
 <domain>
 ## Phase Boundary
 
-Implement specialized primary agents IF Phase 11 research validates clear value over existing tools. Candidates: MasterDebugger (systematic debugging with autonomous flow), Reviewer (comprehensive code review with skills integration). Research must demonstrate these fill a real gap — not just "nice to have."
+Integrate new skills/commands (Phase 14) and memory capabilities (Phase 15) into the existing Autopilot agent. Phase 11 research concluded that all 6 agent candidates (MasterDebugger, Reviewer, Planner, TDD Guide, Doc Updater, Background Task) are better served as skills or commands — no new dedicated agents will be built. This phase focuses on making the Autopilot smarter by leveraging the new capabilities.
 
 </domain>
 
 <decisions>
 ## Implementation Decisions
 
-### Scope gate
-- **D-01:** Research decides — Phase 11 must demonstrate clear value before any agent is built
-- **D-02:** "Let's actually be critical about it, investigate, see if it makes sense and adds value"
-- **D-03:** If research shows existing tools (built-in OpenCode agents, our review engine, etc.) already cover the need, this phase may be reduced or eliminated
-- **D-04:** Each proposed agent must pass the test: "Does this do something meaningfully better than what users already have?"
+### Research verdict (from 11-AGENT-VERDICT.md)
+- **D-01:** All 6 agent candidates assessed as SKIP — implement as skills/commands instead (Phase 14)
+- **D-02:** Skills > agents for methodology transfer — superpowers (131k stars) validated this pattern
+- **D-03:** Phase 16 scoped down from "specialized agents" to "autopilot integration"
+- **D-04:** If deliverables are too thin, remaining work merges into Phase 17
 
-### Candidate agents
-- **D-05:** MasterDebugger — systematic debugging with proper skills, autonomous flow, breakpoint analysis, root cause identification
-- **D-06:** Reviewer — comprehensive code review beyond what the review engine does, with skill integration and memory awareness
-- **D-07:** Phase 11 research may propose entirely different agent archetypes that better fill gaps
+### Concrete deliverables
+- **D-05:** Memory injection into autopilot dispatch prompts — relevant memories injected per task type
+- **D-06:** Skill-aware routing logic — select relevant skills per task type during autonomous pipeline
+- **D-07:** Confidence threshold tuning — adjust pipeline depth based on learned patterns from memory
 
-### Quality requirements (if agents are built)
-- **D-08:** Must be primary agents (mode: primary or mode: all) — directly accessible to users, not hidden subagents
-- **D-09:** Must have proper skills integration — agents should use relevant skills during their workflow
-- **D-10:** Must work with the autonomous flow — not just one-shot tools
-- **D-11:** Must integrate with the memory system (Phase 15) — agents should benefit from learned patterns
+### Quality requirements
+- **D-08:** Must integrate with skills from Phase 14 — autopilot should leverage brainstorming, TDD, debugging skills
+- **D-09:** Must integrate with memory from Phase 15 — autopilot should benefit from learned project patterns
+- **D-10:** Must not regress existing autopilot functionality
 
 ### Claude's Discretion
-- Final agent list (based on Phase 11 research findings)
-- Agent prompt design and tool permissions
-- Whether to build 0, 1, 2, or more agents
-- Skill integration approach per agent
+- How memory injection is structured in dispatch prompts
+- Skill selection algorithm design
+- Confidence threshold calibration values
 
 </decisions>
 

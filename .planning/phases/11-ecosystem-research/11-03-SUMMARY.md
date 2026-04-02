@@ -11,8 +11,8 @@ requires:
   - phase: 11-ecosystem-research (plan 02)
     provides: "Broader ecosystem scan (52+ plugins) and 7 novel opportunities with feasibility assessments"
 provides:
-  - "Gap matrix with 71 uniquely-identified gaps across 10 coverage areas"
-  - "Phase scope definitions with concrete feature lists for Phases 12-17 (54 planned features)"
+  - "Gap matrix with 73 uniquely-identified gaps across 10 coverage areas (12 CRITICAL, 26 HIGH, 24 MEDIUM, 11 LOW)"
+  - "Phase scope definitions with concrete feature lists for Phases 12-17 (56 planned features)"
   - "Memory architecture recommendation: bun:sqlite, FTS5, 3-layer progressive disclosure, observation-based capture"
   - "Agent verdict: all 6 candidates SKIP as agents, implement as skills/commands instead"
   - "Phase 16 scoped down to single integration plan (Option A)"

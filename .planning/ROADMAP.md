@@ -25,10 +25,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 ### v2.0 Autonomous Orchestrator
 
-- [ ] **Phase 4: Foundation Infrastructure** - State machine, deterministic tooling, config schema, and agent dispatch validation
-- [ ] **Phase 5: Review Engine** - Standalone multi-agent code review with parallel dispatch, cross-verification, and fix cycle
-- [ ] **Phase 6: Orchestrator Pipeline** - Full 8-phase autonomous SDLC pipeline integrating review engine
-- [ ] **Phase 7: Learning & Resilience** - Institutional memory, retrospective extraction, and failure forensics
+- [x] **Phase 4: Foundation Infrastructure** - State machine, deterministic tooling, config schema, and agent dispatch validation
+- [x] **Phase 5: Review Engine** - Standalone multi-agent code review with parallel dispatch, cross-verification, and fix cycle
+- [x] **Phase 6: Orchestrator Pipeline** - Full 8-phase autonomous SDLC pipeline integrating review engine
+- [x] **Phase 7: Learning & Resilience** - Institutional memory, retrospective extraction, and failure forensics
+- [x] **Phase 8: Testing & CI** - Zero-regression CI pipeline with type safety, lint, and 90% coverage
+- [x] **Phase 9: Model Fallback Integration** - Per-agent model fallback with error classification and state machine
+- [x] **Phase 10: UX Polish & Metaprompting** - Severity alignment, agent modes, prompt rewrite, skill injection, fallback chain, smart review
 
 ## Phase Details
 
@@ -154,7 +157,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8 -> 9
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> ...
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -165,6 +168,9 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 5. Review Engine | v2.0 | 4/4 | Complete | - |
 | 6. Orchestrator Pipeline | v2.0 | 4/4 | Complete | - |
 | 7. Learning & Resilience | v2.0 | 3/3 | Complete | - |
+| 8. Testing & CI | v2.0 | 2/2 | Complete | - |
+| 9. Model Fallback Integration | v2.0 | 3/3 | Complete | - |
+| 10. UX Polish & Metaprompting | v2.0 | 4/4 | Complete | - |
 | 11. Ecosystem Research | v3.0 | 3/3 | Complete | 2026-04-02 |
 
 ### Phase 8: Testing & CI
@@ -222,7 +228,7 @@ Plans:
 - [ ] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing
 - [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
 - [ ] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval
-- [ ] **Phase 16: Specialized Agents** - Primary agents if Phase 11 validates value (MasterDebugger, Reviewer candidates)
+- [ ] **Phase 16: Autopilot Integration (Skills + Memory)** - Integrate new skills/commands and memory capabilities into the existing Autopilot; no new dedicated agents
 - [ ] **Phase 17: Integration & Polish** - Cross-feature integration, high-value hooks, final production polish
 
 ## Phase Details (v3.0)
@@ -289,15 +295,15 @@ Plans:
   5. Memory demonstrably improves agent behavior over multiple sessions
 **Plans:** TBD
 
-### Phase 16: Specialized Agents
-**Goal:** Implement specialized primary agents if Phase 11 research validates clear value over existing tools — candidates: MasterDebugger, Reviewer
-**Depends on:** Phase 11 (research decides), Phase 15 (memory integration)
-**Requirements:** TBD (defined by Phase 11 research)
+### Phase 16: Autopilot Integration (Skills + Memory)
+**Goal:** Integrate new skills/commands (Phase 14) and memory capabilities (Phase 15) into the existing Autopilot agent — no new dedicated agents (Phase 11 research concluded skills > agents for all candidates)
+**Depends on:** Phase 14 (skills), Phase 15 (memory)
+**Requirements:** TBD
 **Success Criteria** (what must be TRUE):
-  1. Each agent passes the "does this meaningfully better than existing tools" test (validated by research)
-  2. Agents are primary mode — directly accessible to users
-  3. Agents integrate with skills and memory system
-  4. Agents support autonomous workflow, not just one-shot interactions
+  1. Memory injection works in autopilot dispatch prompts (relevant memories injected per task)
+  2. Skill-aware routing selects relevant skills per task type during autonomous pipeline
+  3. Confidence threshold tuning adjusts pipeline depth based on learned patterns
+  4. If deliverables are too thin, remaining work merges into Phase 17
 **Plans:** TBD
 
 ### Phase 17: Integration & Polish

@@ -213,21 +213,21 @@ Research across all 5 competitors shows the skills > agents trend. MasterDebugge
 | SF-01 | Destructive git/shell command prevention | gsd-prompt-guard | - | write-existing-file-guard | - | - | Nothing | HIGH | 17 |
 | SF-02 | Secret / .env leak protection (See also: HK-07) | - | - | - | - | - | Nothing (Envsitter Guard ecosystem plugin) | HIGH | 17 |
 | SF-03 | Input sanitization for hook/prompt injection | gsd-prompt-guard | - | Rules-injector (has vulnerability) | - | - | Nothing | MEDIUM | 17 |
-| SF-04 | Self-healing configuration repair | - | - | - | - | - | Config v3 auto-migration (partial) | HIGH | 12 |
+| SF-04 | Self-healing configuration repair | - | - | - | - | - | Config v4 auto-migration (partial) | HIGH | 12 |
 
 ---
 
 ## Coverage Area 10: Developer Experience
 
 ### Current State
-- We have: /oc-configure wizard, self-healing asset installer, config v3 with auto-migration
+- We have: /oc-configure wizard, self-healing asset installer, config v4 with auto-migration (v1→v2→v3→v4)
 - Competitor range: GSD (60+ commands, settings), OMO (/doctor, model routing), ECC (skill-health, harness-audit, prompt-optimize)
 
 ### Gap Table
 
 | Gap ID | Feature | GSD | Superpowers | OMO | ECC | claude-mem | We Have | Priority | Phase |
 |--------|---------|-----|-------------|-----|-----|-----------|---------|----------|-------|
-| DX-01 | Self-healing doctor with auto-repair (See also: NV-06) | /gsd:health | - | /doctor (report only) | /harness-audit, /skill-health | Smart Install | Config v3 migration (partial) | CRITICAL | 12 |
+| DX-01 | Self-healing doctor with auto-repair (See also: NV-06) | /gsd:health | - | /doctor (report only) | /harness-audit, /skill-health | Smart Install | Config v4 migration (partial) | CRITICAL | 12 |
 | DX-02 | Plugin health diagnostics | /gsd:health | - | /doctor | /harness-audit | - | Nothing | CRITICAL | 12 |
 | DX-03 | Installed asset audit / stocktake | /gsd:stats | - | - | /skill-stocktake | - | Nothing | HIGH | 14 |
 | DX-04 | Documentation sync with code changes -> Consolidated into CM-02 | /gsd:docs-update | - | - | /update-docs, /update-codemaps | - | Nothing | HIGH | 14 |
@@ -259,8 +259,8 @@ Research across all 5 competitors shows the skills > agents trend. MasterDebugge
 | MEDIUM | 24 | Phase 12: 1, Phase 13: 2, Phase 14: 8, Phase 15: 5, Phase 17: 7, Novel: 1 |
 | LOW | 11 | Skip: 9, Skip (Agent): 2 |
 
-**Total gaps identified:** 71
-**Assigned to phases:** 60
+**Total gaps identified:** 73
+**Assigned to phases:** 62
 **Deferred/skipped:** 11 (all LOW priority)
 
 **Phase 16 note:** Phase 16 has no directly assigned gaps. Research recommends either (a) assigning autopilot agent enhancements (memory injection, skill-aware routing, confidence tuning) or (b) merging Phase 16 into Phase 17. See 11-AGENT-VERDICT.md.

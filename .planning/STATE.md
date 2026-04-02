@@ -136,8 +136,8 @@ Recent decisions affecting current work:
 - [Phase 11-ecosystem-research]: Brainstorming (superpowers, 131k stars) is #1 priority gap; skills > agents for methodology transfer
 - [Phase 11-ecosystem-research]: Avoid Chroma dependency for Phase 15 memory; use bun:sqlite with FTS5, embedding-in-SQLite for semantic search
 - [Phase 11-ecosystem-research]: Unified memory+learning system (neither ECC instincts-only nor claude-mem memory-only) for Phase 15
-- [Phase 11]: 71 gaps identified across 10 coverage areas: 10 CRITICAL, 26 HIGH, 24 MEDIUM, 11 LOW
-- [Phase 11]: All CRITICAL and HIGH gaps (36 total) assigned to phases; Phase 14 largest (22 features, 6 plans)
+- [Phase 11]: 73 gaps identified across 10 coverage areas: 12 CRITICAL, 26 HIGH, 24 MEDIUM, 11 LOW
+- [Phase 11]: All CRITICAL and HIGH gaps (38 total) assigned to phases; Phase 14 largest (22 features, split into 14a/14b)
 - [Phase 11]: Phase 16 scoped down to single integration plan (Option A) -- all 6 agent candidates better as skills/commands
 - [Phase 11]: Memory architecture: bun:sqlite + FTS5, 3-layer progressive disclosure, observation-based capture, 90-day decay, 2000-token injection cap
 - [Phase 11]: Self-healing doctor + plugin diagnostics as Phase 12 quick wins (CRITICAL priority)
