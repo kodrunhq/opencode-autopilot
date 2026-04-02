@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
 status: Phase complete — ready for verification
-stopped_at: Completed 13-02-PLAN.md (event collection layer)
-last_updated: "2026-04-02T14:48:00.000Z"
+stopped_at: Completed 13-04-PLAN.md (user-facing tools & plugin wiring)
+last_updated: "2026-04-02T15:04:49.095Z"
 progress:
   total_phases: 10
   completed_phases: 10
@@ -67,8 +67,7 @@ Plan: 3 of 3 (all complete)
 | Phase 11-ecosystem-research P03 | 8min | 2 tasks | 4 files |
 | Phase 12-quick-wins P01 | 2min | 2 tasks | 2 files |
 | Phase 12-quick-wins P02 | 4min | 2 tasks | 11 files |
-| Phase 13-session-observability P05 | 4min | 2 tasks | 5 files |
-| Phase 13-session-observability P02 | 5min | 2 tasks | 9 files |
+| Phase 13-session-observability P04 | 9min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -148,13 +147,8 @@ Recent decisions affecting current work:
 - [Phase 12-quick-wins]: Use modelData.id field over record key for provider-prefixed model path construction in configure wizard
 - [Phase 12-quick-wins]: Created src/health/ module from scratch as health check infrastructure for oc_doctor
 - [Phase 12-quick-wins]: Hook-registration check is informational only (always pass when oc_doctor callable)
-- [Phase 13-session-observability]: Timeout mock uses message pattern for service_unavailable classification (real classifier checks regex, not HTTP 504 status)
-- [Phase 13-session-observability]: Mock errors use Object.freeze on both outer and nested objects for deep immutability
-- [Phase 13-02]: Created event-store.ts as blocking dependency (Plan 01 did not create SessionEventStore)
-- [Phase 13-02]: TokenAggregate uses Object.freeze for immutable returns per CLAUDE.md
-- [Phase 13-02]: ContextMonitor fires warning once per session via per-session warned flag (D-36)
-- [Phase 13-02]: Event handlers are pure observers that never modify session state or output
-- [Phase 13-02]: Default 200k context limit when provider metadata unavailable
+- [Phase 13-session-observability]: Observability event handler runs first as pure observer, before first-load toast and fallback handler
+- [Phase 13-session-observability]: SessionEvents-to-SessionLog adapter filters ObservabilityEvent types to schema-valid subset (fallback/error/decision/model_switch)
 
 ### Pending Todos
 
@@ -168,6 +162,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T14:48:00.000Z
-Stopped at: Completed 13-02-PLAN.md (event collection layer)
+Last session: 2026-04-02T15:04:49.090Z
+Stopped at: Completed 13-04-PLAN.md (user-facing tools & plugin wiring)
 Resume file: None

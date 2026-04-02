@@ -58,21 +58,21 @@ export const loggingConfigSchema = z.object({
 	retentionDays: z.number().min(1).max(365).default(30),
 });
 
+export const sessionDecisionSchema = z.object({
+	timestamp: z.string().optional(),
+	phase: z.string(),
+	agent: z.string(),
+	decision: z.string(),
+	rationale: z.string(),
+});
+
 export const sessionLogSchema = z.object({
 	schemaVersion: z.number().default(1),
 	sessionId: z.string(),
 	startedAt: z.string(),
+	endedAt: z.string().nullable().default(null),
 	events: z.array(sessionEventSchema),
-	decisions: z
-		.array(
-			z.object({
-				phase: z.string(),
-				agent: z.string(),
-				decision: z.string(),
-				rationale: z.string(),
-			}),
-		)
-		.default([]),
+	decisions: z.array(sessionDecisionSchema).default([]),
 	errorSummary: z.record(z.string(), z.number()).default({}),
 });
 
