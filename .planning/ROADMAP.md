@@ -321,9 +321,9 @@ Plans:
   3. Memory-based confidence tuning adjusts Arena debate depth based on project error history
   4. Cross-feature integration tests exercise orchestrator + skills + memory + config migration
   5. Documentation updated (CLAUDE.md, CHANGELOG), version bumped, CI green
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 17-01-PLAN.md -- Wire adaptive skill routing + memory-based confidence tuning
+- [x] 17-01-PLAN.md -- Wire adaptive skill routing + memory-based confidence tuning
 - [ ] 17-02-PLAN.md -- Cross-feature integration tests + config migration chain test
 - [ ] 17-03-PLAN.md -- Documentation polish, CHANGELOG, version bump to 1.6.0

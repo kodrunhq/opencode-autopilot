@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
-status: Phase complete — ready for verification
-stopped_at: Phase 17 context gathered
-last_updated: "2026-04-02T21:37:56.220Z"
+status: Ready to execute
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-04-02T22:03:55.528Z"
 progress:
   total_phases: 10
   completed_phases: 10
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** A single command transforms an idea into a shipped, reviewed, tested result
-**Current focus:** Phase 11 — ecosystem-research (COMPLETE)
+**Current focus:** Phase 17 — integration-polish
 
 ## Current Position
 
-Phase: 11 (ecosystem-research) — COMPLETE
-Plan: 3 of 3 (all complete)
+Phase: 17 (integration-polish) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Plan: 3 of 3 (all complete)
 | Phase 13-session-observability P04 | 9min | 2 tasks | 10 files |
 | Phase 14-skills-commands P06 | 3min | 2 tasks | 7 files |
 | Phase 15 P03 | 10min | 2 tasks | 10 files |
+| Phase 17 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,9 @@ Recent decisions affecting current work:
 - [Phase 15]: Per-session cache in injector avoids repeated DB reads within a session
 - [Phase 15]: Config v5 migration chain preserves all v4 fields, adds memory defaults
 - [Phase 15]: Memory capture positioned as event hook step 2 (after observability, before toast)
+- [Phase 17]: loadAdaptiveSkillContext replaces loadSkillContent+buildSkillContext for all dispatch prompts
+- [Phase 17]: Error threshold of 3 observations triggers +1 debate depth (capped at 3)
+- [Phase 17]: getMemoryTunedDepth is best-effort: memory failures silently fall back to standard depth
 
 ### Pending Todos
 
@@ -169,6 +173,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T21:37:56.217Z
-Stopped at: Phase 17 context gathered
-Resume file: .planning/phases/17-integration-polish/17-CONTEXT.md
+Last session: 2026-04-02T22:03:55.526Z
+Stopped at: Completed 17-01-PLAN.md
+Resume file: None
