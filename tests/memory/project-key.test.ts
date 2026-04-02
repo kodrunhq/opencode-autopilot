@@ -1,20 +1,20 @@
 import { describe, expect, test } from "bun:test";
+// Types verified via schema tests (Observation, ObservationType, Project, Preference)
+import {
+	CHARS_PER_TOKEN,
+	DEFAULT_HALF_LIFE_DAYS,
+	DEFAULT_INJECTION_BUDGET,
+	MAX_OBSERVATIONS_PER_PROJECT,
+	OBSERVATION_TYPES,
+	TYPE_WEIGHTS,
+} from "../../src/memory/constants";
 import { computeProjectKey } from "../../src/memory/project-key";
 import {
 	observationSchema,
 	observationTypeSchema,
-	projectSchema,
 	preferenceSchema,
+	projectSchema,
 } from "../../src/memory/schemas";
-import type { Observation, ObservationType, Project, Preference } from "../../src/memory/types";
-import {
-	TYPE_WEIGHTS,
-	DEFAULT_INJECTION_BUDGET,
-	DEFAULT_HALF_LIFE_DAYS,
-	CHARS_PER_TOKEN,
-	MAX_OBSERVATIONS_PER_PROJECT,
-	OBSERVATION_TYPES,
-} from "../../src/memory/constants";
 
 describe("computeProjectKey", () => {
 	test("returns a 64-char hex string (SHA-256)", () => {
@@ -97,9 +97,7 @@ describe("observationSchema", () => {
 	test("rejects missing required fields", () => {
 		expect(() => observationSchema.parse({})).toThrow();
 		expect(() => observationSchema.parse({ content: "x" })).toThrow();
-		expect(() =>
-			observationSchema.parse({ ...validObservation, content: undefined }),
-		).toThrow();
+		expect(() => observationSchema.parse({ ...validObservation, content: undefined })).toThrow();
 	});
 
 	test("rejects empty content", () => {
