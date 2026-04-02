@@ -21,6 +21,7 @@ import {
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
+import { ocDoctor } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
 import { ocOrchestrate } from "./tools/orchestrate";
 import { ocPhase } from "./tools/phase";
@@ -126,6 +127,7 @@ const plugin: Plugin = async (input) => {
 			oc_phase: ocPhase,
 			oc_plan: ocPlan,
 			oc_orchestrate: ocOrchestrate,
+			oc_doctor: ocDoctor,
 			oc_forensics: ocForensics,
 			oc_review: ocReview,
 		},
