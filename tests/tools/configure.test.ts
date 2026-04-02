@@ -237,6 +237,17 @@ describe("configureCore edge cases", () => {
 		expect(result.availableModels.anthropic).toContain("anthropic/claude-opus-4-6");
 		expect(result.availableModels.anthropic).toContain("anthropic/claude-sonnet-4-6");
 		expect(result.availableModels.openai).toContain("openai/gpt-5.4");
+
+		// modelIndex maps numbers to model IDs
+		expect(result.modelIndex).toBeDefined();
+		expect(Object.keys(result.modelIndex).length).toBe(3);
+		expect(Object.values(result.modelIndex)).toContain("anthropic/claude-opus-4-6");
+		expect(Object.values(result.modelIndex)).toContain("openai/gpt-5.4");
+
+		// displayText is a pre-formatted numbered list
+		expect(result.displayText).toContain("Available models (3 total)");
+		expect(result.displayText).toContain("anthropic/claude-opus-4-6");
+		expect(result.displayText).toContain("openai/gpt-5.4");
 		// cleanup handled by beforeEach → resetPendingAssignments() which also clears providers
 	});
 });
