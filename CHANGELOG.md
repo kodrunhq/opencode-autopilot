@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.1.3...opencode-autopilot-v1.2.0) (2026-04-02)
+
+
+### Features
+
+* add interactive CLI configure wizard with searchable model selection ([4c822fb](https://github.com/kodrunhq/opencode-autopilot/commit/4c822fbe857d68fb6f52dc2742ab6092f33c62cc))
+
+
+### Bug Fixes
+
+* address PR review — dirname for ensureDir, access-before-copy, keep currentAssignment key ([84b82c1](https://github.com/kodrunhq/opencode-autopilot/commit/84b82c1186a887616879f1614e42f5abb34a80e2))
+* compact tool output to prevent OpenCode truncation ([6bd0901](https://github.com/kodrunhq/opencode-autopilot/commit/6bd090113695b53007ef29221fc9e1fd1dbe93cf))
+* compact tool output to prevent truncation, force-update command files ([6552b28](https://github.com/kodrunhq/opencode-autopilot/commit/6552b282bdd6338d8a42869b95223961fead7a32))
+
 ## [1.1.3](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.1.2...opencode-autopilot-v1.1.3) (2026-04-02)
 
 
