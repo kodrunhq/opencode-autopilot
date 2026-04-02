@@ -130,7 +130,7 @@ describe("createObservabilityEventHandler", () => {
 		expect(warnings?.length).toBe(1);
 	});
 
-	it("on session.idle, flushes to disk via writer callback", async () => {
+	it("on session.idle, snapshots to disk but keeps session in store", async () => {
 		store.initSession("sess-1");
 
 		await handler({
@@ -143,8 +143,8 @@ describe("createObservabilityEventHandler", () => {
 		});
 
 		expect(writeSessionLog).toHaveBeenCalledTimes(1);
-		// Session data should have been flushed (removed from store)
-		expect(store.getSession("sess-1")).toBeUndefined();
+		// Session data should still be in store (snapshot, not flush)
+		expect(store.getSession("sess-1")).toBeDefined();
 	});
 
 	it("on session.deleted, flushes remaining data and cleans up", async () => {

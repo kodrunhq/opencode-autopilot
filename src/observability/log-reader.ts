@@ -104,8 +104,12 @@ export async function listSessionLogs(logsDir?: string): Promise<readonly Sessio
 					errorCount,
 				});
 			}
-		} catch {
-			// Skip malformed files
+		} catch (innerError: unknown) {
+			// SyntaxError = malformed JSON, expected and skipped.
+			// I/O errors (permissions, etc.) are unexpected — log them.
+			if (!(innerError instanceof SyntaxError) && !isEnoentError(innerError)) {
+				console.error("[opencode-autopilot] Unexpected error reading log file:", file, innerError);
+			}
 		}
 	}
 

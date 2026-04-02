@@ -4,7 +4,7 @@
  * Reads a session log and produces a read-only report showing:
  * - Phase-by-phase decision timeline
  * - Per-phase decision count
- * - Decisions with agent, rationale, and confidence context
+ * - Decisions with agent and rationale context
  *
  * Follows the *Core + tool() wrapper pattern per CLAUDE.md.
  * Returns JSON with displayText field following oc_doctor pattern.
@@ -134,9 +134,13 @@ export async function pipelineReportCore(sessionID?: string, logsDir?: string): 
 export const ocPipelineReport = tool({
 	description:
 		"View pipeline decision trace. Shows phase-by-phase breakdown of all autonomous decisions " +
-		"with agent, rationale, and confidence. Read-only report for post-session analysis.",
+		"with agent and rationale. Read-only report for post-session analysis.",
 	args: {
-		sessionID: z.string().optional().describe("Session ID to view (uses latest if omitted)"),
+		sessionID: z
+			.string()
+			.regex(/^[a-zA-Z0-9_-]{1,256}$/)
+			.optional()
+			.describe("Session ID to view (uses latest if omitted)"),
 	},
 	async execute({ sessionID }) {
 		return pipelineReportCore(sessionID);

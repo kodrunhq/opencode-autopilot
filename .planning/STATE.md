@@ -1,7 +1,7 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Autonomous Orchestrator
+milestone: v3.0
+milestone_name: Intelligence & Polish
 status: Phase complete — ready for verification
 stopped_at: Completed 13-04-PLAN.md (user-facing tools & plugin wiring)
 last_updated: "2026-04-02T15:04:49.095Z"

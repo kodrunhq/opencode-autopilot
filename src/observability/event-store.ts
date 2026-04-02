@@ -18,43 +18,43 @@ export type ObservabilityEvent =
 	| {
 			readonly type: "fallback";
 			readonly timestamp: string;
-			readonly sessionID: string;
+			readonly sessionId: string;
 			readonly failedModel: string;
 			readonly nextModel: string;
-			readonly errorType: string;
+			readonly reason: string;
 			readonly success: boolean;
 	  }
 	| {
 			readonly type: "error";
 			readonly timestamp: string;
-			readonly sessionID: string;
+			readonly sessionId: string;
 			readonly errorType: string;
 			readonly message: string;
-			readonly model?: string;
+			readonly model: string;
 			readonly retryable: boolean;
+			readonly statusCode?: number;
 	  }
 	| {
 			readonly type: "decision";
 			readonly timestamp: string;
-			readonly sessionID: string;
+			readonly sessionId: string;
 			readonly phase: string;
 			readonly agent: string;
 			readonly decision: string;
 			readonly rationale: string;
-			readonly confidence: string;
 	  }
 	| {
 			readonly type: "model_switch";
 			readonly timestamp: string;
-			readonly sessionID: string;
+			readonly sessionId: string;
 			readonly fromModel: string;
 			readonly toModel: string;
-			readonly reason: string;
+			readonly trigger: "fallback" | "config" | "user";
 	  }
 	| {
 			readonly type: "context_warning";
 			readonly timestamp: string;
-			readonly sessionID: string;
+			readonly sessionId: string;
 			readonly utilization: number;
 			readonly contextLimit: number;
 			readonly inputTokens: number;
@@ -62,7 +62,7 @@ export type ObservabilityEvent =
 	| {
 			readonly type: "tool_complete";
 			readonly timestamp: string;
-			readonly sessionID: string;
+			readonly sessionId: string;
 			readonly tool: string;
 			readonly durationMs: number;
 			readonly success: boolean;
@@ -70,16 +70,15 @@ export type ObservabilityEvent =
 	| {
 			readonly type: "phase_transition";
 			readonly timestamp: string;
-			readonly sessionID: string;
+			readonly sessionId: string;
 			readonly fromPhase: string;
 			readonly toPhase: string;
-			readonly confidence?: string;
 	  }
-	| { readonly type: "session_start"; readonly timestamp: string; readonly sessionID: string }
+	| { readonly type: "session_start"; readonly timestamp: string; readonly sessionId: string }
 	| {
 			readonly type: "session_end";
 			readonly timestamp: string;
-			readonly sessionID: string;
+			readonly sessionId: string;
 			readonly durationMs: number;
 			readonly totalCost: number;
 	  };
@@ -98,7 +97,7 @@ export interface ToolMetrics {
  * All collected data for a single session.
  */
 export interface SessionEvents {
-	readonly sessionID: string;
+	readonly sessionId: string;
 	readonly events: readonly ObservabilityEvent[];
 	readonly tokens: TokenAggregate;
 	readonly toolMetrics: ReadonlyMap<string, ToolMetrics>;
@@ -110,7 +109,7 @@ export interface SessionEvents {
  * Mutable internal state for a session (used within the store only).
  */
 interface MutableSessionData {
-	sessionID: string;
+	sessionId: string;
 	events: ObservabilityEvent[];
 	tokens: TokenAggregate;
 	toolMetrics: Map<string, ToolMetrics>;
@@ -128,9 +127,9 @@ export class SessionEventStore {
 	/**
 	 * Initializes a new session in the store.
 	 */
-	initSession(sessionID: string): void {
-		this.sessions.set(sessionID, {
-			sessionID,
+	initSession(sessionId: string): void {
+		this.sessions.set(sessionId, {
+			sessionId,
 			events: [],
 			tokens: createEmptyTokenAggregate(),
 			toolMetrics: new Map(),
@@ -140,10 +139,10 @@ export class SessionEventStore {
 	}
 
 	/**
-	 * Appends an event to a session. Creates session if not yet initialized.
+	 * Appends an event to a session. Silently returns if session is not initialized.
 	 */
-	appendEvent(sessionID: string, event: ObservabilityEvent): void {
-		const session = this.sessions.get(sessionID);
+	appendEvent(sessionId: string, event: ObservabilityEvent): void {
+		const session = this.sessions.get(sessionId);
 		if (!session) return;
 		session.events.push(event);
 	}
@@ -151,8 +150,8 @@ export class SessionEventStore {
 	/**
 	 * Accumulates token data for a session.
 	 */
-	accumulateTokens(sessionID: string, tokens: Partial<TokenAggregate>): void {
-		const session = this.sessions.get(sessionID);
+	accumulateTokens(sessionId: string, tokens: Partial<TokenAggregate>): void {
+		const session = this.sessions.get(sessionId);
 		if (!session) return;
 		session.tokens = accumulateTokens(session.tokens, tokens);
 	}
@@ -160,8 +159,8 @@ export class SessionEventStore {
 	/**
 	 * Records a tool execution metric.
 	 */
-	recordToolExecution(sessionID: string, tool: string, durationMs: number, success: boolean): void {
-		const session = this.sessions.get(sessionID);
+	recordToolExecution(sessionId: string, tool: string, durationMs: number, success: boolean): void {
+		const session = this.sessions.get(sessionId);
 		if (!session) return;
 
 		const existing = session.toolMetrics.get(tool);
@@ -177,8 +176,8 @@ export class SessionEventStore {
 	/**
 	 * Sets the current pipeline phase for a session.
 	 */
-	setCurrentPhase(sessionID: string, phase: string): void {
-		const session = this.sessions.get(sessionID);
+	setCurrentPhase(sessionId: string, phase: string): void {
+		const session = this.sessions.get(sessionId);
 		if (!session) return;
 		session.currentPhase = phase;
 	}
@@ -186,19 +185,19 @@ export class SessionEventStore {
 	/**
 	 * Gets the current pipeline phase for a session.
 	 */
-	getCurrentPhase(sessionID: string): string | null {
-		return this.sessions.get(sessionID)?.currentPhase ?? null;
+	getCurrentPhase(sessionId: string): string | null {
+		return this.sessions.get(sessionId)?.currentPhase ?? null;
 	}
 
 	/**
 	 * Returns a snapshot of session data without removing it.
 	 */
-	getSession(sessionID: string): SessionEvents | undefined {
-		const session = this.sessions.get(sessionID);
+	getSession(sessionId: string): SessionEvents | undefined {
+		const session = this.sessions.get(sessionId);
 		if (!session) return undefined;
 
 		return {
-			sessionID: session.sessionID,
+			sessionId: session.sessionId,
 			events: [...session.events],
 			tokens: session.tokens,
 			toolMetrics: new Map(session.toolMetrics),
@@ -210,10 +209,10 @@ export class SessionEventStore {
 	/**
 	 * Returns session data and removes it from the store (for disk flush).
 	 */
-	flush(sessionID: string): SessionEvents | undefined {
-		const session = this.getSession(sessionID);
+	flush(sessionId: string): SessionEvents | undefined {
+		const session = this.getSession(sessionId);
 		if (session) {
-			this.sessions.delete(sessionID);
+			this.sessions.delete(sessionId);
 		}
 		return session;
 	}

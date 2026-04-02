@@ -13,19 +13,19 @@ import type { ObservabilityEvent } from "./event-store";
  * Constructs a fallback event.
  */
 export function emitFallbackEvent(
-	sessionID: string,
+	sessionId: string,
 	failedModel: string,
 	nextModel: string,
-	errorType: string,
+	reason: string,
 	success: boolean,
 ): ObservabilityEvent {
 	return Object.freeze({
 		type: "fallback" as const,
 		timestamp: new Date().toISOString(),
-		sessionID,
+		sessionId,
 		failedModel,
 		nextModel,
-		errorType,
+		reason,
 		success,
 	});
 }
@@ -34,20 +34,22 @@ export function emitFallbackEvent(
  * Constructs an error event.
  */
 export function emitErrorEvent(
-	sessionID: string,
+	sessionId: string,
 	errorType: string,
 	message: string,
 	retryable: boolean,
-	model?: string,
+	model = "unknown",
+	statusCode?: number,
 ): ObservabilityEvent {
 	return Object.freeze({
 		type: "error" as const,
 		timestamp: new Date().toISOString(),
-		sessionID,
+		sessionId,
 		errorType,
 		message,
 		retryable,
-		...(model !== undefined ? { model } : {}),
+		model,
+		...(statusCode !== undefined ? { statusCode } : {}),
 	});
 }
 
@@ -55,22 +57,20 @@ export function emitErrorEvent(
  * Constructs a decision event (per D-27, D-28).
  */
 export function emitDecisionEvent(
-	sessionID: string,
+	sessionId: string,
 	phase: string,
 	agent: string,
 	decision: string,
 	rationale: string,
-	confidence: string,
 ): ObservabilityEvent {
 	return Object.freeze({
 		type: "decision" as const,
 		timestamp: new Date().toISOString(),
-		sessionID,
+		sessionId,
 		phase,
 		agent,
 		decision,
 		rationale,
-		confidence,
 	});
 }
 
@@ -78,18 +78,18 @@ export function emitDecisionEvent(
  * Constructs a model_switch event.
  */
 export function emitModelSwitchEvent(
-	sessionID: string,
+	sessionId: string,
 	fromModel: string,
 	toModel: string,
-	reason: string,
+	trigger: "fallback" | "config" | "user",
 ): ObservabilityEvent {
 	return Object.freeze({
 		type: "model_switch" as const,
 		timestamp: new Date().toISOString(),
-		sessionID,
+		sessionId,
 		fromModel,
 		toModel,
-		reason,
+		trigger,
 	});
 }
 
@@ -97,7 +97,7 @@ export function emitModelSwitchEvent(
  * Constructs a tool_complete event.
  */
 export function emitToolCompleteEvent(
-	sessionID: string,
+	sessionId: string,
 	tool: string,
 	durationMs: number,
 	success: boolean,
@@ -105,7 +105,7 @@ export function emitToolCompleteEvent(
 	return Object.freeze({
 		type: "tool_complete" as const,
 		timestamp: new Date().toISOString(),
-		sessionID,
+		sessionId,
 		tool,
 		durationMs,
 		success,
@@ -116,17 +116,15 @@ export function emitToolCompleteEvent(
  * Constructs a phase_transition event.
  */
 export function emitPhaseTransition(
-	sessionID: string,
+	sessionId: string,
 	fromPhase: string,
 	toPhase: string,
-	confidence?: string,
 ): ObservabilityEvent {
 	return Object.freeze({
 		type: "phase_transition" as const,
 		timestamp: new Date().toISOString(),
-		sessionID,
+		sessionId,
 		fromPhase,
 		toPhase,
-		...(confidence !== undefined ? { confidence } : {}),
 	});
 }

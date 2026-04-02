@@ -41,7 +41,7 @@ export interface ObservabilityHandlerDeps {
  * Extracts a session ID from event properties.
  * Supports properties.sessionID, properties.info.sessionID, and properties.info.id.
  */
-function extractSessionID(properties: Record<string, unknown>): string | undefined {
+function extractSessionId(properties: Record<string, unknown>): string | undefined {
 	if (typeof properties.sessionID === "string") return properties.sessionID;
 	if (properties.info !== null && typeof properties.info === "object") {
 		const info = properties.info as Record<string, unknown>;
@@ -68,12 +68,12 @@ function hasTokenShape(obj: unknown): obj is {
 	if (typeof o.cost !== "number") return false;
 	if (o.tokens === null || typeof o.tokens !== "object") return false;
 	const tokens = o.tokens as Record<string, unknown>;
-	return (
-		typeof tokens.input === "number" &&
-		typeof tokens.output === "number" &&
-		tokens.cache !== null &&
-		typeof tokens.cache === "object"
-	);
+	if (typeof tokens.input !== "number") return false;
+	if (typeof tokens.output !== "number") return false;
+	if (typeof tokens.reasoning !== "number") return false;
+	if (tokens.cache === null || typeof tokens.cache !== "object") return false;
+	const cache = tokens.cache as Record<string, unknown>;
+	return typeof cache.read === "number" && typeof cache.write === "number";
 }
 
 /**
@@ -111,24 +111,24 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 				const startEvent: ObservabilityEvent = Object.freeze({
 					type: "session_start" as const,
 					timestamp: new Date().toISOString(),
-					sessionID: info.id,
+					sessionId: info.id,
 				});
 				eventStore.appendEvent(info.id, startEvent);
 				return;
 			}
 
 			case "session.error": {
-				const sessionID =
+				const sessionId =
 					typeof properties.sessionID === "string" ? properties.sessionID : undefined;
-				if (!sessionID) return;
+				if (!sessionId) return;
 
 				const error = properties.error;
 				const errorType = classifyErrorType(error);
 				const message = getErrorMessage(error);
 				const retryable = isRetryableError(error, retryOnErrors);
 
-				const errorEvent = emitErrorEvent(sessionID, errorType, message, retryable);
-				eventStore.appendEvent(sessionID, errorEvent);
+				const errorEvent = emitErrorEvent(sessionId, errorType, message, retryable);
+				eventStore.appendEvent(sessionId, errorEvent);
 				return;
 			}
 
@@ -136,37 +136,37 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 				const info = properties.info as Record<string, unknown> | undefined;
 				if (!info) return;
 
-				const sessionID = typeof info.sessionID === "string" ? info.sessionID : undefined;
-				if (!sessionID) return;
+				const sessionId = typeof info.sessionID === "string" ? info.sessionID : undefined;
+				if (!sessionId) return;
 
 				// Accumulate tokens if message has AssistantMessage shape
 				if (hasTokenShape(info)) {
 					const empty = createEmptyTokenAggregate();
 					const accumulated = accumulateTokensFromMessage(empty, info);
-					eventStore.accumulateTokens(sessionID, accumulated);
+					eventStore.accumulateTokens(sessionId, accumulated);
 
 					// Check context utilization
-					const utilResult = contextMonitor.processMessage(sessionID, info.tokens.input);
+					const utilResult = contextMonitor.processMessage(sessionId, info.tokens.input);
 					if (utilResult.shouldWarn) {
 						const pct = Math.round(utilResult.utilization * 100);
 						// Append context_warning event
 						const warningEvent: ObservabilityEvent = Object.freeze({
 							type: "context_warning" as const,
 							timestamp: new Date().toISOString(),
-							sessionID,
+							sessionId,
 							utilization: utilResult.utilization,
 							contextLimit: 200000,
 							inputTokens: info.tokens.input,
 						});
-						eventStore.appendEvent(sessionID, warningEvent);
+						eventStore.appendEvent(sessionId, warningEvent);
 
 						// Fire toast (per D-35)
 						showToast(
 							"Context Warning",
 							`Context at ${pct}% -- consider compacting`,
 							"warning",
-						).catch(() => {
-							// Best-effort toast
+						).catch((err) => {
+							console.error("[opencode-autopilot]", err);
 						});
 					}
 				}
@@ -174,47 +174,53 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 			}
 
 			case "session.idle": {
-				const sessionID = extractSessionID(properties);
-				if (!sessionID) return;
+				const sessionId = extractSessionId(properties);
+				if (!sessionId) return;
 
-				// Flush to disk (fire-and-forget per Pitfall 2)
-				const sessionData = eventStore.flush(sessionID);
-				writeSessionLog(sessionData).catch(() => {
-					// Best-effort write
+				// Snapshot to disk (fire-and-forget per Pitfall 2) — session continues
+				const sessionData = eventStore.getSession(sessionId);
+				writeSessionLog(sessionData).catch((err) => {
+					console.error("[opencode-autopilot]", err);
 				});
 				return;
 			}
 
 			case "session.deleted": {
-				const sessionID = extractSessionID(properties);
-				if (!sessionID) return;
+				const sessionId = extractSessionId(properties);
+				if (!sessionId) return;
 
-				// Final flush
-				const sessionData = eventStore.flush(sessionID);
-				writeSessionLog(sessionData).catch(() => {
-					// Best-effort write
+				// Final flush — session is done, remove from store
+				const sessionData = eventStore.flush(sessionId);
+				writeSessionLog(sessionData).catch((err) => {
+					console.error("[opencode-autopilot]", err);
 				});
 
 				// Clean up context monitor
-				contextMonitor.cleanup(sessionID);
+				contextMonitor.cleanup(sessionId);
 				return;
 			}
 
 			case "session.compacted": {
-				const sessionID = extractSessionID(properties);
-				if (!sessionID) return;
+				const sessionId = extractSessionId(properties);
+				if (!sessionId) return;
 
-				// Append compaction event
+				// Append compaction decision event (not session_start)
 				const compactEvent: ObservabilityEvent = Object.freeze({
-					type: "session_start" as const,
+					type: "decision" as const,
 					timestamp: new Date().toISOString(),
-					sessionID,
+					sessionId,
+					phase: "COMPACT",
+					agent: "system",
+					decision: "Session compacted",
+					rationale: "Context window compaction triggered",
 				});
-				eventStore.appendEvent(sessionID, compactEvent);
+				eventStore.appendEvent(sessionId, compactEvent);
 
-				// Intermediate flush
-				const sessionData = eventStore.flush(sessionID);
-				writeSessionLog(sessionData).catch(() => {});
+				// Snapshot to disk — session continues after compaction
+				const sessionData = eventStore.getSession(sessionId);
+				writeSessionLog(sessionData).catch((err) => {
+					console.error("[opencode-autopilot]", err);
+				});
 				return;
 			}
 

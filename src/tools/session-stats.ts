@@ -1,11 +1,11 @@
 /**
- * oc_session_stats tool - Token/cost breakdown with per-phase grouping.
+ * oc_session_stats tool - Event counts, decisions, errors, and per-phase breakdown.
  *
  * Reads a session log and computes:
- * - Token breakdown (input, output, reasoning, cache read/write)
- * - Tool usage metrics
+ * - Event count totals
+ * - Decision count and per-phase grouping
+ * - Error summary by type with per-phase attribution
  * - Session duration
- * - Total cost
  * - Per-phase breakdown (when decisions span multiple phases)
  *
  * Follows the *Core + tool() wrapper pattern per CLAUDE.md.
@@ -31,22 +31,45 @@ interface PhaseBreakdownEntry {
 
 /**
  * Computes per-phase breakdown from session log decisions and events.
- * Groups decisions by phase and counts errors per phase.
+ * Groups decisions by phase and counts errors per phase time window.
+ *
+ * Error-to-phase mapping: for each error event, find the phase whose
+ * decision time window (first to last decision timestamp) contains the
+ * error timestamp. Unmatched errors are not attributed to any phase
+ * (they still appear in the overall errorSummary).
  */
 function computePhaseBreakdown(log: SessionLog): readonly PhaseBreakdownEntry[] {
 	const phaseMap = new Map<string, { decisions: number; errors: number }>();
 
-	// Group decisions by phase
+	// Collect per-phase time windows from decisions
+	const phaseWindows = new Map<string, { start: string; end: string }>();
+
 	for (const d of log.decisions) {
 		const existing = phaseMap.get(d.phase) ?? { decisions: 0, errors: 0 };
 		phaseMap.set(d.phase, { ...existing, decisions: existing.decisions + 1 });
+
+		const ts = d.timestamp ?? "";
+		const window = phaseWindows.get(d.phase);
+		if (!window) {
+			phaseWindows.set(d.phase, { start: ts, end: ts });
+		} else {
+			if (ts < window.start) phaseWindows.set(d.phase, { ...window, start: ts });
+			if (ts > window.end) phaseWindows.set(d.phase, { ...window, end: ts });
+		}
 	}
 
-	// Group errors by phase from decision events (best-effort mapping)
+	// Map errors to phases by timestamp overlap with phase time windows
 	for (const e of log.events) {
 		if (e.type === "error") {
-			// Errors don't have a phase field in the schema, so count them separately
-			// They'll be shown in the overall stats, not per-phase
+			for (const [phase, window] of phaseWindows) {
+				if (e.timestamp >= window.start && e.timestamp <= window.end) {
+					const data = phaseMap.get(phase);
+					if (data) {
+						phaseMap.set(phase, { ...data, errors: data.errors + 1 });
+					}
+					break;
+				}
+			}
 		}
 	}
 
@@ -149,7 +172,11 @@ export const ocSessionStats = tool({
 		"View session statistics including event counts, decisions, errors, and per-phase breakdown. " +
 		"Shows duration, error summary, and phase-by-phase activity.",
 	args: {
-		sessionID: z.string().optional().describe("Session ID to view (uses latest if omitted)"),
+		sessionID: z
+			.string()
+			.regex(/^[a-zA-Z0-9_-]{1,256}$/)
+			.optional()
+			.describe("Session ID to view (uses latest if omitted)"),
 	},
 	async execute({ sessionID }) {
 		return sessionStatsCore(sessionID);

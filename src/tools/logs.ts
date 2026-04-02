@@ -160,7 +160,11 @@ export const ocLogs = tool({
 		"summary, 'search' filters events by type/time. Use to inspect session history and errors.",
 	args: {
 		mode: z.enum(["list", "detail", "search"]).describe("View mode: list, detail, or search"),
-		sessionID: z.string().optional().describe("Session ID to view (uses latest if omitted)"),
+		sessionID: z
+			.string()
+			.regex(/^[a-zA-Z0-9_-]{1,256}$/)
+			.optional()
+			.describe("Session ID to view (uses latest if omitted)"),
 		eventType: z.string().optional().describe("Filter events by type (for search mode)"),
 		after: z.string().optional().describe("Only events after this ISO timestamp (for search mode)"),
 		before: z

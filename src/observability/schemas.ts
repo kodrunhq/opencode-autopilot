@@ -2,7 +2,10 @@ import { z } from "zod";
 
 export const baseEventSchema = z.object({
 	timestamp: z.string().max(128),
-	sessionId: z.string().max(256),
+	sessionId: z
+		.string()
+		.max(256)
+		.regex(/^[a-zA-Z0-9_-]{1,256}$/, "Invalid session ID"),
 	type: z.enum(["fallback", "error", "decision", "model_switch"]),
 });
 
@@ -68,7 +71,7 @@ export const sessionDecisionSchema = z.object({
 
 export const sessionLogSchema = z.object({
 	schemaVersion: z.number().default(1),
-	sessionId: z.string(),
+	sessionId: z.string().regex(/^[a-zA-Z0-9_-]{1,256}$/, "Invalid session ID"),
 	startedAt: z.string(),
 	endedAt: z.string().nullable().default(null),
 	events: z.array(sessionEventSchema),

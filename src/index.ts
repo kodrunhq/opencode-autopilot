@@ -89,8 +89,8 @@ const plugin: Plugin = async (input) => {
 	const contextMonitor = new ContextMonitor();
 
 	// Retention pruning on load (non-blocking per D-14)
-	pruneOldLogs().catch(() => {
-		// Pruning failures are non-fatal
+	pruneOldLogs().catch((err) => {
+		console.error("[opencode-autopilot]", err);
 	});
 
 	// --- Fallback subsystem initialization ---
@@ -154,16 +154,16 @@ const plugin: Plugin = async (input) => {
 		showToast: sdkOps.showToast,
 		writeSessionLog: async (sessionData) => {
 			if (!sessionData) return;
-			// Convert ObservabilityEvent[] to SessionEvent[] (filter to schema-valid types)
-			const schemaEvents = sessionData.events.filter(
+			// Filter to schema-valid event types that match SessionEvent discriminated union
+			const schemaEvents: SessionEvent[] = sessionData.events.filter(
 				(e): e is SessionEvent =>
 					e.type === "fallback" ||
 					e.type === "error" ||
 					e.type === "decision" ||
 					e.type === "model_switch",
-			) as unknown as SessionEvent[];
+			);
 			await writeSessionLog({
-				sessionId: sessionData.sessionID,
+				sessionId: sessionData.sessionId,
 				startedAt: sessionData.startedAt,
 				events: schemaEvents,
 			});
