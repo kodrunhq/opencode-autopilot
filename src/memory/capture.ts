@@ -130,8 +130,8 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 						},
 						deps.getDb(),
 					);
-				} catch {
-					// Best-effort
+				} catch (err) {
+					console.warn("[opencode-autopilot] upsertProject failed:", err);
 				}
 				return;
 			}
@@ -149,8 +149,8 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 					setTimeout(() => {
 						try {
 							pruneStaleObservations(projectKey, db);
-						} catch {
-							// Best-effort
+						} catch (err) {
+							console.warn("[opencode-autopilot] pruneStaleObservations failed:", err);
 						}
 					}, 0);
 				}

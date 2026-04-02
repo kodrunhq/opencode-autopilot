@@ -14,7 +14,6 @@
 import type { Database } from "bun:sqlite";
 import { CHARS_PER_TOKEN, DEFAULT_INJECTION_BUDGET } from "./constants";
 import { computeRelevanceScore } from "./decay";
-import { computeProjectKey } from "./project-key";
 import { getAllPreferences, getObservationsByProject, getProjectByPath } from "./repository";
 import type { Observation, Preference } from "./types";
 
@@ -213,6 +212,9 @@ function buildTimeline(observations: readonly ScoredObservation[]): string {
 		const existing = sessions.get(obs.sessionId);
 		if (existing) {
 			existing.count++;
+			if (new Date(obs.createdAt).getTime() > new Date(existing.date).getTime()) {
+				existing.date = obs.createdAt;
+			}
 		} else {
 			sessions.set(obs.sessionId, { date: obs.createdAt, count: 1 });
 		}

@@ -47,12 +47,13 @@ export function memoryStatusCore(
 	_args: { readonly detail?: "summary" | "full" },
 	dbOrPath?: Database | string,
 ): MemoryStatusResult {
+	let ownedDb: Database | null = null;
 	try {
 		const db =
 			dbOrPath instanceof Database
 				? dbOrPath
 				: typeof dbOrPath === "string"
-					? new Database(dbOrPath)
+					? (ownedDb = new Database(dbOrPath))
 					: getMemoryDb();
 
 		// Count observations
@@ -86,11 +87,14 @@ export function memoryStatusCore(
 		};
 		const totalPreferences = prefCountRow.cnt;
 
-		// Storage size
+		// Storage size — derive from actual DB path, not always the global default
 		let storageSizeKb = 0;
 		try {
-			const dbPath = join(getGlobalConfigDir(), MEMORY_DIR, DB_FILE);
-			const stat = statSync(dbPath);
+			const statPath =
+				typeof dbOrPath === "string" && dbOrPath !== ":memory:"
+					? dbOrPath
+					: join(getGlobalConfigDir(), MEMORY_DIR, DB_FILE);
+			const stat = statSync(statPath);
 			storageSizeKb = Math.round(stat.size / 1024);
 		} catch {
 			// DB might be in-memory or path doesn't exist
@@ -142,6 +146,8 @@ export function memoryStatusCore(
 			preferences: [],
 			error: `Memory system error: ${detail}`,
 		};
+	} finally {
+		ownedDb?.close();
 	}
 }
 
