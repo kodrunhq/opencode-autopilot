@@ -60,3 +60,23 @@ export const loggingConfigSchema = z.object({
 
 // Pre-compute defaults for Zod v4 nested default compatibility
 export const loggingDefaults = loggingConfigSchema.parse({});
+
+// --- Session Log schema (persisted JSON per session) ---
+
+export const sessionDecisionSchema = z.object({
+	timestamp: z.string(),
+	phase: z.string(),
+	agent: z.string(),
+	decision: z.string(),
+	rationale: z.string(),
+});
+
+export const sessionLogSchema = z.object({
+	schemaVersion: z.literal(1),
+	sessionId: z.string(),
+	startedAt: z.string(),
+	endedAt: z.string().nullable(),
+	events: z.array(sessionEventSchema),
+	decisions: z.array(sessionDecisionSchema),
+	errorSummary: z.record(z.string(), z.number()),
+});
