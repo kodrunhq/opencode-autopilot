@@ -13,6 +13,9 @@ describe("plugin entry point", () => {
 		tui: {
 			showToast: async () => {},
 		},
+		provider: {
+			list: async () => ({ data: { all: [] } }),
+		},
 	};
 
 	const mockInput = {

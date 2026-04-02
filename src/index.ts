@@ -12,7 +12,12 @@ import {
 import { fallbackDefaults } from "./orchestrator/fallback/fallback-config";
 import { resolveChain } from "./orchestrator/fallback/resolve-chain";
 import { ocConfidence } from "./tools/confidence";
-import { ocConfigure, setAvailableProviders, setOpenCodeConfig } from "./tools/configure";
+import {
+	ocConfigure,
+	setAvailableProviders,
+	setOpenCodeConfig,
+	setProviderDiscoveryPromise,
+} from "./tools/configure";
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
@@ -34,17 +39,23 @@ const plugin: Plugin = async (input) => {
 		console.error("[opencode-autopilot] Asset installation errors:", installResult.errors);
 	}
 
-	// Discover available providers/models from OpenCode SDK
+	// Discover available providers/models in the background (non-blocking).
+	// The promise is stored so oc_configure "start" can await it (with timeout).
 	try {
-		const providerResponse = await client.provider.list({
-			query: { directory: process.cwd() },
-		});
-		const providerData = providerResponse.data;
-		if (providerData?.all) {
-			setAvailableProviders(providerData.all);
-		}
+		const discoveryPromise = client.provider
+			.list({ query: { directory: process.cwd() } })
+			.then((providerResponse) => {
+				const providerData = providerResponse.data;
+				if (providerData?.all) {
+					setAvailableProviders(providerData.all);
+				}
+			})
+			.catch(() => {
+				// Provider discovery is best-effort; configure will show empty models
+			});
+		setProviderDiscoveryPromise(discoveryPromise);
 	} catch {
-		// Provider discovery is best-effort; configure will show empty models
+		// Guard against synchronous failures (e.g. client.provider undefined)
 	}
 
 	// Load config for first-load detection and fallback settings
