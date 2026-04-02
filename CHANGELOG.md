@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.5.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.4.0...opencode-autopilot-v1.5.0) (2026-04-02)
+
+
+### Features
+
+* **14-01:** create brainstorming skill with Socratic design refinement methodology ([ef35765](https://github.com/kodrunhq/opencode-autopilot/commit/ef35765172dc1886256a68b6c34369ab9fb28ef3))
+* **14-01:** create TDD workflow and systematic debugging skills ([f5030ee](https://github.com/kodrunhq/opencode-autopilot/commit/f5030eeb0072eef1be6cbbedb87fcf2b49056a96))
+* **14-02:** create plan-writing and plan-executing skills (SK-06, SK-07) ([4f8f962](https://github.com/kodrunhq/opencode-autopilot/commit/4f8f9625150ec7d7647ebf35cbedf53ee365fdad))
+* **14-02:** create verification and git-worktrees skills (SK-04, SK-05) ([2b1dcf3](https://github.com/kodrunhq/opencode-autopilot/commit/2b1dcf38f6209cd4ef4ced830aee110cdaa17663))
+* **14-03:** create code-review, strategic-compaction, and e2e-testing skills ([a7449f1](https://github.com/kodrunhq/opencode-autopilot/commit/a7449f1fe56c04038328c021d4143019aa56fd67))
+* **14-03:** create thin wrapper commands for brainstorm, tdd, and write-plan ([9afc04f](https://github.com/kodrunhq/opencode-autopilot/commit/9afc04fdb4f76832f9f9445e361d6b7f5134d147))
+* **14-04:** create Python and Rust language pattern skills ([fb52608](https://github.com/kodrunhq/opencode-autopilot/commit/fb526086962d3dcb17ede9b4b4201bb1c3eb06cf))
+* **14-04:** create TypeScript/Bun and Go language pattern skills ([75e0168](https://github.com/kodrunhq/opencode-autopilot/commit/75e016856042e73801dab15c528b8029d8c2a05e))
+* **14-05:** add asset linter, stocktake tool, and update-docs tool ([c82cfc9](https://github.com/kodrunhq/opencode-autopilot/commit/c82cfc97c2bfecf2544bc133f79643d016f2b6d7))
+* **14-05:** update skill template with stacks/requires and register new tools ([f9052ab](https://github.com/kodrunhq/opencode-autopilot/commit/f9052abf0dbbe78a68281c34e31c952184a81bfc))
+* **14-06:** add loadAdaptiveSkillContext to skill-injection.ts ([78544e8](https://github.com/kodrunhq/opencode-autopilot/commit/78544e81a37b50292ff88157f295969df8721700))
+* **14-06:** create skill loader, dependency resolver, and adaptive injector ([432fc52](https://github.com/kodrunhq/opencode-autopilot/commit/432fc52eaf2624d413dfad688d0dbb8e2d97582c))
+* Phase 14 — Skills & Commands (22 features) ([9e25581](https://github.com/kodrunhq/opencode-autopilot/commit/9e25581bec977ec8b30d32fbda0ce5537f3936f4))
+
+
+### Bug Fixes
+
+* address Copilot PR comments + ace review findings — cycle detection, CRLF, yaml guards, error handling, sanitizer, token budget ([d09c145](https://github.com/kodrunhq/opencode-autopilot/commit/d09c145c88fd1542df7c7cdafd9fd3f103604e34))
+* address review round 1 — agent count, anti-patterns, immutability, test assertions, lint failure test ([89e0f6e](https://github.com/kodrunhq/opencode-autopilot/commit/89e0f6eaeb02301c3e7668e21ee81b1e09e2de16))
+* address review round 2 — update-docs project root, remove duplicate anti-pattern section ([99d6e03](https://github.com/kodrunhq/opencode-autopilot/commit/99d6e03d85486ab703eb4cda06c3d51f0e5456e1))
+* format dependency-resolver.ts and config.json for CI lint ([48ebc15](https://github.com/kodrunhq/opencode-autopilot/commit/48ebc15fae74fe4cc06825f0c148515433e6d371))
+
 ## [1.4.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.3.0...opencode-autopilot-v1.4.0) (2026-04-02)
 
 
