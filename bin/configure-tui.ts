@@ -307,7 +307,7 @@ export async function runConfigure(configPath: string = CONFIG_PATH): Promise<vo
 
 	const newConfig = {
 		...baseConfig,
-		version: 4 as const,
+		version: 5 as const,
 		configured: true,
 		groups: groupsRecord,
 		overrides: baseConfig.overrides ?? {},

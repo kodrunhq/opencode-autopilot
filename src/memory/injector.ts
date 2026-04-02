@@ -28,7 +28,7 @@ export interface MemoryInjectorConfig {
  */
 interface InjectorInput {
 	readonly sessionID?: string;
-	readonly model: { readonly providerID: string; readonly modelID: string };
+	readonly model: Record<string, unknown>;
 }
 
 /**

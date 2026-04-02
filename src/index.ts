@@ -289,10 +289,7 @@ const plugin: Plugin = async (input) => {
 				await toolExecuteAfterHandler(hookInput, output);
 			}
 		},
-		"experimental.chat.system.transform": async (
-			input: { sessionID?: string; model: { providerID: string; modelID: string } },
-			output: { system: string[] },
-		) => {
+		"experimental.chat.system.transform": async (input, output) => {
 			if (memoryInjector) {
 				await memoryInjector(input, output);
 			}

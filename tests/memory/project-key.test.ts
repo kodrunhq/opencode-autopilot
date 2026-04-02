@@ -38,7 +38,14 @@ describe("computeProjectKey", () => {
 
 describe("observationTypeSchema", () => {
 	test("accepts all 6 valid types", () => {
-		const validTypes = ["decision", "pattern", "error", "preference", "context", "tool_usage"];
+		const validTypes = [
+			"decision",
+			"pattern",
+			"error",
+			"preference",
+			"context",
+			"tool_usage",
+		] as const;
 		for (const t of validTypes) {
 			expect(observationTypeSchema.parse(t)).toBe(t);
 		}
