@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.6.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.5.0...opencode-autopilot-v1.6.0) (2026-04-02)
+
+
+### Features
+
+* **15-01:** add memory schemas, types, constants, and project-key module ([5f77e6a](https://github.com/kodrunhq/opencode-autopilot/commit/5f77e6a5a6819484a8d1c23065d2d44659e42976))
+* **15-01:** add memory schemas, types, constants, and project-key module ([ab1150e](https://github.com/kodrunhq/opencode-autopilot/commit/ab1150ef0b53b48483ae156881ac8d2ee5e90281))
+* **15-01:** add SQLite database singleton with FTS5 and repository CRUD ([bd588b8](https://github.com/kodrunhq/opencode-autopilot/commit/bd588b8623a21dfe89f9b1821d1894577be146f6))
+* **15-01:** add SQLite database singleton with FTS5 and repository CRUD ([044c851](https://github.com/kodrunhq/opencode-autopilot/commit/044c8516aa72bd2dd5c4fd1f32beb803f5ffd02c))
+* **15-02:** add 3-layer progressive disclosure retrieval with token budget ([07db844](https://github.com/kodrunhq/opencode-autopilot/commit/07db8440eb0a057740c9193fb64ff6e95d2d172c))
+* **15-02:** add event capture handler and decay scoring ([79f39fb](https://github.com/kodrunhq/opencode-autopilot/commit/79f39fbe4e34bc7f4affde47dbe40b9878680db9))
+* **15-03:** add memory injector and oc_memory_status tool ([e4ccd2a](https://github.com/kodrunhq/opencode-autopilot/commit/e4ccd2a82968c6213a64459ef840bb59e0db6543))
+* **15-03:** config v5 with memory section and index.ts wiring ([1ce8bc9](https://github.com/kodrunhq/opencode-autopilot/commit/1ce8bc9d63982207414854f91fb0cb1fdcc9547e))
+* Phase 15 — smart memory system with SQLite, FTS5, and relevance-scored retrieval ([c8be170](https://github.com/kodrunhq/opencode-autopilot/commit/c8be17063c00edb6f87b6d3c2e627da68a0b5eae))
+
+
+### Bug Fixes
+
+* address ace review findings — halfLifeDays forwarding, FTS5 sanitization, type safety, error logging, budget accounting, schema constraints ([758a4dd](https://github.com/kodrunhq/opencode-autopilot/commit/758a4dd1ad6ddea882cd08f3c2cf12f405fe6e52))
+* address Copilot PR comments + remaining ace findings — unused import, timeline date tracking, DB leak, storage path, empty catches ([f909da3](https://github.com/kodrunhq/opencode-autopilot/commit/f909da3028f2df2d46b9012017ceb82dfb75dbba))
+* apply lint fixes to new memory test files ([e636d8e](https://github.com/kodrunhq/opencode-autopilot/commit/e636d8e266a3ef19180d5ac64aef2e1c5590ab7d))
+* resolve lint errors — no-assign-in-expression, config.json formatting ([b872d70](https://github.com/kodrunhq/opencode-autopilot/commit/b872d70fb182d6813ec1cfd54bc2c456de7c4c3a))
+* resolve type errors from config v5 migration and SDK Model type ([8e4df4d](https://github.com/kodrunhq/opencode-autopilot/commit/8e4df4dad732b8b96f732b010912df425528d4e2))
+
 ## [1.5.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.4.0...opencode-autopilot-v1.5.0) (2026-04-02)
 
 
