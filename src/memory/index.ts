@@ -14,4 +14,10 @@ export {
 	upsertPreference,
 	upsertProject,
 } from "./repository";
+export {
+	buildMemoryContext,
+	retrieveMemoryContext,
+	type ScoredObservation,
+	scoreAndRankObservations,
+} from "./retrieval";
 export * from "./types";

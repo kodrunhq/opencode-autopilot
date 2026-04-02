@@ -1,16 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { Database } from "bun:sqlite";
-import { CHARS_PER_TOKEN, DEFAULT_INJECTION_BUDGET } from "../../src/memory/constants";
-import { initMemoryDb } from "../../src/memory/database";
-import { insertObservation, upsertProject } from "../../src/memory/repository";
+import { describe, expect, it } from "bun:test";
+import { CHARS_PER_TOKEN } from "../../src/memory/constants";
 import {
-	type ScoredObservation,
 	buildMemoryContext,
+	type ScoredObservation,
 	scoreAndRankObservations,
 } from "../../src/memory/retrieval";
 import type { Observation, Preference } from "../../src/memory/types";
 
-function makeObservation(overrides: Partial<Omit<Observation, "id">> = {}): Omit<Observation, "id"> {
+function makeObservation(
+	overrides: Partial<Omit<Observation, "id">> = {},
+): Omit<Observation, "id"> {
 	return {
 		projectId: "test-project",
 		sessionId: "session-1",
@@ -46,9 +45,7 @@ const emptyPrefs: readonly Preference[] = [];
 
 describe("scoreAndRankObservations", () => {
 	it("returns ScoredObservation with relevanceScore", () => {
-		const obs: Observation[] = [
-			{ ...makeObservation(), id: 1 } as Observation,
-		];
+		const obs: Observation[] = [{ ...makeObservation(), id: 1 } as Observation];
 		const scored = scoreAndRankObservations(obs);
 		expect(scored.length).toBe(1);
 		expect(typeof scored[0].relevanceScore).toBe("number");
@@ -214,9 +211,7 @@ describe("buildMemoryContext", () => {
 	});
 
 	it("with budget=2000 includes Layer 1 + Layer 2 (timeline)", () => {
-		const observations: ScoredObservation[] = [
-			makeScoredObs({ id: 1, summary: "A decision" }),
-		];
+		const observations: ScoredObservation[] = [makeScoredObs({ id: 1, summary: "A decision" })];
 
 		const result = buildMemoryContext({
 			projectName: "my-project",
