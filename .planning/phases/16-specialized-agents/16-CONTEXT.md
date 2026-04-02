@@ -1,97 +1,95 @@
 # Phase 16: Autopilot Integration (Skills + Memory) - Context
 
 **Gathered:** 2026-04-02
-**Updated:** 2026-04-02 (post Phase 11 research)
-**Status:** Ready for planning (scope defined by 11-AGENT-VERDICT.md)
+**Updated:** 2026-04-02 (post Phase 14+15 completion)
+**Status:** MERGED INTO PHASE 17
 
 <domain>
 ## Phase Boundary
 
-Integrate new skills/commands (Phase 14) and memory capabilities (Phase 15) into the existing Autopilot agent. Phase 11 research concluded that all 6 agent candidates (MasterDebugger, Reviewer, Planner, TDD Guide, Doc Updater, Background Task) are better served as skills or commands — no new dedicated agents will be built. This phase focuses on making the Autopilot smarter by leveraging the new capabilities.
+**This phase has been merged into Phase 17.** The concrete work (adaptive skill routing into orchestrator, memory-based confidence tuning) is too thin for a standalone phase. All Phase 16 deliverables are absorbed into Phase 17: Integration & Polish.
+
+### What Phase 16 was supposed to deliver:
+1. Wire `loadAdaptiveSkillContext` into orchestrator dispatch (replacing single coding-standards skill)
+2. Memory injection into dispatch prompts (determined unnecessary — system prompt hook is sufficient)
+3. Confidence threshold tuning based on memory patterns
+
+### Merge rationale:
+- Skill routing wire-up is ~20 lines in `orchestrate.ts`
+- Memory injection already works via `experimental.chat.system.transform` hook (Phase 15)
+- Phase 11 research flagged this phase as potentially "too thin" (D-04)
+- Better to combine with Phase 17's integration polish as one cohesive phase
 
 </domain>
 
 <decisions>
 ## Implementation Decisions
 
-### Research verdict (from 11-AGENT-VERDICT.md)
-- **D-01:** All 6 agent candidates assessed as SKIP — implement as skills/commands instead (Phase 14)
-- **D-02:** Skills > agents for methodology transfer — superpowers (131k stars) validated this pattern
-- **D-03:** Phase 16 scoped down from "specialized agents" to "autopilot integration"
-- **D-04:** If deliverables are too thin, remaining work merges into Phase 17
+### Merge decision
+- **D-01:** Phase 16 scope merged into Phase 17 — not enough standalone work after Phase 14+15 delivered their features
+- **D-02:** All Phase 16 success criteria become Phase 17 success criteria
 
-### Concrete deliverables
-- **D-05:** Memory injection into autopilot dispatch prompts — relevant memories injected per task type
-- **D-06:** Skill-aware routing logic — select relevant skills per task type during autonomous pipeline
-- **D-07:** Confidence threshold tuning — adjust pipeline depth based on learned patterns from memory
+### Skill routing (moves to Phase 17)
+- **D-03:** Replace `loadSkillContent` (single coding-standards skill) with `loadAdaptiveSkillContext` (all matching skills) in `orchestrate.ts`. Simplest upgrade — every dispatch gets full stack-filtered, dependency-ordered skill context within token budget.
+- **D-04:** No phase-aware skill filtering — all matching skills injected to every dispatch. Simpler, and the token budget enforcement already prevents bloat.
 
-### Quality requirements
-- **D-08:** Must integrate with skills from Phase 14 — autopilot should leverage brainstorming, TDD, debugging skills
-- **D-09:** Must integrate with memory from Phase 15 — autopilot should benefit from learned project patterns
-- **D-10:** Must not regress existing autopilot functionality
+### Memory in dispatch (resolved — no work needed)
+- **D-05:** System prompt injection only. The existing `experimental.chat.system.transform` hook from Phase 15 is sufficient. No memory context in dispatch prompts — agents already get memory via their system prompt.
+- **D-06:** No double-injection risk since dispatch prompts are tool-return instructions, not direct LLM calls.
+
+### Confidence tuning (moves to Phase 17)
+- **D-07:** Memory-based confidence tuning moves to Phase 17 scope — adjust pipeline depth based on learned patterns (e.g., projects that always need thorough review get higher Arena depth).
 
 ### Claude's Discretion
-- How memory injection is structured in dispatch prompts
-- Skill selection algorithm design
-- Confidence threshold calibration values
+- How confidence tuning maps memory patterns to pipeline parameters
+- Whether to expose confidence tuning as user-configurable or fully automatic
 
 </decisions>
-
-<specifics>
-## Specific Ideas
-
-- "A MasterDebugger and Reviewer that do those things perfectly, with proper skills, autonomous flow"
-- "Just a thought, let's actually be critical about it" — user explicitly wants rigor, not assumption
-- If built, these should feel like premium additions, not duplicates of existing functionality
-
-</specifics>
 
 <canonical_refs>
 ## Canonical References
 
 **Downstream agents MUST read these before planning or implementing.**
 
-### Phase 11 research output (agent gap analysis)
-- `.planning/phases/11-ecosystem-research/` — Agent archetype analysis, competitor agent catalogs
+### Phase 14 skill system (what to wire in)
+- `src/skills/adaptive-injector.ts` — `loadAdaptiveSkillContext()` function to replace `loadSkillContent`
+- `src/skills/loader.ts` — `loadAllSkills()` for loading all skill directories
+- `src/skills/dependency-resolver.ts` — Topological sort for skill ordering
 
-### Existing agent system
-- `assets/agents/` — All current bundled agents (what we already have)
-- `src/pipeline/agents/` — Pipeline agent configs and dispatch
-- `src/config.ts` — Config hook agent injection pattern
+### Phase 15 memory system (already integrated)
+- `src/memory/injector.ts` — System prompt injection (already working, no changes needed)
+- `src/memory/retrieval.ts` — `retrieveMemoryContext()` for potential confidence tuning
 
-### Review engine (potential overlap with Reviewer agent)
-- `src/pipeline/review/` — Multi-agent review system already in place
+### Orchestrator (target for changes)
+- `src/tools/orchestrate.ts` — `injectSkillContext()` function to upgrade (line 102-112)
+- `src/orchestrator/skill-injection.ts` — Current single-skill injection pattern
+- `src/orchestrator/confidence/` — Confidence system for tuning
 
 </canonical_refs>
 
 <code_context>
 ## Existing Code Insights
 
-### Reusable Assets
-- Config hook agent injection — established pattern for registering new agents
-- Agent template (`src/templates/agent-template.ts`) — generates agent markdown with frontmatter
-- Pipeline agent configs — pattern for structured agent prompts with Role/Steps/Output/Constraints
-
-### Established Patterns
-- Agent modes: primary (Tab cycle), subagent (@ only), hidden (internal), all (both)
-- YAML frontmatter for agent metadata (model, tools, description)
-- Structured prompt format from Phase 10: Role, Steps, Output Format, Constraints, Error Recovery
+### Key finding: loadAdaptiveSkillContext already exists but isn't wired in
+- `src/orchestrator/skill-injection.ts:69` exports `loadAdaptiveSkillContext` — does stack detection, skill filtering, dependency ordering, token budgeting
+- `src/tools/orchestrate.ts:102-112` still uses the old `loadSkillContent` (single coding-standards skill)
+- The upgrade is literally replacing `loadSkillContent` + `buildSkillContext` with `loadAdaptiveSkillContext`
 
 ### Integration Points
-- Config hook in `src/index.ts` — where new agents get injected
-- Memory system (Phase 15) — agents should read relevant memories
-- Skills system — agents should reference relevant skills in their prompts
+- `src/tools/orchestrate.ts:injectSkillContext()` — replace with adaptive version
+- `src/orchestrator/confidence/` — read memory patterns for tuning (Phase 17 scope)
 
 </code_context>
 
 <deferred>
 ## Deferred Ideas
 
-None — discussion stayed within phase scope
+- **Phase-aware skill filtering** — different pipeline phases get different skills (RECON gets brainstorming, BUILD gets TDD). More sophisticated but not needed for v3.0.
+- **Memory context in dispatch prompts** — add memory alongside skills in dispatch. Currently unnecessary since system prompt hook handles it.
 
 </deferred>
 
 ---
 
-*Phase: 16-specialized-agents*
+*Phase: 16-specialized-agents (MERGED INTO PHASE 17)*
 *Context gathered: 2026-04-02*
