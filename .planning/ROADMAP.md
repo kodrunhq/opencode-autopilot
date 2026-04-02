@@ -165,6 +165,7 @@ Phases execute in numeric order: 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 5. Review Engine | v2.0 | 4/4 | Complete | - |
 | 6. Orchestrator Pipeline | v2.0 | 4/4 | Complete | - |
 | 7. Learning & Resilience | v2.0 | 3/3 | Complete | - |
+| 11. Ecosystem Research | v3.0 | 3/3 | Complete | 2026-04-02 |
 
 ### Phase 8: Testing & CI
 
@@ -216,7 +217,7 @@ Plans:
 
 ### v3.0 Intelligence & Polish
 
-- [ ] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
+- [x] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
 - [ ] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research
 - [ ] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing
 - [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
@@ -236,12 +237,12 @@ Plans:
   3. Memory system patterns analyzed with token-efficiency assessment
   4. Specialized agent archetypes critically evaluated with clear value/no-value determination
   5. Research surfaces gaps we hadn't anticipated (creative, forward-looking analysis)
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed
 
 Plans:
 - [x] 11-01-PLAN.md -- Five competitor deep-dives (GSD, superpowers, OMO, ECC, claude-mem) with feature catalogs
 - [x] 11-02-PLAN.md -- Broader ecosystem scan and novel opportunities analysis
-- [ ] 11-03-PLAN.md -- Gap matrix synthesis, phase scope definitions, memory architecture, agent verdict
+- [x] 11-03-PLAN.md -- Gap matrix synthesis, phase scope definitions, memory architecture, agent verdict
 
 ### Phase 12: Quick Wins & Fixes
 **Goal:** Fix known bugs and small improvements that don't require research or complex architecture
