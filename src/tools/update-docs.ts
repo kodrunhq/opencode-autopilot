@@ -111,7 +111,6 @@ export const ocUpdateDocs = tool({
 			.describe("Scope: 'changed' for git diff, 'all' for full scan"),
 	},
 	async execute(args) {
-		const { getGlobalConfigDir } = await import("../utils/paths");
-		return updateDocsCore(args, getGlobalConfigDir());
+		return updateDocsCore(args, process.cwd());
 	},
 });
