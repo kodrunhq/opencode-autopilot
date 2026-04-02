@@ -36,10 +36,10 @@ describe("plugin entry point", () => {
 		expect(result.tool).toBeDefined();
 	});
 
-	test("tool property contains oc_placeholder", async () => {
+	test("tool property contains oc_configure", async () => {
 		const result = await plugin(mockInput);
-		expect(result.tool?.oc_placeholder).toBeDefined();
-		expect(typeof result.tool?.oc_placeholder.execute).toBe("function");
+		expect(result.tool?.oc_configure).toBeDefined();
+		expect(typeof result.tool?.oc_configure.execute).toBe("function");
 	});
 
 	test("returns event handler function", async () => {
@@ -62,7 +62,7 @@ describe("plugin entry point", () => {
 		expect(result.tool).toBeDefined();
 		const toolNames = [...Object.keys(result.tool ?? {})].sort();
 		const expected = [
-			"oc_placeholder",
+			"oc_configure",
 			"oc_create_agent",
 			"oc_create_skill",
 			"oc_create_command",

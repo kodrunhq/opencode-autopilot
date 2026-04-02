@@ -55,14 +55,14 @@ describe("installAssets", () => {
 
 	test("copies command files", async () => {
 		await writeFile(
-			join(sourceDir, "commands", "configure.md"),
-			"---\ndescription: Configure\n---\nRun oc_configure",
+			join(sourceDir, "commands", "new-agent.md"),
+			"---\ndescription: New Agent\n---\nCreate a new agent",
 		);
 
 		const result = await installAssets(sourceDir, targetDir);
 
-		expect(result.copied).toContain("commands/configure.md");
-		expect(await fileExists(join(targetDir, "commands", "configure.md"))).toBe(true);
+		expect(result.copied).toContain("commands/new-agent.md");
+		expect(await fileExists(join(targetDir, "commands", "new-agent.md"))).toBe(true);
 	});
 
 	test("copies skill directory structure", async () => {

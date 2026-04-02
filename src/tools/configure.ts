@@ -1,0 +1,328 @@
+import type { Config } from "@opencode-ai/plugin";
+import { tool } from "@opencode-ai/plugin";
+import { createDefaultConfig, loadConfig, saveConfig } from "../config";
+import { checkDiversity } from "../registry/diversity";
+import { diagnose } from "../registry/doctor";
+import {
+	AGENT_REGISTRY,
+	ALL_GROUP_IDS,
+	DIVERSITY_RULES,
+	GROUP_DEFINITIONS,
+} from "../registry/model-groups";
+import { extractFamily } from "../registry/resolver";
+import type { DiversityWarning, GroupModelAssignment } from "../registry/types";
+
+// --- Module-level state ---
+
+// Module-level mutable state is intentional: oc_configure is a session-scoped
+// workflow where assignments accumulate across multiple "assign" calls before
+// being persisted by "commit". The Map is cleared on commit and reset.
+
+/**
+ * In-progress group assignments, keyed by GroupId.
+ * Populated by "assign" subcommand, persisted by "commit", cleared by "reset".
+ * Held in memory — configuration is a single-session flow.
+ */
+let pendingAssignments: Map<string, GroupModelAssignment> = new Map();
+
+/**
+ * Reference to the OpenCode host config, set by the plugin's config hook.
+ * Used by "start" subcommand to discover available models.
+ */
+let openCodeConfig: Config | null = null;
+
+// --- Exported helpers for test/plugin wiring ---
+
+export function resetPendingAssignments(): void {
+	pendingAssignments = new Map();
+}
+
+export function setOpenCodeConfig(config: Config | null): void {
+	openCodeConfig = config;
+}
+
+// --- Core logic ---
+
+interface ConfigureArgs {
+	readonly subcommand: "start" | "assign" | "commit" | "doctor" | "reset";
+	readonly group?: string;
+	readonly primary?: string;
+	readonly fallbacks?: string;
+}
+
+function getStringField(obj: Record<string, unknown>, key: string): string | undefined {
+	const val = obj[key];
+	return typeof val === "string" ? val : undefined;
+}
+
+/**
+ * Extract available models from the OpenCode host config, grouped by family.
+ * Returns a map of family -> model IDs.
+ */
+function discoverAvailableModels(config: Config | null): Map<string, string[]> {
+	const modelsByFamily = new Map<string, string[]>();
+	if (!config) return modelsByFamily;
+
+	const configRecord = config as Record<string, unknown>;
+	const seen = new Set<string>();
+
+	// Collect from agent configs
+	const agentConfigs = configRecord.agent;
+	if (agentConfigs && typeof agentConfigs === "object" && agentConfigs !== null) {
+		for (const agentCfg of Object.values(agentConfigs as Record<string, unknown>)) {
+			if (agentCfg && typeof agentCfg === "object" && agentCfg !== null) {
+				const model = getStringField(agentCfg as Record<string, unknown>, "model");
+				if (model && !seen.has(model)) {
+					seen.add(model);
+					const family = extractFamily(model);
+					const list = modelsByFamily.get(family) ?? [];
+					list.push(model);
+					modelsByFamily.set(family, list);
+				}
+			}
+		}
+	}
+
+	// Also include top-level model and small_model
+	const topModel = getStringField(configRecord, "model");
+	const smallModel = getStringField(configRecord, "small_model");
+	for (const m of [topModel, smallModel]) {
+		if (m && !seen.has(m)) {
+			seen.add(m);
+			const family = extractFamily(m);
+			const list = modelsByFamily.get(family) ?? [];
+			list.push(m);
+			modelsByFamily.set(family, list);
+		}
+	}
+
+	return modelsByFamily;
+}
+
+function serializeDiversityWarnings(warnings: readonly DiversityWarning[]): readonly {
+	groups: readonly string[];
+	severity: string;
+	sharedFamily: string;
+	reason: string;
+}[] {
+	return warnings.map((w) => ({
+		groups: w.groups,
+		severity: w.rule.severity,
+		sharedFamily: w.sharedFamily,
+		reason: w.rule.reason,
+	}));
+}
+
+async function handleStart(configPath?: string): Promise<string> {
+	const modelsByFamily = discoverAvailableModels(openCodeConfig);
+
+	// Load current plugin config to show existing assignments
+	const currentConfig = await loadConfig(configPath);
+
+	// Build groups with agents derived from AGENT_REGISTRY
+	const groups = ALL_GROUP_IDS.map((groupId) => {
+		const def = GROUP_DEFINITIONS[groupId];
+		const agents = Object.entries(AGENT_REGISTRY)
+			.filter(([, entry]) => entry.group === groupId)
+			.map(([name]) => name);
+
+		return {
+			id: def.id,
+			label: def.label,
+			purpose: def.purpose,
+			recommendation: def.recommendation,
+			tier: def.tier,
+			order: def.order,
+			agents,
+			currentAssignment: currentConfig?.groups[groupId] ?? null,
+		};
+	});
+
+	return JSON.stringify({
+		action: "configure",
+		stage: "start",
+		availableModels: Object.fromEntries(modelsByFamily),
+		groups,
+		currentConfig: currentConfig
+			? { configured: currentConfig.configured, groups: currentConfig.groups }
+			: null,
+		diversityRules: DIVERSITY_RULES,
+	});
+}
+
+function handleAssign(args: ConfigureArgs): string {
+	const { group, primary, fallbacks: fallbacksStr } = args;
+
+	// Validate group
+	if (!group || !ALL_GROUP_IDS.includes(group as (typeof ALL_GROUP_IDS)[number])) {
+		return JSON.stringify({
+			action: "error",
+			message: `Invalid group: '${group ?? ""}'. Valid groups: ${ALL_GROUP_IDS.join(", ")}`,
+		});
+	}
+
+	// Validate primary
+	if (!primary || primary.trim().length === 0) {
+		return JSON.stringify({
+			action: "error",
+			message: "Primary model is required for assign subcommand.",
+		});
+	}
+
+	const trimmedPrimary = primary.trim();
+
+	// Parse fallbacks
+	const parsedFallbacks = fallbacksStr
+		? fallbacksStr
+				.split(",")
+				.map((s) => s.trim())
+				.filter(Boolean)
+		: [];
+
+	// Store assignment
+	const assignment: GroupModelAssignment = Object.freeze({
+		primary: trimmedPrimary,
+		fallbacks: Object.freeze(parsedFallbacks),
+	});
+	pendingAssignments.set(group, assignment);
+
+	// Run diversity check on all pending assignments
+	const assignmentRecord: Record<string, GroupModelAssignment> =
+		Object.fromEntries(pendingAssignments);
+	const diversityWarnings = serializeDiversityWarnings(checkDiversity(assignmentRecord));
+
+	return JSON.stringify({
+		action: "configure",
+		stage: "assigned",
+		group,
+		primary: trimmedPrimary,
+		fallbacks: parsedFallbacks,
+		assignedCount: pendingAssignments.size,
+		totalGroups: ALL_GROUP_IDS.length,
+		diversityWarnings,
+	});
+}
+
+async function handleCommit(configPath?: string): Promise<string> {
+	// Validate all groups assigned
+	if (pendingAssignments.size < ALL_GROUP_IDS.length) {
+		const assigned = new Set(pendingAssignments.keys());
+		const missing = ALL_GROUP_IDS.filter((id) => !assigned.has(id));
+		return JSON.stringify({
+			action: "error",
+			message: `Cannot commit: ${missing.length} group(s) missing assignments: ${missing.join(", ")}`,
+		});
+	}
+
+	// Load current config or create default
+	const currentConfig = (await loadConfig(configPath)) ?? createDefaultConfig();
+
+	// Build new config — convert readonly fallbacks to mutable for Zod schema compatibility
+	const groupsRecord: Record<string, { primary: string; fallbacks: string[] }> = {};
+	for (const [key, val] of pendingAssignments) {
+		groupsRecord[key] = { primary: val.primary, fallbacks: [...val.fallbacks] };
+	}
+	const newConfig = {
+		...currentConfig,
+		version: 4 as const,
+		configured: true,
+		groups: groupsRecord,
+		overrides: currentConfig.overrides ?? {},
+	};
+
+	// Save
+	await saveConfig(newConfig, configPath);
+
+	// Clear pending
+	const savedGroups = { ...groupsRecord };
+	pendingAssignments.clear();
+
+	// Final diversity check
+	const diversityWarnings = serializeDiversityWarnings(checkDiversity(savedGroups));
+
+	return JSON.stringify({
+		action: "configure",
+		stage: "committed",
+		groups: savedGroups,
+		diversityWarnings,
+		configPath: configPath ?? "~/.config/opencode/opencode-autopilot.json",
+	});
+}
+
+async function handleDoctor(configPath?: string): Promise<string> {
+	const config = await loadConfig(configPath);
+	const result = diagnose(config);
+
+	return JSON.stringify({
+		action: "configure",
+		stage: "doctor",
+		checks: {
+			configExists: result.configExists,
+			schemaValid: result.schemaValid,
+			configured: result.configured,
+			groupsAssigned: result.groupsAssigned,
+		},
+		diversityWarnings: serializeDiversityWarnings(result.diversityWarnings),
+		allPassed: result.allPassed,
+	});
+}
+
+function handleReset(): string {
+	pendingAssignments.clear();
+	return JSON.stringify({
+		action: "configure",
+		stage: "reset",
+		message: "All in-progress assignments cleared.",
+	});
+}
+
+// --- Public API ---
+
+export async function configureCore(args: ConfigureArgs, configPath?: string): Promise<string> {
+	switch (args.subcommand) {
+		case "start":
+			return handleStart(configPath);
+		case "assign":
+			return handleAssign(args);
+		case "commit":
+			return handleCommit(configPath);
+		case "doctor":
+			return handleDoctor(configPath);
+		case "reset":
+			return handleReset();
+		default:
+			return JSON.stringify({
+				action: "error",
+				message: `Unknown subcommand: '${args.subcommand}'`,
+			});
+	}
+}
+
+// --- Tool wrapper ---
+
+export const ocConfigure = tool({
+	description:
+		"Configure model assignments for opencode-autopilot agent groups. " +
+		"Subcommands: start (discover models), assign (set group model), " +
+		"commit (persist), doctor (diagnose), reset (clear in-progress).",
+	args: {
+		subcommand: tool.schema
+			.enum(["start", "assign", "commit", "doctor", "reset"])
+			.describe("Action to perform"),
+		group: tool.schema
+			.string()
+			.optional()
+			.describe("Group ID for assign subcommand (e.g. 'architects')"),
+		primary: tool.schema
+			.string()
+			.optional()
+			.describe("Primary model ID for assign subcommand (e.g. 'anthropic/claude-opus-4-6')"),
+		fallbacks: tool.schema
+			.string()
+			.optional()
+			.describe("Comma-separated fallback model IDs for assign subcommand"),
+	},
+	async execute(args) {
+		return configureCore(args);
+	},
+});

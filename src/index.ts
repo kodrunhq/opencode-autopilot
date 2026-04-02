@@ -12,13 +12,13 @@ import {
 import { fallbackDefaults } from "./orchestrator/fallback/fallback-config";
 import { resolveChain } from "./orchestrator/fallback/resolve-chain";
 import { ocConfidence } from "./tools/confidence";
+import { ocConfigure, setOpenCodeConfig } from "./tools/configure";
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
 import { ocForensics } from "./tools/forensics";
 import { ocOrchestrate } from "./tools/orchestrate";
 import { ocPhase } from "./tools/phase";
-import { ocPlaceholder } from "./tools/placeholder";
 import { ocPlan } from "./tools/plan";
 import { ocReview } from "./tools/review";
 import { ocState } from "./tools/state";
@@ -77,7 +77,9 @@ const plugin: Plugin = async (input) => {
 			const agentConfigs = openCodeConfig?.agent as
 				| Record<string, Record<string, unknown>>
 				| undefined;
-			return resolveChain(agentName ?? "", agentConfigs, config?.fallback_models);
+			// Per-agent fallback_models are populated by configHook from group/override config.
+			// resolveChain reads config.agent[agentName].fallback_models (tier 1).
+			return resolveChain(agentName ?? "", agentConfigs, undefined);
 		},
 	});
 
@@ -91,7 +93,7 @@ const plugin: Plugin = async (input) => {
 
 	return {
 		tool: {
-			oc_placeholder: ocPlaceholder,
+			oc_configure: ocConfigure,
 			oc_create_agent: ocCreateAgent,
 			oc_create_skill: ocCreateSkill,
 			oc_create_command: ocCreateCommand,
@@ -105,8 +107,11 @@ const plugin: Plugin = async (input) => {
 		},
 		event: async ({ event }) => {
 			if (event.type === "session.created" && isFirstLoad(config)) {
-				// First load: config wizard will be triggered via /configure command
-				// Phase 2 will add the oc_configure tool
+				await sdkOps.showToast(
+					"Welcome to OpenCode Autopilot!",
+					"Run /oc-configure to set up your model assignments for each agent group.",
+					"info",
+				);
 			}
 
 			// Fallback event handling (runs for all events)
@@ -116,6 +121,7 @@ const plugin: Plugin = async (input) => {
 		},
 		config: async (cfg: Config) => {
 			openCodeConfig = cfg;
+			setOpenCodeConfig(cfg);
 			await configHook(cfg);
 		},
 		"chat.message": async (

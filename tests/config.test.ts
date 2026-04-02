@@ -3,7 +3,13 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createDefaultConfig, isFirstLoad, loadConfig, saveConfig } from "../src/config";
+import {
+	createDefaultConfig,
+	isFirstLoad,
+	loadConfig,
+	type PluginConfig,
+	saveConfig,
+} from "../src/config";
 
 describe("isFirstLoad", () => {
 	test("returns true when config is null", () => {
@@ -20,9 +26,9 @@ describe("isFirstLoad", () => {
 		expect(isFirstLoad(config)).toBe(false);
 	});
 
-	test("works with v3 configs (configured:false returns true)", () => {
+	test("works with v4 configs (configured:false returns true)", () => {
 		const config = createDefaultConfig();
-		expect(config.version).toBe(3);
+		expect(config.version).toBe(4);
 		expect(isFirstLoad(config)).toBe(true);
 
 		const configured = { ...config, configured: true };
@@ -31,11 +37,12 @@ describe("isFirstLoad", () => {
 });
 
 describe("createDefaultConfig", () => {
-	test("returns v3 config with version:3", () => {
+	test("returns v4 config with version:4", () => {
 		const config = createDefaultConfig();
-		expect(config.version).toBe(3);
+		expect(config.version).toBe(4);
 		expect(config.configured).toBe(false);
-		expect(config.models).toEqual({});
+		expect(config.groups).toEqual({});
+		expect(config.overrides).toEqual({});
 	});
 
 	test("orchestrator defaults: autonomy full, strictness normal, all phases true", () => {
@@ -85,9 +92,11 @@ describe("saveConfig and loadConfig round-trip", () => {
 
 		const raw = await readFile(configPath, "utf-8");
 		const parsed = JSON.parse(raw);
-		expect(parsed.version).toBe(3);
+		expect(parsed.version).toBe(4);
 		expect(parsed.orchestrator).toBeDefined();
 		expect(parsed.fallback).toBeDefined();
+		expect(parsed.groups).toBeDefined();
+		expect(parsed.overrides).toBeDefined();
 
 		const loaded = await loadConfig(configPath);
 		expect(loaded).toEqual(config);
@@ -115,7 +124,7 @@ describe("saveConfig and loadConfig round-trip", () => {
 	});
 });
 
-describe("v1 to v3 migration", () => {
+describe("v1 to v4 migration", () => {
 	let tempDir: string;
 	let configPath: string;
 
@@ -129,7 +138,7 @@ describe("v1 to v3 migration", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("loadConfig on a v1 JSON file returns v3 config with migrated defaults", async () => {
+	test("loadConfig on a v1 JSON file returns v4 config with migrated defaults", async () => {
 		const v1Config = {
 			version: 1,
 			configured: true,
@@ -139,9 +148,11 @@ describe("v1 to v3 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result?.version).toBe(3);
+		expect(result?.version).toBe(4);
 		expect(result?.configured).toBe(true);
-		expect(result?.models).toEqual({ default: "gpt-4" });
+		// "default" is not in AGENT_REGISTRY, so it becomes an override
+		expect(result?.overrides.default).toBeDefined();
+		expect(result?.overrides.default.primary).toBe("gpt-4");
 		expect(result?.orchestrator.autonomy).toBe("full");
 		expect(result?.orchestrator.strictness).toBe("normal");
 		expect(result?.confidence.enabled).toBe(true);
@@ -151,21 +162,23 @@ describe("v1 to v3 migration", () => {
 		expect(result?.fallback.maxFallbackAttempts).toBe(10);
 	});
 
-	test("loadConfig on a v1 JSON file writes migrated v3 back to disk", async () => {
+	test("loadConfig on a v1 JSON file writes migrated v4 back to disk", async () => {
 		const v1Config = { version: 1, configured: true, models: {} };
 		await writeFile(configPath, JSON.stringify(v1Config), "utf-8");
 
 		await loadConfig(configPath);
 
 		const raw = JSON.parse(await readFile(configPath, "utf-8"));
-		expect(raw.version).toBe(3);
+		expect(raw.version).toBe(4);
 		expect(raw.orchestrator).toBeDefined();
 		expect(raw.confidence).toBeDefined();
 		expect(raw.fallback).toBeDefined();
+		expect(raw.groups).toBeDefined();
+		expect(raw.overrides).toBeDefined();
 	});
 });
 
-describe("v2 to v3 migration", () => {
+describe("v2 to v4 migration", () => {
 	let tempDir: string;
 	let configPath: string;
 
@@ -179,7 +192,7 @@ describe("v2 to v3 migration", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("loadConfig on a v2 JSON file returns v3 config with fallback defaults", async () => {
+	test("loadConfig on a v2 JSON file returns v4 config with fallback defaults", async () => {
 		const v2Config = {
 			version: 2,
 			configured: true,
@@ -207,7 +220,7 @@ describe("v2 to v3 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result?.version).toBe(3);
+		expect(result?.version).toBe(4);
 		expect(result?.orchestrator.autonomy).toBe("supervised");
 		expect(result?.orchestrator.strictness).toBe("strict");
 		expect(result?.orchestrator.phases.challenge).toBe(false);
@@ -218,9 +231,11 @@ describe("v2 to v3 migration", () => {
 		expect(result?.fallback.maxFallbackAttempts).toBe(10);
 		expect(result?.fallback.cooldownSeconds).toBe(60);
 		expect(result?.fallback.timeoutSeconds).toBe(30);
+		expect(result?.groups).toEqual({});
+		expect(result?.overrides).toEqual({});
 	});
 
-	test("loadConfig on a v2 JSON file writes migrated v3 back to disk", async () => {
+	test("loadConfig on a v2 JSON file writes migrated v4 back to disk", async () => {
 		const v2Config = {
 			version: 2,
 			configured: true,
@@ -249,13 +264,15 @@ describe("v2 to v3 migration", () => {
 		await loadConfig(configPath);
 
 		const raw = JSON.parse(await readFile(configPath, "utf-8"));
-		expect(raw.version).toBe(3);
+		expect(raw.version).toBe(4);
 		expect(raw.fallback).toBeDefined();
 		expect(raw.fallback.enabled).toBe(true);
+		expect(raw.groups).toBeDefined();
+		expect(raw.overrides).toBeDefined();
 	});
 });
 
-describe("v3 direct load", () => {
+describe("v3 migration to v4", () => {
 	let tempDir: string;
 	let configPath: string;
 
@@ -269,7 +286,7 @@ describe("v3 direct load", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("loadConfig on a v3 JSON file returns v3 config directly", async () => {
+	test("loadConfig on a v3 JSON file returns v4 config with migration", async () => {
 		const v3Config = {
 			version: 3,
 			configured: true,
@@ -306,10 +323,307 @@ describe("v3 direct load", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result?.version).toBe(3);
+		expect(result?.version).toBe(4);
 		expect(result?.fallback.enabled).toBe(false);
 		expect(result?.fallback.retryOnErrors).toEqual([429]);
 		expect(result?.fallback.maxFallbackAttempts).toBe(5);
+		// "default" not in registry, becomes override
+		expect(result?.overrides.default).toBeDefined();
+		expect(result?.overrides.default.primary).toBe("gpt-4");
+	});
+});
+
+describe("v3 to v4 migration", () => {
+	let tempDir: string;
+	let configPath: string;
+
+	beforeEach(async () => {
+		tempDir = join(tmpdir(), `opencode-config-v3v4-migration-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+		configPath = join(tempDir, "opencode-autopilot.json");
+	});
+
+	afterEach(async () => {
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("loadConfig on a v3 JSON file returns v4 config with groups", async () => {
+		const v3Config = {
+			version: 3,
+			configured: true,
+			models: {
+				"oc-architect": "anthropic/claude-opus-4-6",
+				"oc-planner": "anthropic/claude-opus-4-6",
+				"oc-implementer": "openai/gpt-5.4",
+			},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				retryOnErrors: [429],
+				retryableErrorPatterns: [],
+				maxFallbackAttempts: 10,
+				cooldownSeconds: 60,
+				timeoutSeconds: 30,
+				notifyOnFallback: true,
+			},
+		};
+		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
+
+		const result = await loadConfig(configPath);
+		expect(result).not.toBeNull();
+		expect(result!.version).toBe(4);
+		expect(result!.configured).toBe(true);
+		// oc-architect and oc-planner are both "architects" group with same model
+		expect(result!.groups.architects).toBeDefined();
+		expect(result!.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
+		// oc-implementer is "builders" group
+		expect(result!.groups.builders).toBeDefined();
+		expect(result!.groups.builders.primary).toBe("openai/gpt-5.4");
+	});
+
+	test("v3 agents with different models in same group become overrides", async () => {
+		const v3Config = {
+			version: 3,
+			configured: true,
+			models: {
+				"oc-architect": "anthropic/claude-opus-4-6",
+				"oc-planner": "openai/gpt-5.4", // different from oc-architect, same group
+			},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				retryOnErrors: [429],
+				retryableErrorPatterns: [],
+				maxFallbackAttempts: 10,
+				cooldownSeconds: 60,
+				timeoutSeconds: 30,
+				notifyOnFallback: true,
+			},
+		};
+		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
+
+		const result = await loadConfig(configPath);
+		expect(result!.version).toBe(4);
+		// First agent sets group primary, second becomes override
+		expect(result!.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
+		expect(result!.overrides["oc-planner"]).toBeDefined();
+		expect(result!.overrides["oc-planner"].primary).toBe("openai/gpt-5.4");
+	});
+
+	test("v3 fallback_models string migrates to per-group fallbacks", async () => {
+		const v3Config = {
+			version: 3,
+			configured: true,
+			models: { "oc-architect": "anthropic/claude-opus-4-6" },
+			fallback_models: "openai/gpt-5.4",
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				retryOnErrors: [429],
+				retryableErrorPatterns: [],
+				maxFallbackAttempts: 10,
+				cooldownSeconds: 60,
+				timeoutSeconds: 30,
+				notifyOnFallback: true,
+			},
+		};
+		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
+
+		const result = await loadConfig(configPath);
+		expect(result!.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
+	});
+
+	test("v3 fallback_models array migrates to per-group fallbacks", async () => {
+		const v3Config = {
+			version: 3,
+			configured: true,
+			models: { "oc-implementer": "anthropic/claude-opus-4-6" },
+			fallback_models: ["openai/gpt-5.4", "google/gemini-3.1-pro"],
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				retryOnErrors: [429],
+				retryableErrorPatterns: [],
+				maxFallbackAttempts: 10,
+				cooldownSeconds: 60,
+				timeoutSeconds: 30,
+				notifyOnFallback: true,
+			},
+		};
+		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
+
+		const result = await loadConfig(configPath);
+		expect(result!.groups.builders.fallbacks).toEqual(["openai/gpt-5.4", "google/gemini-3.1-pro"]);
+	});
+
+	test("v3 config writes migrated v4 back to disk", async () => {
+		const v3Config = {
+			version: 3,
+			configured: true,
+			models: {},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				retryOnErrors: [429],
+				retryableErrorPatterns: [],
+				maxFallbackAttempts: 10,
+				cooldownSeconds: 60,
+				timeoutSeconds: 30,
+				notifyOnFallback: true,
+			},
+		};
+		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
+		await loadConfig(configPath);
+
+		const raw = JSON.parse(await readFile(configPath, "utf-8"));
+		expect(raw.version).toBe(4);
+		expect(raw.groups).toBeDefined();
+		expect(raw.overrides).toBeDefined();
+	});
+});
+
+describe("v4 direct load", () => {
+	let tempDir: string;
+	let configPath: string;
+
+	beforeEach(async () => {
+		tempDir = join(tmpdir(), `opencode-config-v4-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+		configPath = join(tempDir, "opencode-autopilot.json");
+	});
+
+	afterEach(async () => {
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("loadConfig on a v4 JSON file returns v4 config directly", async () => {
+		const v4Config = {
+			version: 4,
+			configured: true,
+			groups: {
+				architects: { primary: "anthropic/claude-opus-4-6", fallbacks: ["openai/gpt-5.4"] },
+			},
+			overrides: {},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				retryOnErrors: [429],
+				retryableErrorPatterns: [],
+				maxFallbackAttempts: 10,
+				cooldownSeconds: 60,
+				timeoutSeconds: 30,
+				notifyOnFallback: true,
+			},
+		};
+		await writeFile(configPath, JSON.stringify(v4Config), "utf-8");
+
+		const result = await loadConfig(configPath);
+		expect(result!.version).toBe(4);
+		expect(result!.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
+		expect(result!.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
+	});
+
+	test("createDefaultConfig returns v4 with empty groups", () => {
+		const config = createDefaultConfig();
+		expect(config.version).toBe(4);
+		expect(config.configured).toBe(false);
+		expect(config.groups).toEqual({});
+		expect(config.overrides).toEqual({});
+	});
+
+	test("v1 → v2 → v3 → v4 full chain migration works", async () => {
+		const v1Config = { version: 1, configured: true, models: { default: "gpt-4" } };
+		await writeFile(configPath, JSON.stringify(v1Config), "utf-8");
+
+		const result = await loadConfig(configPath);
+		expect(result!.version).toBe(4);
+		expect(result!.configured).toBe(true);
+		expect(result!.groups).toBeDefined();
+		expect(result!.overrides).toBeDefined();
 	});
 });
 
