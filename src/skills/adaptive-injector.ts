@@ -39,20 +39,18 @@ const MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze
  * Complements detectStackTags (which works on file paths from git diff).
  */
 export async function detectProjectStackTags(projectRoot: string): Promise<readonly string[]> {
-	const tags = new Set<string>();
-
-	await Promise.all(
+	const results = await Promise.all(
 		Object.entries(MANIFEST_TAGS).map(async ([manifest, manifestTags]) => {
 			try {
 				await access(join(projectRoot, manifest));
-				for (const tag of manifestTags) tags.add(tag);
+				return [...manifestTags];
 			} catch {
-				/* file doesn't exist — skip */
+				return [];
 			}
 		}),
 	);
 
-	return [...tags];
+	return [...new Set(results.flat())];
 }
 
 /**

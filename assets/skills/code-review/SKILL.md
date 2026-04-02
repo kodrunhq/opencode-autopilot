@@ -165,7 +165,7 @@ Every comment should include:
 
 ### Automated Review with oc_review
 
-Use `oc_review` for automated multi-agent code review. The review engine runs 13 specialist agents in parallel covering:
+Use `oc_review` for automated multi-agent code review. The review engine runs up to 21 specialist agents (universal + stack-gated) covering:
 
 - Logic correctness and edge cases
 - Security vulnerabilities and input validation

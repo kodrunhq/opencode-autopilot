@@ -37,6 +37,15 @@ describe("resolveDependencyOrder", () => {
 		]);
 		const result = resolveDependencyOrder(skills);
 		expect(result.cycles.length).toBeGreaterThan(0);
+		// Cycle detection reports the entry point node(s) — at minimum "a" is detected
+		expect(result.cycles).toContain("a");
+	});
+
+	it("detects self-referencing cycles", () => {
+		const skills = new Map([["a", { requires: ["a"] }]]);
+		const result = resolveDependencyOrder(skills);
+		expect(result.cycles.length).toBeGreaterThan(0);
+		expect(result.cycles).toContain("a");
 	});
 
 	it("handles chain dependencies", () => {

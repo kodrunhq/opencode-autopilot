@@ -49,6 +49,17 @@ describe("stocktakeCore", () => {
 		expect(parsed.skills[0].lint.valid).toBe(true);
 	});
 
+	it("reports lint failures for invalid assets", async () => {
+		// Write an invalid skill (missing name field)
+		await writeFile(
+			join(tempDir, "skills", "my-skill", "SKILL.md"),
+			"---\ndescription: Missing name\nstacks: []\nrequires: []\n---\n# Content",
+		);
+		const result = await stocktakeCore({ lint: true }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.skills[0].lint.valid).toBe(false);
+	});
+
 	it("handles empty directories gracefully", async () => {
 		const emptyDir = await mkdtemp(join(tmpdir(), "oc-test-empty-"));
 		const result = await stocktakeCore({ lint: false }, emptyDir);

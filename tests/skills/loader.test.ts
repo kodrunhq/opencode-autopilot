@@ -65,8 +65,7 @@ stacks:
 ---`;
 
 		const result = parseSkillFrontmatter(content);
-		// Should return null or parse gracefully
-		expect(result === null || typeof result === "object").toBe(true);
+		expect(result).toBeNull();
 	});
 });
 
