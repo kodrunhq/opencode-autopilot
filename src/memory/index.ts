@@ -2,6 +2,7 @@ export { createMemoryCaptureHandler, type MemoryCaptureDeps } from "./capture";
 export * from "./constants";
 export { closeMemoryDb, getMemoryDb, initMemoryDb } from "./database";
 export { computeRelevanceScore, pruneStaleObservations } from "./decay";
+export { createMemoryInjector, type MemoryInjectorConfig } from "./injector";
 export { computeProjectKey } from "./project-key";
 export {
 	deleteObservation,

@@ -59,7 +59,7 @@ describe("CLI install", () => {
 		await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
 
 		const config = JSON.parse(await readFile(configPath, "utf-8"));
-		expect(config.version).toBe(4);
+		expect(config.version).toBe(5);
 		expect(config.configured).toBe(false);
 		expect(config.groups).toEqual({});
 	});

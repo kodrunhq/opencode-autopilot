@@ -172,9 +172,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 9. Model Fallback Integration | v2.0 | 3/3 | Complete | - |
 | 10. UX Polish & Metaprompting | v2.0 | 4/4 | Complete | - |
 | 11. Ecosystem Research | v3.0 | 3/3 | Complete | 2026-04-02 |
-| 12. Quick Wins & Fixes | v3.0 | 3/3 | Complete | 2026-04-02 |
-| 13. Session Observability | v3.0 | 5/5 | Complete | 2026-04-02 |
-| 14. Skills & Commands | v3.0 | 6/6 | Complete | 2026-04-02 |
 
 ### Phase 8: Testing & CI
 
@@ -229,8 +226,8 @@ Plans:
 - [x] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
 - [x] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research (completed 2026-04-02)
 - [x] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing (completed 2026-04-02)
-- [x] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.) (completed 2026-04-02)
-- [ ] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval
+- [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
+- [x] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval (completed 2026-04-02)
 - [ ] **Phase 16: Autopilot Integration (Skills + Memory)** - Integrate new skills/commands and memory capabilities into the existing Autopilot; no new dedicated agents
 - [ ] **Phase 17: Integration & Polish** - Cross-feature integration, high-value hooks, final production polish
 
@@ -298,19 +295,14 @@ Plans:
 ### Phase 15: Memory System
 **Goal:** Smart dual-scope memory system that learns project patterns and user preferences, stored globally with relevance-scored retrieval — the plugin gets better the more you use it
 **Depends on:** Phase 11 (research informs architecture)
-**Requirements:** MEM-01, MEM-02, MEM-03, MEM-04, MEM-05
+**Requirements:** TBD
 **Success Criteria** (what must be TRUE):
   1. Project-level memories capture coding conventions, architecture decisions, and codebase patterns
   2. User-level memories capture workflow preferences and communication style across all projects
   3. All memory stored in ~/.config/opencode/memory/ — never in project repos
   4. Relevance scoring injects only top-N relevant memories into context, keeping token usage lean
   5. Memory demonstrably improves agent behavior over multiple sessions
-**Plans:** 3 plans
-
-Plans:
-- [ ] 15-01-PLAN.md -- Storage layer: SQLite database with FTS5, schemas, types, repository CRUD, project-key hashing
-- [ ] 15-02-PLAN.md -- Capture and retrieval: event subscriber, decay scoring, 3-layer progressive disclosure
-- [ ] 15-03-PLAN.md -- Integration: config v5, system prompt injection, oc_memory_status tool, index.ts wiring
+**Plans:** 1/1 plans complete
 
 ### Phase 16: Autopilot Integration (Skills + Memory)
 **Goal:** Integrate new skills/commands (Phase 14) and memory capabilities (Phase 15) into the existing Autopilot agent — no new dedicated agents (Phase 11 research concluded skills > agents for all candidates)

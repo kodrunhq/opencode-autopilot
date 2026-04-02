@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
 status: Phase complete — ready for verification
-stopped_at: Completed 15-02-PLAN.md
-last_updated: "2026-04-02T20:39:17.721Z"
+stopped_at: Completed 15-03-PLAN.md
+last_updated: "2026-04-02T20:52:39.253Z"
 progress:
   total_phases: 10
   completed_phases: 10
@@ -69,7 +69,7 @@ Plan: 3 of 3 (all complete)
 | Phase 12-quick-wins P02 | 4min | 2 tasks | 11 files |
 | Phase 13-session-observability P04 | 9min | 2 tasks | 10 files |
 | Phase 14-skills-commands P06 | 3min | 2 tasks | 7 files |
-| Phase 15-memory-system P02 | 6m30s | 2 tasks | 7 files |
+| Phase 15 P03 | 10min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -153,9 +153,9 @@ Recent decisions affecting current work:
 - [Phase 13-session-observability]: SessionEvents-to-SessionLog adapter filters ObservabilityEvent types to schema-valid subset (fallback/error/decision/model_switch)
 - [Phase 14-skills-commands]: Manifest-based stack detection complements file-path detection for skill filtering
 - [Phase 14-skills-commands]: Token budget default 8000 tokens for multi-skill context injection
-- [Phase 15-memory-system]: Event capture uses app.decision and app.phase_transition event types for pipeline events, session.error for hook errors
-- [Phase 15-memory-system]: Noisy events filtered via whitelist (CAPTURE_EVENT_TYPES set) for safety
-- [Phase 15-memory-system]: buildMemoryContext sorts internally for defensive correctness even if caller pre-sorts
+- [Phase 15]: Per-session cache in injector avoids repeated DB reads within a session
+- [Phase 15]: Config v5 migration chain preserves all v4 fields, adds memory defaults
+- [Phase 15]: Memory capture positioned as event hook step 2 (after observability, before toast)
 
 ### Pending Todos
 
@@ -169,6 +169,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T20:39:17.719Z
-Stopped at: Completed 15-02-PLAN.md
+Last session: 2026-04-02T20:52:39.250Z
+Stopped at: Completed 15-03-PLAN.md
 Resume file: None
