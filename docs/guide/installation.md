@@ -88,9 +88,16 @@ This registers the plugin in opencode.json and creates a starter config.
 
 ### Step 3: Configure model assignments
 
-Tell the user that `/oc-configure` walks through 8 agent groups.
+Tell the user that `/oc-configure` walks through 8 agent groups
+and collects an **ordered list of models** for each (primary + fallbacks).
 
-The /oc-configure command will walk through 8 agent groups:
+> **Important:** `/oc-configure` is a slash command inside the OpenCode
+> TUI. Do NOT try to run it as a shell command. The user must restart
+> OpenCode after installing the plugin, then type `/oc-configure` in
+> the OpenCode chat.
+
+The `/oc-configure` command presents ALL available models as a numbered
+list, then walks through 8 agent groups:
 
 1. **Architects** — System design, planning, orchestration
    - Agents: oc-architect, oc-planner, autopilot
@@ -127,7 +134,11 @@ The /oc-configure command will walk through 8 agent groups:
    - Agents: oc-explorer, metaprompter, pr-reviewer
    - Recommendation: Fastest/cheapest model
 
-For each group, the user picks a primary model and optional fallbacks.
+For each group, the user picks an **ordered list of models**:
+- First model = primary (used by default)
+- Remaining models = fallbacks (tried in order when primary fails/rate-limits)
+- Minimum 1, recommended 2-3 per group
+- Fallbacks are the core feature — more fallbacks = more resilience
 
 ### Step 4: Verify setup
 
