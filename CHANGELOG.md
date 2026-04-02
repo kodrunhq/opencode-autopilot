@@ -5,6 +5,11 @@
 
 ### Features
 
+* **17-01:** wire adaptive skill routing into orchestrator dispatch (replaces single coding-standards injection)
+* **17-01:** add memory-based confidence tuning for Arena debate depth
+* **17-02:** add cross-feature integration tests (orchestrator + skills + memory)
+* **17-02:** add config migration chain v1-v5 integration test
+* **17-03:** update CLAUDE.md with memory, observability, and skills documentation
 * **15-01:** add memory schemas, types, constants, and project-key module ([5f77e6a](https://github.com/kodrunhq/opencode-autopilot/commit/5f77e6a5a6819484a8d1c23065d2d44659e42976))
 * **15-01:** add memory schemas, types, constants, and project-key module ([ab1150e](https://github.com/kodrunhq/opencode-autopilot/commit/ab1150ef0b53b48483ae156881ac8d2ee5e90281))
 * **15-01:** add SQLite database singleton with FTS5 and repository CRUD ([bd588b8](https://github.com/kodrunhq/opencode-autopilot/commit/bd588b8623a21dfe89f9b1821d1894577be146f6))
@@ -14,6 +19,35 @@
 * **15-03:** add memory injector and oc_memory_status tool ([e4ccd2a](https://github.com/kodrunhq/opencode-autopilot/commit/e4ccd2a82968c6213a64459ef840bb59e0db6543))
 * **15-03:** config v5 with memory section and index.ts wiring ([1ce8bc9](https://github.com/kodrunhq/opencode-autopilot/commit/1ce8bc9d63982207414854f91fb0cb1fdcc9547e))
 * Phase 15 — smart memory system with SQLite, FTS5, and relevance-scored retrieval ([c8be170](https://github.com/kodrunhq/opencode-autopilot/commit/c8be17063c00edb6f87b6d3c2e627da68a0b5eae))
+
+### Phase 15 (Memory System)
+
+* Smart dual-scope memory with project patterns and user preferences
+* bun:sqlite with FTS5 for full-text search
+* 3-layer progressive disclosure retrieval with token budgeting
+* System prompt injection via experimental.chat.system.transform hook
+* Relevance scoring with configurable 90-day half-life decay
+
+### Phase 14 (Skills and Commands)
+
+* 22 new skills covering brainstorming, TDD, debugging, planning, code review, and language patterns
+* Adaptive skill injection with stack detection, dependency resolution, and token budgeting
+* Thin wrapper commands for brainstorm, tdd, and write-plan
+* Asset linter, stocktake tool, and update-docs tool
+* Skill template with stacks/requires metadata
+
+### Phase 13 (Session Observability)
+
+* Structured event logging with JSON persistence
+* Token tracking and context monitoring
+* Session summaries and pipeline reports
+* Time-based log retention (30-day default)
+* Mock provider for fallback chain testing
+
+### Phase 12 (Quick Wins)
+
+* Self-healing oc_doctor tool with plugin diagnostics
+* Quick mode and Zen display fix
 
 
 ### Bug Fixes
