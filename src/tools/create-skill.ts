@@ -11,6 +11,8 @@ interface CreateSkillArgs {
 	readonly description: string;
 	readonly license?: string;
 	readonly compatibility?: string;
+	readonly stacks?: readonly string[];
+	readonly requires?: readonly string[];
 }
 
 export async function createSkillCore(args: CreateSkillArgs, baseDir: string): Promise<string> {
@@ -27,6 +29,8 @@ export async function createSkillCore(args: CreateSkillArgs, baseDir: string): P
 		description: args.description,
 		license: args.license,
 		compatibility: args.compatibility,
+		stacks: args.stacks,
+		requires: args.requires,
 	});
 
 	try {
@@ -67,6 +71,14 @@ export const ocCreateSkill = tool({
 			.max(64)
 			.optional()
 			.describe("Compatibility (e.g., 'opencode')"),
+		stacks: tool.schema
+			.array(tool.schema.string())
+			.optional()
+			.describe("Stack tags for adaptive loading (e.g., ['typescript', 'bun'])"),
+		requires: tool.schema
+			.array(tool.schema.string())
+			.optional()
+			.describe("Required skill dependencies (e.g., ['coding-standards'])"),
 	},
 	async execute(args) {
 		return createSkillCore(args, getGlobalConfigDir());
