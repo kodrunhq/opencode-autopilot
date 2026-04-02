@@ -1,8 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-	ContextMonitor,
-	checkContextUtilization,
-} from "../../src/observability/context-monitor";
+import { ContextMonitor, checkContextUtilization } from "../../src/observability/context-monitor";
 
 describe("checkContextUtilization", () => {
 	it("returns shouldWarn=true when >= 0.80 and not already warned", () => {

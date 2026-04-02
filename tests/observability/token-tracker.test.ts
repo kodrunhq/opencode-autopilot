@@ -46,7 +46,12 @@ describe("accumulateTokens", () => {
 	it("accumulates multiple rounds correctly", () => {
 		const a = createEmptyTokenAggregate();
 		const b = accumulateTokens(a, { inputTokens: 100, totalCost: 0.01, messageCount: 1 });
-		const c = accumulateTokens(b, { inputTokens: 200, outputTokens: 75, totalCost: 0.02, messageCount: 1 });
+		const c = accumulateTokens(b, {
+			inputTokens: 200,
+			outputTokens: 75,
+			totalCost: 0.02,
+			messageCount: 1,
+		});
 
 		expect(c.inputTokens).toBe(300);
 		expect(c.outputTokens).toBe(75);

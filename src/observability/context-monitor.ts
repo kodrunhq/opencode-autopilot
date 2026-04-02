@@ -11,7 +11,7 @@
  */
 
 /** Threshold at which context utilization triggers a warning (80%). */
-const CONTEXT_WARNING_THRESHOLD = 0.80;
+const CONTEXT_WARNING_THRESHOLD = 0.8;
 
 /**
  * Result of a context utilization check.
@@ -77,20 +77,13 @@ export class ContextMonitor {
 	 * Checks context utilization for a session and updates warned state.
 	 * Returns utilization 0 for unknown sessions.
 	 */
-	processMessage(
-		sessionID: string,
-		inputTokens: number,
-	): ContextUtilizationResult {
+	processMessage(sessionID: string, inputTokens: number): ContextUtilizationResult {
 		const state = this.sessions.get(sessionID);
 		if (!state) {
 			return { utilization: 0, shouldWarn: false };
 		}
 
-		const result = checkContextUtilization(
-			inputTokens,
-			state.contextLimit,
-			state.warned,
-		);
+		const result = checkContextUtilization(inputTokens, state.contextLimit, state.warned);
 
 		// Update warned flag if warning triggered (one-time per session)
 		if (result.shouldWarn) {
