@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { initMemoryDb } from "../../src/memory/database";
 import { createMemoryInjector } from "../../src/memory/injector";
 import { computeProjectKey } from "../../src/memory/project-key";
-import { insertObservation, upsertPreference, upsertProject } from "../../src/memory/repository";
+import { insertObservation, upsertProject } from "../../src/memory/repository";
 
 const PROJECT_PATH = "/tmp/test-project";
 const PROJECT_KEY = computeProjectKey(PROJECT_PATH);

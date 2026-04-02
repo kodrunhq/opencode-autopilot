@@ -44,7 +44,7 @@ interface MemoryStatusResult {
  * Accepts a Database instance for testability (or uses the singleton).
  */
 export function memoryStatusCore(
-	args: { readonly detail?: "summary" | "full" },
+	_args: { readonly detail?: "summary" | "full" },
 	dbOrPath?: Database | string,
 ): MemoryStatusResult {
 	try {
