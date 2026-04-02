@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.1.0...opencode-autopilot-v1.1.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* guard against sync failures and race condition in provider discovery ([d07d192](https://github.com/kodrunhq/opencode-autopilot/commit/d07d1923075aae98a545fbf0772ca101ca707a17))
+* make provider discovery non-blocking to prevent plugin init hang ([2b374ec](https://github.com/kodrunhq/opencode-autopilot/commit/2b374ecb7fc2ab46b9c345b140aa32e5dc7af2ba))
+* non-blocking provider discovery to prevent startup hang ([b76238a](https://github.com/kodrunhq/opencode-autopilot/commit/b76238ab924f6165ee44e894b799eeb82e1e7997))
+
 ## [1.1.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.0.0...opencode-autopilot-v1.1.0) (2026-04-02)
 
 
