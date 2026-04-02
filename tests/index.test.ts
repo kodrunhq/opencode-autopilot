@@ -74,6 +74,7 @@ describe("plugin entry point", () => {
 			"oc_phase",
 			"oc_plan",
 			"oc_orchestrate",
+			"oc_quick",
 			"oc_forensics",
 			"oc_review",
 		];

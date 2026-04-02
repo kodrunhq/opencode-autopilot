@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInitialState, saveState } from "../../src/orchestrator/state";
@@ -17,7 +17,7 @@ afterEach(async () => {
 describe("quickCore", () => {
 	test("creates initial state with currentPhase set to PLAN", async () => {
 		const { quickCore } = await import("../../src/tools/quick");
-		const result = await quickCore({ idea: "fix typo in README" }, tempDir);
+		await quickCore({ idea: "fix typo in README" }, tempDir);
 		const stateRaw = await readFile(join(tempDir, "state.json"), "utf-8");
 		const state = JSON.parse(stateRaw);
 		expect(state.currentPhase).toBe("PLAN");
@@ -43,9 +43,7 @@ describe("quickCore", () => {
 		await quickCore({ idea: "fix typo in README" }, tempDir);
 		const stateRaw = await readFile(join(tempDir, "state.json"), "utf-8");
 		const state = JSON.parse(stateRaw);
-		const planPhase = state.phases.find(
-			(p: { name: string; status: string }) => p.name === "PLAN",
-		);
+		const planPhase = state.phases.find((p: { name: string; status: string }) => p.name === "PLAN");
 		expect(planPhase.status).toBe("IN_PROGRESS");
 	});
 

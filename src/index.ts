@@ -25,6 +25,7 @@ import { ocForensics } from "./tools/forensics";
 import { ocOrchestrate } from "./tools/orchestrate";
 import { ocPhase } from "./tools/phase";
 import { ocPlan } from "./tools/plan";
+import { ocQuick } from "./tools/quick";
 import { ocReview } from "./tools/review";
 import { ocState } from "./tools/state";
 
@@ -126,6 +127,7 @@ const plugin: Plugin = async (input) => {
 			oc_phase: ocPhase,
 			oc_plan: ocPlan,
 			oc_orchestrate: ocOrchestrate,
+			oc_quick: ocQuick,
 			oc_forensics: ocForensics,
 			oc_review: ocReview,
 		},
