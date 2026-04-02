@@ -12,7 +12,12 @@ import {
 import { fallbackDefaults } from "./orchestrator/fallback/fallback-config";
 import { resolveChain } from "./orchestrator/fallback/resolve-chain";
 import { ocConfidence } from "./tools/confidence";
-import { ocConfigure, setAvailableProviders, setOpenCodeConfig } from "./tools/configure";
+import {
+	ocConfigure,
+	setAvailableProviders,
+	setOpenCodeConfig,
+	setProviderDiscoveryPromise,
+} from "./tools/configure";
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
@@ -35,18 +40,23 @@ const plugin: Plugin = async (input) => {
 	}
 
 	// Discover available providers/models in the background (non-blocking).
-	// The data is only needed when oc_configure "start" is called, not at plugin init.
-	client.provider
-		.list({ query: { directory: process.cwd() } })
-		.then((providerResponse) => {
-			const providerData = providerResponse.data;
-			if (providerData?.all) {
-				setAvailableProviders(providerData.all);
-			}
-		})
-		.catch(() => {
-			// Provider discovery is best-effort; configure will show empty models
-		});
+	// The promise is stored so oc_configure "start" can await it (with timeout).
+	try {
+		const discoveryPromise = client.provider
+			.list({ query: { directory: process.cwd() } })
+			.then((providerResponse) => {
+				const providerData = providerResponse.data;
+				if (providerData?.all) {
+					setAvailableProviders(providerData.all);
+				}
+			})
+			.catch(() => {
+				// Provider discovery is best-effort; configure will show empty models
+			});
+		setProviderDiscoveryPromise(discoveryPromise);
+	} catch {
+		// Guard against synchronous failures (e.g. client.provider undefined)
+	}
 
 	// Load config for first-load detection and fallback settings
 	const config = await loadConfig();

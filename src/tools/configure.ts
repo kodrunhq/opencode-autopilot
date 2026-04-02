@@ -41,11 +41,19 @@ let availableProviders: ReadonlyArray<{
 	readonly models: Readonly<Record<string, { readonly id: string; readonly name: string }>>;
 }> = [];
 
+/**
+ * Promise that resolves when provider discovery completes (or fails).
+ * handleStart awaits this (with timeout) so oc_configure doesn't race
+ * against background discovery.
+ */
+let providerDiscoveryPromise: Promise<void> = Promise.resolve();
+
 // --- Exported helpers for test/plugin wiring ---
 
 export function resetPendingAssignments(): void {
 	pendingAssignments = new Map();
 	availableProviders = [];
+	providerDiscoveryPromise = Promise.resolve();
 }
 
 export function setOpenCodeConfig(config: Config | null): void {
@@ -60,6 +68,10 @@ export function setAvailableProviders(
 	}>,
 ): void {
 	availableProviders = providers;
+}
+
+export function setProviderDiscoveryPromise(promise: Promise<void>): void {
+	providerDiscoveryPromise = promise;
 }
 
 // --- Core logic ---
@@ -106,6 +118,12 @@ function serializeDiversityWarnings(warnings: readonly DiversityWarning[]): read
 }
 
 async function handleStart(configPath?: string): Promise<string> {
+	// Wait for background provider discovery (up to 5s) before building model list
+	await Promise.race([
+		providerDiscoveryPromise,
+		new Promise<void>((resolve) => setTimeout(resolve, 5000)),
+	]);
+
 	const modelsByProvider = discoverAvailableModels();
 
 	// Load current plugin config to show existing assignments
