@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.7.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.6.0...opencode-autopilot-v1.7.0) (2026-04-02)
+
+
+### Features
+
+* **17-01:** add memory-based confidence tuning to arena depth ([7b358f0](https://github.com/kodrunhq/opencode-autopilot/commit/7b358f0a7fc9d562482ee9975346306ba093d54b))
+* **17-01:** replace single-skill injection with adaptive skill context ([493a0b6](https://github.com/kodrunhq/opencode-autopilot/commit/493a0b655a8332b3d8d89a65a60b7f123636fa42))
+* Phase 17 — integration polish, adaptive skill routing, confidence tuning ([9feb7b8](https://github.com/kodrunhq/opencode-autopilot/commit/9feb7b8743d5fa7e504d8aaa587f744563be2139))
+
+
+### Bug Fixes
+
+* address Copilot PR comments + ace findings — projectRoot param, error logging, boundary test, length assertion, singleton isolation ([0b1111b](https://github.com/kodrunhq/opencode-autopilot/commit/0b1111b4cb42d6609b03fa08a2c271fe9937d4ee))
+* format and lint fixes for integration tests ([8d5fd3e](https://github.com/kodrunhq/opencode-autopilot/commit/8d5fd3ef2983319bc6525b5d757ee6defa6ddf3b))
+* re-throw SyntaxError in loadAdaptiveSkillContext, document observation scan cap ([f94e228](https://github.com/kodrunhq/opencode-autopilot/commit/f94e22814f738a835558cdca88f1d6bae546d3d1))
+
 ## [1.6.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.5.0...opencode-autopilot-v1.6.0) (2026-04-02)
 
 
