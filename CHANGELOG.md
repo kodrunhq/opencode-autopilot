@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.12.0...opencode-autopilot-v1.12.1) (2026-04-03)
+
+
+### Bug Fixes
+
+* **23:** resolve PR comments — doctor check count 6→7, fix PostToolUse naming, add maintenance note, update STATE/ROADMAP ([8872ff0](https://github.com/kodrunhq/opencode-autopilot/commit/8872ff09bf4bae32d0b475346e1f8e97d98d7c01))
+
 ## [1.12.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.11.0...opencode-autopilot-v1.12.0) (2026-04-03)
 
 
