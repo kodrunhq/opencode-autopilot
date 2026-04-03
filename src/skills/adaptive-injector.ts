@@ -7,7 +7,7 @@
  * filtering even before any git diff is available.
  */
 
-import { access } from "node:fs/promises";
+import { access, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { sanitizeTemplateContent } from "../review/sanitize";
 import { resolveDependencyOrder } from "./dependency-resolver";
@@ -32,6 +32,18 @@ const MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze
 	"requirements.txt": Object.freeze(["python"]),
 	Pipfile: Object.freeze(["python"]),
 	Gemfile: Object.freeze(["ruby"]),
+	"pom.xml": Object.freeze(["java"]),
+	"build.gradle": Object.freeze(["java"]),
+	"build.gradle.kts": Object.freeze(["java"]),
+});
+
+/**
+ * Glob-based manifest patterns for languages that use variable filenames.
+ * Checked via readdir + extension matching (not exact filename access).
+ */
+const GLOB_MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+	".csproj": Object.freeze(["csharp"]),
+	".sln": Object.freeze(["csharp"]),
 });
 
 /**
@@ -39,6 +51,8 @@ const MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze
  * Complements detectStackTags (which works on file paths from git diff).
  */
 export async function detectProjectStackTags(projectRoot: string): Promise<readonly string[]> {
+	const tags = new Set<string>();
+
 	const results = await Promise.all(
 		Object.entries(MANIFEST_TAGS).map(async ([manifest, manifestTags]) => {
 			try {
@@ -50,7 +64,27 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 		}),
 	);
 
-	return [...new Set(results.flat())];
+	for (const result of results) {
+		for (const tag of result) {
+			tags.add(tag);
+		}
+	}
+
+	// Check glob-based manifests (file extension matching)
+	try {
+		const entries = await readdir(projectRoot);
+		for (const [ext, extTags] of Object.entries(GLOB_MANIFEST_TAGS)) {
+			if (entries.some((entry) => entry.endsWith(ext))) {
+				for (const tag of extTags) {
+					tags.add(tag);
+				}
+			}
+		}
+	} catch {
+		// readdir failure is non-fatal — skip glob detection
+	}
+
+	return [...tags];
 }
 
 /**
