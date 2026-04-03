@@ -28,19 +28,19 @@ interface AssetEntry {
 
 export interface ConfigHookAgent {
 	readonly name: string;
-	readonly config: Readonly<Record<string, unknown>>;
+	readonly mode?: "all" | "primary" | "subagent";
+	readonly hidden?: boolean;
 	readonly group?: string;
 }
 
 function configHookAgentToEntry(agent: ConfigHookAgent): AssetEntry {
-	const config = agent.config;
 	return {
 		name: agent.name,
 		type: "agent",
 		origin: "config-hook",
-		mode: (config.mode as AssetEntry["mode"]) ?? undefined,
+		mode: agent.mode,
 		group: agent.group,
-		hidden: (config.hidden as boolean) ?? false,
+		hidden: agent.hidden ?? false,
 	};
 }
 
@@ -209,12 +209,14 @@ export const ocStocktake = tool({
 		const configHookAgentList: ConfigHookAgent[] = [
 			...Object.entries(standardAgents).map(([name, config]) => ({
 				name,
-				config: config as Readonly<Record<string, unknown>>,
+				mode: config.mode as ConfigHookAgent["mode"],
+				hidden: (config as Record<string, unknown>).hidden === true,
 				group: AGENT_REGISTRY[name]?.group,
 			})),
 			...Object.entries(pipelineAgents).map(([name, config]) => ({
 				name,
-				config: config as Readonly<Record<string, unknown>>,
+				mode: config.mode as ConfigHookAgent["mode"],
+				hidden: (config as Record<string, unknown>).hidden === true,
 				group: AGENT_REGISTRY[name]?.group,
 			})),
 		];

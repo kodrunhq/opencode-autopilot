@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { metaprompterAgent } from "../../src/agents/metaprompter";
 
 describe("metaprompter agent config", () => {
-	test("mode is all", () => {
-		expect(metaprompterAgent.mode).toBe("all");
+	test("mode is subagent", () => {
+		expect(metaprompterAgent.mode).toBe("subagent");
 	});
 
 	test("has a non-empty description", () => {

@@ -8,7 +8,7 @@ describe("Agent visibility invariants", () => {
 			const entries = Object.entries(pipelineAgents);
 			expect(entries.length).toBe(10);
 
-			for (const [name, agent] of entries) {
+			for (const [_name, agent] of entries) {
 				expect(agent.mode).toBe("subagent");
 				expect(agent.hidden).toBe(true);
 			}
