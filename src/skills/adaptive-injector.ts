@@ -38,10 +38,13 @@ const MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze
 });
 
 /**
- * Glob-based manifest patterns for languages that use variable filenames.
- * Checked via readdir + extension matching (not exact filename access).
+ * Extension-based manifest patterns for languages that use variable filenames
+ * (e.g., MyProject.csproj, MySolution.sln). Detected via readdir + endsWith
+ * matching on the project root directory. Only checks immediate children —
+ * nested .csproj files (e.g., src/MyProject/MyProject.csproj) require the
+ * .sln file at root or diff-path detection via stack-gate.ts.
  */
-const GLOB_MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+const EXT_MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze({
 	".csproj": Object.freeze(["csharp"]),
 	".sln": Object.freeze(["csharp"]),
 });
@@ -73,7 +76,7 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 	// Check glob-based manifests (file extension matching)
 	try {
 		const entries = await readdir(projectRoot);
-		for (const [ext, extTags] of Object.entries(GLOB_MANIFEST_TAGS)) {
+		for (const [ext, extTags] of Object.entries(EXT_MANIFEST_TAGS)) {
 			if (entries.some((entry) => entry.endsWith(ext))) {
 				for (const tag of extTags) {
 					tags.add(tag);

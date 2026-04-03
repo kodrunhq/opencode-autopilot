@@ -92,7 +92,7 @@ Format your review exactly like this:
 - Project type detected: {type}
 - Recommended agents for this type: {list}
 - Missing: {list with brief explanation of why each would help}
-- Starter template: Run `cat ~/.config/opencode/templates/{type}.md` to see a reference
+- Starter template: {if type is web-api, cli-tool, library, or fullstack: `Run cat ~/.config/opencode/templates/{type}.md to see a reference`; otherwise: `No starter template available for this project type`}
 
 ### Top 3 Improvements
 1. {Most impactful improvement with specific guidance}

@@ -96,6 +96,20 @@ describe("installAssets", () => {
 		expect(await fileExists(join(freshTarget, "agents", "new-agent.md"))).toBe(true);
 	});
 
+	test("copies template files to target", async () => {
+		await mkdir(join(sourceDir, "templates"), { recursive: true });
+		const templateContent = "# Web API Starter\n\nAgents for web API projects.";
+		await writeFile(join(sourceDir, "templates", "web-api.md"), templateContent);
+
+		const result = await installAssets(sourceDir, targetDir);
+
+		expect(result.copied).toContain("templates/web-api.md");
+		expect(result.errors).toHaveLength(0);
+
+		const targetContent = await readFile(join(targetDir, "templates", "web-api.md"), "utf-8");
+		expect(targetContent).toBe(templateContent);
+	});
+
 	test("returns empty arrays when no assets exist", async () => {
 		const result = await installAssets(sourceDir, targetDir);
 
