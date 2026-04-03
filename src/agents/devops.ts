@@ -106,12 +106,9 @@ services:
     image: postgres:16-alpine
     volumes:
       - pgdata:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: myapp
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
+    env_file: .env  # Never hardcode credentials — use env_file or Docker secrets
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d myapp"]
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 5
