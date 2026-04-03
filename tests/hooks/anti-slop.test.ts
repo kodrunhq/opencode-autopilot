@@ -96,7 +96,9 @@ describe("createAntiSlopHandler", () => {
 	});
 
 	it("fires showToast when slop found in code file", async () => {
-		const showToast = mock(() => Promise.resolve());
+		const showToast = mock((_t: string, _m: string, _v: "info" | "warning" | "error") =>
+			Promise.resolve(),
+		);
 		const handler = createAntiSlopHandler({ showToast });
 		const tsPath = join(tempDir, "app.ts");
 		await writeFile(tsPath, "// This function handles the logic\nconst x = 1;");
@@ -116,7 +118,9 @@ describe("createAntiSlopHandler", () => {
 		);
 
 		expect(showToast).toHaveBeenCalledTimes(1);
-		expect(showToast.mock.calls[0][2]).toBe("warning");
+		const [title, , variant] = showToast.mock.lastCall ?? [];
+		expect(title).toBe("Anti-Slop Warning");
+		expect(variant).toBe("warning");
 	});
 
 	it("does nothing for non-file-writing tools", async () => {
