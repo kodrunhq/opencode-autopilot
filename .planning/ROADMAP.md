@@ -405,8 +405,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
-- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
+- [x] 20-01-PLAN.md -- Primary agent implementations (debugger, planner, reviewer) with embedded skills
+- [x] 20-02-PLAN.md -- Agent registration, Tab-cycle ordering, and tests
 
 ### Phase 21: Content Expansion
 **Goal**: Coding standards cover OOP/SOLID principles, two new language-specific skills serve Java and C# developers, and a new command helps users audit and improve their project agents
@@ -421,8 +421,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
-- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
+- [x] 21-01-PLAN.md -- Coding standards expansion + language-specific skills (Java, C#)
+- [x] 21-02-PLAN.md -- Review-agents command + starter templates
 
 ### Phase 22: Production Hardening
 **Goal**: The plugin is resilient to model failures in test scenarios, auto-detects project language for commands, has deeper self-diagnostics, and prevents AI comment bloat
@@ -433,11 +433,13 @@ Plans:
   2. Commands that vary by language auto-detect the project language from manifest files (package.json, pom.xml, *.csproj, go.mod, Cargo.toml) instead of requiring per-language variants
   3. Doctor diagnostics report skill loading status per detected stack, memory DB health, and command accessibility alongside existing checks
   4. Anti-slop comment hook detects and prevents AI-generated comment bloat (obvious comments, sycophantic language) with configurable enforcement profiles
-**Plans**: 2 plans
+**Plans**: 4 plans
 
 Plans:
-- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
-- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
+- [x] 22-01-PLAN.md -- Mock fallback test mode with deterministic failure sequences
+- [x] 22-02-PLAN.md -- Context-aware commands with language detection
+- [x] 22-03-PLAN.md -- Skill-aware doctor with memory and command health checks
+- [x] 22-04-PLAN.md -- Anti-slop comment hook with curated regex patterns
 
 ### Phase 23: QA Playbook
 **Goal**: A comprehensive internal QA playbook documents step-by-step test procedures for every feature, enabling systematic manual validation of the entire plugin
@@ -451,8 +453,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
-- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
+- [x] 23-01-PLAN.md -- QA playbook Part 1 (commands, agents, tools, skills, memory)
+- [x] 23-02-PLAN.md -- QA playbook Part 2 (fallback, doctor, observability, orchestrator E2E)
 
 ## Phase Details (v5.0)
 
