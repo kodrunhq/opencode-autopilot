@@ -108,8 +108,8 @@ Requirements for Milestone v4.0 — Production Quality.
 ### Bug Fixes & Infrastructure
 
 - [ ] **BFIX-01**: Stocktake detects config-hook-injected agents alongside filesystem agents
-- [ ] **BFIX-02**: All commands renamed with `oc-` prefix for namespace clarity (brainstorm->oc-brainstorm, tdd->oc-tdd, quick->oc-quick, write-plan->oc-write-plan, stocktake->oc-stocktake, review-pr->oc-review-pr, update-docs->oc-update-docs, new-agent->oc-new-agent, new-skill->oc-new-skill, new-command->oc-new-command)
-- [ ] **BFIX-03**: oc-configure removed as slash command (configuration accessible via CLI only)
+- [x] **BFIX-02**: All commands renamed with `oc-` prefix for namespace clarity (brainstorm->oc-brainstorm, tdd->oc-tdd, quick->oc-quick, write-plan->oc-write-plan, stocktake->oc-stocktake, review-pr->oc-review-pr, update-docs->oc-update-docs, new-agent->oc-new-agent, new-skill->oc-new-skill, new-command->oc-new-command)
+- [x] **BFIX-03**: oc-configure removed as slash command (configuration accessible via CLI only)
 - [ ] **BFIX-04**: Clarify/remove ambiguous "general" and "explore" agents — replace with well-defined primary agents
 
 ### Agents
@@ -218,8 +218,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLLB-07 | Phase 9 | Complete |
 | FLLB-08 | Phase 9 | Complete |
 | BFIX-01 | Phase 19 | Pending |
-| BFIX-02 | Phase 18 | Pending |
-| BFIX-03 | Phase 18 | Pending |
+| BFIX-02 | Phase 18 | Complete |
+| BFIX-03 | Phase 18 | Complete |
 | BFIX-04 | Phase 19 | Pending |
 | AGNT-10 | Phase 20 | Pending |
 | AGNT-11 | Phase 20 | Pending |
