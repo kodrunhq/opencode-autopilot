@@ -89,7 +89,7 @@ describe("doctorCore", () => {
 		const result = JSON.parse(
 			await doctorCore({
 				configPath,
-				openCodeConfig: { agent: agentMap } as any,
+				openCodeConfig: { agent: agentMap } as unknown as import("@opencode-ai/plugin").Config,
 				targetDir: tempDir,
 				projectRoot: tempDir,
 			}),
