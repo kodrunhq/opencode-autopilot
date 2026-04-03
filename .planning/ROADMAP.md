@@ -186,7 +186,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> ... -> 23 -> 24
 | 22. Production Hardening | v4.0 | 4/4 | Complete   | 2026-04-03 |
 | 23. QA Playbook | v4.0 | 2/2 | Complete   | 2026-04-03 |
 | 24. Coder Agent & Built-in Replacements | v5.0 | 4/4 | Complete   | 2026-04-03 |
-| 25. Content & Agent Expansion | v5.0 | 0/TBD | Not started | - |
+| 25. Content & Agent Expansion | v5.0 | 0/2 | In progress | - |
 
 ### Phase 8: Testing & CI
 
@@ -402,7 +402,11 @@ Plans:
   2. User can Tab to a Planner agent that loads plan-writing and plan-executing skills and helps decompose work
   3. User can Tab to a Code Reviewer agent that loads the code-review skill and can invoke oc_review for multi-agent review
   4. Tab cycle follows the intentional order: Autopilot first, then Debugger, Planner, Reviewer (no other primary agents polluting the cycle)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
+- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
 
 ### Phase 21: Content Expansion
 **Goal**: Coding standards cover OOP/SOLID principles, two new language-specific skills serve Java and C# developers, and a new command helps users audit and improve their project agents
@@ -414,7 +418,11 @@ Plans:
   3. C# developers get a language patterns skill with idiomatic C#, .NET patterns, and Entity Framework conventions loaded automatically when .csproj files are detected
   4. User can run `/oc-review-agents` to validate and improve their project's agents.md file with structure and prompt quality feedback
   5. Curated agents.md starter templates are available for common project types (web-api, cli-tool, library, fullstack)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
+- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
 
 ### Phase 22: Production Hardening
 **Goal**: The plugin is resilient to model failures in test scenarios, auto-detects project language for commands, has deeper self-diagnostics, and prevents AI comment bloat
@@ -425,7 +433,11 @@ Plans:
   2. Commands that vary by language auto-detect the project language from manifest files (package.json, pom.xml, *.csproj, go.mod, Cargo.toml) instead of requiring per-language variants
   3. Doctor diagnostics report skill loading status per detected stack, memory DB health, and command accessibility alongside existing checks
   4. Anti-slop comment hook detects and prevents AI-generated comment bloat (obvious comments, sycophantic language) with configurable enforcement profiles
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
+- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
 
 ### Phase 23: QA Playbook
 **Goal**: A comprehensive internal QA playbook documents step-by-step test procedures for every feature, enabling systematic manual validation of the entire plugin
@@ -436,7 +448,11 @@ Plans:
   2. Every agent has a documented test scenario verifying its availability, skill loading, and core behavior
   3. Memory flow, fallback chain, and doctor diagnostics each have end-to-end test procedures
   4. The playbook can be executed by a human (or AI) in a single session to validate a release
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
+- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
 
 ## Phase Details (v5.0)
 
@@ -467,4 +483,8 @@ Plans:
   2. Plugin ships with at least 25 skills covering major development workflows
   3. Every command is routed to an appropriate agent
   4. New skills follow the established stack-detection and token-budgeting patterns
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
+- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
