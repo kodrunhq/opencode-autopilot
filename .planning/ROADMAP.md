@@ -380,11 +380,7 @@ Plans:
   2. The "general" and "explore" agents are removed or replaced with clearly-scoped agents that have explicit purposes
   3. Primary-mode agents registered via config hook appear correctly in the Tab cycle (not just in @ autocomplete)
   4. Agent count reported by stocktake matches the actual number of registered agents (zero silent omissions)
-**Plans**: 2 plans
-
-Plans:
-- [x] 18-01-PLAN.md -- Rename command files to oc- prefix, delete oc-configure, update installer DEPRECATED_ASSETS
-- [ ] 18-02-PLAN.md -- Update all source code and documentation references to use oc- prefixed command names
+**Plans**: TBD
 
 ### Phase 20: New Primary Agents
 **Goal**: Users can Tab-cycle through a curated set of primary agents -- Autopilot, Debugger, Planner, and Code Reviewer -- each loading relevant skills automatically
@@ -395,11 +391,7 @@ Plans:
   2. User can Tab to a Planner agent that loads plan-writing and plan-executing skills and helps decompose work
   3. User can Tab to a Code Reviewer agent that loads the code-review skill and can invoke oc_review for multi-agent review
   4. Tab cycle follows the intentional order: Autopilot first, then Debugger, Planner, Reviewer (no other primary agents polluting the cycle)
-**Plans**: 2 plans
-
-Plans:
-- [ ] 18-01-PLAN.md -- Rename command files to oc- prefix, delete oc-configure, update installer DEPRECATED_ASSETS
-- [ ] 18-02-PLAN.md -- Update all source code and documentation references to use oc- prefixed command names
+**Plans**: TBD
 
 ### Phase 21: Content Expansion
 **Goal**: Coding standards cover OOP/SOLID principles, two new language-specific skills serve Java and C# developers, and a new command helps users audit and improve their project agents
@@ -411,11 +403,7 @@ Plans:
   3. C# developers get a language patterns skill with idiomatic C#, .NET patterns, and Entity Framework conventions loaded automatically when .csproj files are detected
   4. User can run `/oc-review-agents` to validate and improve their project's agents.md file with structure and prompt quality feedback
   5. Curated agents.md starter templates are available for common project types (web-api, cli-tool, library, fullstack)
-**Plans**: 2 plans
-
-Plans:
-- [ ] 18-01-PLAN.md -- Rename command files to oc- prefix, delete oc-configure, update installer DEPRECATED_ASSETS
-- [ ] 18-02-PLAN.md -- Update all source code and documentation references to use oc- prefixed command names
+**Plans**: TBD
 
 ### Phase 22: Production Hardening
 **Goal**: The plugin is resilient to model failures in test scenarios, auto-detects project language for commands, has deeper self-diagnostics, and prevents AI comment bloat
@@ -426,11 +414,7 @@ Plans:
   2. Commands that vary by language auto-detect the project language from manifest files (package.json, pom.xml, *.csproj, go.mod, Cargo.toml) instead of requiring per-language variants
   3. Doctor diagnostics report skill loading status per detected stack, memory DB health, and command accessibility alongside existing checks
   4. Anti-slop comment hook detects and prevents AI-generated comment bloat (obvious comments, sycophantic language) with configurable enforcement profiles
-**Plans**: 2 plans
-
-Plans:
-- [ ] 18-01-PLAN.md -- Rename command files to oc- prefix, delete oc-configure, update installer DEPRECATED_ASSETS
-- [ ] 18-02-PLAN.md -- Update all source code and documentation references to use oc- prefixed command names
+**Plans**: TBD
 
 ### Phase 23: QA Playbook
 **Goal**: A comprehensive internal QA playbook documents step-by-step test procedures for every feature, enabling systematic manual validation of the entire plugin
@@ -441,8 +425,4 @@ Plans:
   2. Every agent has a documented test scenario verifying its availability, skill loading, and core behavior
   3. Memory flow, fallback chain, and doctor diagnostics each have end-to-end test procedures
   4. The playbook can be executed by a human (or AI) in a single session to validate a release
-**Plans**: 2 plans
-
-Plans:
-- [ ] 18-01-PLAN.md -- Rename command files to oc- prefix, delete oc-configure, update installer DEPRECATED_ASSETS
-- [ ] 18-02-PLAN.md -- Update all source code and documentation references to use oc- prefixed command names
+**Plans**: TBD

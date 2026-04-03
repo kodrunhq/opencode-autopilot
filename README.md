@@ -72,7 +72,7 @@ This checks config health, model assignments, and adversarial diversity between 
 
 ## Model Groups
 
-Agents are organized into 8 groups by the type of thinking they do. Each group gets a primary model and fallback chain. Run `bunx @kodrunhq/opencode-autopilot configure` to assign models interactively, or use the `oc_configure` tool in-session.
+Agents are organized into 8 groups by the type of thinking they do. Each group gets a primary model and fallback chain. Run `bunx @kodrunhq/opencode-autopilot configure` to assign models interactively. For advanced use, the `oc_configure` tool is also available in-session.
 
 | Group | Agents | What they do | Model recommendation |
 |-------|--------|-------------|---------------------|
