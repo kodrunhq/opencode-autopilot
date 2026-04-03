@@ -339,7 +339,7 @@ For each finding, include: file path, line range, issue description, and a concr
 - ALWAYS run dependency audit commands when bash access is available.
 - DO use bash to run security scanning tools and audit commands.
 - DO NOT access the web.
-- DO NOT modify source code unless explicitly asked to fix findings -- report only by default.`,
+- DO NOT modify source code -- this agent is audit-only (edit permission is denied).`,
 	permission: {
 		edit: "deny",
 		bash: "allow",

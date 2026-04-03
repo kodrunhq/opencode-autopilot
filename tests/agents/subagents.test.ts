@@ -24,7 +24,7 @@ describe("Phase 25 subagent agents", () => {
 
 			test("has a non-empty description", () => {
 				expect(typeof agent.description).toBe("string");
-				expect(agent.description!.length).toBeGreaterThan(0);
+				expect((agent.description ?? "").length).toBeGreaterThan(0);
 			});
 
 			test(`prompt contains domain keyword "${keyword}"`, () => {
@@ -34,7 +34,7 @@ describe("Phase 25 subagent agents", () => {
 
 			test("prompt has production-ready length with embedded skills", () => {
 				expect(typeof agent.prompt).toBe("string");
-				expect(agent.prompt!.length).toBeGreaterThanOrEqual(100);
+				expect((agent.prompt ?? "").length).toBeGreaterThanOrEqual(100);
 			});
 
 			test("webfetch is denied", () => {

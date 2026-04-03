@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 25 (content-agent-expansion) — EXECUTING
+Phase: 25 (content-agent-expansion) — COMPLETE
 Plan: 2 of 2
-Status: Phase complete — ready for verification
+Status: Phase complete — all plans executed, in PR review
 Last activity: 2026-04-03
 
 Progress: [██████████] 100%
@@ -118,7 +118,7 @@ Recent decisions affecting current work:
 - [Phase 24]: Plan suppression uses variant loop (Plan/plan/Planner/planner) for robustness
 - [Phase 25]: All 4 new skills are universal (stacks: []) since security, API design, database, and Docker patterns are language-agnostic
 - [Phase 25]: frontend-engineer embeds both frontend-design and coding-standards skills (code-writing agents need standards)
-- [Phase 25]: security-auditor is report-only by default with edit:allow for when user asks for fixes
+- [Phase 25]: security-auditor is audit-only with edit:deny — cannot modify source code
 
 ### Pending Todos
 

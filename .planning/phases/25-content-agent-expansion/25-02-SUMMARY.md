@@ -32,7 +32,7 @@ key-files:
 
 key-decisions:
   - "frontend-engineer embeds both frontend-design and coding-standards skills (code-writing agents need standards)"
-  - "security-auditor is report-only by default with edit:allow for when user asks for fixes"
+  - "security-auditor is audit-only with edit:deny — cannot modify source code"
 
 patterns-established:
   - "Subagent skill embedding: strip YAML frontmatter, embed full content in <skill> tags within agent prompt"
