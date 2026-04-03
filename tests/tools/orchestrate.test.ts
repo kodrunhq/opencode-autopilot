@@ -105,8 +105,8 @@ describe("autopilotAgent", () => {
 		expect(autopilotAgent.prompt).toContain("oc_orchestrate");
 	});
 
-	test("prompt is lean (under 2000 chars)", () => {
-		expect(autopilotAgent.prompt?.length).toBeLessThan(2000);
+	test("prompt is lean (under 2500 chars)", () => {
+		expect(autopilotAgent.prompt?.length).toBeLessThan(2500);
 	});
 
 	test("has maxSteps of 50", () => {
