@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { createMockInterceptor, MockInterceptor } from "../../../src/orchestrator/fallback/mock-interceptor";
+import {
+	createMockInterceptor,
+	MockInterceptor,
+} from "../../../src/orchestrator/fallback/mock-interceptor";
 import { isRetryableError } from "../../../src/orchestrator/fallback/error-classifier";
 import type { MockFailureMode } from "../../../src/observability/mock/types";
 
@@ -32,7 +35,12 @@ describe("MockInterceptor", () => {
 
 	test("generated mock errors pass isRetryableError (except malformed)", () => {
 		const retryOnErrors = [401, 402, 429, 500, 502, 503, 504];
-		const retryableModes: MockFailureMode[] = ["rate_limit", "quota_exceeded", "timeout", "service_unavailable"];
+		const retryableModes: MockFailureMode[] = [
+			"rate_limit",
+			"quota_exceeded",
+			"timeout",
+			"service_unavailable",
+		];
 		for (const mode of retryableModes) {
 			const interceptor = new MockInterceptor([mode]);
 			const error = interceptor.nextError();

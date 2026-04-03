@@ -6,7 +6,9 @@ import {
 } from "../../src/utils/language-resolver";
 
 // Mock detectProjectStackTags
-const mockDetect = mock(() => Promise.resolve(Object.freeze(["typescript", "bun"]) as readonly string[]));
+const mockDetect = mock(() =>
+	Promise.resolve(Object.freeze(["typescript", "bun"]) as readonly string[]),
+);
 mock.module("../../src/skills/adaptive-injector", () => ({
 	detectProjectStackTags: mockDetect,
 }));
