@@ -557,9 +557,9 @@ All agents are injected via the config hook at plugin load time. Primary agents 
 
 All tools are registered programmatically via the plugin entry point (`src/index.ts`). They are invoked by agents during pipeline execution or directly by the user through agent interactions. Each tool name starts with `oc_`.
 
-### Diagnostic Tools
+**Diagnostic Tools**
 
-#### oc_doctor
+### oc_doctor
 
 **Purpose:** Run plugin health diagnostics. Reports pass/fail status for config, agents, assets, skills, memory, commands, and hooks.
 
@@ -589,7 +589,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_session_stats
+### oc_session_stats
 
 **Purpose:** View session statistics including event counts, decisions, errors, and per-phase breakdown.
 
@@ -618,7 +618,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_logs
+### oc_logs
 
 **Purpose:** View session logs. Modes: list (all sessions), detail (full log with summary), search (filter events by type/time).
 
@@ -654,7 +654,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_memory_status
+### oc_memory_status
 
 **Purpose:** Show memory system status: observation counts, recent memories, preferences, and storage size.
 
@@ -683,9 +683,9 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-### Configuration Tools
+**Configuration Tools**
 
-#### oc_configure
+### oc_configure
 
 **Purpose:** Configure model assignments for agent groups. Supports a multi-step session workflow: start, assign, commit, doctor, reset.
 
@@ -724,7 +724,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_mock_fallback
+### oc_mock_fallback
 
 **Purpose:** Generate mock errors for fallback chain testing. Simulates various failure modes and shows how the fallback system would classify them.
 
@@ -756,9 +756,9 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-### Asset Tools
+**Asset Tools**
 
-#### oc_stocktake
+### oc_stocktake
 
 **Purpose:** Audit all installed skills, commands, and agents with optional YAML frontmatter lint validation.
 
@@ -789,7 +789,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_create_agent
+### oc_create_agent
 
 **Purpose:** Create a new OpenCode agent markdown file.
 
@@ -824,7 +824,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_create_skill
+### oc_create_skill
 
 **Purpose:** Create a new OpenCode skill directory with SKILL.md.
 
@@ -859,7 +859,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_create_command
+### oc_create_command
 
 **Purpose:** Create a new OpenCode command markdown file.
 
@@ -891,7 +891,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_update_docs
+### oc_update_docs
 
 **Purpose:** Detect documentation affected by recent code changes and suggest updates.
 
@@ -922,7 +922,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_quick
+### oc_quick
 
 **Purpose:** Run a task through a simplified pipeline, skipping RECON, CHALLENGE, ARCHITECT, and EXPLORE phases.
 
@@ -955,9 +955,9 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-### Pipeline Tools
+**Pipeline Tools**
 
-#### oc_orchestrate
+### oc_orchestrate
 
 **Purpose:** Drive the orchestrator pipeline. Provide an idea to start, or a result to advance the current phase.
 
@@ -991,7 +991,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_phase
+### oc_phase
 
 **Purpose:** Manage orchestrator phase transitions.
 
@@ -1027,7 +1027,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_state
+### oc_state
 
 **Purpose:** Manage orchestrator pipeline state with CRUD operations.
 
@@ -1068,7 +1068,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_plan
+### oc_plan
 
 **Purpose:** Query orchestrator plan data: tasks by wave and status counts.
 
@@ -1099,7 +1099,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_confidence
+### oc_confidence
 
 **Purpose:** Manage the orchestrator confidence ledger: append entries, get summary, filter by phase.
 
@@ -1136,7 +1136,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_pipeline_report
+### oc_pipeline_report
 
 **Purpose:** View pipeline decision trace with phase-by-phase breakdown.
 
@@ -1166,7 +1166,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-#### oc_forensics
+### oc_forensics
 
 **Purpose:** Diagnose a failed orchestrator pipeline run. Returns structured failure analysis.
 
@@ -1199,9 +1199,9 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ---
 
-### Review Tools
+**Review Tools**
 
-#### oc_review
+### oc_review
 
 **Purpose:** Run multi-agent code review. Dispatches specialist reviewer agents and cross-verifies findings.
 
