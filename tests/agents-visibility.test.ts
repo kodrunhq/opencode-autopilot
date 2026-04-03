@@ -63,12 +63,12 @@ describe("Agent visibility invariants", () => {
 	});
 
 	describe("Agent count", () => {
-		it("total agent count is 19 (9 standard + 10 pipeline)", () => {
+		it("total agent count is 23 (13 standard + 10 pipeline)", () => {
 			const standardCount = Object.keys(agents).length;
 			const pipelineCount = Object.keys(pipelineAgents).length;
-			expect(standardCount).toBe(9);
+			expect(standardCount).toBe(13);
 			expect(pipelineCount).toBe(10);
-			expect(standardCount + pipelineCount).toBe(19);
+			expect(standardCount + pipelineCount).toBe(23);
 		});
 
 		it("primary agent names sort alphabetically in desired Tab-cycle order", () => {

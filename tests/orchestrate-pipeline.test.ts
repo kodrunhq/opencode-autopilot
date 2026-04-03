@@ -276,8 +276,14 @@ describe("configHook pipeline agents", () => {
 		expect(agents["oc-researcher"]).toBeDefined();
 		expect(agents["oc-implementer"]).toBeDefined();
 
-		// Total: 9 standard + 10 pipeline = 19
-		expect(Object.keys(agents).length).toBe(19);
+		// new subagent agents
+		expect(agents["db-specialist"]).toBeDefined();
+		expect(agents.devops).toBeDefined();
+		expect(agents["frontend-engineer"]).toBeDefined();
+		expect(agents["security-auditor"]).toBeDefined();
+
+		// Total: 13 standard + 10 pipeline = 23
+		expect(Object.keys(agents).length).toBe(23);
 	});
 
 	test("pipeline agents have mode subagent", async () => {
