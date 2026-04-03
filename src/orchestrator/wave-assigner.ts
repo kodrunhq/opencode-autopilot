@@ -55,10 +55,13 @@ export function assignWaves(tasks: readonly TaskNode[]): WaveAssignment {
 	}
 
 	// Build in-degree map: count of valid dependencies per task
+	// Deduplicate depends_on and skip self-dependencies
 	const inDegree = new Map<number, number>();
 	for (const task of tasks) {
+		const uniqueDeps = [...new Set(task.depends_on)];
 		let degree = 0;
-		for (const dep of task.depends_on) {
+		for (const dep of uniqueDeps) {
+			if (dep === task.id) continue; // Skip self-dependency
 			if (validIds.has(dep)) {
 				degree++;
 				const list = dependents.get(dep);

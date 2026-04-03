@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { isAbsolute, resolve } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 
 /**
@@ -99,7 +100,22 @@ function toLineArray(lines: string | readonly string[] | null): readonly string[
 // --- Core function ---
 
 export async function hashlineEditCore(args: HashlineEditArgs): Promise<string> {
-	const raw = await readFile(args.file, "utf-8");
+	// Path safety: require absolute paths to prevent relative path confusion
+	if (!isAbsolute(args.file)) {
+		return `Error: File path must be absolute. Got: "${args.file}"`;
+	}
+	const resolved = resolve(args.file);
+
+	if (args.edits.length === 0) {
+		return "Applied 0 edit(s) — no changes made.";
+	}
+
+	let raw: string;
+	try {
+		raw = await readFile(resolved, "utf-8");
+	} catch (err) {
+		return `Error: Cannot read file "${resolved}": ${err instanceof Error ? err.message : String(err)}`;
+	}
 
 	// Split preserving trailing newline behavior
 	const hasTrailingNewline = raw.endsWith("\n");
@@ -244,9 +260,13 @@ export async function hashlineEditCore(args: HashlineEditArgs): Promise<string> 
 
 	// Write back
 	const output = fileLines.join("\n") + (hasTrailingNewline ? "\n" : "");
-	await writeFile(args.file, output, "utf-8");
+	try {
+		await writeFile(resolved, output, "utf-8");
+	} catch (err) {
+		return `Error: Cannot write file "${resolved}": ${err instanceof Error ? err.message : String(err)}`;
+	}
 
-	return `Applied ${sortedEdits.length} edit(s) to ${args.file}.`;
+	return `Applied ${sortedEdits.length} edit(s) to ${resolved}.`;
 }
 
 // --- Tool wrapper ---

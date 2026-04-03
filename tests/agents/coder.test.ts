@@ -22,14 +22,28 @@ describe("coder agent config", () => {
 		expect(prompt).toContain('<skill name="coding-standards">');
 	});
 
-	test("permissions: edit=allow, bash=allow", () => {
-		expect(coderAgent.permission?.edit).toBe("allow");
-		expect(coderAgent.permission?.bash).toBe("allow");
+	test("permissions: exact shape (edit, bash allowed; webfetch denied)", () => {
+		expect(coderAgent.permission).toEqual({
+			edit: "allow",
+			bash: "allow",
+			webfetch: "deny",
+		});
 	});
 
-	test("permissions: webfetch is undefined or deny", () => {
-		const webfetch = coderAgent.permission?.webfetch;
-		expect(webfetch === undefined || webfetch === "deny").toBe(true);
+	test("maxSteps is 30", () => {
+		expect(coderAgent.maxSteps).toBe(30);
+	});
+
+	test("prompt has production-ready length with embedded skills", () => {
+		expect(typeof coderAgent.prompt).toBe("string");
+		expect(coderAgent.prompt?.length).toBeGreaterThanOrEqual(100);
+	});
+
+	test("prompt references RED, GREEN, REFACTOR phases", () => {
+		const prompt = (coderAgent.prompt ?? "").toLowerCase();
+		expect(prompt).toContain("red");
+		expect(prompt).toContain("green");
+		expect(prompt).toContain("refactor");
 	});
 
 	test("is frozen (immutable)", () => {

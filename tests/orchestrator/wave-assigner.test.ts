@@ -97,4 +97,47 @@ describe("assignWaves", () => {
 		expect(result.assignments.get(4)).toBe(1);
 		expect(result.cycles).toEqual([]);
 	});
+
+	test("self-dependency is ignored (task gets wave 1)", () => {
+		const tasks: readonly TaskNode[] = [{ id: 1, depends_on: [1] }];
+		const result = assignWaves(tasks);
+		expect(result.assignments.get(1)).toBe(1);
+		expect(result.cycles).toEqual([]);
+	});
+
+	test("duplicate entries in depends_on are deduplicated", () => {
+		const tasks: readonly TaskNode[] = [
+			{ id: 1, depends_on: [] },
+			{ id: 2, depends_on: [1, 1, 1] },
+		];
+		const result = assignWaves(tasks);
+		expect(result.assignments.get(1)).toBe(1);
+		expect(result.assignments.get(2)).toBe(2);
+		expect(result.cycles).toEqual([]);
+	});
+
+	test("three-task cycle (A->B->C->A) all reported as cycles", () => {
+		const tasks: readonly TaskNode[] = [
+			{ id: 1, depends_on: [3] },
+			{ id: 2, depends_on: [1] },
+			{ id: 3, depends_on: [2] },
+		];
+		const result = assignWaves(tasks);
+		expect(result.cycles.length).toBe(3);
+		expect(result.cycles).toContain(1);
+		expect(result.cycles).toContain(2);
+		expect(result.cycles).toContain(3);
+		expect(result.assignments.size).toBe(0);
+	});
+
+	test("mixed valid and non-existent dependency IDs", () => {
+		const tasks: readonly TaskNode[] = [
+			{ id: 1, depends_on: [] },
+			{ id: 2, depends_on: [999, 1] },
+		];
+		const result = assignWaves(tasks);
+		expect(result.assignments.get(1)).toBe(1);
+		expect(result.assignments.get(2)).toBe(2);
+		expect(result.cycles).toEqual([]);
+	});
 });
