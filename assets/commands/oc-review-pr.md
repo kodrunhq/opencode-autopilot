@@ -14,6 +14,8 @@ First, gather the PR context:
 
 Then analyze the PR against these dimensions:
 
+The project uses $LANGUAGE. Apply language-specific idioms, framework conventions, and ecosystem best practices when reviewing.
+
 - **Correctness:** Does the code do what the PR description claims? Are there logic errors, off-by-one bugs, or missing edge cases?
 - **Security:** Are there hardcoded secrets, unsanitized inputs, missing auth checks, or injection vulnerabilities?
 - **Code quality:** Does the code follow the coding-standards skill? Check naming, file size, function size, error handling, immutability, and separation of concerns.
