@@ -179,7 +179,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 15. Memory System | v3.0 | 1/1 | Complete | 2026-04-02 |
 | 16. Autopilot Integration | v3.0 | 0/0 | MERGED | - |
 | 17. Integration & Polish | v3.0 | 3/3 | Complete | 2026-04-03 |
-| 18. Namespace Cleanup | v4.0 | 1/2 | In Progress|  |
+| 18. Namespace Cleanup | v4.0 | 2/2 | Complete   | 2026-04-03 |
 | 19. Agent Visibility & Fixes | v4.0 | 0/TBD | Not started | - |
 | 20. New Primary Agents | v4.0 | 0/TBD | Not started | - |
 | 21. Content Expansion | v4.0 | 0/TBD | Not started | - |
@@ -348,7 +348,7 @@ Plans:
 
 ### v4.0 Production Quality
 
-- [ ] **Phase 18: Namespace Cleanup** - Prefix all commands with oc- and remove oc-configure slash command
+- [x] **Phase 18: Namespace Cleanup** - Prefix all commands with oc- and remove oc-configure slash command (completed 2026-04-03)
 - [ ] **Phase 19: Agent Visibility & Fixes** - Fix stocktake agent detection, clarify ambiguous agents, ensure config-hook agents appear in Tab cycle
 - [ ] **Phase 20: New Primary Agents** - Add Debugger, Planner, and Code Reviewer primary agents with intentional Tab-cycle ordering
 - [ ] **Phase 21: Content Expansion** - OOP/SOLID coding standards, Java/C# language skills, agents.md review command and starter templates
@@ -369,7 +369,7 @@ Plans:
 
 Plans:
 - [x] 18-01-PLAN.md -- Rename command files to oc- prefix, delete oc-configure, update installer DEPRECATED_ASSETS
-- [ ] 18-02-PLAN.md -- Update all source code and documentation references to use oc- prefixed command names
+- [x] 18-02-PLAN.md -- Update all source code and documentation references to use oc- prefixed command names
 
 ### Phase 19: Agent Visibility & Fixes
 **Goal**: Stocktake correctly detects all agents (filesystem and config-hook-injected), and ambiguous agents are replaced with well-defined alternatives
@@ -383,7 +383,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 18-01-PLAN.md -- Rename command files to oc- prefix, delete oc-configure, update installer DEPRECATED_ASSETS
+- [x] 18-01-PLAN.md -- Rename command files to oc- prefix, delete oc-configure, update installer DEPRECATED_ASSETS
 - [ ] 18-02-PLAN.md -- Update all source code and documentation references to use oc- prefixed command names
 
 ### Phase 20: New Primary Agents
