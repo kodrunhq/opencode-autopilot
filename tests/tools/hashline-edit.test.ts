@@ -96,7 +96,7 @@ describe("hashlineEditCore", () => {
 			edits: [{ op: "replace", pos, lines: "line TWO replaced" }],
 		});
 
-		expect(result).toContain("1");
+		expect(result).toContain("Applied 1 edit(s)");
 		const content = await readFile(filePath, "utf-8");
 		expect(content.split("\n")[1]).toBe("line TWO replaced");
 	});
@@ -122,7 +122,7 @@ describe("hashlineEditCore", () => {
 			edits: [{ op: "append", pos, lines: "inserted after two" }],
 		});
 
-		expect(result).toContain("1");
+		expect(result).toContain("Applied 1 edit(s)");
 		const content = await readFile(filePath, "utf-8");
 		const lines = content.split("\n");
 		expect(lines[1]).toBe("line two");
@@ -139,7 +139,7 @@ describe("hashlineEditCore", () => {
 			edits: [{ op: "prepend", pos, lines: "inserted before two" }],
 		});
 
-		expect(result).toContain("1");
+		expect(result).toContain("Applied 1 edit(s)");
 		const content = await readFile(filePath, "utf-8");
 		const lines = content.split("\n");
 		expect(lines[0]).toBe("line one");
@@ -163,7 +163,7 @@ describe("hashlineEditCore", () => {
 			edits: [{ op: "replace", pos, end, lines: "replaced range" }],
 		});
 
-		expect(result).toContain("1");
+		expect(result).toContain("Applied 1 edit(s)");
 		const content = await readFile(filePath, "utf-8");
 		const lines = content.split("\n");
 		expect(lines[0]).toBe("line one");
@@ -180,7 +180,7 @@ describe("hashlineEditCore", () => {
 			edits: [{ op: "replace", pos, lines: null }],
 		});
 
-		expect(result).toContain("1");
+		expect(result).toContain("Applied 1 edit(s)");
 		const content = await readFile(filePath, "utf-8");
 		const lines = content.split("\n");
 		expect(lines[0]).toBe("line one");
@@ -202,7 +202,7 @@ describe("hashlineEditCore", () => {
 			],
 		});
 
-		expect(result).toContain("2");
+		expect(result).toContain("Applied 2 edit(s)");
 		const content = await readFile(filePath, "utf-8");
 		const lines = content.split("\n");
 		expect(lines[0]).toBe("ONE");
@@ -245,12 +245,72 @@ describe("hashlineEditCore", () => {
 			edits: [{ op: "append", pos, lines: ["inserted A", "inserted B"] }],
 		});
 
-		expect(result).toContain("1");
+		expect(result).toContain("Applied 1 edit(s)");
 		const content = await readFile(filePath, "utf-8");
 		const lines = content.split("\n");
 		expect(lines[0]).toBe("line one");
 		expect(lines[1]).toBe("inserted A");
 		expect(lines[2]).toBe("inserted B");
 		expect(lines[3]).toBe("line two");
+	});
+
+	test("rejects relative file paths", async () => {
+		const result = await hashlineEditCore({
+			file: "relative/path/file.txt",
+			edits: [{ op: "replace", pos: "1#ZZ", lines: "x" }],
+		});
+		expect(result).toContain("Error");
+		expect(result).toContain("absolute");
+	});
+
+	test("returns error string for non-existent file", async () => {
+		const result = await hashlineEditCore({
+			file: "/tmp/this-file-does-not-exist-xyz.txt",
+			edits: [{ op: "replace", pos: "1#ZZ", lines: "x" }],
+		});
+		expect(result).toContain("Error");
+		expect(result).toContain("Cannot read");
+	});
+
+	test("rejects end anchor before start anchor", async () => {
+		const filePath = await writeTestFile(["line one", "line two", "line three", "line four"]);
+		const pos = anchor(4, "line four");
+		const end = anchor(2, "line two");
+		const result = await hashlineEditCore({
+			file: filePath,
+			edits: [{ op: "replace", pos, end, lines: "x" }],
+		});
+		expect(result).toContain("Error");
+		expect(result).toContain("before start");
+	});
+
+	test("returns early with no changes for empty edits array", async () => {
+		const filePath = await writeTestFile(["line one"]);
+		const result = await hashlineEditCore({ file: filePath, edits: [] });
+		expect(result).toBe("Applied 0 edit(s) — no changes made.");
+	});
+
+	test("rejects overlapping range edits", async () => {
+		const filePath = await writeTestFile(["a", "b", "c", "d", "e"]);
+		const result = await hashlineEditCore({
+			file: filePath,
+			edits: [
+				{ op: "replace", pos: anchor(2, "b"), end: anchor(4, "d"), lines: "X" },
+				{ op: "replace", pos: anchor(3, "c"), lines: "Y" },
+			],
+		});
+		expect(result).toContain("Error");
+		expect(result).toContain("Overlapping");
+	});
+
+	test("end-anchor hash mismatch returns error with updated anchors", async () => {
+		const filePath = await writeTestFile(["line one", "line two", "line three"]);
+		const pos = anchor(1, "line one");
+		const result = await hashlineEditCore({
+			file: filePath,
+			edits: [{ op: "replace", pos, end: "3#ZZ", lines: "x" }],
+		});
+		expect(result).toContain("Error");
+		expect(result).toContain("end line 3");
 	});
 });

@@ -70,6 +70,18 @@ describe("configHook", () => {
 			disable: true,
 		});
 	});
+
+	test("does NOT suppress custom planner agent registered by the plugin", async () => {
+		const config = {
+			agent: {},
+		} as Config;
+		await configHook(config);
+
+		// Our custom planner should be registered and NOT have disable: true
+		const planner = config.agent?.planner as Record<string, unknown> | undefined;
+		expect(planner).toBeDefined();
+		expect(planner?.disable).toBeUndefined();
+	});
 });
 
 describe("configHook with model resolution", () => {

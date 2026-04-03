@@ -153,6 +153,22 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 		}
 	}
 
+	// Check if all remaining tasks are BLOCKED (cycles or MAX_TASKS cap)
+	const nonDoneTasks = effectiveTasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED");
+	if (nonDoneTasks.length > 0 && nonDoneTasks.every((t) => t.status === "BLOCKED")) {
+		const blockedIds = nonDoneTasks.map((t) => t.id).join(", ");
+		return Object.freeze({
+			action: "error" as const,
+			progress: `All remaining tasks are BLOCKED due to dependency cycles: [${blockedIds}]`,
+			_stateUpdates: Object.freeze({
+				buildProgress: Object.freeze({
+					...buildProgress,
+				}),
+				tasks: effectiveTasks,
+			}),
+		});
+	}
+
 	// Case 1: Review pending + result provided -> process review outcome
 	if (buildProgress.reviewPending && result) {
 		if (hasCriticalFindings(result)) {

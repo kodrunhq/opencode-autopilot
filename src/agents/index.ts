@@ -81,15 +81,19 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 	const groups: Readonly<Record<string, GroupModelAssignment>> = pluginConfig?.groups ?? {};
 	const overrides: Readonly<Record<string, AgentOverride>> = pluginConfig?.overrides ?? {};
 
+	// Snapshot built-in agent keys BEFORE we register ours — we only suppress
+	// built-in Plan variants, not our own custom "planner" agent.
+	const builtInKeys = new Set(Object.keys(config.agent));
+
 	// Register standard agents and pipeline agents (v2 orchestrator subagents)
 	registerAgents(agents, config, groups, overrides);
 	registerAgents(pipelineAgents, config, groups, overrides);
 
 	// Suppress built-in Plan agent — our planner agent replaces it (D-17).
-	// Try common naming variants since the exact built-in name is undocumented.
+	// Only disable keys that existed before our registration (built-ins).
 	const planVariants = ["Plan", "plan", "Planner", "planner"] as const;
 	for (const variant of planVariants) {
-		if (config.agent[variant] !== undefined) {
+		if (builtInKeys.has(variant) && config.agent[variant] !== undefined) {
 			config.agent[variant] = {
 				...config.agent[variant],
 				disable: true,

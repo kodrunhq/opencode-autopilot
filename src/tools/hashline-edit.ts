@@ -214,6 +214,21 @@ export async function hashlineEditCore(args: HashlineEditArgs): Promise<string> 
 		return `Error: Stale edit(s) detected.\n${hashErrors.join("\n\n")}`;
 	}
 
+	// Detect overlapping edits — reject before applying any mutations
+	for (let i = 0; i < parsedEdits.length; i++) {
+		const a = parsedEdits[i];
+		const aStart = a.lineIdx;
+		const aEnd = a.endLineIdx ?? a.lineIdx;
+		for (let j = i + 1; j < parsedEdits.length; j++) {
+			const b = parsedEdits[j];
+			const bStart = b.lineIdx;
+			const bEnd = b.endLineIdx ?? b.lineIdx;
+			if (aStart <= bEnd && bStart <= aEnd) {
+				return `Error: Overlapping edits at lines ${aStart + 1}-${aEnd + 1} and ${bStart + 1}-${bEnd + 1}. Split into separate calls.`;
+			}
+		}
+	}
+
 	// Sort edits bottom-up (highest line index first) to prevent drift
 	const sortedEdits = [...parsedEdits].sort((a, b) => {
 		const aLine = a.endLineIdx ?? a.lineIdx;
