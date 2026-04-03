@@ -101,21 +101,55 @@ Requirements for Milestone v2.0 -- Autonomous Orchestrator.
 - [x] **FLLB-07**: chat.message hook overrides outgoing model to the fallback model when fallback state differs from original, with plugin-initiated dispatch detection to prevent state reset
 - [x] **FLLB-08**: Plugin entry (index.ts) registers chat.message, enhanced event handler, and tool.execute.after hooks alongside existing tool/config/event hooks
 
+## v4 Requirements
+
+Requirements for Milestone v4.0 — Production Quality.
+
+### Bug Fixes & Infrastructure
+
+- [ ] **BFIX-01**: Stocktake detects config-hook-injected agents alongside filesystem agents
+- [ ] **BFIX-02**: All commands renamed with `oc-` prefix for namespace clarity (brainstorm->oc-brainstorm, tdd->oc-tdd, quick->oc-quick, write-plan->oc-write-plan, stocktake->oc-stocktake, review-pr->oc-review-pr, update-docs->oc-update-docs, new-agent->oc-new-agent, new-skill->oc-new-skill, new-command->oc-new-command)
+- [ ] **BFIX-03**: oc-configure removed as slash command (configuration accessible via CLI only)
+- [ ] **BFIX-04**: Clarify/remove ambiguous "general" and "explore" agents — replace with well-defined primary agents
+
+### Agents
+
+- [ ] **AGNT-10**: Primary Debugger agent visible in Tab cycle, loads systematic-debugging skill
+- [ ] **AGNT-11**: Primary Planner agent visible in Tab cycle, loads plan-writing + plan-executing skills
+- [ ] **AGNT-12**: Primary Code Reviewer agent visible in Tab cycle, loads code-review skill and invokes oc_review
+- [ ] **AGNT-13**: Primary agents registered with intentional Tab-cycle ordering (Autopilot first, then Debugger, Planner, Reviewer)
+- [ ] **AGNT-14**: Config-hook agents appear in Tab cycle correctly for primary mode agents
+
+### Content Expansion
+
+- [ ] **SKLL-10**: Coding standards expanded with OOP/SOLID principles, Clean Architecture, dependency inversion, composition over inheritance
+- [ ] **SKLL-11**: Java language patterns skill with idiomatic Java, Spring Boot patterns, JPA conventions
+- [ ] **SKLL-12**: C# language patterns skill with idiomatic C#, .NET patterns, Entity Framework conventions
+- [ ] **CMND-10**: `/oc-review-agents` command validates and improves project agents.md files (structure, system prompts)
+- [ ] **CMND-11**: Curated agents.md starter templates for common project types (web-api, cli-tool, library, fullstack)
+
+### Production Hardening
+
+- [ ] **HARD-01**: Mock/fail-forced fallback test mode accessible from CLI configure, simulates rate-limit, timeout, quota-exceeded, malformed
+- [ ] **HARD-02**: Context-aware commands auto-detect project language from files instead of requiring per-language variants
+- [ ] **HARD-03**: Doctor extended with skill-aware diagnostics (skill loading per detected stack, memory DB health, command accessibility)
+- [ ] **HARD-04**: Anti-slop comment hook prevents AI-generated comment bloat (obvious comments, sycophantic language), configurable via profiles
+
+### Quality Assurance
+
+- [ ] **QAPL-01**: Internal manual QA playbook with step-by-step test procedures for every command, agent, skill, memory flow, fallback chain, and doctor check
+
 ## Future Requirements
 
-Deferred beyond v2.0. Tracked for future milestones.
-
-### Additional Agents (from v1 backlog)
-
-- **AGNT-05**: Code reviewer agent focused on code quality and patterns
-- **AGNT-06**: Planner agent that creates structured implementation plans
-- **AGNT-07**: TDD guide agent for test-driven development workflows
+Deferred beyond v4.0. Tracked for future milestones.
 
 ### Advanced Features
 
 - **ADV-01**: Divergent explorer (parallel prototyping with branch comparison)
 - **ADV-02**: Ace enforcement pipeline (inline quality during build with enriched plans + checkpoints)
 - **ADV-03**: Language-specific review agents beyond TypeScript (Go, Python, Rust, React)
+- **ADV-04**: Cross-machine memory portability (instinct import/export)
+- **ADV-05**: Eval harness for measuring agent effectiveness
 
 ## Out of Scope
 
@@ -187,9 +221,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 **Coverage:**
 - v1 requirements: 15 total (all Complete)
 - v2 requirements: 42 total (34 original + 8 fallback)
-- Mapped to phases: 42/42
-- Unmapped: 0
+- v4 requirements: 18 total
+- Mapped to phases: 42/42 (v1+v2), 0/18 (v4 — pending roadmap)
+- Unmapped: 18 (v4) ⚠️
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-04-01 after Phase 9 requirement definition*
+*Last updated: 2026-04-03 after v4.0 requirement definition*
