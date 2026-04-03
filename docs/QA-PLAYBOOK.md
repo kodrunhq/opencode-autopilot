@@ -1774,3 +1774,462 @@ The fallback chain provides automatic model failover when API calls fail. It cla
 **Pass/Fail:**
 - PASS: Recovery returns to original model after cooldown. Returns null when already on original or still in cooldown.
 - FAIL: Recovery happens during cooldown, state not properly reset, or crash on edge cases.
+
+---
+
+## Doctor and Health Checks
+
+The `oc_doctor` tool runs 6 independent health checks and reports pass/fail status for each. Health checks are implemented in `src/health/checks.ts` and aggregated by `src/health/runner.ts`. The anti-slop comment hook detects AI-generated comment bloat in code files.
+
+### config-validity
+
+**What it checks:** Plugin config file exists at `~/.config/opencode/opencode-autopilot.json` and passes Zod schema validation.
+
+**Steps:**
+1. Invoke `oc_doctor`.
+2. Locate the `config-validity` check in the `checks` array.
+
+**Expected Output:**
+- Pass: `Config v{N} loaded and valid` (where N is the config schema version).
+- Fail: `Plugin config file not found` or `Config validation failed: {error}`.
+
+**Negative Test:**
+- Delete `~/.config/opencode/opencode-autopilot.json`.
+- Run `oc_doctor`.
+- Expected: `config-validity` reports "fail" with message "Plugin config file not found".
+- Corrupt the JSON file (e.g., add invalid characters).
+- Expected: `config-validity` reports "fail" with message "Config validation failed: ...".
+
+**Pass/Fail:**
+- PASS: Valid config reports pass with version. Missing config reports fail. Corrupt config reports fail with specific error.
+- FAIL: Missing config not detected, or corrupt config accepted as valid.
+
+---
+
+### agent-injection
+
+**What it checks:** All expected agents (standard + pipeline) are present in the OpenCode config agent map.
+
+**Steps:**
+1. Invoke `oc_doctor`.
+2. Locate the `agent-injection` check.
+
+**Expected Output:**
+- Pass: `All {N} agents injected` (includes standard agents: researcher, metaprompter, documenter, pr-reviewer, autopilot; plus pipeline agents from AGENT_NAMES).
+- Fail: `{N} agent(s) missing: {list}`.
+
+**Negative Test:**
+- Remove one agent from the config hook registration.
+- Expected: `agent-injection` reports "fail" listing the missing agent name.
+- Provide no OpenCode config (null).
+- Expected: "No OpenCode config or agent map available".
+
+**Pass/Fail:**
+- PASS: All agents detected when properly registered. Missing agents listed by name.
+- FAIL: Missing agents not detected, or false positives reported.
+
+---
+
+### asset-directories
+
+**What it checks:** Source asset directory (bundled `assets/`) and target directory (`~/.config/opencode/`) exist and are accessible.
+
+**Steps:**
+1. Invoke `oc_doctor`.
+2. Locate the `asset-directories` check.
+
+**Expected Output:**
+- Pass: `Asset directories exist: source={path}, target={path}`.
+- Fail: `Asset source directory missing: {path}` or `Asset target directory inaccessible ({code}): {path}`.
+
+**Negative Test:**
+- Delete `~/.config/opencode/` directory.
+- Expected: `asset-directories` reports "fail" with "missing" for the target directory.
+- Make the directory read-only (no execute permission).
+- Expected: Reports "inaccessible (EACCES)".
+
+**Pass/Fail:**
+- PASS: Both directories verified when present. Missing/inaccessible directories produce specific error messages with path and error code.
+- FAIL: Missing directories not detected, or error codes not reported.
+
+---
+
+### skill-loading
+
+**What it checks:** Skills load from the skills directory, project stacks are detected, and matching skills are filtered.
+
+**Steps:**
+1. Invoke `oc_doctor` from a project directory.
+2. Locate the `skill-loading` check.
+
+**Expected Output:**
+- Pass: `Detected stacks: [{tags}], {matched}/{total} skills matched`.
+- The `details` field contains the list of matched skill names.
+- Fail: `Skill check failed: {error}`.
+
+**Negative Test:**
+- Delete the entire `~/.config/opencode/skills/` directory.
+- Expected: `skill-loading` reports "pass" with 0/0 skills matched (loadAllSkills returns empty map on ENOENT).
+
+**Pass/Fail:**
+- PASS: Reports detected stacks and matched skill count. Details list skill names. Missing skills directory handled gracefully.
+- FAIL: Incorrect stack detection, wrong count, or crash on missing directory.
+
+---
+
+### memory-db
+
+**What it checks:** Memory database exists, is readable, and contains a valid observation count.
+
+**Steps:**
+1. Invoke `oc_doctor`.
+2. Locate the `memory-db` check.
+
+**Expected Output:**
+- Pass (DB exists): `Memory DB exists ({N} observation(s), {size}KB)`.
+- Pass (no DB yet): `Memory DB not yet initialized -- will be created on first memory capture`.
+- Fail: `Memory DB inaccessible: {error}` or `Memory DB exists but is empty (0 bytes)` or `Memory DB read error: {error}`.
+
+**Negative Test:**
+- Delete the memory DB file.
+- Expected: Reports pass (DB will be created on first use).
+- Create a 0-byte file at the DB path.
+- Expected: Reports "fail" with "Memory DB exists but is empty (0 bytes)".
+- Corrupt the DB file (write random bytes).
+- Expected: Reports "fail" with a read error message.
+
+**Pass/Fail:**
+- PASS: Valid DB reports observation count and size. Missing DB reports pending initialization. Empty and corrupt DBs report specific failures.
+- FAIL: Missing DB causes crash, or corrupt DB not detected.
+
+---
+
+### command-accessibility
+
+**What it checks:** All 11 expected command files exist in `~/.config/opencode/commands/` and have valid YAML frontmatter with non-empty descriptions.
+
+**Steps:**
+1. Invoke `oc_doctor`.
+2. Locate the `command-accessibility` check.
+
+**Expected Output:**
+- Pass: `All 11 commands accessible`.
+- Fail: `{N} command issue(s) found` with details listing each issue (e.g., "missing: oc-tdd", "oc-brainstorm: no frontmatter").
+- Expected commands: oc-tdd, oc-review-pr, oc-brainstorm, oc-write-plan, oc-stocktake, oc-update-docs, oc-new-agent, oc-new-skill, oc-new-command, oc-quick, oc-review-agents.
+
+**Negative Test:**
+- Delete one command file (e.g., `oc-tdd.md`).
+- Expected: Reports "1 command issue(s) found" with detail "missing: oc-tdd".
+- Create a command file with invalid YAML frontmatter.
+- Expected: Reports issue with "invalid YAML frontmatter".
+- Create a command file with empty description in frontmatter.
+- Expected: Reports issue with "missing or empty description".
+
+**Pass/Fail:**
+- PASS: All 11 commands verified when present. Missing and invalid commands listed with specific issues.
+- FAIL: Missing commands not detected, or invalid frontmatter accepted.
+
+---
+
+### Full Doctor Run
+
+**Prerequisites:**
+- Plugin installed and loaded
+- OpenCode session open
+
+**Steps:**
+1. Invoke `oc_doctor` with no arguments.
+2. Observe the full JSON response.
+
+**Expected Output:**
+- JSON with `action: "doctor"`, `checks` array (6 entries), `allPassed` boolean, `displayText`, and `duration` in milliseconds.
+- Each check runs independently (Promise.allSettled) -- a failure in one does not skip others.
+- `allPassed` is true only when every check's status is "pass".
+- `displayText` shows human-readable `[OK]` or `[FAIL]` per check with fix suggestions for failures.
+- Duration reports total execution time in milliseconds.
+
+**Negative Test:**
+- Corrupt multiple components (delete config file, remove a command, corrupt memory DB).
+- Run `oc_doctor`.
+- Expected: Each affected check reports "fail" independently. Working components still report "pass". `allPassed` is false.
+
+**Pass/Fail:**
+- PASS: All 6 checks run independently. Failed checks include actionable messages. `allPassed` correctly reflects aggregate status. Duration is reasonable (<5 seconds).
+- FAIL: Checks not independent (one failure blocks others), missing fix suggestions, or incorrect aggregate status.
+
+---
+
+### Anti-Slop Comment Hook
+
+**Prerequisites:**
+- Plugin installed with the anti-slop PostToolUse hook registered
+- An OpenCode session with file-writing tools available
+
+**Steps:**
+1. Use a file-writing tool (write_file, edit_file) to write a code file containing obvious AI-generated comments.
+2. Example slop comments to test:
+   - `// This is a comprehensive and robust implementation`
+   - `// Handle edge cases gracefully`
+   - `// Ensure proper error handling`
+3. Observe the toast notification.
+
+**Expected Output:**
+- The `createAntiSlopHandler` fires after file-writing tools (write_file, edit_file, write, edit, create_file).
+- It reads the written file (not the tool output), scans for slop patterns using comment-aware regex.
+- Only comments are scanned (not code) -- uses `EXT_COMMENT_STYLE` mapping and `COMMENT_PATTERNS` regex per language.
+- Findings show line numbers and detected text (up to 5 in the preview).
+- Toast notification: "Anti-Slop Warning: {N} AI comment(s) detected: {preview}".
+
+**Negative Test:**
+- Write a code file with no comments or only legitimate comments.
+- Expected: No toast notification. Handler returns silently.
+- Write a non-code file (e.g., `.md`, `.json`).
+- Expected: `isCodeFile` returns false. Handler skips. No toast.
+- Write a file with a relative path.
+- Expected: Handler skips (requires absolute path within cwd for safety).
+
+**Pass/Fail:**
+- PASS: Slop comments detected in code files. Toast shows line numbers and text. Non-code files and clean code files are skipped. Path validation prevents traversal.
+- FAIL: False positives on code tokens (not comments), or slop in comments not detected, or non-code files scanned.
+
+---
+
+## Observability
+
+The observability system captures session events, tracks token usage, persists logs as JSON files, and provides tools for inspection. Implemented in `src/observability/`.
+
+### Event Capture
+
+**Prerequisites:**
+- Plugin installed with observability hooks registered
+- An active OpenCode session
+
+**Steps:**
+1. Open an OpenCode session. Observe the `session.created` event initializes the session in the event store.
+2. Invoke a tool (e.g., `oc_doctor`). Observe the `tool.execute.before` and `tool.execute.after` hooks fire.
+3. Send a message that generates a response. Observe the `message.updated` event accumulates tokens.
+4. If running a pipeline, observe `decision` and `phase_transition` events.
+
+**Expected Output:**
+- `SessionEventStore` accumulates events in memory per session ID.
+- Event types captured: `session_start`, `session_end`, `tool_complete`, `decision`, `phase_transition`, `error`, `fallback`, `model_switch`, `context_warning`.
+- Tool execution metrics tracked: invocation count, total duration, successes, failures per tool name.
+- Token tracking: input, output, reasoning, cache read/write, and cost accumulated from `message.updated`.
+- All handlers are pure observers -- they never modify session state or output (Pitfall 5).
+
+**Negative Test:**
+- Attempt to append an event to a non-initialized session ID.
+- Expected: `appendEvent` silently returns (session not in store). No crash.
+
+**Pass/Fail:**
+- PASS: Events accumulate in memory. Tool metrics tracked per tool. Token data accumulated from messages. Non-initialized sessions handled gracefully.
+- FAIL: Events lost, metrics incorrect, or non-initialized sessions cause errors.
+
+---
+
+### Session Stats
+
+**Prerequisites:**
+- At least one session log exists in `~/.config/opencode/logs/`
+
+**Steps:**
+1. Invoke `oc_session_stats` with no arguments (uses latest session).
+2. Observe the JSON response.
+
+**Expected Output:**
+- JSON with `action: "session_stats"`, `sessionId`, `duration` (ms), `eventCount`, `decisionCount`, `errorSummary` (object with error type counts), `phaseBreakdown` (array with per-phase stats), `displayText`.
+- Phase breakdown entries have `phase`, `decisionCount`, `errorCount`.
+- Display text contains a human-readable summary table.
+
+**Negative Test:**
+- Invoke `oc_session_stats` with `sessionID: "nonexistent-session-id"`.
+- Expected: Returns `action: "error"` with message `Session "nonexistent-session-id" not found.`
+
+**Pass/Fail:**
+- PASS: Returns accurate session statistics with event counts, decision counts, error summary, and phase breakdown. Invalid session ID returns clear error.
+- FAIL: Wrong counts, missing phase breakdown, or crash on missing session.
+
+---
+
+### Log Persistence
+
+**Prerequisites:**
+- Plugin installed with observability active
+
+**Steps:**
+1. Open an OpenCode session and perform some actions.
+2. End the session (triggers `session.deleted` event).
+3. Check `~/.config/opencode/logs/` for a new JSON file named `{sessionId}.json`.
+4. Open the log file and verify its structure.
+
+**Expected Output:**
+- Session logs written as JSON files using atomic write pattern (temp file + rename).
+- Log file schema version: 1.
+- Log file contains: `schemaVersion`, `sessionId`, `startedAt`, `endedAt`, `events` (array), `decisions` (extracted from decision events), `errorSummary` (counts by error type).
+- Logs written on `session.idle` (intermediate snapshot, fire-and-forget) and `session.deleted` (final flush).
+- Log directory: `~/.config/opencode/logs/` (user-scoped, not project-scoped).
+- Validated through `sessionLogSchema` (Zod) before writing.
+
+**Negative Test:**
+- Make the logs directory read-only.
+- Expected: Write fails silently (fire-and-forget pattern). Session continues normally. Error logged to console.
+
+**Pass/Fail:**
+- PASS: JSON log files written atomically. Schema includes all required fields. Intermediate snapshots on idle. Final flush on session end. Write failures are non-fatal.
+- FAIL: Logs not written, non-atomic writes (corruption risk), or write failure crashes session.
+
+---
+
+### Log Retrieval
+
+**Prerequisites:**
+- At least one session log exists
+
+**Steps:**
+1. Invoke `oc_logs` with `mode: "list"`.
+2. Observe: Returns a table of all session logs with session ID, start time, event count, decisions, and errors.
+3. Pick a session ID from the list.
+4. Invoke `oc_logs` with `mode: "detail"` and the chosen `sessionID`.
+5. Observe: Returns the full session log with a markdown summary.
+6. Invoke `oc_logs` with `mode: "search"`, `eventType: "decision"`.
+7. Observe: Returns filtered events matching the type.
+
+**Expected Output:**
+- List mode: `action: "logs_list"`, `sessions` array, `displayText` with table format.
+- Detail mode: `action: "logs_detail"`, `sessionLog` object, `summary` markdown, `displayText`.
+- Search mode: `action: "logs_search"`, `events` array, `displayText`.
+- Search supports filtering by `eventType`, `after` (ISO timestamp lower bound), `before` (ISO timestamp upper bound).
+
+**Negative Test:**
+- Invoke `oc_logs` with `mode: "detail"` and `sessionID: "does-not-exist"`.
+- Expected: Returns `action: "error"` with message `Session "does-not-exist" not found.`
+
+**Pass/Fail:**
+- PASS: All three modes return structured JSON with displayText. Search filters work for type and time range. Missing sessions return clear errors.
+- FAIL: Any mode crashes, search filters not applied, or missing session produces unhandled exception.
+
+---
+
+### Log Retention
+
+**Prerequisites:**
+- Multiple session logs exist, some older than 30 days
+
+**Steps:**
+1. Verify some log files in `~/.config/opencode/logs/` have modification times older than 30 days (or create test files with old timestamps).
+2. Trigger log pruning (runs non-blocking on plugin load).
+3. Verify old log files are removed.
+
+**Expected Output:**
+- `pruneOldLogs` checks file modification time against the retention threshold (default: 30 days).
+- Files older than the threshold are deleted via `unlink`.
+- Files newer than the threshold are preserved.
+- Handles missing logs directory gracefully (ENOENT returns `{ pruned: 0 }`).
+- Race condition safety: files that disappear between `readdir` and `stat` are silently skipped.
+
+**Negative Test:**
+- Run pruning on an empty logs directory.
+- Expected: Returns `{ pruned: 0 }`. No errors.
+- Run pruning when the logs directory does not exist.
+- Expected: Returns `{ pruned: 0 }`. No crash.
+
+**Pass/Fail:**
+- PASS: Logs older than 30 days are pruned. Recent logs preserved. Missing/empty directories handled gracefully. No race condition errors.
+- FAIL: Old logs not pruned, recent logs deleted, or missing directory causes crash.
+
+---
+
+### Context Monitor
+
+**Prerequisites:**
+- Plugin installed with observability active
+- An active session with message exchanges
+
+**Steps:**
+1. Open a session. The context monitor initializes with a default context limit (200,000 tokens).
+2. Exchange messages until context utilization approaches 80%.
+3. Observe: A one-time toast warning fires: "Context Warning: Context at {N}% -- consider compacting".
+4. Continue messaging past 80%.
+5. Observe: No additional toast (one-time per session per D-36).
+
+**Expected Output:**
+- `ContextMonitor` tracks per-session context utilization.
+- Warning threshold: 80% of context limit (CONTEXT_WARNING_THRESHOLD = 0.8).
+- Warning fires exactly once per session (tracked by `warned` flag).
+- `processMessage(sessionID, inputTokens)` returns `{ utilization, shouldWarn }`.
+- Zero context limit returns utilization 0 (no divide-by-zero).
+- Unknown session IDs return `{ utilization: 0, shouldWarn: false }`.
+
+**Negative Test:**
+- Process a message for an unknown session ID (never initialized).
+- Expected: Returns `{ utilization: 0, shouldWarn: false }`. No crash.
+- Set context limit to 0.
+- Expected: Returns `{ utilization: 0, shouldWarn: false }`. No division by zero.
+
+**Pass/Fail:**
+- PASS: Warning fires once at 80% utilization. Subsequent messages do not re-warn. Zero/unknown sessions handled gracefully.
+- FAIL: Warning fires multiple times, wrong threshold, or division by zero on zero limit.
+
+---
+
+## Orchestrator Pipeline E2E
+
+The orchestrator pipeline drives the full SDLC: RECON, CHALLENGE, ARCHITECT, EXPLORE, PLAN, BUILD, SHIP, RETROSPECTIVE. It is implemented in `src/orchestrator/handlers/` with entry point `src/tools/orchestrate.ts`.
+
+### Full Pipeline Run
+
+**Prerequisites:**
+- OpenCode session open in a project directory
+- No existing pipeline state file (`.opencode-autopilot/pipeline-state.json`)
+- Plugin installed with all agents registered
+
+**Steps:**
+1. Invoke `oc_orchestrate` with `idea: "Add a hello-world utility function"`.
+2. Receive a dispatch instruction for the RECON phase (research agent).
+3. Execute the dispatched agent and collect its output.
+4. Invoke `oc_orchestrate` with `result: "<agent output>"`.
+5. Repeat the dispatch/result cycle through all phases:
+   - **RECON:** Dispatches researcher agent. Produces research report with prior art, technology options, and constraints.
+   - **CHALLENGE:** Dispatches challenger agent. Proposes enhancements, identifies risks, and refines the brief.
+   - **ARCHITECT:** Dispatches architect agent. Produces system design with file structure, component interactions, and trade-offs.
+   - **EXPLORE (conditional):** May dispatch explorer agent if confidence is low. Investigates specific uncertainties.
+   - **PLAN:** Dispatches planner agent. Produces task list with dependency waves, file paths, and verification commands.
+   - **BUILD:** Dispatches builder agent. Creates commits implementing the plan tasks.
+   - **SHIP:** Dispatches shipper agent. Produces changelog, updates documentation, and prepares release notes.
+   - **RETROSPECTIVE:** Dispatches retrospective agent. Extracts lessons learned and captures observations.
+6. Receive `action: "complete"` with pipeline summary.
+
+**Expected Output:**
+- Pipeline state persisted at `.opencode-autopilot/pipeline-state.json` after each phase transition.
+- Each phase transitions through: PENDING -> IN_PROGRESS -> COMPLETED.
+- Artifacts produced for each phase are stored in the state.
+- Decision log captures agent decisions with rationale at each phase.
+- Confidence ledger tracks confidence levels across areas.
+- Final status: "COMPLETED" with all 8 phases marked as completed.
+
+**Negative Test:**
+- Invoke `oc_orchestrate` with no arguments and no existing state.
+- Expected: Returns `action: "error"` with message `No active run. Provide an idea to start.`
+- Invoke `oc_orchestrate` with an idea while a run is already in progress.
+- Expected: Resumes the existing run (does not start a new one).
+
+**Pass/Fail:**
+- PASS: Pipeline completes all 8 phases. State file shows "COMPLETED". Artifacts exist for each phase. Decision log captures rationale. Dispatch/result cycle works correctly.
+- FAIL: Phases skipped, state not persisted, artifacts missing, or pipeline hangs.
+
+---
+
+### Quick Smoke Test Checklist
+
+A rapid 10-item checklist for validating core plugin functionality before a release. Each item should take less than 1 minute to verify.
+
+- [ ] **Plugin loads:** OpenCode starts without errors when the plugin is configured in `opencode.json`.
+- [ ] **Tools register:** Invoke `oc_doctor` -- should return JSON with `action: "doctor"` and 6 health checks.
+- [ ] **Commands accessible:** Type `/oc-` in the OpenCode TUI -- at least 11 commands should appear in autocomplete.
+- [ ] **Agents visible:** Press Tab to cycle primary agents -- autopilot, debugger, planner, reviewer should be available. Type `@` and verify researcher, metaprompter, documenter, pr-reviewer are @-callable.
+- [ ] **Skills inject:** Run `oc_doctor` in a TypeScript project -- `skill-loading` check should report detected stacks and matched skills.
+- [ ] **Memory captures:** Run `oc_memory_status` -- should return `stats` object (or null if DB not yet created). After a session with decisions, stats should show non-zero observation counts.
+- [ ] **Doctor passes:** Run `oc_doctor` -- all 6 checks should report "pass" with `allPassed: true`.
+- [ ] **Logs write:** End a session, then check `~/.config/opencode/logs/` for a new JSON log file.
+- [ ] **Config saves:** Run `oc_configure` start/assign/commit cycle -- config should persist to `~/.config/opencode/opencode-autopilot.json`.
+- [ ] **Stocktake counts match:** Run `oc_stocktake` -- summary counts should match: 18 skills, 11 commands, 8+ agents (standard + pipeline).
