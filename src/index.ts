@@ -236,7 +236,7 @@ const plugin: Plugin = async (input) => {
 			if (event.type === "session.created" && isFirstLoad(config)) {
 				await sdkOps.showToast(
 					"Welcome to OpenCode Autopilot!",
-					"Run /oc-configure to set up your model assignments for each agent group.",
+					"Plugin loaded. Run oc_doctor to verify your setup.",
 					"info",
 				);
 			}

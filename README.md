@@ -42,7 +42,7 @@ The AI walks you through installation, model assignment for each agent group, an
 bunx @kodrunhq/opencode-autopilot install
 ```
 
-This registers the plugin in `opencode.json` and creates a starter config. Then launch OpenCode and run `/oc-configure` to set up your model assignments.
+This registers the plugin in `opencode.json` and creates a starter config. Then run `bunx @kodrunhq/opencode-autopilot configure` to set up your model assignments.
 
 ### Option C: Manual setup
 
@@ -60,7 +60,7 @@ npm install -g @kodrunhq/opencode-autopilot
 }
 ```
 
-Launch OpenCode. The plugin auto-installs agents, skills, and commands on first load and shows a welcome toast directing you to `/oc-configure`.
+Launch OpenCode. The plugin auto-installs agents, skills, and commands on first load and shows a welcome toast.
 
 ### Verify your setup
 
@@ -72,7 +72,7 @@ This checks config health, model assignments, and adversarial diversity between 
 
 ## Model Groups
 
-Agents are organized into 8 groups by the type of thinking they do. Each group gets a primary model and fallback chain. The `/oc-configure` command walks you through assigning models interactively.
+Agents are organized into 8 groups by the type of thinking they do. Each group gets a primary model and fallback chain. Run `bunx @kodrunhq/opencode-autopilot configure` to assign models interactively. For advanced use, the `oc_configure` tool is also available in-session.
 
 | Group | Agents | What they do | Model recommendation |
 |-------|--------|-------------|---------------------|
@@ -203,22 +203,22 @@ The plugin ships with production-ready assets that auto-install to `~/.config/op
 | Type | Assets | Purpose |
 |------|--------|---------|
 | **Agents** | researcher, metaprompter, documenter, pr-reviewer, autopilot + 10 pipeline agents | Research, docs, PR review, full autonomous pipeline |
-| **Commands** | `/oc-configure`, `/new-agent`, `/new-skill`, `/new-command`, `/review-pr` | Model setup, extend the plugin in-session, PR reviews |
+| **Commands** | `/oc-brainstorm`, `/oc-tdd`, `/oc-quick`, `/oc-write-plan`, `/oc-stocktake`, `/oc-review-pr`, `/oc-update-docs`, `/oc-new-agent`, `/oc-new-skill`, `/oc-new-command` | Brainstorming, TDD, quick tasks, planning, auditing, PR reviews, docs, extend plugin |
 | **Skills** | coding-standards | Universal best practices (naming, error handling, immutability, validation) |
 
 ### In-session creation
 
 Extend the plugin without leaving OpenCode:
 
-- **`/new-agent`** -- Create a custom agent with YAML frontmatter + system prompt
-- **`/new-skill`** -- Create a skill directory with domain knowledge
-- **`/new-command`** -- Create a slash command (validates against built-in names)
+- **`/oc-new-agent`** -- Create a custom agent with YAML frontmatter + system prompt
+- **`/oc-new-skill`** -- Create a skill directory with domain knowledge
+- **`/oc-new-command`** -- Create a slash command (validates against built-in names)
 
 All created assets write to `~/.config/opencode/` and are available immediately.
 
 ## Configuration
 
-Config lives at `~/.config/opencode/opencode-autopilot.json`. Run `/oc-configure` for interactive setup, or edit manually.
+Config lives at `~/.config/opencode/opencode-autopilot.json`. Run `bunx @kodrunhq/opencode-autopilot configure` for interactive setup, or edit manually.
 
 | Setting | Options | Default |
 |---------|---------|---------|

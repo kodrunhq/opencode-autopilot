@@ -8,19 +8,21 @@ An OpenCode plugin that provides autonomous SDLC orchestration, built-in code qu
 
 A single command transforms an idea into a shipped, reviewed, tested result — fully autonomous, with built-in code quality enforcement at every stage.
 
-## Current Milestone: v2.0 Autonomous Orchestrator
+## Current Milestone: v4.0 Production Quality
 
-**Goal:** Transform opencode-autopilot from a utility plugin into an autonomous SDLC orchestration engine with embedded code review.
+**Goal:** Comprehensive quality overhaul — fix bugs, expand assets to competitor parity, enforce naming conventions, add fallback testability, and create a manual QA playbook.
 
 **Target features:**
-- Tool-based orchestrator (`oc_orchestrate`) driving an 8-phase state machine
-- Embedded ace review engine (20+ specialized review agents)
-- Deterministic tooling ported to native TypeScript
-- 12+ specialized subagents injected via config hook
-- Confidence ledger controlling pipeline depth
-- Architecture Arena with competing proposals + adversarial critique
-- Full user configurability (autonomy, strictness, model routing, phase toggles)
-- Preserves v1 creation tooling and curated agents
+- Asset expansion: many more agents, skills, and commands to reach competitive parity with top plugins
+- Primary agents: add missing agents (debugger, etc.), fix Tab-cycle ordering
+- Fix oc_stocktake not detecting agents (returns empty array)
+- Remove oc-configure as slash command (keep CLI-only)
+- All commands prefixed with oc- for namespace clarity
+- More @-callable subagents; clarify/remove "general"/"explore" agents
+- Command to review and improve a project's agents.md
+- Mock/fail-forced fallback mode accessible from CLI configure
+- Coding standards expansion: more languages + design principles (abstraction, OOP patterns)
+- Internal manual QA playbook with step-by-step tests for every feature/agent/flow
 
 ## Requirements
 
@@ -30,16 +32,18 @@ A single command transforms an idea into a shipped, reviewed, tested result — 
 
 ### Active
 
-<!-- v2.0 Autonomous Orchestrator -->
+<!-- v4.0 Production Quality -->
 
-- [ ] Autonomous orchestrator tool (oc_orchestrate) with 8-phase state machine
-- [ ] Embedded ace review engine with 20+ specialized agents
-- [ ] Deterministic state/config/confidence tooling in TypeScript
-- [ ] 12+ specialized subagents (researcher, proposer, critic, implementer, reviewer, etc.)
-- [ ] Architecture Arena with competing proposals and adversarial critique
-- [ ] Confidence ledger controlling pipeline depth and decisions
-- [ ] User-configurable settings (autonomy, strictness, model routing, phase toggles)
-- [ ] Institutional memory for cross-project learning
+- [ ] Expand agents, skills, and commands to competitive parity
+- [ ] Add missing primary agents (debugger) and fix Tab-cycle ordering
+- [ ] Fix oc_stocktake agent detection bug
+- [ ] Remove oc-configure command (CLI-only)
+- [ ] Prefix all commands with oc- namespace
+- [ ] Expand @-callable subagents; clarify/remove general/explore
+- [ ] Add agents.md review/improve command
+- [ ] Add mock/fail-forced fallback test mode to CLI configure
+- [ ] Expand coding standards (more languages, OOP/abstraction principles)
+- [ ] Create internal manual QA playbook for all features/agents/flows
 
 ### Out of Scope
 
@@ -104,4 +108,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-31 after milestone v2.0 start*
+*Last updated: 2026-04-03 after milestone v4.0 start*

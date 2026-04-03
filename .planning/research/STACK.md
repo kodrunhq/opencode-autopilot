@@ -1,338 +1,241 @@
-# Technology Stack
+# Stack Research
 
-**Project:** OpenCode Assets Plugin v2.0 -- Autonomous Orchestrator + Review Engine
-**Researched:** 2026-03-31
-**Scope:** Stack additions for NEW capabilities only (orchestrator state machine, review pipeline, confidence system, institutional memory). Existing stack validated in prior milestone is listed for integration context but not re-evaluated.
+**Domain:** OpenCode AI Plugin — v4.0 Production Quality Milestone
+**Researched:** 2026-04-03
+**Confidence:** HIGH
 
-## Existing Stack (VALIDATED -- DO NOT CHANGE)
+## Executive Summary
 
-Already in production. Listed for integration context only.
+The v4.0 milestone requires **zero new npm dependencies**. Every feature — mock/fail-forced fallback testing, QA playbook infrastructure, coding standards expansion, command namespace prefixing, and agent expansion — is achievable with the existing stack. The project already has the mock provider infrastructure (`src/observability/mock/`), the skill YAML frontmatter system with adaptive injection, and the config hook agent registration pattern. New work is content authoring (markdown skills/agents/commands), config schema extensions, and wiring — not library adoption.
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Bun | 1.2.x+ | JS/TS runtime, test runner, plugin host |
-| TypeScript | 5.8.x (native via Bun) | Language |
-| @opencode-ai/plugin | ^1.3.8 | Plugin SDK (tool registration, hooks, config) |
-| Zod | transitive via plugin SDK | Schema validation (import { z } from "zod" works) |
-| yaml | ^2.8.3 | YAML frontmatter generation |
-| Biome | ^2.4.10 | Lint + format |
-| node:fs/promises | built-in | File I/O (project constraint: no Bun.file/Bun.write) |
-| node:path, node:os | built-in | Path manipulation, homedir resolution |
-| bun:test | built-in | Jest-compatible test runner |
+## Current Stack (Unchanged for v4.0)
 
-## Recommended Stack Additions
+### Core Technologies
 
-### State Machine: Hand-rolled with TypeScript discriminated unions
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Bun | 1.3.11 | Runtime, test runner, package manager | Required by OpenCode plugin spec; native TS execution |
+| TypeScript | ^6.0.2 | Type safety | Already in use; `--noEmit` check in prepublishOnly |
+| @opencode-ai/plugin | ^1.3.8 (peer >=1.3.0) | Plugin API (tools, hooks, config) | The only way to register tools/hooks/agents in OpenCode |
+| yaml | ^2.8.3 | YAML frontmatter parsing for linter and templates | Covers all skill/agent/command YAML needs |
+| zod | (transitive via @opencode-ai/plugin) | Schema validation for tool args and config | Available as `import { z } from "zod"`; no separate install needed |
+| Biome | ^2.4.10 (dev) | Lint + format | Already configured; covers all new TS files |
+| @inquirer/select, checkbox, confirm, search | ^5-6.x | Interactive CLI prompts | Used by oc_configure wizard |
+| mitt | ^3.0.1 | Typed event emitter | Already installed from v2.0; used by orchestrator lifecycle events |
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Custom FSM | n/a (project code) | 8-phase orchestrator state machine | Zero deps, compile-time safety, ~80 lines |
+## v4.0 Feature Stack Analysis
 
-**Why NOT XState v5:** XState v5 (latest 5.28.0, ~3.7M weekly downloads, zero deps) is a powerful statechart library with actor model support. However, it is overengineered for this use case:
+### 1. Mock/Fail-Forced Fallback Testing Mode
 
-1. The orchestrator has a **fixed 8-phase linear pipeline** with known transitions -- no hierarchical states, no parallel regions, no dynamic actor spawning
-2. XState's actor model adds conceptual overhead (spawn, send, invoke) that maps poorly to OpenCode's Task tool dispatch model
-3. Bundle size (~50KB+ minified) for what is a simple transition map
-4. David Khourshid (XState's creator) himself wrote ["You don't need a library for state machines"](https://dev.to/davidkpiano/you-don-t-need-a-library-for-state-machines-k7h) for simple cases
+**New dependencies needed:** NONE
 
-**Implementation pattern:**
-```typescript
-// Discriminated union -- compiler enforces exhaustiveness
-type OrchestratorPhase =
-  | { phase: "research"; data: ResearchState }
-  | { phase: "plan"; data: PlanState }
-  | { phase: "architect"; data: ArchitectState }
-  | { phase: "implement"; data: ImplementState }
-  | { phase: "review"; data: ReviewState }
-  | { phase: "fix"; data: FixState }
-  | { phase: "verify"; data: VerifyState }
-  | { phase: "ship"; data: ShipState };
+The mock infrastructure already exists and is complete:
+- `src/observability/mock/types.ts` — 5 failure modes (`rate_limit`, `quota_exceeded`, `timeout`, `malformed`, `service_unavailable`)
+- `src/observability/mock/mock-provider.ts` — `createMockError()` generates frozen error objects matching SDK error shapes
+- `src/tools/mock-fallback.ts` — `oc_mock_fallback` tool registered and functional
+- `src/orchestrator/fallback/error-classifier.ts` — `classifyErrorType()` and `isRetryableError()` already consume mock errors
 
-// Pure function transition map
-function transition(
-  current: OrchestratorPhase,
-  event: OrchestratorEvent
-): OrchestratorPhase { /* switch on phase + event */ }
-```
+**What's missing is wiring, not libraries:**
+1. A config flag (`fallback.mockMode: MockFailureMode | false`) in the Zod config schema — extend existing `src/config.ts`
+2. A hook in `FallbackManager` event handler that injects `createMockError(mode)` when mockMode is active
+3. An `oc_configure` wizard section to toggle mock mode via existing `@inquirer/select`
+4. The `oc_mock_fallback` tool needs "enable/disable" subcommands (currently only "list" and single-shot classification)
 
-**Confidence:** HIGH -- standard TypeScript pattern, no library needed, follows codebase philosophy of "no unnecessary deps."
+**Why no mocking library:** The mock provider IS the mocking library. `createMockError()` produces deterministic frozen objects that exactly match the shapes consumed by the error classifier. Adding sinon, vitest mocks, or testdouble would duplicate existing purpose-built code.
 
----
+### 2. Manual QA Playbook Infrastructure
 
-### State Persistence: JSON files via node:fs/promises + Zod
+**New dependencies needed:** NONE
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| JSON files + Zod schemas | existing deps | Persist orchestrator state, confidence ledger, decision log | Matches existing config.ts pattern exactly |
+A QA playbook is structured markdown content, not an executable test suite. The infrastructure needed:
 
-**Why NOT bun:sqlite:** Bun ships with `bun:sqlite` (synchronous API, 3-6x faster than better-sqlite3), and it would be great for structured queries. However:
-
-1. **Project constraint:** "No Bun.file()/Bun.write()" -- using bun-specific APIs reduces portability. While `bun:sqlite` is a different concern from `Bun.file()`, the spirit of the constraint favors standard Node APIs
-2. **Write frequency:** ~8 writes per orchestration run (one per phase boundary) -- SQLite's advantages (concurrency, ACID) don't matter for sequential single-writer access
-3. **Existing pattern:** `src/config.ts` already implements Zod-validated JSON load/save. Extending this pattern is zero learning curve
-4. **Migration complexity:** SQLite requires schema DDL and migration tooling. JSON + Zod version field handles schema evolution with inline migration functions
-5. **Future upgrade path:** If institutional memory grows beyond ~100 entries or needs cross-field queries, migrate to `bun:sqlite`. The Zod schemas become table definitions. This is a later concern
-
-**Pattern:** Extend the existing `config.ts` approach:
-```typescript
-// Atomic write: temp file + rename (crash-safe)
-async function saveState(state: OrchestratorState, path: string): Promise<void> {
-  const validated = orchestratorStateSchema.parse(state);
-  const tmp = `${path}.tmp.${Date.now()}`;
-  await writeFile(tmp, JSON.stringify(validated, null, 2), "utf-8");
-  await rename(tmp, path);
-}
-```
-
-**Confidence:** HIGH -- mirrors existing codebase pattern, zero new dependencies.
-
----
-
-### Event Bus: mitt
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| mitt | ^3.0.1 | Typed event emitter for orchestrator lifecycle events | 200 bytes gzipped, zero deps, typed generics, 16.7M weekly downloads |
-
-**Why an event system at all:** The orchestrator pipeline has multiple consumers of state changes:
-1. Decision logging observes every confidence change and phase transition
-2. Plugin event hooks (session.updated) receive phase transition data
-3. Future: TUI progress display via `tui.toast.show` hook
-4. Review engine emits per-agent results that the confidence ledger consumes
-
-Without an event bus, this requires threading callbacks through every function -- violating the codebase's pure-function patterns.
-
-**Why mitt over alternatives:**
-
-| Library | Size | Downloads/wk | API | Verdict |
-|---------|------|-------------|-----|---------|
-| mitt | 200B | 16.7M | on/off/emit | Use this -- minimal, typed, sufficient |
-| eventemitter3 | ~1KB | 76.3M | Rich (wildcards, namespaces) | Overkill -- no wildcards needed |
-| Node EventEmitter | built-in | n/a | Untyped by default | Requires wrapper for type safety |
-| No event system | 0B | n/a | Callbacks | Callback threading breaks pure-function pattern |
-
-**Usage:**
-```typescript
-import mitt from "mitt";
-
-type OrchestratorEvents = {
-  "phase:enter": { phase: string; timestamp: number };
-  "phase:exit": { phase: string; result: PhaseResult };
-  "confidence:update": ConfidenceEntry;
-  "review:complete": ReviewResult;
-};
-
-const bus = mitt<OrchestratorEvents>();
-```
-
-**Confidence:** HIGH -- well-established, trivial API, 200 bytes.
-
----
-
-### Confidence Ledger: Pure TypeScript with Zod
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Custom module | n/a (project code) | Numerical confidence tracking (0-1 scale) per phase/decision | Domain-specific logic, no library fits |
-
-**Design:** Immutable append-only ledger. Each entry records:
-- `phase`: which orchestrator phase produced the score
-- `dimension`: what was measured (code-quality, test-coverage, architecture-alignment, security, performance)
-- `score`: 0.0-1.0 float
-- `source`: which agent/check produced it
-- `timestamp`: ISO 8601
-
-Aggregate confidence (weighted average across dimensions) drives pipeline decisions:
-- >= 0.8: proceed to next phase
-- 0.5-0.8: deepen current phase (run additional reviews, request fixes)
-- < 0.5: abort with explanation
-
-**No library needed because:** This is domain-specific arithmetic (weighted averages, threshold comparisons). The infrastructure is Zod (validation) + JSON files (persistence) -- both already available.
-
-**Confidence:** HIGH -- pure business logic, no external dependencies.
-
----
-
-### Subagent Definitions: AgentConfig objects via config hook
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| @opencode-ai/plugin config hook | existing dep | Register 12+ specialized subagents | Proven pattern in src/agents/index.ts |
-
-**How subagent dispatch works (critical architectural insight):**
-
-1. Plugin registers agent configs via `configHook` (mutates the Config object -- existing pattern)
-2. OpenCode's built-in **Task tool** handles session creation for subagents
-3. The orchestrator tool (`oc_orchestrate`) returns **instructions** telling the LLM which subagent to invoke via Task
-4. The LLM dispatches via Task, subagent runs in its own session with its own tools/prompt
-5. Result flows back to the orchestrator tool on the next invocation
-
-**The plugin does NOT spawn agents directly.** OpenCode is the runtime. The orchestrator is a state machine that tells the LLM what to do next, and the LLM uses Task to dispatch. This means:
-- No agent runtime library needed (no LangChain, Mastra, ADK-TS)
-- No custom session management
-- No process spawning or worker threads
-
-**New agents to register (~12+):**
-
-| Agent | Mode | Purpose |
+| Asset | Type | Purpose |
 |-------|------|---------|
-| oc-proposer | subagent | Generate architecture proposals for Arena |
-| oc-critic | subagent | Adversarial critique of proposals |
-| oc-implementer | subagent | Code generation for implementation phase |
-| oc-reviewer-security | subagent | Security-focused code review |
-| oc-reviewer-perf | subagent | Performance review |
-| oc-reviewer-errors | subagent | Error handling review |
-| oc-reviewer-types | subagent | Type safety review |
-| oc-reviewer-naming | subagent | Naming/readability review |
-| oc-reviewer-tests | subagent | Test quality review |
-| oc-reviewer-arch | subagent | Architecture alignment review |
-| oc-fixer | subagent | Auto-fix loop for review findings |
-| oc-verifier | subagent | Checkpoint verification (tests pass, lint clean) |
+| `assets/commands/oc-qa.md` | Command | Entry point: runs structured QA verification |
+| `assets/skills/qa-methodology/SKILL.md` | Skill | Injects QA best practices into system prompt when loaded |
 
-All follow the existing `src/agents/researcher.ts` pattern: `Readonly<AgentConfig>` with `Object.freeze()`.
+**Pattern:** The playbook is a command file with `$ARGUMENTS` support. The command body contains structured test scripts organized by feature area:
+- **Setup verification:** config loads, assets installed, health checks pass
+- **Tool verification:** each `oc_*` tool called with known inputs, outputs validated
+- **Agent verification:** each agent invoked via Task, responses checked for quality signals
+- **Pipeline flow:** full orchestration run with known codebase, output matches expectations
+- **Edge cases:** missing config, corrupt state, concurrent sessions
 
-**Confidence:** HIGH -- extends validated pattern, no new dependencies.
+The AI executing the command IS the test runner. No Playwright, no Jest, no test framework needed for QA playbooks.
 
----
+**What NOT to add:** Do not add any test framework or test runner for QA. The `bun test` runner handles unit/integration tests. QA playbooks are human-readable and AI-executable checklists.
 
-### Review Engine Dispatch: Pure function registry
+### 3. Coding Standards Expansion (OOP, Abstraction, Design Principles)
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Custom registry | n/a (project code) | Map review dimensions to agent configs, flat fan-out dispatch | Lookup table + Promise.allSettled, not a framework problem |
+**New dependencies needed:** NONE
 
-**Design:** A `ReadonlyMap<ReviewDimension, AgentConfig>` where each dimension maps to an agent definition. The review engine:
-1. Determines which dimensions to run (based on file types changed, user config)
-2. Groups compatible reviews into waves (wave-based parallelism)
-3. Emits dispatch instructions for each wave
-4. Collects results, feeds to confidence ledger
-5. If confidence < threshold, triggers fix loop
+Coding standards are pure markdown content in the adaptive skill system. The expansion adds new skill directories — zero code changes to the injection pipeline.
 
-**Wave-based parallelism** is a simple array-of-arrays:
+**New skills to author:**
+
+| Skill Directory | Content Focus | `stacks` Tag | `requires` |
+|----------------|--------------|--------------|------------|
+| `oop-patterns/SKILL.md` | SOLID principles, composition over inheritance, encapsulation, polymorphism, interface segregation | `[]` (all languages) | `["coding-standards"]` |
+| `abstraction-layers/SKILL.md` | Repository pattern, service layers, adapter pattern, dependency inversion, hexagonal architecture | `[]` (all languages) | `["coding-standards"]` |
+| `java-patterns/SKILL.md` | Java-specific OOP idioms, Spring conventions, records, sealed classes, streams | `["java"]` | `["oop-patterns"]` |
+| `csharp-patterns/SKILL.md` | C# patterns, LINQ, async/await, nullable refs, record types, minimal APIs | `["csharp"]` | `["oop-patterns"]` |
+| `security-standards/SKILL.md` | Input sanitization, secrets management, OWASP top 10, auth patterns | `[]` (all languages) | `["coding-standards"]` |
+| `api-design/SKILL.md` | REST conventions, error response format, pagination, versioning | `[]` (all languages) | `["coding-standards"]` |
+
+**Why existing infrastructure is sufficient:**
+
+1. **Stack detection** (`adaptive-injector.ts:detectProjectStackTags`) — already reads `package.json`, `tsconfig.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, etc. Add Java/C# manifest detection (`pom.xml` -> `["java"]`, `*.csproj` -> `["csharp"]`) with a small code change to `MANIFEST_TAGS`
+2. **Skill filtering** (`filterSkillsByStack`) — methodology skills with `stacks: []` always load; language skills filter by detected tags
+3. **Dependency ordering** (`dependency-resolver.ts`) — topological sort already handles `requires` chains (e.g., `java-patterns` requires `oop-patterns` requires `coding-standards`)
+4. **Token budgeting** (`buildMultiSkillContext`) — default 8000-token budget (32,000 chars) accommodates 5-8 additional skills. Each skill section averages 2000-4000 chars, so the budget handles the expansion without increase
+5. **System prompt injection** (`experimental.chat.system.transform` hook) — already wired in `src/index.ts`
+
+**Pattern for OOP/abstraction skills:** Write as opinionated DO/DON'T rules matching the existing `coding-standards/SKILL.md` format. The AI treats skill content as instructions. Each section: principle name, rationale, code examples in pseudocode (language-agnostic) or target language (language-specific skills).
+
+**Small code change needed:** Add Java/C# manifest detection to `MANIFEST_TAGS` in `adaptive-injector.ts`:
 ```typescript
-const waves: readonly ReviewDimension[][] = [
-  ["security", "performance", "error-handling"],  // Wave 1: independent
-  ["architecture", "naming", "types"],             // Wave 2: independent
-  ["tests"],                                        // Wave 3: depends on impl
-];
+"pom.xml": ["java"],
+"build.gradle": ["java"],
+"*.csproj": ["csharp"],  // requires glob or directory scan
+"Directory.Build.props": ["csharp"],
 ```
 
-**Why no orchestration framework:** This is flat fan-out (dispatch N agents, collect results, aggregate). No DAG, no conditional routing, no retry-with-backoff at the framework level. `Promise.allSettled` over dispatch instructions is sufficient.
+### 4. Command Namespace Prefixing (oc-*)
 
-**Confidence:** HIGH -- the complexity is in the agent prompts, not the dispatch mechanism.
+**New dependencies needed:** NONE
 
----
+This is a file rename + validation update:
 
-### Institutional Memory: JSON files in state directory
+| Current Name | New Name | Notes |
+|-------------|----------|-------|
+| `brainstorm.md` | `oc-brainstorm.md` | |
+| `new-agent.md` | `oc-new-agent.md` | |
+| `new-command.md` | `oc-new-command.md` | |
+| `new-skill.md` | `oc-new-skill.md` | |
+| `oc-configure.md` | REMOVED | CLI-only per PROJECT.md |
+| `quick.md` | `oc-quick.md` | |
+| `review-pr.md` | `oc-review-pr.md` | |
+| `stocktake.md` | `oc-stocktake.md` | |
+| `tdd.md` | `oc-tdd.md` | |
+| `update-docs.md` | `oc-update-docs.md` | |
+| `write-plan.md` | `oc-write-plan.md` | |
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| JSON files + Zod | existing deps | Cross-project learning, pattern library, pitfall database | Same persistence pattern, start simple |
+**Code changes:**
+- `src/tools/create-command.ts` — enforce `oc-` prefix in `validateCommandName`
+- `src/utils/validators.ts` — update `BUILT_IN_COMMANDS` set with new names
+- Grep all agent system prompts for hardcoded command references (e.g., `/brainstorm` -> `/oc-brainstorm`)
 
-**Location:** `~/.config/opencode/opencode-autopilot/memory/`
+### 5. Agent Expansion to Competitive Parity
 
-**Schema versioning:** Include a `version` field (already done in `config.ts` with `version: z.literal(1)`). When schemas evolve, add migration functions inline.
+**New dependencies needed:** NONE
 
-**Contents:**
-- `patterns.json` -- Successful architecture patterns with context
-- `pitfalls.json` -- Mistakes encountered and how they were resolved
-- `decisions.json` -- Key decisions log with rationale and outcome
+oh-my-openagent (main competitor) has 11 specialized agents with 8 task categories. This project currently has 5 standard agents + pipeline agents. New agents follow the existing `AgentConfig` pattern in `src/agents/`.
 
-**Future upgrade path:** If memory grows beyond ~100 entries or needs cross-field queries, migrate to `bun:sqlite`. The Zod schemas become table definitions.
+**Agents to add:**
 
-**Confidence:** MEDIUM -- the pattern is proven, but institutional memory is the least well-defined requirement. May need a research spike during implementation to determine what data is actually useful to persist.
+| Agent | Mode | Group | Purpose |
+|-------|------|-------|---------|
+| `debugger` | subagent | coding | Systematic debugging with hypothesis-driven investigation |
+| `security-reviewer` | subagent | review | Security-focused code review (OWASP, auth, injection) |
+| `refactorer` | subagent | coding | Extract-method, rename, simplify refactoring |
+| `test-writer` | subagent | coding | TDD-focused test generation |
+| `planner` | subagent | planning | Detailed implementation planning (distinct from pipeline plan phase) |
+| `architect` | subagent | planning | System design and architecture decisions |
+
+All are `Readonly<AgentConfig>` objects with `Object.freeze()`, registered via `registerAgents()` in `configHook()`. Zero new dependencies.
 
 ## What NOT to Add
 
-| Category | Tempting Addition | Why Skip It |
-|----------|-------------------|-------------|
-| State machine lib | XState v5 | 8-phase linear pipeline doesn't need statecharts. Custom FSM is ~80 lines |
-| Database | bun:sqlite | Low-frequency writes, JSON + Zod matches existing patterns. Revisit if query needs grow |
-| Task queue | BullMQ, bee-queue | Subagent dispatch goes through OpenCode's Task tool, not a job queue |
-| Logging framework | pino, winston | Plugin runs inside OpenCode's process. console.error for errors, structured JSON for decision logs |
-| Schema migration lib | umzug, knex migrate | JSON file versioning with inline migration functions is sufficient |
-| Agent framework | LangChain, Mastra, ADK-TS, VoltAgent | Agents are markdown prompts + OpenCode AgentConfig. OpenCode IS the agent runtime |
-| DAG engine | dagster, temporal | Review dispatch is flat fan-out. Orchestrator is linear pipeline. Neither needs a DAG |
-| HTTP client | axios, got | No HTTP calls needed. Subagents use OpenCode's built-in webfetch tool |
-| Process manager | pm2, child_process | Subagents run in OpenCode sessions, not separate processes |
-| Testing additions | none | bun:test covers everything. No new test infra required |
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Any mocking library (sinon, testdouble, vitest mock) | Mock provider already built in `src/observability/mock/` with 5 failure modes | Existing `createMockError()` + `MockFailureMode` types |
+| Any test runner for QA playbooks (Playwright, Jest) | QA playbooks are AI-executable markdown checklists | Command file + skill injection |
+| AST parsing libraries (ts-morph, jscodeshift) | OOP standards enforced via prompt injection, not static analysis | Skill markdown files injected into system prompt |
+| Documentation generators (typedoc, jsdoc) | QA playbooks are hand-authored markdown | Direct markdown authoring in `assets/` |
+| Additional YAML libraries | `yaml@^2.8.3` handles all parsing needs | Already installed |
+| Template engines (handlebars, mustache, ejs) | Templates are pure TS functions returning strings | Existing pattern in `src/templates/` |
+| Agent frameworks (LangChain, Mastra, ADK-TS) | Agents are markdown prompts + AgentConfig objects; OpenCode IS the runtime | Config hook registration |
+| Markdown linting libraries (markdownlint, remark-lint) | Skill/agent/command linting already handled by `src/skills/linter.ts` | Existing YAML frontmatter linter |
 
-## Complete Dependency Change
+## Installation
 
 ```bash
-# The ONLY new dependency for v2.0
-bun add mitt
+# No new dependencies for v4.0
+# The entire milestone is content authoring + wiring changes
 ```
 
-**Total new runtime dependencies: 1 package (200 bytes gzipped).**
+## Integration Points for v4.0
 
-Everything else is custom TypeScript using existing dependencies (Zod, yaml, node:fs/promises) or built-in Node/Bun APIs.
-
-## Integration Points with Existing Codebase
-
-| Existing Module | How New Code Integrates |
-|----------------|------------------------|
-| `src/index.ts` | Register `oc_orchestrate` and `oc_review` tools alongside existing creation tools |
-| `src/agents/index.ts` | Add 12+ orchestrator/reviewer agent configs to configHook registry |
-| `src/config.ts` | Extend pluginConfigSchema with orchestrator settings (autonomy, strictness, phase toggles) |
-| `src/utils/validators.ts` | Reuse `validateAssetName` regex pattern for orchestrator input validation |
-| `src/utils/fs-helpers.ts` | Reuse `ensureDir`, `isEnoentError`. Add `atomicWrite` (write-temp + rename) |
-| `src/utils/paths.ts` | Add `getStateDir()`, `getMemoryDir()`, `getDecisionLogPath()` |
-| `src/templates/` | Add orchestrator prompt templates (same pure-function pattern: input -> string) |
-
-## New Directory Structure
+### Mock Fallback Mode
 
 ```
-src/
-  orchestrator/
-    machine.ts          State machine transitions + guards (pure functions)
-    runner.ts           Orchestration loop (phase execution, tool return values)
-    events.ts           mitt bus setup + typed event map
-    types.ts            OrchestratorPhase, OrchestratorEvent discriminated unions
-  review/
-    engine.ts           Review dispatch + result aggregation
-    dimensions.ts       ReviewDimension -> AgentConfig registry
-    waves.ts            Wave grouping for parallel dispatch
-    types.ts            ReviewResult, ReviewDimension types
-  confidence/
-    ledger.ts           Append-only ledger CRUD + aggregate scoring
-    thresholds.ts       Decision rules (proceed / deepen / abort)
-    types.ts            ConfidenceEntry, ConfidenceSummary schemas
-  memory/
-    store.ts            Institutional memory read/write
-    types.ts            Memory entry Zod schemas
-  tools/
-    orchestrate.ts      oc_orchestrate tool (new)
-    review.ts           oc_review tool (new, standalone review entry point)
-    (existing creation tools unchanged)
-  agents/
-    (existing 4 agents unchanged)
-    orchestrator/       12+ new subagent configs
-  utils/
-    atomic-write.ts     Write-temp + rename for crash-safe persistence
-    (existing utils unchanged)
+src/config.ts (extend Zod schema)
+  --> Add fallback.mockMode: z.union([z.literal(false), z.enum(FAILURE_MODES)])
+
+src/orchestrator/fallback/ (existing FallbackManager)
+  --> Check config.fallback.mockMode on error events
+  --> If active, inject createMockError(mode) from src/observability/mock/
+
+src/tools/configure.ts (existing oc_configure)
+  --> Add "Mock Fallback Mode" section to wizard using @inquirer/select
+
+src/tools/mock-fallback.ts (existing oc_mock_fallback)
+  --> Add "enable <mode>" and "disable" subcommands to toggle at runtime
 ```
 
-## Alternatives Considered
+### Coding Standards Skills
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| State machine | Custom FSM | XState v5 | Overkill for linear 8-phase pipeline, +50KB dep, actor model doesn't map to Task tool |
-| Persistence | JSON + Zod | bun:sqlite | Matches existing pattern, low write frequency, avoids migration complexity |
-| Events | mitt (200B) | eventemitter3 (1KB) | mitt's on/off/emit is sufficient; no wildcards/namespaces needed |
-| Events | mitt | No event system | Callback threading violates pure-function patterns |
-| Agent dispatch | OpenCode Task tool | Custom process spawn | OpenCode already manages subagent sessions |
-| Review dispatch | Pure registry | LangGraph/Mastra | Flat fan-out is Promise.allSettled, not a DAG |
-| Memory storage | JSON files | SQLite | Start simple, migrate later if query patterns demand it |
+```
+assets/skills/<new-dir>/SKILL.md (new files)
+  --> Discovered automatically by src/skills/loader.ts
+  --> Filtered by src/skills/adaptive-injector.ts:filterSkillsByStack()
+  --> Ordered by src/skills/dependency-resolver.ts
+  --> Injected via experimental.chat.system.transform hook
+
+src/skills/adaptive-injector.ts (small change)
+  --> Add Java/C# manifest detection to MANIFEST_TAGS
+```
+
+### QA Playbook
+
+```
+assets/commands/oc-qa.md (new command file)
+  --> YAML frontmatter with description and $ARGUMENTS
+  --> Structured sections: Setup, Tools, Agents, Pipeline, Edge Cases
+
+assets/skills/qa-methodology/SKILL.md (optional supporting skill)
+  --> Injects QA mindset when loaded
+```
+
+## Version Compatibility
+
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| @opencode-ai/plugin ^1.3.8 | Bun 1.3.x | Config hook API stable since 1.3.0 |
+| yaml ^2.8.3 | All YAML 1.2 | Handles all frontmatter parsing |
+| TypeScript ^6.0.2 | Biome ^2.4.10 | Both support latest TS syntax |
+| zod (transitive) | @opencode-ai/plugin >=1.3.0 | Always available via plugin dep |
+
+## Confidence Assessment
+
+| Claim | Confidence | Basis |
+|-------|------------|-------|
+| Zero new dependencies needed | HIGH | Audited all 5 features against codebase; every integration point exists |
+| Mock provider sufficient for fallback testing | HIGH | Code reviewed `mock-provider.ts`, `error-classifier.ts`, `mock-fallback.ts` |
+| Skill system handles OOP/abstraction enforcement | HIGH | Code reviewed adaptive-injector.ts; dependency ordering, stack filtering, token budgeting operational |
+| QA playbook needs no test framework | HIGH | Playbooks are AI-executable markdown, not automated test suites |
+| Command rename is safe | MEDIUM | Need to grep agent prompts for hardcoded command references during implementation |
+| Competitive parity benchmark (11 agents) | MEDIUM | Based on WebSearch for oh-my-openagent; may have changed |
+| Token budget (8000) sufficient for expanded skills | MEDIUM | ~5-8 skills fit; may need monitoring if all methodology skills load simultaneously |
 
 ## Sources
 
-- [OpenCode Plugin Documentation](https://opencode.ai/docs/plugins/) -- Plugin API, config hook, event hooks (HIGH confidence)
-- [OpenCode Agent Documentation](https://opencode.ai/docs/agents/) -- Task tool dispatch, subagent architecture, permission model (HIGH confidence)
-- [XState v5 documentation](https://stately.ai/docs/xstate) -- Evaluated and rejected for this use case (HIGH confidence)
-- [XState npm page](https://www.npmjs.com/package/xstate) -- v5.28.0, ~3.7M weekly downloads, zero deps (HIGH confidence)
-- [mitt GitHub](https://github.com/developit/mitt) -- 200 byte typed event emitter, 16.7M weekly downloads (HIGH confidence)
-- [Bun SQLite docs](https://bun.com/docs/runtime/sqlite) -- Evaluated as future upgrade path for institutional memory (HIGH confidence)
-- ["You don't need a library for state machines"](https://dev.to/davidkpiano/you-don-t-need-a-library-for-state-machines-k7h) -- David Khourshid (XState creator) on when simple FSMs suffice (MEDIUM confidence)
-- [Supervisor pattern for agent orchestration](https://dev.to/programmingcentral/the-supervisor-pattern-stop-writing-monolithic-agents-and-start-orchestrating-teams-2olk) -- Hub-and-spoke topology validates orchestrator design (MEDIUM confidence)
-- [npm-compare: mitt vs eventemitter3](https://npm-compare.com/emittery,eventemitter3,mitt,nanoevents) -- Download stats, size comparison (MEDIUM confidence)
+- **Codebase audit:** `src/observability/mock/`, `src/skills/adaptive-injector.ts`, `src/agents/index.ts`, `src/tools/mock-fallback.ts`, `src/skills/linter.ts`, `assets/skills/coding-standards/SKILL.md` (HIGH confidence)
+- [oh-my-openagent GitHub](https://github.com/code-yeongyu/oh-my-openagent) — competitor agent count and architecture (MEDIUM confidence)
+- [OpenCode Skills documentation](https://opencode.ai/docs/skills) — skill format specification (HIGH confidence)
+- [OpenCode Plugins documentation](https://opencode.ai/docs/plugins/) — plugin API reference (HIGH confidence)
+- [OpenCode Agents documentation](https://opencode.ai/docs/agents/) — agent configuration, modes, Task dispatch (HIGH confidence)
+
+---
+*Stack research for: OpenCode Autopilot v4.0 Production Quality*
+*Researched: 2026-04-03*
