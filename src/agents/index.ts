@@ -3,6 +3,7 @@ import { loadConfig } from "../config";
 import { resolveModelForAgent } from "../registry/resolver";
 import type { AgentOverride, GroupModelAssignment } from "../registry/types";
 import { autopilotAgent } from "./autopilot";
+import { coderAgent } from "./coder";
 import { debuggerAgent } from "./debugger";
 import { documenterAgent } from "./documenter";
 import { metaprompterAgent } from "./metaprompter";
@@ -19,6 +20,7 @@ interface AgentConfig {
 
 export const agents = {
 	autopilot: autopilotAgent,
+	coder: coderAgent,
 	debugger: debuggerAgent,
 	documenter: documenterAgent,
 	metaprompter: metaprompterAgent,
@@ -85,6 +87,7 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 }
 
 export { autopilotAgent } from "./autopilot";
+export { coderAgent } from "./coder";
 export { debuggerAgent } from "./debugger";
 export { documenterAgent } from "./documenter";
 export { metaprompterAgent } from "./metaprompter";

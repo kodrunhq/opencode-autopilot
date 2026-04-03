@@ -48,21 +48,27 @@ describe("Agent visibility invariants", () => {
 			expect(agents["pr-reviewer"].mode).toBe("subagent");
 		});
 
-		it("exactly 4 agents have mode 'all': autopilot, debugger, planner, reviewer", () => {
+		it("exactly 5 agents have mode 'all': autopilot, coder, debugger, planner, reviewer", () => {
 			const primaryAgents = Object.entries(agents)
 				.filter(([_, agent]) => agent.mode === "all")
 				.map(([name]) => name);
-			expect(primaryAgents.sort()).toEqual(["autopilot", "debugger", "planner", "reviewer"]);
+			expect(primaryAgents.sort()).toEqual([
+				"autopilot",
+				"coder",
+				"debugger",
+				"planner",
+				"reviewer",
+			]);
 		});
 	});
 
 	describe("Agent count", () => {
-		it("total agent count is 18 (8 standard + 10 pipeline)", () => {
+		it("total agent count is 19 (9 standard + 10 pipeline)", () => {
 			const standardCount = Object.keys(agents).length;
 			const pipelineCount = Object.keys(pipelineAgents).length;
-			expect(standardCount).toBe(8);
+			expect(standardCount).toBe(9);
 			expect(pipelineCount).toBe(10);
-			expect(standardCount + pipelineCount).toBe(18);
+			expect(standardCount + pipelineCount).toBe(19);
 		});
 
 		it("primary agent names sort alphabetically in desired Tab-cycle order", () => {
@@ -70,11 +76,12 @@ describe("Agent visibility invariants", () => {
 				.filter(([_, agent]) => agent.mode === "all")
 				.map(([name]) => name);
 			const sorted = [...primaryNames].sort();
-			expect(sorted).toEqual(["autopilot", "debugger", "planner", "reviewer"]);
+			expect(sorted).toEqual(["autopilot", "coder", "debugger", "planner", "reviewer"]);
 			expect(sorted[0]).toBe("autopilot");
-			expect(sorted[1]).toBe("debugger");
-			expect(sorted[2]).toBe("planner");
-			expect(sorted[3]).toBe("reviewer");
+			expect(sorted[1]).toBe("coder");
+			expect(sorted[2]).toBe("debugger");
+			expect(sorted[3]).toBe("planner");
+			expect(sorted[4]).toBe("reviewer");
 		});
 	});
 
