@@ -2,11 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-	commandHealthCheck,
-	memoryHealthCheck,
-	skillHealthCheck,
-} from "../../src/health/checks";
+import { commandHealthCheck, memoryHealthCheck, skillHealthCheck } from "../../src/health/checks";
 
 // ---------------------------------------------------------------------------
 // skillHealthCheck
@@ -76,9 +72,7 @@ describe("memoryHealthCheck", () => {
 		const { Database } = await import("bun:sqlite");
 		const dbPath = join(memoryDir, "memory.db");
 		const db = new Database(dbPath);
-		db.run(
-			"CREATE TABLE observations (id INTEGER PRIMARY KEY, content TEXT NOT NULL)",
-		);
+		db.run("CREATE TABLE observations (id INTEGER PRIMARY KEY, content TEXT NOT NULL)");
 		db.run("INSERT INTO observations (content) VALUES ('test observation')");
 		db.close();
 
@@ -173,7 +167,7 @@ Content`,
 		expect(result.status).toBe("fail");
 		expect(result.name).toBe("command-accessibility");
 		expect(result.details).toBeDefined();
-		expect(result.details!.length).toBeGreaterThan(0);
+		expect(result.details?.length).toBeGreaterThan(0);
 
 		await rm(tempDir, { recursive: true, force: true });
 	});

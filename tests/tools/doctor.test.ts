@@ -55,11 +55,43 @@ describe("doctorCore", () => {
 			agentMap[name] = { systemPrompt: "test" };
 		}
 
+		// Create expected command files for commandHealthCheck
+		const commandsDir = join(tempDir, "commands");
+		await mkdir(commandsDir, { recursive: true });
+		const expectedCommands = [
+			"oc-tdd",
+			"oc-review-pr",
+			"oc-brainstorm",
+			"oc-write-plan",
+			"oc-stocktake",
+			"oc-update-docs",
+			"oc-new-agent",
+			"oc-new-skill",
+			"oc-new-command",
+			"oc-quick",
+			"oc-review-agents",
+		];
+		for (const cmd of expectedCommands) {
+			await writeFile(
+				join(commandsDir, `${cmd}.md`),
+				`---\ndescription: Test ${cmd}\n---\nContent`,
+			);
+		}
+
+		// Create memory DB for memoryHealthCheck
+		const memoryDir = join(tempDir, "memory");
+		await mkdir(memoryDir, { recursive: true });
+		const { Database } = await import("bun:sqlite");
+		const db = new Database(join(memoryDir, "memory.db"));
+		db.run("CREATE TABLE observations (id INTEGER PRIMARY KEY, content TEXT NOT NULL)");
+		db.close();
+
 		const result = JSON.parse(
 			await doctorCore({
 				configPath,
 				openCodeConfig: { agent: agentMap } as any,
 				targetDir: tempDir,
+				projectRoot: tempDir,
 			}),
 		);
 
