@@ -1,5 +1,6 @@
 ---
 description: Create a new OpenCode command from within this session
+agent: metaprompter
 ---
 The user wants to create a new OpenCode slash command. Gather the following information conversationally before calling the tool:
 

@@ -1,5 +1,6 @@
 ---
 description: Create a new OpenCode agent from within this session
+agent: metaprompter
 ---
 The user wants to create a new OpenCode agent. Gather the following information conversationally before calling the tool:
 

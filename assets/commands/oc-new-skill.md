@@ -1,5 +1,6 @@
 ---
 description: Create a new OpenCode skill from within this session
+agent: metaprompter
 ---
 The user wants to create a new OpenCode skill. Gather the following information conversationally before calling the tool:
 
