@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import type { MockFailureMode } from "../../../src/observability/mock/types";
+import { isRetryableError } from "../../../src/orchestrator/fallback/error-classifier";
 import {
 	createMockInterceptor,
 	MockInterceptor,
 } from "../../../src/orchestrator/fallback/mock-interceptor";
-import { isRetryableError } from "../../../src/orchestrator/fallback/error-classifier";
-import type { MockFailureMode } from "../../../src/observability/mock/types";
 
 describe("MockInterceptor", () => {
 	test("cycles through sequence deterministically", () => {

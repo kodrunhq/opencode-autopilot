@@ -42,11 +42,13 @@ function registerAgents(
 	groups: Readonly<Record<string, GroupModelAssignment>>,
 	overrides: Readonly<Record<string, AgentOverride>>,
 ): void {
+	const agentRef = config.agent;
+	if (!agentRef) return;
 	for (const [name, agentConfig] of Object.entries(agentMap)) {
-		if (config.agent![name] === undefined) {
+		if (agentRef[name] === undefined) {
 			// Deep-copy agent config including nested permission to avoid shared references.
 			const resolved = resolveModelForAgent(name, groups, overrides);
-			config.agent![name] = {
+			agentRef[name] = {
 				...agentConfig,
 				...(agentConfig.permission && { permission: { ...agentConfig.permission } }),
 				...(resolved && { model: resolved.primary }),
