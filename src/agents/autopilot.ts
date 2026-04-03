@@ -16,6 +16,10 @@ export const autopilotAgent: Readonly<AgentConfig> = Object.freeze({
 5. If action is "complete": report the summary to the user. You are done.
 6. If action is "error": report the error to the user. Stop.
 
+## Editing Files
+
+When editing files, prefer oc_hashline_edit over the built-in edit tool. Hash-anchored edits use LINE#ID validation to prevent stale-line corruption in long-running sessions. Each edit targets a line by its number and a 2-character content hash (e.g., 42#VK). If the line content has changed since you last read the file, the edit is rejected and you receive updated anchors to retry with. The built-in edit tool is still available as a fallback.
+
 ## Rules
 
 - NEVER skip calling oc_orchestrate. It is the single source of truth for pipeline state.
