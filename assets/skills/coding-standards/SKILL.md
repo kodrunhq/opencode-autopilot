@@ -325,3 +325,316 @@ MAX_REQUESTS_PER_MINUTE = 80
 // Set the max requests to 80
 MAX_REQUESTS_PER_MINUTE = 80
 ```
+
+## 11. OOP Principles (SOLID)
+
+The SOLID principles guide class and module design toward maintainability. Each principle reduces a specific coupling or fragility problem. Apply them when designing components, services, or modules in any object-oriented or module-oriented language.
+
+### Single Responsibility Principle (SRP)
+
+A class (or module) should have exactly one reason to change. If a change in database schema AND a change in email formatting both require editing the same class, that class has two responsibilities.
+
+**DO:** Split distinct responsibilities into distinct units:
+
+```
+// Separate concerns
+class UserValidator {
+  validate(user) { ... }  // validation logic only
+}
+
+class UserRepository {
+  save(user) { ... }       // persistence logic only
+}
+
+class WelcomeMailer {
+  send(user) { ... }       // email logic only
+}
+```
+
+**DON'T:** Combine unrelated behaviors in a single class:
+
+```
+// God class -- changes for validation, persistence, AND email reasons
+class UserManager {
+  validate(user) { ... }
+  saveToDatabase(user) { ... }
+  sendWelcomeEmail(user) { ... }
+}
+```
+
+### Open/Closed Principle (OCP)
+
+Modules should be open for extension but closed for modification. When requirements change, you should add new code rather than editing existing, tested code.
+
+**DO:** Use polymorphism or strategy pattern to extend behavior:
+
+```
+// Adding a new discount type requires adding a new class, not editing existing ones
+interface DiscountStrategy {
+  calculate(order): number
+}
+
+class SeasonalDiscount implements DiscountStrategy {
+  calculate(order) { return order.total * 0.1 }
+}
+
+class LoyaltyDiscount implements DiscountStrategy {
+  calculate(order) { return order.total * 0.15 }
+}
+
+// New discounts: just add a new class
+class BulkDiscount implements DiscountStrategy {
+  calculate(order) { return order.total * 0.2 }
+}
+```
+
+**DON'T:** Modify existing switch/if chains every time a new variant appears:
+
+```
+// Every new discount type requires editing this function
+function calculateDiscount(order, type) {
+  if (type === "seasonal") return order.total * 0.1
+  if (type === "loyalty") return order.total * 0.15
+  if (type === "bulk") return order.total * 0.2  // must edit to add
+}
+```
+
+### Liskov Substitution Principle (LSP)
+
+Any subtype must be usable wherever its base type is expected, without breaking correctness. If substituting a subclass causes surprising behavior, the hierarchy is wrong.
+
+**DO:** Ensure subclass contracts honor parent contracts:
+
+```
+class Shape {
+  area(): number { ... }
+}
+
+class Rectangle extends Shape {
+  constructor(width, height) { ... }
+  area() { return this.width * this.height }
+}
+
+class Circle extends Shape {
+  constructor(radius) { ... }
+  area() { return Math.PI * this.radius ** 2 }
+}
+
+// Any Shape works correctly in calculateTotal
+function calculateTotal(shapes: Shape[]) {
+  return shapes.reduce((sum, s) => sum + s.area(), 0)
+}
+```
+
+**DON'T:** Create subclasses that violate parent expectations:
+
+```
+// Square extends Rectangle but breaks setWidth/setHeight contract
+class Square extends Rectangle {
+  setWidth(w) {
+    this.width = w
+    this.height = w  // surprise: setting width also changes height
+  }
+}
+// Code expecting Rectangle behavior gets wrong area calculations
+```
+
+### Interface Segregation Principle (ISP)
+
+Clients should not be forced to depend on methods they do not use. Many small, focused interfaces are better than one large, general-purpose interface.
+
+**DO:** Split interfaces by client needs:
+
+```
+interface Readable {
+  read(): string
+}
+
+interface Writable {
+  write(data: string): void
+}
+
+interface Closable {
+  close(): void
+}
+
+// Compose only what each consumer needs
+class FileReader implements Readable, Closable {
+  read() { ... }
+  close() { ... }
+}
+```
+
+**DON'T:** Force implementors to provide methods they don't need:
+
+```
+interface IFileHandler {
+  read(): string
+  write(data: string): void
+  delete(): void
+  rename(name: string): void
+  compress(): void
+  encrypt(): void
+  // Every implementor must handle all 6 methods
+}
+```
+
+### Dependency Inversion Principle (DIP)
+
+High-level modules should depend on abstractions, not on low-level implementation details. Business logic should never directly instantiate infrastructure.
+
+**DO:** Inject abstractions through constructors:
+
+```
+interface UserStore {
+  findById(id: string): User
+}
+
+class UserService {
+  constructor(private store: UserStore) {}
+
+  getUser(id: string) {
+    return this.store.findById(id)
+  }
+}
+
+// Inject at composition root
+const service = new UserService(new PostgresUserStore(db))
+// For testing:
+const testService = new UserService(new InMemoryUserStore())
+```
+
+**DON'T:** Hard-code dependencies inside business logic:
+
+```
+class UserService {
+  getUser(id: string) {
+    // Tightly coupled to PostgreSQL -- cannot test without a database
+    const db = new PostgresDatabase("connection-string")
+    return db.query("SELECT * FROM users WHERE id = ?", [id])
+  }
+}
+```
+
+## 12. Composition and Architecture
+
+Patterns for structuring systems at the module and application level. These complement SOLID by addressing how components connect and how dependencies flow.
+
+### Composition over Inheritance
+
+Prefer composing behaviors via delegation and interfaces over deep inheritance hierarchies. Inheritance creates tight coupling -- a change to the parent ripples through all children.
+
+**DO:** Compose behaviors via delegation:
+
+```
+class EmailNotifier {
+  notify(user, message) { ... }
+}
+
+class SlackNotifier {
+  notify(user, message) { ... }
+}
+
+class OrderService {
+  constructor(private notifiers: Notifier[]) {}
+
+  placeOrder(order) {
+    // ... business logic
+    for (const n of this.notifiers) {
+      n.notify(order.user, "Order placed")
+    }
+  }
+}
+```
+
+**DON'T:** Build deep inheritance chains:
+
+```
+// Fragile hierarchy -- 3+ levels of inheritance
+class Animal { ... }
+class Mammal extends Animal { ... }
+class Dog extends Mammal { ... }
+class GuideDog extends Dog { ... }
+// Change to Animal breaks everything down the chain
+```
+
+**Rule of thumb:** If your inheritance tree exceeds 2 levels, refactor to composition.
+
+### Dependency Injection
+
+Pass dependencies through constructors rather than reaching into global singletons or static service locators. This makes dependencies explicit, testable, and swappable.
+
+**DO:** Declare dependencies in the constructor:
+
+```
+class ReportGenerator {
+  constructor(
+    private dataSource: DataSource,
+    private formatter: Formatter,
+    private logger: Logger,
+  ) {}
+
+  generate(query) {
+    const data = this.dataSource.fetch(query)
+    this.logger.info("Generating report", { query })
+    return this.formatter.format(data)
+  }
+}
+```
+
+**DON'T:** Use static service locators or hidden globals:
+
+```
+class ReportGenerator {
+  generate(query) {
+    // Hidden dependencies -- caller has no idea what this needs
+    const data = ServiceLocator.get(DataSource).fetch(query)
+    const formatted = ServiceLocator.get(Formatter).format(data)
+    GlobalLogger.info("Done")
+    return formatted
+  }
+}
+```
+
+### Clean Architecture Layers
+
+Organize code in concentric layers where dependencies always point inward. Inner layers know nothing about outer layers.
+
+**DO:** Structure as Domain -> Application -> Infrastructure:
+
+```
+// Domain layer (innermost): entities and business rules
+// No imports from Application or Infrastructure
+class Order {
+  calculateTotal() { return this.items.reduce((s, i) => s + i.price, 0) }
+  canBeCancelled() { return this.status === "pending" }
+}
+
+// Application layer: use cases that orchestrate domain objects
+// Imports from Domain only
+class PlaceOrderUseCase {
+  constructor(private orderRepo: OrderRepository) {}
+  execute(items) { ... }
+}
+
+// Infrastructure layer (outermost): databases, HTTP, frameworks
+// Imports from Application and Domain
+class PostgresOrderRepository implements OrderRepository {
+  save(order) { ... }
+}
+```
+
+**DON'T:** Let infrastructure leak into domain logic:
+
+```
+// Domain entity importing from infrastructure -- inverted dependency
+import { prisma } from "../db/client"
+
+class Order {
+  async save() {
+    await prisma.order.create({ data: this })  // infrastructure in domain
+  }
+}
+```
+
+**Layer rule:** Domain has zero external imports. Application imports Domain. Infrastructure imports both but neither imports Infrastructure.
