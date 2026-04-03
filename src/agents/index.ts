@@ -3,11 +3,14 @@ import { loadConfig } from "../config";
 import { resolveModelForAgent } from "../registry/resolver";
 import type { AgentOverride, GroupModelAssignment } from "../registry/types";
 import { autopilotAgent } from "./autopilot";
+import { debuggerAgent } from "./debugger";
 import { documenterAgent } from "./documenter";
 import { metaprompterAgent } from "./metaprompter";
 import { pipelineAgents } from "./pipeline/index";
+import { plannerAgent } from "./planner";
 import { prReviewerAgent } from "./pr-reviewer";
 import { researcherAgent } from "./researcher";
+import { reviewerAgent } from "./reviewer";
 
 interface AgentConfig {
 	readonly [key: string]: unknown;
@@ -15,11 +18,14 @@ interface AgentConfig {
 }
 
 export const agents = {
-	researcher: researcherAgent,
-	metaprompter: metaprompterAgent,
-	documenter: documenterAgent,
-	"pr-reviewer": prReviewerAgent,
 	autopilot: autopilotAgent,
+	debugger: debuggerAgent,
+	documenter: documenterAgent,
+	metaprompter: metaprompterAgent,
+	planner: plannerAgent,
+	"pr-reviewer": prReviewerAgent,
+	researcher: researcherAgent,
+	reviewer: reviewerAgent,
 } as const;
 
 /**
@@ -77,7 +83,10 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 }
 
 export { autopilotAgent } from "./autopilot";
+export { debuggerAgent } from "./debugger";
 export { documenterAgent } from "./documenter";
 export { metaprompterAgent } from "./metaprompter";
+export { plannerAgent } from "./planner";
 export { prReviewerAgent } from "./pr-reviewer";
 export { researcherAgent } from "./researcher";
+export { reviewerAgent } from "./reviewer";
