@@ -104,6 +104,20 @@ describe("installAssets", () => {
 		expect(result.errors).toHaveLength(0);
 	});
 
+	test("removes deprecated assets from target directory", async () => {
+		// Simulate a user upgrading from v3 who has old unprefixed command files
+		await mkdir(join(targetDir, "commands"), { recursive: true });
+		await writeFile(join(targetDir, "commands", "brainstorm.md"), "old content");
+		await writeFile(join(targetDir, "commands", "tdd.md"), "old content");
+
+		const result = await installAssets(sourceDir, targetDir);
+
+		// Old deprecated files should be removed
+		expect(await fileExists(join(targetDir, "commands", "brainstorm.md"))).toBe(false);
+		expect(await fileExists(join(targetDir, "commands", "tdd.md"))).toBe(false);
+		expect(result.errors).toHaveLength(0);
+	});
+
 	test("populates errors array when source file is unreadable", async () => {
 		const { chmod } = await import("node:fs/promises");
 		const agentPath = join(sourceDir, "agents", "unreadable.md");

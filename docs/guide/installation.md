@@ -123,8 +123,8 @@ The plugin will load with the new model assignments.
 
 Key features to mention:
 - Use the **autopilot** agent for full autonomous pipelines
-- Use **/review-pr** to review pull requests with 21 agents
-- Use **/new-agent**, **/new-skill**, **/new-command** to extend the plugin
+- Use **/oc-review-pr** to review pull requests with 21 agents
+- Use **/oc-new-agent**, **/oc-new-skill**, **/oc-new-command** to extend the plugin
 - Run `bunx @kodrunhq/opencode-autopilot configure` to change assignments
 
 ### ⚠ Warning

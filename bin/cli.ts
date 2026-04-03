@@ -200,7 +200,7 @@ async function printSystemChecks(
 			console.log(`  Setup completed         ${green("✓")} configured: true`);
 		} else {
 			console.log(
-				`  Setup completed         ${red("✗")} configured: false — run /oc-configure in OpenCode`,
+				`  Setup completed         ${red("✗")} configured: false — run bunx @kodrunhq/opencode-autopilot configure`,
 			);
 			hasFailure = true;
 		}

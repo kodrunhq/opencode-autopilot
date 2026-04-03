@@ -21,7 +21,7 @@ interface QuickArgs {
 }
 
 /**
- * Core logic for the /quick command.
+ * Core logic for the /oc-quick command.
  * Creates a pipeline state that starts at PLAN (skipping discovery phases),
  * then delegates to orchestrateCore to continue the pipeline.
  */
