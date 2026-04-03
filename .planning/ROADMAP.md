@@ -186,7 +186,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> ... -> 23 -> 24
 | 22. Production Hardening | v4.0 | 4/4 | Complete   | 2026-04-03 |
 | 23. QA Playbook | v4.0 | 2/2 | Complete   | 2026-04-03 |
 | 24. Coder Agent & Built-in Replacements | v5.0 | 4/4 | Complete   | 2026-04-03 |
-| 25. Content & Agent Expansion | v5.0 | 0/2 | In progress | - |
+| 25. Content & Agent Expansion | v5.0 | 1/2 | In Progress|  |
 
 ### Phase 8: Testing & CI
 
@@ -488,5 +488,5 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
+- [x] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
 - [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
