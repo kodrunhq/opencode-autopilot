@@ -482,7 +482,7 @@ Plans:
 **Requirements**: TBD
 **Success Criteria** (what must be TRUE):
   1. A frontend-engineer agent exists and is available via @ mention for frontend-focused tasks
-  2. Plugin ships with at least 25 skills covering major development workflows
+  2. Plugin ships with at least 22 high-quality skills covering major development workflows
   3. Every command is routed to an appropriate agent
   4. New skills follow the established stack-detection and token-budgeting patterns
 **Plans**: 2 plans
