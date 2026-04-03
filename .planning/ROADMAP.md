@@ -182,7 +182,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 18. Namespace Cleanup | v4.0 | 2/2 | Complete    | 2026-04-03 |
 | 19. Agent Visibility & Fixes | v4.0 | 2/2 | Complete    | 2026-04-03 |
 | 20. New Primary Agents | v4.0 | 2/2 | Complete   | 2026-04-03 |
-| 21. Content Expansion | v4.0 | 0/TBD | Not started | - |
+| 21. Content Expansion | v4.0 | 1/2 | In Progress|  |
 | 22. Production Hardening | v4.0 | 0/TBD | Not started | - |
 | 23. QA Playbook | v4.0 | 0/TBD | Not started | - |
 

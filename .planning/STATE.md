@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
-status: verifying
-stopped_at: Completed 20-02-PLAN.md
-last_updated: "2026-04-03T14:47:36.765Z"
+status: executing
+stopped_at: Completed 21-02-PLAN.md
+last_updated: "2026-04-03T15:41:00.418Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 10
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** A single command transforms an idea into a shipped, reviewed, tested result
-**Current focus:** Phase 20 — new-primary-agents
+**Current focus:** Phase 21 — content-expansion
 
 ## Current Position
 
-Phase: 20 (new-primary-agents) — EXECUTING
+Phase: 21 (content-expansion) — EXECUTING
 Plan: 2 of 2
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Last activity: 2026-04-03
 
 Progress: [██████████] 100%
@@ -83,6 +83,7 @@ Progress: [██████████] 100%
 | Phase 19 P02 | 2min | 1 tasks | 2 files |
 | Phase 20-new-primary-agents P01 | 7min | 1 tasks | 3 files |
 | Phase 20-new-primary-agents P02 | 2min | 2 tasks | 3 files |
+| Phase 21-content-expansion P02 | 3min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,7 @@ Recent decisions affecting current work:
 - [Phase 20-new-primary-agents]: Static skill embedding in agent prompts (strip YAML frontmatter, embed full content)
 - [Phase 20-new-primary-agents]: Reviewer edit:deny as hard constraint; planner edit:allow with prompt-level prohibition on source code editing
 - [Phase 20-new-primary-agents]: Alphabetical agent map ordering ensures Tab-cycle order: autopilot, debugger, planner, reviewer
+- [Phase 21-content-expansion]: Templates use plain agents.md format for direct copy-paste usability
 
 ### Pending Todos
 
@@ -113,6 +115,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T14:47:36.762Z
-Stopped at: Completed 20-02-PLAN.md
+Last session: 2026-04-03T15:41:00.415Z
+Stopped at: Completed 21-02-PLAN.md
 Resume file: None
