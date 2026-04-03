@@ -21,6 +21,7 @@ interface DoctorOptions {
 	readonly openCodeConfig?: Config | null;
 	readonly assetsDir?: string;
 	readonly targetDir?: string;
+	readonly projectRoot?: string;
 }
 
 /**
@@ -31,6 +32,10 @@ const FIX_SUGGESTIONS: Readonly<Record<string, string>> = Object.freeze({
 		"Run `bunx @kodrunhq/opencode-autopilot configure` to reconfigure, or delete ~/.config/opencode/opencode-autopilot.json to reset",
 	"agent-injection": "Restart OpenCode to trigger agent re-injection via config hook",
 	"asset-directories": "Restart OpenCode to trigger asset reinstallation",
+	"skill-loading": "Ensure skills directory exists in ~/.config/opencode/skills/",
+	"memory-db":
+		"Memory DB is created automatically on first memory capture -- use the plugin normally to initialize",
+	"command-accessibility": "Restart OpenCode to trigger command reinstallation from bundled assets",
 });
 
 function getFixSuggestion(checkName: string): string {
@@ -72,6 +77,7 @@ export async function doctorCore(options?: DoctorOptions): Promise<string> {
 		openCodeConfig: options?.openCodeConfig,
 		assetsDir: options?.assetsDir,
 		targetDir: options?.targetDir,
+		projectRoot: options?.projectRoot,
 	});
 
 	// Map health results to doctor checks with fix suggestions

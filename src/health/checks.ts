@@ -1,7 +1,13 @@
-import { access } from "node:fs/promises";
+import { Database } from "bun:sqlite";
+import { access, readFile, stat } from "node:fs/promises";
+import { join } from "node:path";
 import type { Config } from "@opencode-ai/plugin";
+import { parse } from "yaml";
 import { loadConfig } from "../config";
+import { DB_FILE, MEMORY_DIR } from "../memory/constants";
 import { AGENT_NAMES } from "../orchestrator/handlers/types";
+import { detectProjectStackTags, filterSkillsByStack } from "../skills/adaptive-injector";
+import { loadAllSkills } from "../skills/loader";
 import { getAssetsDir, getGlobalConfigDir } from "../utils/paths";
 import type { HealthResult } from "./types";
 
@@ -122,4 +128,177 @@ export async function assetHealthCheck(
 			message: `Asset target directory ${detail}: ${target}`,
 		});
 	}
+}
+
+/**
+ * Check skill loading status per detected project stack.
+ * Reports which stacks are detected and how many skills match.
+ * Accepts optional skillsDir for testability (defaults to global config skills dir).
+ */
+export async function skillHealthCheck(
+	projectRoot: string,
+	skillsDir?: string,
+): Promise<HealthResult> {
+	try {
+		const tags = await detectProjectStackTags(projectRoot);
+		const resolvedSkillsDir = skillsDir ?? join(getGlobalConfigDir(), "skills");
+		const allSkills = await loadAllSkills(resolvedSkillsDir);
+		const filtered = filterSkillsByStack(allSkills, tags);
+
+		const stackLabel = tags.length > 0 ? tags.join(", ") : "none";
+		return Object.freeze({
+			name: "skill-loading",
+			status: "pass" as const,
+			message: `Detected stacks: [${stackLabel}], ${filtered.size}/${allSkills.size} skills matched`,
+			details: Object.freeze([...filtered.keys()]),
+		});
+	} catch (error: unknown) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "skill-loading",
+			status: "fail" as const,
+			message: `Skill check failed: ${msg}`,
+		});
+	}
+}
+
+/**
+ * Check memory DB health: existence, readability, observation count.
+ * Does NOT call getMemoryDb() to avoid creating an empty DB as a side effect.
+ * Uses readonly DB access for safe inspection.
+ * Accepts optional baseDir for testability (defaults to global config dir).
+ */
+export async function memoryHealthCheck(baseDir?: string): Promise<HealthResult> {
+	const resolvedBase = baseDir ?? getGlobalConfigDir();
+	const dbPath = join(resolvedBase, MEMORY_DIR, DB_FILE);
+
+	try {
+		await access(dbPath);
+	} catch (error: unknown) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code === "ENOENT") {
+			return Object.freeze({
+				name: "memory-db",
+				status: "fail" as const,
+				message: `Memory DB not found at ${dbPath} -- will be created on first memory capture`,
+			});
+		}
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "memory-db",
+			status: "fail" as const,
+			message: `Memory DB inaccessible: ${msg}`,
+		});
+	}
+
+	try {
+		const fileStat = await stat(dbPath);
+		const sizeKB = (fileStat.size / 1024).toFixed(1);
+
+		if (fileStat.size === 0) {
+			return Object.freeze({
+				name: "memory-db",
+				status: "fail" as const,
+				message: `Memory DB exists but is empty (0 bytes)`,
+			});
+		}
+
+		const db = new Database(dbPath, { readonly: true });
+		try {
+			const row = db.query("SELECT COUNT(*) as count FROM observations").get() as {
+				count: number;
+			} | null;
+			const count = row?.count ?? 0;
+			return Object.freeze({
+				name: "memory-db",
+				status: "pass" as const,
+				message: `Memory DB exists (${count} observation${count !== 1 ? "s" : ""}, ${sizeKB}KB)`,
+			});
+		} finally {
+			db.close();
+		}
+	} catch (error: unknown) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "memory-db",
+			status: "fail" as const,
+			message: `Memory DB read error: ${msg}`,
+		});
+	}
+}
+
+/** Expected command files that should exist in the commands directory. */
+const EXPECTED_COMMANDS: readonly string[] = Object.freeze([
+	"oc-tdd",
+	"oc-review-pr",
+	"oc-brainstorm",
+	"oc-write-plan",
+	"oc-stocktake",
+	"oc-update-docs",
+	"oc-new-agent",
+	"oc-new-skill",
+	"oc-new-command",
+	"oc-quick",
+	"oc-review-agents",
+]);
+
+/**
+ * Check command accessibility: file existence and valid YAML frontmatter.
+ * Verifies each expected command file exists and has a non-empty description.
+ */
+export async function commandHealthCheck(targetDir?: string): Promise<HealthResult> {
+	const dir = targetDir ?? getGlobalConfigDir();
+	const missing: string[] = [];
+	const invalid: string[] = [];
+
+	await Promise.all(
+		EXPECTED_COMMANDS.map(async (name) => {
+			const filePath = join(dir, "commands", `${name}.md`);
+			try {
+				const content = await readFile(filePath, "utf-8");
+				const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+				if (!fmMatch) {
+					invalid.push(`${name}: no frontmatter`);
+					return;
+				}
+				try {
+					const parsed = parse(fmMatch[1]);
+					if (
+						parsed === null ||
+						typeof parsed !== "object" ||
+						typeof parsed.description !== "string" ||
+						parsed.description.trim().length === 0
+					) {
+						invalid.push(`${name}: missing or empty description`);
+					}
+				} catch {
+					invalid.push(`${name}: invalid YAML frontmatter`);
+				}
+			} catch (error: unknown) {
+				const code = (error as NodeJS.ErrnoException).code;
+				if (code === "ENOENT") {
+					missing.push(name);
+				} else {
+					invalid.push(`${name}: ${error instanceof Error ? error.message : String(error)}`);
+				}
+			}
+		}),
+	);
+
+	const issues = [...missing.map((n) => `missing: ${n}`), ...invalid];
+
+	if (issues.length === 0) {
+		return Object.freeze({
+			name: "command-accessibility",
+			status: "pass" as const,
+			message: `All ${EXPECTED_COMMANDS.length} commands accessible`,
+		});
+	}
+
+	return Object.freeze({
+		name: "command-accessibility",
+		status: "fail" as const,
+		message: `${issues.length} command issue(s) found`,
+		details: Object.freeze(issues),
+	});
 }
