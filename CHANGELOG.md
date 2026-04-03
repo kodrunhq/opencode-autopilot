@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.12.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.11.0...opencode-autopilot-v1.12.0) (2026-04-03)
+
+
+### Features
+
+* **22-01:** add config v6 schema with testMode and v5-to-v6 migration ([f86c4a3](https://github.com/kodrunhq/opencode-autopilot/commit/f86c4a38bd9d5cfa796253081e75bc50bca8bd7b))
+* **22-01:** add MockInterceptor with deterministic sequence cycling ([7a9bf38](https://github.com/kodrunhq/opencode-autopilot/commit/7a9bf38ce7711461d6990e58a3be72232481ff3b))
+* **22-02:** add $LANGUAGE variable to four command templates ([d53271d](https://github.com/kodrunhq/opencode-autopilot/commit/d53271d19d5f6a3352937fa6e05b43e506b3c426))
+* **22-02:** implement language resolver utility with caching ([2ba3e11](https://github.com/kodrunhq/opencode-autopilot/commit/2ba3e1186f71689d0d892509e2df014703574f19))
+* **22-03:** add skill, memory, and command health check functions ([3c944a8](https://github.com/kodrunhq/opencode-autopilot/commit/3c944a828cf32452911539f9b58e5ec14b49be5b))
+* **22-03:** register 6 health checks in runner and update doctor tool ([1d132c9](https://github.com/kodrunhq/opencode-autopilot/commit/1d132c93aac07f7af1e6a6cf3aeff4152c3bb0b9))
+* **22-04:** add anti-slop pattern definitions and detection logic ([6a0d9d3](https://github.com/kodrunhq/opencode-autopilot/commit/6a0d9d3cf5efcb1263966cd6b97017638165d9dd))
+* **22-04:** register anti-slop hook in plugin entry ([82db082](https://github.com/kodrunhq/opencode-autopilot/commit/82db082547ddb32b0a4c1b8bc464b215b4ef8df8))
+* **22:** production hardening — mock fallback, language commands, doctor, anti-slop ([0af4552](https://github.com/kodrunhq/opencode-autopilot/commit/0af455264c98e72ff4672d85406b09d265dc7f43))
+
+
+### Bug Fixes
+
+* **22:** replace as any with as unknown as Config in doctor test ([cf20427](https://github.com/kodrunhq/opencode-autopilot/commit/cf20427dac86a1fd899d825e6a0c992fbbc4c6d1))
+* **22:** replace dead $LANGUAGE variable with inline detection in commands ([cac5675](https://github.com/kodrunhq/opencode-autopilot/commit/cac567538add97c04e53c80ee05f0a2f34a8c67c))
+* **22:** resolve CI lint errors and ace review findings ([aa10876](https://github.com/kodrunhq/opencode-autopilot/commit/aa108769dab8597d3c34d5be3d45cf4b683d0d29))
+* **22:** resolve CI type errors — downgrade lint rules, fix non-null assertions, fix import ordering ([7c20adc](https://github.com/kodrunhq/opencode-autopilot/commit/7c20adcca911beb2de20d8becbf241c541b4a72d))
+* **22:** resolve CI type errors — version 5→6 in configure, typed mock params, remove unused ts-expect-error ([87d2dd9](https://github.com/kodrunhq/opencode-autopilot/commit/87d2dd968f7b6950fe248a46bedd6c25ae838c61))
+* **22:** resolve review findings — anti-slop reads file content, MockInterceptor guards, memory check pass on fresh install ([ae5f530](https://github.com/kodrunhq/opencode-autopilot/commit/ae5f530817371a0f28e7105cd0abce06e094d4ac))
+* **22:** update tests for config v6 migration and format fixes ([40a0c6e](https://github.com/kodrunhq/opencode-autopilot/commit/40a0c6e74cc59c642d9b9a3b054b567345181c47))
+
 ## [1.11.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.10.0...opencode-autopilot-v1.11.0) (2026-04-03)
 
 
