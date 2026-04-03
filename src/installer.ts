@@ -196,21 +196,29 @@ export async function installAssets(
 	// Force-overwrite assets with critical fixes
 	const forceUpdate = await forceUpdateAssets(assetsDir, targetDir);
 
-	const [agents, commands, skills] = await Promise.all([
+	const [agents, commands, skills, templates] = await Promise.all([
 		processFiles(assetsDir, targetDir, "agents"),
 		processFiles(assetsDir, targetDir, "commands"),
 		processSkills(assetsDir, targetDir),
+		processFiles(assetsDir, targetDir, "templates"),
 	]);
 
 	return {
-		copied: [...forceUpdate.updated, ...agents.copied, ...commands.copied, ...skills.copied],
-		skipped: [...agents.skipped, ...commands.skipped, ...skills.skipped],
+		copied: [
+			...forceUpdate.updated,
+			...agents.copied,
+			...commands.copied,
+			...skills.copied,
+			...templates.copied,
+		],
+		skipped: [...agents.skipped, ...commands.skipped, ...skills.skipped, ...templates.skipped],
 		errors: [
 			...cleanup.errors,
 			...forceUpdate.errors,
 			...agents.errors,
 			...commands.errors,
 			...skills.errors,
+			...templates.errors,
 		],
 	};
 }

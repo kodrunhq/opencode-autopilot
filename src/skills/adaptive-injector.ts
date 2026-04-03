@@ -7,9 +7,10 @@
  * filtering even before any git diff is available.
  */
 
-import { access } from "node:fs/promises";
+import { access, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { sanitizeTemplateContent } from "../review/sanitize";
+import { isEnoentError } from "../utils/fs-helpers";
 import { resolveDependencyOrder } from "./dependency-resolver";
 import type { LoadedSkill } from "./loader";
 
@@ -32,6 +33,21 @@ const MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze
 	"requirements.txt": Object.freeze(["python"]),
 	Pipfile: Object.freeze(["python"]),
 	Gemfile: Object.freeze(["ruby"]),
+	"pom.xml": Object.freeze(["java"]),
+	"build.gradle": Object.freeze(["java"]),
+	"build.gradle.kts": Object.freeze(["java"]),
+});
+
+/**
+ * Extension-based manifest patterns for languages that use variable filenames
+ * (e.g., MyProject.csproj, MySolution.sln). Detected via readdir + endsWith
+ * matching on the project root directory. Only checks immediate children —
+ * nested .csproj files (e.g., src/MyProject/MyProject.csproj) require the
+ * .sln file at root or diff-path detection via stack-gate.ts.
+ */
+const EXT_MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+	".csproj": Object.freeze(["csharp"]),
+	".sln": Object.freeze(["csharp"]),
 });
 
 /**
@@ -39,6 +55,8 @@ const MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.freeze
  * Complements detectStackTags (which works on file paths from git diff).
  */
 export async function detectProjectStackTags(projectRoot: string): Promise<readonly string[]> {
+	const tags = new Set<string>();
+
 	const results = await Promise.all(
 		Object.entries(MANIFEST_TAGS).map(async ([manifest, manifestTags]) => {
 			try {
@@ -50,7 +68,34 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 		}),
 	);
 
-	return [...new Set(results.flat())];
+	for (const result of results) {
+		for (const tag of result) {
+			tags.add(tag);
+		}
+	}
+
+	// Check extension-based manifests (e.g., *.csproj, *.sln)
+	try {
+		const entries = await readdir(projectRoot);
+		for (const [ext, extTags] of Object.entries(EXT_MANIFEST_TAGS)) {
+			if (entries.some((entry) => entry.endsWith(ext))) {
+				for (const tag of extTags) {
+					tags.add(tag);
+				}
+			}
+		}
+	} catch (error: unknown) {
+		// ENOENT is expected (directory may not exist) — skip silently.
+		// Other errors (EACCES, etc.) are logged but non-fatal.
+		if (!isEnoentError(error)) {
+			console.error(
+				"[adaptive-injector] readdir failed for project root, skipping extension detection:",
+				error instanceof Error ? error.message : String(error),
+			);
+		}
+	}
+
+	return [...tags];
 }
 
 /**

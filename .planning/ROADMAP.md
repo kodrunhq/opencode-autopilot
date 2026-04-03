@@ -182,7 +182,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 18. Namespace Cleanup | v4.0 | 2/2 | Complete    | 2026-04-03 |
 | 19. Agent Visibility & Fixes | v4.0 | 2/2 | Complete    | 2026-04-03 |
 | 20. New Primary Agents | v4.0 | 2/2 | Complete   | 2026-04-03 |
-| 21. Content Expansion | v4.0 | 0/TBD | Not started | - |
+| 21. Content Expansion | v4.0 | 2/2 | Complete   | 2026-04-03 |
 | 22. Production Hardening | v4.0 | 0/TBD | Not started | - |
 | 23. QA Playbook | v4.0 | 0/TBD | Not started | - |
 
@@ -351,7 +351,7 @@ Plans:
 - [x] **Phase 18: Namespace Cleanup** - Prefix all commands with oc- and remove oc-configure slash command (completed 2026-04-03)
 - [x] **Phase 19: Agent Visibility & Fixes** - Fix stocktake agent detection, clarify ambiguous agents, ensure config-hook agents appear in Tab cycle
 - [x] **Phase 20: New Primary Agents** - Add Debugger, Planner, and Code Reviewer primary agents with intentional Tab-cycle ordering (completed 2026-04-03)
-- [ ] **Phase 21: Content Expansion** - OOP/SOLID coding standards, Java/C# language skills, agents.md review command and starter templates
+- [x] **Phase 21: Content Expansion** - OOP/SOLID coding standards, Java/C# language skills, agents.md review command and starter templates (completed 2026-04-03)
 - [ ] **Phase 22: Production Hardening** - Mock fallback test mode, context-aware commands, skill-aware doctor, anti-slop comment hook
 - [ ] **Phase 23: QA Playbook** - Internal manual QA playbook with step-by-step test procedures for every feature
 

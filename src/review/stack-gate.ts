@@ -54,6 +54,8 @@ const EXTENSION_TAGS: Readonly<Record<string, readonly string[]>> = Object.freez
 	".svelte": Object.freeze(["svelte", "javascript"]),
 	".kt": Object.freeze(["kotlin"]),
 	".kts": Object.freeze(["kotlin"]),
+	".java": Object.freeze(["java"]),
+	".cs": Object.freeze(["csharp"]),
 });
 
 /**

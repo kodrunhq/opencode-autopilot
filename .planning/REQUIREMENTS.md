@@ -122,11 +122,11 @@ Requirements for Milestone v4.0 — Production Quality.
 
 ### Content Expansion
 
-- [ ] **SKLL-10**: Coding standards expanded with OOP/SOLID principles, Clean Architecture, dependency inversion, composition over inheritance
-- [ ] **SKLL-11**: Java language patterns skill with idiomatic Java, Spring Boot patterns, JPA conventions
-- [ ] **SKLL-12**: C# language patterns skill with idiomatic C#, .NET patterns, Entity Framework conventions
-- [ ] **CMND-10**: `/oc-review-agents` command validates and improves project agents.md files (structure, system prompts)
-- [ ] **CMND-11**: Curated agents.md starter templates for common project types (web-api, cli-tool, library, fullstack)
+- [x] **SKLL-10**: Coding standards expanded with OOP/SOLID principles, Clean Architecture, dependency inversion, composition over inheritance
+- [x] **SKLL-11**: Java language patterns skill with idiomatic Java, Spring Boot patterns, JPA conventions
+- [x] **SKLL-12**: C# language patterns skill with idiomatic C#, .NET patterns, Entity Framework conventions
+- [x] **CMND-10**: `/oc-review-agents` command validates and improves project agents.md files (structure, system prompts)
+- [x] **CMND-11**: Curated agents.md starter templates for common project types (web-api, cli-tool, library, fullstack)
 
 ### Production Hardening
 
@@ -226,11 +226,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AGNT-12 | Phase 20 | Complete |
 | AGNT-13 | Phase 20 | Complete |
 | AGNT-14 | Phase 19 | Pending |
-| SKLL-10 | Phase 21 | Pending |
-| SKLL-11 | Phase 21 | Pending |
-| SKLL-12 | Phase 21 | Pending |
-| CMND-10 | Phase 21 | Pending |
-| CMND-11 | Phase 21 | Pending |
+| SKLL-10 | Phase 21 | Complete |
+| SKLL-11 | Phase 21 | Complete |
+| SKLL-12 | Phase 21 | Complete |
+| CMND-10 | Phase 21 | Complete |
+| CMND-11 | Phase 21 | Complete |
 | HARD-01 | Phase 22 | Pending |
 | HARD-02 | Phase 22 | Pending |
 | HARD-03 | Phase 22 | Pending |
