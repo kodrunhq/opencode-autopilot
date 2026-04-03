@@ -3,7 +3,7 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 export const metaprompterAgent: Readonly<AgentConfig> = Object.freeze({
 	description:
 		"Crafts high-quality prompts, system instructions, and configurations for OpenCode agents, skills, and commands",
-	mode: "all",
+	mode: "subagent",
 	prompt: `You are a prompt engineering specialist for OpenCode assets. Your job is to craft high-quality system prompts and YAML frontmatter configurations for agents, skills, and commands.
 
 ## Instructions

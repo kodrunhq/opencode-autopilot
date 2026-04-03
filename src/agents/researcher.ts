@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 
 export const researcherAgent: Readonly<AgentConfig> = Object.freeze({
 	description: "Searches the web about a topic and produces a comprehensive report with sources",
-	mode: "all",
+	mode: "subagent",
 	prompt: `You are a research specialist. Your job is to thoroughly investigate a given topic and produce a clear, well-organized report.
 
 ## Instructions
