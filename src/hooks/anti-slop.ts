@@ -2,6 +2,7 @@
  * Anti-slop hook: detects AI-generated comment bloat in code files.
  * Warn-only (non-blocking) -- fires as PostToolUse after file-writing tools.
  */
+import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 import {
 	CODE_EXTENSIONS,
@@ -60,13 +61,9 @@ export function scanForSlopComments(content: string, ext: string): readonly Slop
 }
 
 /** Tools that write files and should be scanned for slop. */
-const FILE_WRITING_TOOLS: ReadonlySet<string> = new Set([
-	"write_file",
-	"edit_file",
-	"write",
-	"edit",
-	"create_file",
-]);
+const FILE_WRITING_TOOLS: ReadonlySet<string> = Object.freeze(
+	new Set(["write_file", "edit_file", "write", "edit", "create_file"]),
+);
 
 /**
  * Creates a tool.execute.after handler that scans for slop comments.
@@ -98,7 +95,16 @@ export function createAntiSlopHandler(options: {
 		if (!filePath || !isCodeFile(filePath)) return;
 
 		const ext = extname(filePath).toLowerCase();
-		const findings = scanForSlopComments(output.output, ext);
+
+		// Read the actual file content — output.output is the tool's result message, not file content
+		let fileContent: string;
+		try {
+			fileContent = await readFile(filePath, "utf-8");
+		} catch {
+			return; // file unreadable — best-effort, skip
+		}
+
+		const findings = scanForSlopComments(fileContent, ext);
 		if (findings.length === 0) return;
 
 		const preview = findings

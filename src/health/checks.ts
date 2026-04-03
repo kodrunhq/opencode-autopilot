@@ -179,8 +179,8 @@ export async function memoryHealthCheck(baseDir?: string): Promise<HealthResult>
 		if (code === "ENOENT") {
 			return Object.freeze({
 				name: "memory-db",
-				status: "fail" as const,
-				message: `Memory DB not found at ${dbPath} -- will be created on first memory capture`,
+				status: "pass" as const,
+				message: `Memory DB not yet initialized -- will be created on first memory capture`,
 			});
 		}
 		const msg = error instanceof Error ? error.message : String(error);

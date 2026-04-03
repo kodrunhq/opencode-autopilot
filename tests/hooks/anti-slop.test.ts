@@ -1,4 +1,7 @@
-import { describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createAntiSlopHandler, isCodeFile, scanForSlopComments } from "../../src/hooks/anti-slop";
 
 describe("isCodeFile", () => {
@@ -55,6 +58,16 @@ describe("scanForSlopComments", () => {
 });
 
 describe("createAntiSlopHandler", () => {
+	let tempDir: string;
+
+	beforeEach(async () => {
+		tempDir = await mkdtemp(join(tmpdir(), "anti-slop-test-"));
+	});
+
+	afterEach(async () => {
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
 	it("returns a function", () => {
 		const handler = createAntiSlopHandler({
 			showToast: mock(() => Promise.resolve()),
@@ -65,21 +78,66 @@ describe("createAntiSlopHandler", () => {
 	it("does nothing for non-code file output", async () => {
 		const showToast = mock(() => Promise.resolve());
 		const handler = createAntiSlopHandler({ showToast });
+		const mdPath = join(tempDir, "readme.md");
+		await writeFile(mdPath, "// This function handles stuff");
 
 		await handler(
 			{
 				tool: "write_file",
 				sessionID: "s1",
 				callID: "c1",
-				args: { file_path: "readme.md" },
+				args: { file_path: mdPath },
 			},
-			{ title: "", output: "// This function handles stuff", metadata: {} },
+			{ title: "", output: "File written successfully", metadata: {} },
 		);
 
 		expect(showToast).not.toHaveBeenCalled();
 	});
 
-	it("fires showToast when slop found in code file output", async () => {
+	it("fires showToast when slop found in code file", async () => {
+		const showToast = mock(() => Promise.resolve());
+		const handler = createAntiSlopHandler({ showToast });
+		const tsPath = join(tempDir, "app.ts");
+		await writeFile(tsPath, "// This function handles the logic\nconst x = 1;");
+
+		await handler(
+			{
+				tool: "write_file",
+				sessionID: "s1",
+				callID: "c1",
+				args: { file_path: tsPath },
+			},
+			{
+				title: "",
+				output: "File written successfully",
+				metadata: {},
+			},
+		);
+
+		expect(showToast).toHaveBeenCalledTimes(1);
+		expect(showToast.mock.calls[0][2]).toBe("warning");
+	});
+
+	it("does nothing for non-file-writing tools", async () => {
+		const showToast = mock(() => Promise.resolve());
+		const handler = createAntiSlopHandler({ showToast });
+		const tsPath = join(tempDir, "app.ts");
+		await writeFile(tsPath, "// This function handles the logic");
+
+		await handler(
+			{
+				tool: "read_file",
+				sessionID: "s1",
+				callID: "c1",
+				args: { file_path: tsPath },
+			},
+			{ title: "", output: "file content", metadata: {} },
+		);
+
+		expect(showToast).not.toHaveBeenCalled();
+	});
+
+	it("does nothing when file is unreadable", async () => {
 		const showToast = mock(() => Promise.resolve());
 		const handler = createAntiSlopHandler({ showToast });
 
@@ -88,16 +146,11 @@ describe("createAntiSlopHandler", () => {
 				tool: "write_file",
 				sessionID: "s1",
 				callID: "c1",
-				args: { file_path: "app.ts" },
+				args: { file_path: "/nonexistent/path/app.ts" },
 			},
-			{
-				title: "",
-				output: "// This function handles the logic\nconst x = 1;",
-				metadata: {},
-			},
+			{ title: "", output: "done", metadata: {} },
 		);
 
-		expect(showToast).toHaveBeenCalledTimes(1);
-		expect(showToast.mock.calls[0][2]).toBe("warning");
+		expect(showToast).not.toHaveBeenCalled();
 	});
 });

@@ -12,7 +12,7 @@ export async function resolveLanguageTag(projectRoot: string): Promise<string> {
 	if (cached !== undefined) return cached;
 
 	const tags = await detectProjectStackTags(projectRoot);
-	const result = tags.length > 0 ? [...tags].join(", ") : "unknown";
+	const result = tags.length > 0 ? [...tags].sort().join(", ") : "unknown";
 	cache.set(projectRoot, result);
 	return result;
 }

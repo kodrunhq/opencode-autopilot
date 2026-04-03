@@ -52,12 +52,9 @@ export const COMMENT_PATTERNS: Readonly<Record<string, RegExp>> = Object.freeze(
 export const SLOP_PATTERNS: readonly RegExp[] = Object.freeze([
 	/^increment\s+.*\s+by\s+\d+$/i,
 	/^decrement\s+.*\s+by\s+\d+$/i,
-	/^set\s+\w+\s+to\s+/i,
-	/^return\s+the\s+(result|value|data)/i,
+	/^return\s+the\s+(result|value|data)\s*$/i,
 	/^(?:this|the)\s+(?:function|method|class)\s+(?:does|will|is used to|handles)/i,
 	/^(?:initialize|init)\s+(?:the\s+)?(?:variable|value|state)/i,
-	/^loop\s+(?:through|over)\s+/i,
-	/^check\s+if\s+/i,
 	/^import\s+(?:the\s+)?(?:necessary|required|needed)/i,
 	/^define\s+(?:the\s+)?(?:interface|type|class|function)/i,
 	/\belegantly?\b/i,

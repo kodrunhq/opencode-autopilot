@@ -85,14 +85,14 @@ describe("memoryHealthCheck", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("returns fail when DB file does not exist", async () => {
+	test("returns pass when DB file does not exist (fresh install)", async () => {
 		const tempDir = join(tmpdir(), `mem-check-noexist-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
 
 		const result = await memoryHealthCheck(tempDir);
-		expect(result.status).toBe("fail");
+		expect(result.status).toBe("pass");
 		expect(result.name).toBe("memory-db");
-		expect(result.message).toContain("not found");
+		expect(result.message).toContain("not yet initialized");
 
 		await rm(tempDir, { recursive: true, force: true });
 	});

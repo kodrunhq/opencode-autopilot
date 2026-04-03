@@ -17,8 +17,11 @@ export class MockInterceptor {
 
 	/** Get the next failure mode in the sequence (cycles). */
 	nextMode(): MockFailureMode {
+		if (this.sequence.length === 0) {
+			throw new Error("MockInterceptor: cannot call nextMode() on an empty sequence");
+		}
 		const mode = this.sequence[this.index % this.sequence.length];
-		this.index++;
+		this.index = (this.index + 1) % this.sequence.length;
 		return mode;
 	}
 

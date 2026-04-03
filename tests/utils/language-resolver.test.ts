@@ -22,7 +22,7 @@ describe("resolveLanguageTag", () => {
 	test("returns comma-separated tags from detectProjectStackTags", async () => {
 		mockDetect.mockResolvedValueOnce(Object.freeze(["typescript", "javascript"]));
 		const result = await resolveLanguageTag("/tmp/project-ts");
-		expect(result).toBe("typescript, javascript");
+		expect(result).toBe("javascript, typescript");
 		expect(mockDetect).toHaveBeenCalledWith("/tmp/project-ts");
 	});
 

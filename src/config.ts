@@ -7,6 +7,7 @@ import {
 	fallbackConfigSchemaV6,
 	fallbackDefaults,
 	fallbackDefaultsV6,
+	testModeDefaults,
 } from "./orchestrator/fallback/fallback-config";
 import { AGENT_REGISTRY, ALL_GROUP_IDS } from "./registry/model-groups";
 import { ensureDir, isEnoentError } from "./utils/fs-helpers";
@@ -281,7 +282,7 @@ function migrateV5toV6(v5Config: PluginConfigV5): PluginConfig {
 		overrides: v5Config.overrides,
 		orchestrator: v5Config.orchestrator,
 		confidence: v5Config.confidence,
-		fallback: { ...v5Config.fallback, testMode: { enabled: false, sequence: [] } },
+		fallback: { ...v5Config.fallback, testMode: testModeDefaults },
 		memory: v5Config.memory,
 	};
 }
