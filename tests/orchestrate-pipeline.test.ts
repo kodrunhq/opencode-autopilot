@@ -235,19 +235,22 @@ describe("configHook pipeline agents", () => {
 
 		expect(config.agent).toBeDefined();
 		const agents = config.agent as Record<string, unknown>;
-		// v1 agents
+		// standard agents
 		expect(agents.researcher).toBeDefined();
 		expect(agents.metaprompter).toBeDefined();
 		expect(agents.documenter).toBeDefined();
 		expect(agents["pr-reviewer"]).toBeDefined();
 		expect(agents.autopilot).toBeDefined();
+		expect(agents.debugger).toBeDefined();
+		expect(agents.planner).toBeDefined();
+		expect(agents.reviewer).toBeDefined();
 
 		// pipeline agents
 		expect(agents["oc-researcher"]).toBeDefined();
 		expect(agents["oc-implementer"]).toBeDefined();
 
-		// Total: 5 v1 + 10 pipeline = 15
-		expect(Object.keys(agents).length).toBe(15);
+		// Total: 8 standard + 10 pipeline = 18
+		expect(Object.keys(agents).length).toBe(18);
 	});
 
 	test("pipeline agents have mode subagent", async () => {
