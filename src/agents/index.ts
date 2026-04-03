@@ -14,7 +14,7 @@ interface AgentConfig {
 	readonly permission?: Record<string, unknown>;
 }
 
-const agents = {
+export const agents = {
 	researcher: researcherAgent,
 	metaprompter: metaprompterAgent,
 	documenter: documenterAgent,

@@ -1,6 +1,9 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
+import { agents as standardAgents } from "../agents/index";
+import { pipelineAgents } from "../agents/pipeline/index";
+import { AGENT_REGISTRY } from "../registry/model-groups";
 import { lintAgent, lintCommand, lintSkill } from "../skills/linter";
 import { getAssetsDir, getGlobalConfigDir } from "../utils/paths";
 
@@ -11,11 +14,33 @@ interface StocktakeArgs {
 interface AssetEntry {
 	readonly name: string;
 	readonly type: "skill" | "command" | "agent";
-	readonly origin: "built-in" | "user-created";
+	readonly origin: "built-in" | "config-hook" | "user-created";
+	readonly mode?: "all" | "primary" | "subagent";
+	readonly model?: string;
+	readonly group?: string;
+	readonly hidden?: boolean;
 	readonly lint?: {
 		readonly valid: boolean;
 		readonly errors: readonly string[];
 		readonly warnings: readonly string[];
+	};
+}
+
+export interface ConfigHookAgent {
+	readonly name: string;
+	readonly mode?: "all" | "primary" | "subagent";
+	readonly hidden?: boolean;
+	readonly group?: string;
+}
+
+function configHookAgentToEntry(agent: ConfigHookAgent): AssetEntry {
+	return {
+		name: agent.name,
+		type: "agent",
+		origin: "config-hook",
+		mode: agent.mode,
+		group: agent.group,
+		hidden: agent.hidden ?? false,
 	};
 }
 
@@ -45,11 +70,15 @@ async function isBuiltIn(assetType: string, name: string): Promise<boolean> {
 	return cached.has(name);
 }
 
-export async function stocktakeCore(args: StocktakeArgs, baseDir: string): Promise<string> {
+export async function stocktakeCore(
+	args: StocktakeArgs,
+	baseDir: string,
+	configHookAgents?: readonly ConfigHookAgent[],
+): Promise<string> {
 	const shouldLint = args.lint !== false;
 	const skills: AssetEntry[] = [];
 	const commands: AssetEntry[] = [];
-	const agents: AssetEntry[] = [];
+	const agentEntries: AssetEntry[] = [];
 
 	// Scan skills (each subdirectory is a skill) — filter to directories only
 	const skillEntries = await readdir(join(baseDir, "skills"), { withFileTypes: true }).catch(
@@ -113,22 +142,33 @@ export async function stocktakeCore(args: StocktakeArgs, baseDir: string): Promi
 			try {
 				const content = await readFile(join(baseDir, "agents", file), "utf-8");
 				const lint = lintAgent(content);
-				agents.push({ ...entry, lint });
+				agentEntries.push({ ...entry, lint });
 			} catch {
-				agents.push({
+				agentEntries.push({
 					...entry,
 					lint: { valid: false, errors: ["Could not read agent file"], warnings: [] },
 				});
 			}
 		} else {
-			agents.push(entry);
+			agentEntries.push(entry);
+		}
+	}
+
+	// Add config-hook agents (skip any already found on filesystem to avoid duplicates)
+	const filesystemAgentNames = new Set(agentEntries.map((a) => a.name));
+	if (configHookAgents) {
+		for (const hookAgent of configHookAgents) {
+			if (!filesystemAgentNames.has(hookAgent.name)) {
+				agentEntries.push(configHookAgentToEntry(hookAgent));
+			}
 		}
 	}
 
 	// Compute summary
-	const allAssets = [...skills, ...commands, ...agents];
+	const allAssets = [...skills, ...commands, ...agentEntries];
 	const builtIn = allAssets.filter((a) => a.origin === "built-in").length;
 	const userCreated = allAssets.filter((a) => a.origin === "user-created").length;
+	const configHook = allAssets.filter((a) => a.origin === "config-hook").length;
 	const lintErrors = shouldLint
 		? allAssets.reduce((sum, a) => sum + (a.lint?.errors.length ?? 0), 0)
 		: 0;
@@ -140,11 +180,12 @@ export async function stocktakeCore(args: StocktakeArgs, baseDir: string): Promi
 		{
 			skills,
 			commands,
-			agents,
+			agents: agentEntries,
 			summary: {
 				total: allAssets.length,
 				builtIn,
 				userCreated,
+				configHook,
 				lintErrors,
 				lintWarnings,
 			},
@@ -165,6 +206,20 @@ export const ocStocktake = tool({
 			.describe("Run YAML frontmatter linter on all assets"),
 	},
 	async execute(args) {
-		return stocktakeCore(args, getGlobalConfigDir());
+		const configHookAgentList: ConfigHookAgent[] = [
+			...Object.entries(standardAgents).map(([name, config]) => ({
+				name,
+				mode: config.mode as ConfigHookAgent["mode"],
+				hidden: (config as Record<string, unknown>).hidden === true,
+				group: AGENT_REGISTRY[name]?.group,
+			})),
+			...Object.entries(pipelineAgents).map(([name, config]) => ({
+				name,
+				mode: config.mode as ConfigHookAgent["mode"],
+				hidden: (config as Record<string, unknown>).hidden === true,
+				group: AGENT_REGISTRY[name]?.group,
+			})),
+		];
+		return stocktakeCore(args, getGlobalConfigDir(), configHookAgentList);
 	},
 });

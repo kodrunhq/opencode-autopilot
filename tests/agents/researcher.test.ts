@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { researcherAgent } from "../../src/agents/researcher";
 
 describe("researcher agent config", () => {
-	test("mode is all", () => {
-		expect(researcherAgent.mode).toBe("all");
+	test("mode is subagent", () => {
+		expect(researcherAgent.mode).toBe("subagent");
 	});
 
 	test("has a non-empty description", () => {
