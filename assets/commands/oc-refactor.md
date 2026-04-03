@@ -4,7 +4,7 @@ agent: coder
 ---
 Analyze and refactor the code specified by $ARGUMENTS.
 
-Detect the project language and framework from manifest files (package.json, tsconfig.json, go.mod, Cargo.toml, pom.xml, *.csproj, pyproject.toml, requirements.txt, pyproject.toml) and adapt refactoring patterns to that language/framework.
+Detect the project language and framework from manifest files (package.json, tsconfig.json, go.mod, Cargo.toml, pom.xml, *.csproj, pyproject.toml, requirements.txt) and adapt refactoring patterns to that language/framework.
 
 $ARGUMENTS can be a file path, function name, module name, or a description of what to refactor.
 

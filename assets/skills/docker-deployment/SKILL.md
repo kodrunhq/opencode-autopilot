@@ -44,9 +44,9 @@ Practical patterns for containerizing applications, orchestrating services, and 
   tests/
   .github/
   ```
-- Pin base image versions with SHA digests for reproducibility:
+- Pin base image versions with SHA digests for reproducibility (get the digest from `docker pull <image>`):
   ```dockerfile
-  FROM node:20-alpine@sha256:abc123...
+  FROM node:20-alpine@sha256:<64-char-hex-digest>
   ```
 - Use `COPY` instead of `ADD` (unless extracting archives)
 - Combine `RUN` commands to reduce layers:
@@ -96,12 +96,9 @@ services:
     image: postgres:16-alpine
     volumes:
       - pgdata:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: myapp
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
+    env_file: .env  # Never hardcode credentials — use env_file or Docker secrets
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d myapp"]
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 5

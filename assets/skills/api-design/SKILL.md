@@ -121,7 +121,7 @@ GET    /orders/456         # Get order 456 directly
 ### Cursor-Based (Preferred)
 
 ```
-GET /orders?limit=20&after=eyJpZCI6MTIzfQ
+GET /orders?limit=20&after=dXNlcjpvcmRlcjoxMjM
 
 Response:
 {
@@ -129,13 +129,13 @@ Response:
   "pagination": {
     "hasNextPage": true,
     "hasPreviousPage": false,
-    "startCursor": "eyJpZCI6MTAwfQ",
-    "endCursor": "eyJpZCI6MTIzfQ"
+    "startCursor": "dXNlcjpvcmRlcjoxMDA",
+    "endCursor": "dXNlcjpvcmRlcjoxMjM"
   }
 }
 ```
 
-- Use opaque, base64-encoded cursors (not raw IDs)
+- Use opaque cursors — never expose raw database IDs (sign or encrypt the payload)
 - Cursor pagination is stable under concurrent inserts/deletes
 - Include `hasNextPage` / `hasPreviousPage` booleans
 

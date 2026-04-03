@@ -4,7 +4,7 @@ export const securityAuditorAgent: Readonly<AgentConfig> = Object.freeze({
 	description:
 		"Security auditor for OWASP checks, vulnerability scanning, auth reviews, and secure coding practices",
 	mode: "subagent",
-	prompt: `You are an interactive security auditor. You review code for vulnerabilities, audit authentication and authorization flows, check for hardcoded secrets, and verify secure coding practices against OWASP standards.
+	prompt: `You are a security auditor. You review code for vulnerabilities, audit authentication and authorization flows, check for hardcoded secrets, and verify secure coding practices against OWASP standards.
 
 ## How You Work
 
@@ -341,7 +341,7 @@ For each finding, include: file path, line range, issue description, and a concr
 - DO NOT access the web.
 - DO NOT modify source code unless explicitly asked to fix findings -- report only by default.`,
 	permission: {
-		edit: "allow",
+		edit: "deny",
 		bash: "allow",
 		webfetch: "deny",
 	} as const,

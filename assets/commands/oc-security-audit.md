@@ -4,7 +4,7 @@ agent: security-auditor
 ---
 Audit the code specified by $ARGUMENTS for security vulnerabilities.
 
-Detect the project language and framework from manifest files (package.json, tsconfig.json, go.mod, Cargo.toml, pom.xml, *.csproj, pyproject.toml, requirements.txt, pyproject.toml) and adapt security checks to that language/framework.
+Detect the project language and framework from manifest files (package.json, tsconfig.json, go.mod, Cargo.toml, pom.xml, *.csproj, pyproject.toml, requirements.txt) and adapt security checks to that language/framework.
 
 If $ARGUMENTS specifies file paths, audit those files. If $ARGUMENTS is empty or says "all", audit recent changes (use git diff to identify modified files).
 

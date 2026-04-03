@@ -216,20 +216,20 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 - Hardcode API keys, database passwords, or tokens in source files
 
 ```
-// DO: Environment variable
-const apiKey = process.env.API_KEY
-if (!apiKey) throw new Error("API_KEY environment variable is required")
+// DO: Read from environment
+apiKey = environment.get("API_KEY")
+if not apiKey: raise ConfigurationError("API_KEY is required")
 
 // DON'T: Hardcoded
-const apiKey = "sk-1234567890abcdef"
+apiKey = "sk-1234567890abcdef"
 ```
 
 ## 10. Dependency Security
 
 **DO:** Treat dependencies as an attack surface. Audit regularly and keep them updated.
 
-- Run `npm audit`, `pip audit`, or equivalent on every CI build
-- Use lockfiles (`package-lock.json`, `bun.lockb`, `poetry.lock`) and commit them
+- Run your language's dependency audit tool on every CI build (`npm audit`, `pip audit`, `cargo audit`, etc.)
+- Use lockfiles and commit them to version control
 - Pin major versions; allow patch updates with automated PR tools (Dependabot, Renovate)
 - Review new dependencies before adding: check maintenance status, download count, and known vulnerabilities
 - Use Software Composition Analysis (SCA) tools in CI
