@@ -15,6 +15,7 @@ export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = deepFreeze({
 	"oc-architect": { group: "architects" },
 	"oc-planner": { group: "architects" },
 	autopilot: { group: "architects" },
+	planner: { group: "architects" },
 
 	// ── Challengers ────────────────────────────────────────────
 	// Adversarial to Architects: critique proposals, enhance ideas
@@ -22,8 +23,9 @@ export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = deepFreeze({
 	"oc-challenger": { group: "challengers" },
 
 	// ── Builders ───────────────────────────────────────────────
-	// Code generation
+	// Code generation and debugging
 	"oc-implementer": { group: "builders" },
+	debugger: { group: "builders" },
 
 	// ── Reviewers ──────────────────────────────────────────────
 	// Code analysis, adversarial to Builders
@@ -32,6 +34,7 @@ export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = deepFreeze({
 	// src/review/types.ts, not AgentConfig. The review pipeline resolves their
 	// model via resolveModelForGroup("reviewers") directly.
 	"oc-reviewer": { group: "reviewers" },
+	reviewer: { group: "reviewers" },
 
 	// ── Red Team ───────────────────────────────────────────────
 	// Final adversarial pass

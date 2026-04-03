@@ -16,9 +16,12 @@ describe("debugger agent config", () => {
 		expect(debuggerAgent.prompt?.length).toBeGreaterThanOrEqual(100);
 	});
 
-	test("prompt references systematic debugging methodology", () => {
+	test("prompt references all four systematic debugging phases", () => {
 		const prompt = (debuggerAgent.prompt ?? "").toLowerCase();
-		expect(prompt.includes("reproduce") || prompt.includes("hypothesis")).toBe(true);
+		expect(prompt.includes("reproduce")).toBe(true);
+		expect(prompt.includes("isolate")).toBe(true);
+		expect(prompt.includes("diagnose")).toBe(true);
+		expect(prompt.includes("fix")).toBe(true);
 	});
 
 	test("permissions match D-07: edit=allow, bash=allow, webfetch=deny", () => {

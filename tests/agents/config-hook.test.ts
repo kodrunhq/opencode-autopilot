@@ -29,6 +29,7 @@ describe("configHook", () => {
 		expect(config.agent?.metaprompter).toBeDefined();
 		expect(config.agent?.documenter).toBeDefined();
 		expect(config.agent?.["pr-reviewer"]).toBeDefined();
+		expect(config.agent?.autopilot).toBeDefined();
 		expect(config.agent?.debugger).toBeDefined();
 		expect(config.agent?.planner).toBeDefined();
 		expect(config.agent?.reviewer).toBeDefined();

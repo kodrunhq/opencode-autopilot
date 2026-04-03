@@ -18,7 +18,9 @@ describe("planner agent config", () => {
 
 	test("prompt references plan-writing concepts", () => {
 		const prompt = (plannerAgent.prompt ?? "").toLowerCase();
-		expect(prompt.includes("wave") || prompt.includes("verification")).toBe(true);
+		expect(prompt.includes("wave")).toBe(true);
+		expect(prompt.includes("task")).toBe(true);
+		expect(prompt.includes("plan-writing")).toBe(true);
 	});
 
 	test("permissions match D-08: edit=allow, bash=allow, webfetch=deny", () => {

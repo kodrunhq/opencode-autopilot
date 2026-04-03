@@ -277,7 +277,7 @@ Every task needs a verification command. The plan as a whole needs an end-to-end
 
 ### Tasks Keep Growing
 
-**Symptom:** "This task was supposed to be 30 minutes but it is been 2 hours." Implementation reveals more work than planned.
+**Symptom:** "This task was supposed to be 30 minutes but it has been 2 hours." Implementation reveals more work than planned.
 
 **Fix:** You are combining concerns. Stop, re-plan the remaining work. Split the current task into smaller tasks. The sunk time is gone -- do not let it cascade into more wasted time.
 

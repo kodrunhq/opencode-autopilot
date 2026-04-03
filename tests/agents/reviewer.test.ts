@@ -16,9 +16,10 @@ describe("reviewer agent config", () => {
 		expect(reviewerAgent.prompt?.length).toBeGreaterThanOrEqual(100);
 	});
 
-	test("prompt references oc_review tool for auto-invocation", () => {
+	test("prompt references oc_review tool and review-only constraint", () => {
 		const prompt = (reviewerAgent.prompt ?? "").toLowerCase();
 		expect(prompt.includes("oc_review")).toBe(true);
+		expect(prompt.includes("you do not fix")).toBe(true);
 	});
 
 	test("permissions match D-09: edit=deny, bash=allow, webfetch=deny", () => {
