@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Orchestrator
-status: executing
-stopped_at: Completed 20-01-PLAN.md
-last_updated: "2026-04-03T14:43:52.251Z"
+status: verifying
+stopped_at: Completed 20-02-PLAN.md
+last_updated: "2026-04-03T14:47:36.765Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 10
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 Phase: 20 (new-primary-agents) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-03
 
 Progress: [██████████] 100%
@@ -82,6 +82,7 @@ Progress: [██████████] 100%
 | Phase 19 P01 | 1min | 2 tasks | 4 files |
 | Phase 19 P02 | 2min | 1 tasks | 2 files |
 | Phase 20-new-primary-agents P01 | 7min | 1 tasks | 3 files |
+| Phase 20-new-primary-agents P02 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,7 @@ Recent decisions affecting current work:
 - [Phase 18]: First-load toast drops oc-configure mention, points to oc_doctor (D-04)
 - [Phase 20-new-primary-agents]: Static skill embedding in agent prompts (strip YAML frontmatter, embed full content)
 - [Phase 20-new-primary-agents]: Reviewer edit:deny as hard constraint; planner edit:allow with prompt-level prohibition on source code editing
+- [Phase 20-new-primary-agents]: Alphabetical agent map ordering ensures Tab-cycle order: autopilot, debugger, planner, reviewer
 
 ### Pending Todos
 
@@ -111,6 +113,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T14:43:52.248Z
-Stopped at: Completed 20-01-PLAN.md
+Last session: 2026-04-03T14:47:36.762Z
+Stopped at: Completed 20-02-PLAN.md
 Resume file: None
