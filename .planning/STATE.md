@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** A single command transforms an idea into a shipped, reviewed, tested result
-**Current focus:** Phase 21 — content-expansion
+**Current focus:** Phase 23 — qa-playbook
 
 ## Current Position
 
-Phase: 21 (content-expansion) — EXECUTING
+Phase: 23 (qa-playbook) — COMPLETE
 Plan: 2 of 2
-Status: Phase complete — ready for verification
+Status: Phase complete — v4.0 milestone finished
 Last activity: 2026-04-03
 
 Progress: [██████████] 100%

@@ -24,6 +24,8 @@
 
 Execute this playbook top-to-bottom in a single OpenCode session. Each section contains numbered test procedures with prerequisites, steps, expected output, and pass/fail criteria. Every feature includes at least one negative test case for invalid input or missing prerequisites. A feature passes only when all its criteria are met. Mark each test as PASS or FAIL as you go, then tally results at the end.
 
+**Maintenance:** When a future phase adds or changes features, that phase's task list must include a step to update the relevant playbook section. This keeps the playbook in sync with the codebase without requiring a separate maintenance pass.
+
 ---
 
 ## Commands
@@ -1954,7 +1956,7 @@ The `oc_doctor` tool runs 6 independent health checks and reports pass/fail stat
 - Expected: Each affected check reports "fail" independently. Working components still report "pass". `allPassed` is false.
 
 **Pass/Fail:**
-- PASS: All 6 checks run independently. Failed checks include actionable messages. `allPassed` correctly reflects aggregate status. Duration is reasonable (<5 seconds).
+- PASS: All 7 checks run independently (6 health checks + 1 informational hook-registration). Failed checks include actionable messages. `allPassed` correctly reflects aggregate status. Duration is reasonable (<5 seconds).
 - FAIL: Checks not independent (one failure blocks others), missing fix suggestions, or incorrect aggregate status.
 
 ---
@@ -1962,7 +1964,7 @@ The `oc_doctor` tool runs 6 independent health checks and reports pass/fail stat
 ### Anti-Slop Comment Hook
 
 **Prerequisites:**
-- Plugin installed with the anti-slop PostToolUse hook registered
+- Plugin installed with the anti-slop `tool.execute.after` hook registered
 - An OpenCode session with file-writing tools available
 
 **Steps:**
@@ -2224,12 +2226,12 @@ The orchestrator pipeline drives the full SDLC: RECON, CHALLENGE, ARCHITECT, EXP
 A rapid 10-item checklist for validating core plugin functionality before a release. Each item should take less than 1 minute to verify.
 
 - [ ] **Plugin loads:** OpenCode starts without errors when the plugin is configured in `opencode.json`.
-- [ ] **Tools register:** Invoke `oc_doctor` -- should return JSON with `action: "doctor"` and 6 health checks.
+- [ ] **Tools register:** Invoke `oc_doctor` -- should return JSON with `action: "doctor"` and 7 checks (6 health + 1 hook-registration).
 - [ ] **Commands accessible:** Type `/oc-` in the OpenCode TUI -- at least 11 commands should appear in autocomplete.
 - [ ] **Agents visible:** Press Tab to cycle primary agents -- autopilot, debugger, planner, reviewer should be available. Type `@` and verify researcher, metaprompter, documenter, pr-reviewer are @-callable.
 - [ ] **Skills inject:** Run `oc_doctor` in a TypeScript project -- `skill-loading` check should report detected stacks and matched skills.
 - [ ] **Memory captures:** Run `oc_memory_status` -- should return `stats` object (or null if DB not yet created). After a session with decisions, stats should show non-zero observation counts.
-- [ ] **Doctor passes:** Run `oc_doctor` -- all 6 checks should report "pass" with `allPassed: true`.
+- [ ] **Doctor passes:** Run `oc_doctor` -- all 7 checks should report "pass" with `allPassed: true`.
 - [ ] **Logs write:** End a session, then check `~/.config/opencode/logs/` for a new JSON log file.
 - [ ] **Config saves:** Run `oc_configure` start/assign/commit cycle -- config should persist to `~/.config/opencode/opencode-autopilot.json`.
 - [ ] **Stocktake counts match:** Run `oc_stocktake` -- summary counts should match: 18 skills, 11 commands, 8+ agents (standard + pipeline).
