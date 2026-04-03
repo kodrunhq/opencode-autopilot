@@ -114,9 +114,9 @@ Requirements for Milestone v4.0 — Production Quality.
 
 ### Agents
 
-- [ ] **AGNT-10**: Primary Debugger agent visible in Tab cycle, loads systematic-debugging skill
-- [ ] **AGNT-11**: Primary Planner agent visible in Tab cycle, loads plan-writing + plan-executing skills
-- [ ] **AGNT-12**: Primary Code Reviewer agent visible in Tab cycle, loads code-review skill and invokes oc_review
+- [x] **AGNT-10**: Primary Debugger agent visible in Tab cycle, loads systematic-debugging skill
+- [x] **AGNT-11**: Primary Planner agent visible in Tab cycle, loads plan-writing + plan-executing skills
+- [x] **AGNT-12**: Primary Code Reviewer agent visible in Tab cycle, loads code-review skill and invokes oc_review
 - [ ] **AGNT-13**: Primary agents registered with intentional Tab-cycle ordering (Autopilot first, then Debugger, Planner, Reviewer)
 - [ ] **AGNT-14**: Config-hook agents appear in Tab cycle correctly for primary mode agents
 
@@ -221,9 +221,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BFIX-02 | Phase 18 | Complete |
 | BFIX-03 | Phase 18 | Complete |
 | BFIX-04 | Phase 19 | Pending |
-| AGNT-10 | Phase 20 | Pending |
-| AGNT-11 | Phase 20 | Pending |
-| AGNT-12 | Phase 20 | Pending |
+| AGNT-10 | Phase 20 | Complete |
+| AGNT-11 | Phase 20 | Complete |
+| AGNT-12 | Phase 20 | Complete |
 | AGNT-13 | Phase 20 | Pending |
 | AGNT-14 | Phase 19 | Pending |
 | SKLL-10 | Phase 21 | Pending |
