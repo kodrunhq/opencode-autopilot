@@ -30,7 +30,7 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 	if (!args.idea || args.idea.trim().length === 0) {
 		return JSON.stringify({
 			action: "error",
-			message: "No idea provided. Usage: /quick <describe the task>",
+			message: "No idea provided. Usage: /oc-quick <describe the task>",
 		});
 	}
 
@@ -64,7 +64,7 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 				phase: "PLAN",
 				agent: "oc-quick",
 				decision: "Skip discovery phases",
-				rationale: "Quick task mode: user explicitly requested simplified pipeline via /quick",
+				rationale: "Quick task mode: user explicitly requested simplified pipeline via /oc-quick",
 			},
 		],
 		confidence: [],

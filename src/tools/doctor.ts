@@ -28,7 +28,7 @@ interface DoctorOptions {
  */
 const FIX_SUGGESTIONS: Readonly<Record<string, string>> = Object.freeze({
 	"config-validity":
-		"Run /oc-configure to reconfigure, or delete ~/.config/opencode/opencode-autopilot.json to reset",
+		"Run `bunx @kodrunhq/opencode-autopilot configure` to reconfigure, or delete ~/.config/opencode/opencode-autopilot.json to reset",
 	"agent-injection": "Restart OpenCode to trigger agent re-injection via config hook",
 	"asset-directories": "Restart OpenCode to trigger asset reinstallation",
 });
