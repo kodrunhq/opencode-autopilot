@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createAntiSlopHandler, isCodeFile, scanForSlopComments } from "../../src/hooks/anti-slop";
 
@@ -61,7 +60,9 @@ describe("createAntiSlopHandler", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "anti-slop-test-"));
+		// Use cwd-relative path so hook's path validation passes
+		tempDir = join(process.cwd(), `.test-anti-slop-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
 	});
 
 	afterEach(async () => {

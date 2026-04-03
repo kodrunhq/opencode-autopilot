@@ -3,7 +3,7 @@
  * Warn-only (non-blocking) -- fires as PostToolUse after file-writing tools.
  */
 import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
+import { extname, isAbsolute, resolve } from "node:path";
 import {
 	CODE_EXTENSIONS,
 	COMMENT_PATTERNS,
@@ -70,7 +70,11 @@ const FILE_WRITING_TOOLS: ReadonlySet<string> = Object.freeze(
  * Best-effort: never throws, never blocks the pipeline.
  */
 export function createAntiSlopHandler(options: {
-	readonly showToast: (title: string, message: string, variant: string) => Promise<void>;
+	readonly showToast: (
+		title: string,
+		message: string,
+		variant: "info" | "warning" | "error",
+	) => Promise<void>;
 }) {
 	return async (
 		hookInput: {
@@ -79,27 +83,30 @@ export function createAntiSlopHandler(options: {
 			readonly callID: string;
 			readonly args: unknown;
 		},
-		output: { title: string; output: string; metadata: unknown },
+		_output: { title: string; output: string; metadata: unknown },
 	): Promise<void> => {
 		if (!FILE_WRITING_TOOLS.has(hookInput.tool)) return;
 
-		// Extract file path from args (tools use different key names)
-		const args = hookInput.args as Record<string, unknown> | null;
-		if (!args) return;
+		// Extract file path from args with type-safe narrowing
+		const args = hookInput.args;
+		if (args === null || typeof args !== "object") return;
+		const record = args as Record<string, unknown>;
+		const rawPath = record.file_path ?? record.filePath ?? record.path ?? record.file;
+		if (typeof rawPath !== "string" || rawPath.length === 0) return;
 
-		const filePath =
-			(args.file_path as string) ??
-			(args.filePath as string) ??
-			(args.path as string) ??
-			(args.file as string);
-		if (!filePath || !isCodeFile(filePath)) return;
+		// Validate path is absolute and within cwd (prevent path traversal)
+		if (!isAbsolute(rawPath)) return;
+		const resolved = resolve(rawPath);
+		const cwd = process.cwd();
+		if (!resolved.startsWith(`${cwd}/`) && resolved !== cwd) return;
 
-		const ext = extname(filePath).toLowerCase();
+		if (!isCodeFile(resolved)) return;
+		const ext = extname(resolved).toLowerCase();
 
 		// Read the actual file content — output.output is the tool's result message, not file content
 		let fileContent: string;
 		try {
-			fileContent = await readFile(filePath, "utf-8");
+			fileContent = await readFile(resolved, "utf-8");
 		} catch {
 			return; // file unreadable — best-effort, skip
 		}

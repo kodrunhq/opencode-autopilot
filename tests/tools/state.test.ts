@@ -76,7 +76,8 @@ describe("stateCore", () => {
 	});
 
 	test("unknown subcommand returns error", async () => {
-		const result = await stateCore({ subcommand: "nonexistent" as any }, tempDir);
+		// @ts-expect-error — testing invalid subcommand
+		const result = await stateCore({ subcommand: "nonexistent" }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.error).toContain("unknown subcommand");
 	});

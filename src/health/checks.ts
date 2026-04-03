@@ -285,6 +285,8 @@ export async function commandHealthCheck(targetDir?: string): Promise<HealthResu
 		}),
 	);
 
+	missing.sort();
+	invalid.sort();
 	const issues = [...missing.map((n) => `missing: ${n}`), ...invalid];
 
 	if (issues.length === 0) {

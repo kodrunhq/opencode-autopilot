@@ -39,10 +39,12 @@ export const EXT_COMMENT_STYLE: Readonly<Record<string, string>> = Object.freeze
 	".rb": "#",
 });
 
-/** Regex to extract comment text from a line given its comment prefix. */
+/** Regex to extract comment text from a line given its comment prefix.
+ * Matches both full-line comments and inline trailing comments.
+ * Negative lookbehind (?<!:) prevents matching :// in URLs. */
 export const COMMENT_PATTERNS: Readonly<Record<string, RegExp>> = Object.freeze({
-	"//": /^\s*\/\/\s*(.+)/,
-	"#": /^\s*#\s*(.+)/,
+	"//": /(?<!:)\/\/\s*(.+)/,
+	"#": /#\s*(.+)/,
 });
 
 /**
