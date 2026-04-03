@@ -186,7 +186,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> ... -> 23 -> 24
 | 22. Production Hardening | v4.0 | 4/4 | Complete   | 2026-04-03 |
 | 23. QA Playbook | v4.0 | 2/2 | Complete   | 2026-04-03 |
 | 24. Coder Agent & Built-in Replacements | v5.0 | 4/4 | Complete   | 2026-04-03 |
-| 25. Content & Agent Expansion | v5.0 | 1/2 | In Progress|  |
+| 25. Content & Agent Expansion | v5.0 | 2/2 | Complete   | 2026-04-03 |
 
 ### Phase 8: Testing & CI
 
@@ -360,7 +360,7 @@ Plans:
 ### v5.0 Agent Refinement
 
 - [x] **Phase 24: Coder Agent & Built-in Replacements** - Add a dedicated primary Coder agent (replaces built-in Build), remove built-in Plan agent (covered by custom Planner), route /oc-tdd to Coder (completed 2026-04-03)
-- [ ] **Phase 25: Content & Agent Expansion** - Add new skills, commands, and agents to close gaps with competitors. Frontend engineer agent, additional language patterns, workflow commands, and expanded coverage.
+- [x] **Phase 25: Content & Agent Expansion** - Add new skills, commands, and agents to close gaps with competitors. Frontend engineer agent, additional language patterns, workflow commands, and expanded coverage. (completed 2026-04-03)
 
 ## Phase Details (v4.0)
 
@@ -489,4 +489,4 @@ Plans:
 
 Plans:
 - [x] 25-01-PLAN.md -- Create 4 new universal skills (security-patterns, api-design, database-patterns, docker-deployment)
-- [ ] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
+- [x] 25-02-PLAN.md -- Create 4 subagent agents, 2 commands, and wire into registration
