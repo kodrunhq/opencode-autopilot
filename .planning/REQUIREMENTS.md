@@ -137,7 +137,7 @@ Requirements for Milestone v4.0 — Production Quality.
 
 ### Quality Assurance
 
-- [ ] **QAPL-01**: Internal manual QA playbook with step-by-step test procedures for every command, agent, skill, memory flow, fallback chain, and doctor check
+- [x] **QAPL-01**: Internal manual QA playbook with step-by-step test procedures for every command, agent, skill, memory flow, fallback chain, and doctor check
 
 ## Future Requirements
 
@@ -235,7 +235,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HARD-02 | Phase 22 | Pending |
 | HARD-03 | Phase 22 | Pending |
 | HARD-04 | Phase 22 | Complete |
-| QAPL-01 | Phase 23 | Pending |
+| QAPL-01 | Phase 23 | Complete |
 
 **Coverage:**
 - v1 requirements: 15 total (all Complete)
