@@ -67,4 +67,92 @@ describe("stocktakeCore", () => {
 		expect(parsed.summary.total).toBe(0);
 		await rm(emptyDir, { recursive: true, force: true });
 	});
+
+	// ── Config-hook agent detection tests ──────────────────────────
+
+	it("returns config-hook agents with origin config-hook", async () => {
+		const configHookAgents = [
+			{ name: "mock-agent", config: { mode: "subagent", hidden: true }, group: "utilities" },
+			{ name: "mock-primary", config: { mode: "all" }, group: "architects" },
+		];
+		const result = await stocktakeCore({ lint: false }, tempDir, configHookAgents);
+		const parsed = JSON.parse(result);
+		const hookAgents = parsed.agents.filter((a: { origin: string }) => a.origin === "config-hook");
+		expect(hookAgents.length).toBe(2);
+		expect(hookAgents[0].name).toBe("mock-agent");
+		expect(hookAgents[1].name).toBe("mock-primary");
+	});
+
+	it("populates mode, group, and hidden fields on config-hook agents", async () => {
+		const configHookAgents = [
+			{ name: "mock-agent", config: { mode: "subagent", hidden: true }, group: "utilities" },
+		];
+		const result = await stocktakeCore({ lint: false }, tempDir, configHookAgents);
+		const parsed = JSON.parse(result);
+		const hookAgent = parsed.agents.find((a: { origin: string }) => a.origin === "config-hook");
+		expect(hookAgent.mode).toBe("subagent");
+		expect(hookAgent.group).toBe("utilities");
+		expect(hookAgent.hidden).toBe(true);
+	});
+
+	it("filesystem agents still detected with built-in or user-created origin", async () => {
+		const configHookAgents = [
+			{ name: "mock-agent", config: { mode: "subagent" }, group: "utilities" },
+		];
+		const result = await stocktakeCore({ lint: false }, tempDir, configHookAgents);
+		const parsed = JSON.parse(result);
+		const fsAgent = parsed.agents.find((a: { name: string }) => a.name === "test-agent");
+		expect(fsAgent).toBeDefined();
+		expect(["built-in", "user-created"]).toContain(fsAgent.origin);
+	});
+
+	it("deduplicates filesystem vs config-hook agents — filesystem wins", async () => {
+		// test-agent exists on filesystem, also passed as config-hook
+		const configHookAgents = [
+			{ name: "test-agent", config: { mode: "all", hidden: false }, group: "architects" },
+			{ name: "unique-hook", config: { mode: "subagent" }, group: "utilities" },
+		];
+		const result = await stocktakeCore({ lint: false }, tempDir, configHookAgents);
+		const parsed = JSON.parse(result);
+		const testAgents = parsed.agents.filter((a: { name: string }) => a.name === "test-agent");
+		// Only one entry — the filesystem one
+		expect(testAgents.length).toBe(1);
+		expect(testAgents[0].origin).not.toBe("config-hook");
+		// unique-hook should still be present
+		const uniqueHook = parsed.agents.find((a: { name: string }) => a.name === "unique-hook");
+		expect(uniqueHook).toBeDefined();
+		expect(uniqueHook.origin).toBe("config-hook");
+	});
+
+	it("summary includes configHook count", async () => {
+		const configHookAgents = [
+			{ name: "mock-agent", config: { mode: "subagent" }, group: "utilities" },
+			{ name: "mock-primary", config: { mode: "all" }, group: "architects" },
+		];
+		const result = await stocktakeCore({ lint: false }, tempDir, configHookAgents);
+		const parsed = JSON.parse(result);
+		expect(parsed.summary.configHook).toBe(2);
+	});
+
+	it("works without configHookAgents param (backward compat)", async () => {
+		const result = await stocktakeCore({ lint: false }, tempDir);
+		const parsed = JSON.parse(result);
+		// Should work exactly as before
+		expect(parsed.agents.length).toBe(1);
+		expect(parsed.summary.total).toBe(3);
+		// configHook should be 0
+		expect(parsed.summary.configHook).toBe(0);
+	});
+
+	it("total agent count includes both filesystem and config-hook agents", async () => {
+		const configHookAgents = [
+			{ name: "hook-a", config: { mode: "subagent" }, group: "utilities" },
+			{ name: "hook-b", config: { mode: "all" }, group: "architects" },
+		];
+		const result = await stocktakeCore({ lint: false }, tempDir, configHookAgents);
+		const parsed = JSON.parse(result);
+		// 1 filesystem + 2 config-hook = 3 agents, plus 1 skill + 1 command = 5 total
+		expect(parsed.agents.length).toBe(3);
+		expect(parsed.summary.total).toBe(5);
+	});
 });
