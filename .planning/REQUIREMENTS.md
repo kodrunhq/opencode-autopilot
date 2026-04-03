@@ -132,7 +132,7 @@ Requirements for Milestone v4.0 — Production Quality.
 
 - [ ] **HARD-01**: Mock/fail-forced fallback test mode accessible from CLI configure, simulates rate-limit, timeout, quota-exceeded, malformed
 - [ ] **HARD-02**: Context-aware commands auto-detect project language from files instead of requiring per-language variants
-- [ ] **HARD-03**: Doctor extended with skill-aware diagnostics (skill loading per detected stack, memory DB health, command accessibility)
+- [x] **HARD-03**: Doctor extended with skill-aware diagnostics (skill loading per detected stack, memory DB health, command accessibility)
 - [ ] **HARD-04**: Anti-slop comment hook prevents AI-generated comment bloat (obvious comments, sycophantic language), configurable via profiles
 
 ### Quality Assurance
@@ -233,7 +233,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CMND-11 | Phase 21 | Complete |
 | HARD-01 | Phase 22 | Pending |
 | HARD-02 | Phase 22 | Pending |
-| HARD-03 | Phase 22 | Pending |
+| HARD-03 | Phase 22 | Complete |
 | HARD-04 | Phase 22 | Pending |
 | QAPL-01 | Phase 23 | Pending |
 
