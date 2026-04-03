@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.12.1...opencode-autopilot-v1.12.2) (2026-04-03)
+
+
+### Bug Fixes
+
+* **23:** add agent routing to commands — planner for write-plan, documenter for update-docs, autopilot for quick ([249ca82](https://github.com/kodrunhq/opencode-autopilot/commit/249ca8204e1bd76ccb7e8765cc57742a9e9cbafc))
+* **23:** add missing stacks/requires fields to coding-standards skill frontmatter ([b0348cd](https://github.com/kodrunhq/opencode-autopilot/commit/b0348cddf2da3c39556507da2bec2e9ee2f9a47d))
+* **23:** QA findings — command agent routing, coding-standards frontmatter, Phase 24 roadmap ([81e44b0](https://github.com/kodrunhq/opencode-autopilot/commit/81e44b09fbcd032df04c9706f4928c30df7ee4ab))
+* **23:** route commands to correct agents, add Phase 24 to roadmap ([51b28a3](https://github.com/kodrunhq/opencode-autopilot/commit/51b28a3835c6d2c82636c73d3d73602de75421f9))
+
 ## [1.12.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.12.0...opencode-autopilot-v1.12.1) (2026-04-03)
 
 
