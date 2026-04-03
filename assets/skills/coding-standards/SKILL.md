@@ -1,6 +1,8 @@
 ---
 name: coding-standards
 description: Universal coding standards and best practices for code review and generation. Covers naming, file organization, error handling, immutability, and separation of concerns.
+stacks: []
+requires: []
 ---
 
 # Coding Standards
