@@ -215,7 +215,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 // ---- configHook pipeline agent registration tests ----
 
 describe("configHook pipeline agents", () => {
-	test("registers all 9 pipeline agents in config", async () => {
+	test("registers all 10 pipeline agents in config", async () => {
 		const { configHook } = await import("../src/agents/index");
 		const config = { agent: {} } as import("@opencode-ai/plugin").Config;
 		await configHook(config);
