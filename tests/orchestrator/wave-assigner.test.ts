@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { assignWaves } from "../../src/orchestrator/wave-assigner";
 import type { TaskNode } from "../../src/orchestrator/wave-assigner";
+import { assignWaves } from "../../src/orchestrator/wave-assigner";
 
 describe("assignWaves", () => {
 	test("3 independent tasks (no depends_on) all get wave 1", () => {
@@ -64,9 +64,7 @@ describe("assignWaves", () => {
 	});
 
 	test("task depending on non-existent ID is treated as wave 1 (graceful)", () => {
-		const tasks: readonly TaskNode[] = [
-			{ id: 1, depends_on: [999] },
-		];
+		const tasks: readonly TaskNode[] = [{ id: 1, depends_on: [999] }];
 		const result = assignWaves(tasks);
 		expect(result.assignments.get(1)).toBe(1);
 		expect(result.cycles).toEqual([]);
