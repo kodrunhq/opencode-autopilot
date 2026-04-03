@@ -186,6 +186,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> ... -> 23 -> 24
 | 22. Production Hardening | v4.0 | 4/4 | Complete   | 2026-04-03 |
 | 23. QA Playbook | v4.0 | 2/2 | Complete   | 2026-04-03 |
 | 24. Coder Agent & Built-in Replacements | v5.0 | 4/4 | Complete   | 2026-04-03 |
+| 25. Content & Agent Expansion | v5.0 | 0/TBD | Not started | - |
 
 ### Phase 8: Testing & CI
 
@@ -359,6 +360,7 @@ Plans:
 ### v5.0 Agent Refinement
 
 - [x] **Phase 24: Coder Agent & Built-in Replacements** - Add a dedicated primary Coder agent (replaces built-in Build), remove built-in Plan agent (covered by custom Planner), route /oc-tdd to Coder (completed 2026-04-03)
+- [ ] **Phase 25: Content & Agent Expansion** - Add new skills, commands, and agents to close gaps with competitors. Frontend engineer agent, additional language patterns, workflow commands, and expanded coverage.
 
 ## Phase Details (v4.0)
 
@@ -455,3 +457,14 @@ Plans:
 - [x] 24-02-PLAN.md -- oc_hashline_edit tool with FNV-1a hashing and CID alphabet
 - [x] 24-03-PLAN.md -- Wave auto-assignment from task dependencies (Kahn's algorithm)
 - [x] 24-04-PLAN.md -- Agent prompt updates, Plan suppression, and wiring audit
+
+### Phase 25: Content & Agent Expansion
+**Goal**: Close the content gap with competitors by adding new skills, commands, and agents — including a frontend engineer agent, additional workflow commands, and expanded skill coverage
+**Depends on**: Phase 24 (v5.0 Coder Agent complete)
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. A frontend-engineer agent exists and is available via @ mention for frontend-focused tasks
+  2. Plugin ships with at least 25 skills covering major development workflows
+  3. Every command is routed to an appropriate agent
+  4. New skills follow the established stack-detection and token-budgeting patterns
+**Plans**: TBD
