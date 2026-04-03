@@ -119,8 +119,24 @@ describe("orchestrateCore pipeline dispatch", () => {
 			...state,
 			currentPhase: "BUILD" as Phase,
 			tasks: [
-				{ id: 1, title: "Task A", status: "PENDING" as const, wave: 1, attempt: 0, strike: 0 },
-				{ id: 2, title: "Task B", status: "PENDING" as const, wave: 1, attempt: 0, strike: 0 },
+				{
+					id: 1,
+					title: "Task A",
+					status: "PENDING" as const,
+					wave: 1,
+					depends_on: [],
+					attempt: 0,
+					strike: 0,
+				},
+				{
+					id: 2,
+					title: "Task B",
+					status: "PENDING" as const,
+					wave: 1,
+					depends_on: [],
+					attempt: 0,
+					strike: 0,
+				},
 			],
 			buildProgress: {
 				currentTask: null,
@@ -153,7 +169,17 @@ describe("orchestrateCore pipeline dispatch", () => {
 		const buildState = {
 			...state,
 			currentPhase: "BUILD" as Phase,
-			tasks: [{ id: 1, title: "Task A", status: "DONE" as const, wave: 1, attempt: 0, strike: 0 }],
+			tasks: [
+				{
+					id: 1,
+					title: "Task A",
+					status: "DONE" as const,
+					wave: 1,
+					depends_on: [],
+					attempt: 0,
+					strike: 0,
+				},
+			],
 			buildProgress: {
 				currentTask: null,
 				currentWave: 1,
@@ -244,13 +270,14 @@ describe("configHook pipeline agents", () => {
 		expect(agents.debugger).toBeDefined();
 		expect(agents.planner).toBeDefined();
 		expect(agents.reviewer).toBeDefined();
+		expect(agents.coder).toBeDefined();
 
 		// pipeline agents
 		expect(agents["oc-researcher"]).toBeDefined();
 		expect(agents["oc-implementer"]).toBeDefined();
 
-		// Total: 8 standard + 10 pipeline = 18
-		expect(Object.keys(agents).length).toBe(18);
+		// Total: 9 standard + 10 pipeline = 19
+		expect(Object.keys(agents).length).toBe(19);
 	});
 
 	test("pipeline agents have mode subagent", async () => {

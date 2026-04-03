@@ -3,6 +3,7 @@ import { loadConfig } from "../config";
 import { resolveModelForAgent } from "../registry/resolver";
 import type { AgentOverride, GroupModelAssignment } from "../registry/types";
 import { autopilotAgent } from "./autopilot";
+import { coderAgent } from "./coder";
 import { debuggerAgent } from "./debugger";
 import { documenterAgent } from "./documenter";
 import { metaprompterAgent } from "./metaprompter";
@@ -19,6 +20,7 @@ interface AgentConfig {
 
 export const agents = {
 	autopilot: autopilotAgent,
+	coder: coderAgent,
 	debugger: debuggerAgent,
 	documenter: documenterAgent,
 	metaprompter: metaprompterAgent,
@@ -79,12 +81,29 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 	const groups: Readonly<Record<string, GroupModelAssignment>> = pluginConfig?.groups ?? {};
 	const overrides: Readonly<Record<string, AgentOverride>> = pluginConfig?.overrides ?? {};
 
+	// Snapshot built-in agent keys BEFORE we register ours — we only suppress
+	// built-in Plan variants, not our own custom "planner" agent.
+	const builtInKeys = new Set(Object.keys(config.agent));
+
 	// Register standard agents and pipeline agents (v2 orchestrator subagents)
 	registerAgents(agents, config, groups, overrides);
 	registerAgents(pipelineAgents, config, groups, overrides);
+
+	// Suppress built-in Plan agent — our planner agent replaces it (D-17).
+	// Only disable keys that existed before our registration (built-ins).
+	const planVariants = ["Plan", "plan", "Planner", "planner"] as const;
+	for (const variant of planVariants) {
+		if (builtInKeys.has(variant) && config.agent[variant] !== undefined) {
+			config.agent[variant] = {
+				...config.agent[variant],
+				disable: true,
+			};
+		}
+	}
 }
 
 export { autopilotAgent } from "./autopilot";
+export { coderAgent } from "./coder";
 export { debuggerAgent } from "./debugger";
 export { documenterAgent } from "./documenter";
 export { metaprompterAgent } from "./metaprompter";

@@ -32,6 +32,10 @@ Write a completion report with:
 - **Deviations from Spec** — any differences from the task specification, with rationale.
 - **Branch Name** — the feature branch name for this task.
 
+## Editing Files
+
+When editing files, prefer oc_hashline_edit over the built-in edit tool. Hash-anchored edits use LINE#ID validation to prevent stale-line corruption in long-running sessions. Each edit targets a line by its number and a 2-character content hash (e.g., 42#VK). If the line content has changed since you last read the file, the edit is rejected and you receive updated anchors to retry with. The built-in edit tool is still available as a fallback.
+
 ## Constraints
 
 - DO follow existing code style and patterns found in the project.

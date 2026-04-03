@@ -185,7 +185,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> ... -> 23 -> 24
 | 21. Content Expansion | v4.0 | 2/2 | Complete   | 2026-04-03 |
 | 22. Production Hardening | v4.0 | 4/4 | Complete   | 2026-04-03 |
 | 23. QA Playbook | v4.0 | 2/2 | Complete   | 2026-04-03 |
-| 24. Coder Agent & Built-in Replacements | v5.0 | 0/TBD | Not started | - |
+| 24. Coder Agent & Built-in Replacements | v5.0 | 4/4 | Complete   | 2026-04-03 |
 
 ### Phase 8: Testing & CI
 
@@ -358,7 +358,7 @@ Plans:
 
 ### v5.0 Agent Refinement
 
-- [ ] **Phase 24: Coder Agent & Built-in Replacements** - Add a dedicated primary Coder agent (replaces built-in Build), remove built-in Plan agent (covered by custom Planner), route /oc-tdd to Coder
+- [x] **Phase 24: Coder Agent & Built-in Replacements** - Add a dedicated primary Coder agent (replaces built-in Build), remove built-in Plan agent (covered by custom Planner), route /oc-tdd to Coder (completed 2026-04-03)
 
 ## Phase Details (v4.0)
 
@@ -435,3 +435,23 @@ Plans:
   3. Memory flow, fallback chain, and doctor diagnostics each have end-to-end test procedures
   4. The playbook can be executed by a human (or AI) in a single session to validate a release
 **Plans**: TBD
+
+## Phase Details (v5.0)
+
+### Phase 24: Coder Agent & Built-in Replacements
+**Goal**: Users get a dedicated Coder primary agent (pure implementer), a hash-anchored edit tool for autonomous session safety, automatic wave assignment from task dependencies, and built-in Plan agent suppression
+**Depends on**: Phase 23 (v4.0 complete)
+**Requirements**: BFIX-04, AGNT-14, PIPE-06
+**Success Criteria** (what must be TRUE):
+  1. User can Tab to a Coder agent that writes code, runs tests, and fixes builds with embedded TDD and coding-standards skills
+  2. Agents can use oc_hashline_edit for stale-line-safe file edits with hash validation and error recovery
+  3. Tasks with depends_on arrays automatically get wave numbers computed via topological sort
+  4. Built-in Plan agent is suppressed in the Tab cycle (custom Planner is sufficient)
+  5. /oc-tdd command routes to the Coder agent
+**Plans**: 4 plans
+
+Plans:
+- [x] 24-01-PLAN.md -- Coder agent creation with embedded skills and /oc-tdd routing
+- [x] 24-02-PLAN.md -- oc_hashline_edit tool with FNV-1a hashing and CID alphabet
+- [x] 24-03-PLAN.md -- Wave auto-assignment from task dependencies (Kahn's algorithm)
+- [x] 24-04-PLAN.md -- Agent prompt updates, Plan suppression, and wiring audit

@@ -8,6 +8,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
 		title: "Test task",
 		status: "PENDING",
 		wave: 1,
+		depends_on: [],
 		attempt: 0,
 		strike: 0,
 		...overrides,
