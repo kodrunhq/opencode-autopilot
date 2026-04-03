@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { stocktakeCore } from "../../src/tools/stocktake";
+import { type ConfigHookAgent, stocktakeCore } from "../../src/tools/stocktake";
 
 describe("stocktakeCore", () => {
 	let tempDir: string;
@@ -71,7 +71,7 @@ describe("stocktakeCore", () => {
 	// ── Config-hook agent detection tests ──────────────────────────
 
 	it("returns config-hook agents with origin config-hook", async () => {
-		const configHookAgents = [
+		const configHookAgents: ConfigHookAgent[] = [
 			{ name: "mock-agent", mode: "subagent", hidden: true, group: "utilities" },
 			{ name: "mock-primary", mode: "all", group: "architects" },
 		];
@@ -84,7 +84,7 @@ describe("stocktakeCore", () => {
 	});
 
 	it("populates mode, group, and hidden fields on config-hook agents", async () => {
-		const configHookAgents = [
+		const configHookAgents: ConfigHookAgent[] = [
 			{ name: "mock-agent", mode: "subagent", hidden: true, group: "utilities" },
 		];
 		const result = await stocktakeCore({ lint: false }, tempDir, configHookAgents);
@@ -96,7 +96,9 @@ describe("stocktakeCore", () => {
 	});
 
 	it("filesystem agents still detected with built-in or user-created origin", async () => {
-		const configHookAgents = [{ name: "mock-agent", mode: "subagent", group: "utilities" }];
+		const configHookAgents: ConfigHookAgent[] = [
+			{ name: "mock-agent", mode: "subagent", group: "utilities" },
+		];
 		const result = await stocktakeCore({ lint: false }, tempDir, configHookAgents);
 		const parsed = JSON.parse(result);
 		const fsAgent = parsed.agents.find((a: { name: string }) => a.name === "test-agent");
@@ -106,7 +108,7 @@ describe("stocktakeCore", () => {
 
 	it("deduplicates filesystem vs config-hook agents — filesystem wins", async () => {
 		// test-agent exists on filesystem, also passed as config-hook
-		const configHookAgents = [
+		const configHookAgents: ConfigHookAgent[] = [
 			{ name: "test-agent", mode: "all", hidden: false, group: "architects" },
 			{ name: "unique-hook", mode: "subagent", group: "utilities" },
 		];
@@ -123,7 +125,7 @@ describe("stocktakeCore", () => {
 	});
 
 	it("summary includes configHook count", async () => {
-		const configHookAgents = [
+		const configHookAgents: ConfigHookAgent[] = [
 			{ name: "mock-agent", mode: "subagent", group: "utilities" },
 			{ name: "mock-primary", mode: "all", group: "architects" },
 		];
@@ -143,7 +145,7 @@ describe("stocktakeCore", () => {
 	});
 
 	it("total agent count includes both filesystem and config-hook agents", async () => {
-		const configHookAgents = [
+		const configHookAgents: ConfigHookAgent[] = [
 			{ name: "hook-a", mode: "subagent", group: "utilities" },
 			{ name: "hook-b", mode: "all", group: "architects" },
 		];

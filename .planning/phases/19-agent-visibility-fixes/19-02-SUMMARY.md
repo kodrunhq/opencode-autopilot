@@ -54,11 +54,11 @@ Extended stocktakeCore to detect and report all 15 config-hook-injected agents a
 - `grep 'config-hook' src/tools/stocktake.ts` -- matches found
 - `grep 'configHookAgents' src/tools/stocktake.ts` -- matches found
 - `grep 'AGENT_REGISTRY' src/tools/stocktake.ts` -- match found
-- Full test suite: 1179/1181 pass (2 pre-existing failures in unrelated agent config tests)
+- Full test suite: 1181/1181 pass (stale agent mode assertions fixed in review commit)
 
 ## Deviations from Plan
 
-None -- plan executed exactly as written.
+ConfigHookAgent interface pre-extracts typed fields (mode, hidden, group) rather than carrying an opaque config bag as specified, improving type safety.
 
 ## Known Stubs
 
