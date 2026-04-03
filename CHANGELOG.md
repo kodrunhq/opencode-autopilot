@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.10.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.9.0...opencode-autopilot-v1.10.0) (2026-04-03)
+
+
+### Features
+
+* **19-02:** extend stocktake with config-hook agent detection ([ff8798b](https://github.com/kodrunhq/opencode-autopilot/commit/ff8798b2cf110ee2d0b27b0478509540abaeaad2))
+* agent visibility fixes — stocktake detects config-hook agents ([86153b6](https://github.com/kodrunhq/opencode-autopilot/commit/86153b68fa63723dc66f0ec01515cb4b9df1a139))
+
+
+### Bug Fixes
+
+* **19:** correct agent modes and export agents map ([501e0e3](https://github.com/kodrunhq/opencode-autopilot/commit/501e0e3a2a6cc0617c95f5f104f2ee8bed4069e3))
+* **19:** resolve CI type errors and PR review comments ([6cf99b7](https://github.com/kodrunhq/opencode-autopilot/commit/6cf99b7a5cd54a3c06e5220b08b52bf9745cc9a2))
+* **19:** resolve review findings — stale tests, lint, narrow ConfigHookAgent type ([a4e2e27](https://github.com/kodrunhq/opencode-autopilot/commit/a4e2e27e3b0d9609daac88b566def2c85663822a))
+
 ## [1.9.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.8.0...opencode-autopilot-v1.9.0) (2026-04-03)
 
 
