@@ -84,6 +84,18 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 	// Register standard agents and pipeline agents (v2 orchestrator subagents)
 	registerAgents(agents, config, groups, overrides);
 	registerAgents(pipelineAgents, config, groups, overrides);
+
+	// Suppress built-in Plan agent — our planner agent replaces it (D-17).
+	// Try common naming variants since the exact built-in name is undocumented.
+	const planVariants = ["Plan", "plan", "Planner", "planner"] as const;
+	for (const variant of planVariants) {
+		if (config.agent[variant] !== undefined) {
+			config.agent[variant] = {
+				...config.agent[variant],
+				disable: true,
+			};
+		}
+	}
 }
 
 export { autopilotAgent } from "./autopilot";
