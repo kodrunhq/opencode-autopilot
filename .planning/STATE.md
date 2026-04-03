@@ -103,7 +103,7 @@ Recent decisions affecting current work:
 - [Phase 20-new-primary-agents]: Reviewer edit:deny as hard constraint; planner edit:allow with prompt-level prohibition on source code editing
 - [Phase 20-new-primary-agents]: Alphabetical agent map ordering ensures Tab-cycle order: autopilot, debugger, planner, reviewer
 - [Phase 21-content-expansion]: Templates use plain agents.md format for direct copy-paste usability
-- [Phase 21-content-expansion]: GLOB_MANIFEST_TAGS pattern for extension-based detection via readdir for languages with variable filenames
+- [Phase 21-content-expansion]: EXT_MANIFEST_TAGS pattern for extension-based detection via readdir for languages with variable filenames
 
 ### Pending Todos
 

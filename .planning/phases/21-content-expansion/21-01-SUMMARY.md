@@ -10,7 +10,7 @@ requires:
 provides:
   - Four new/expanded skill assets covering SOLID, Java, C#, and frontend design
   - Stack detection for Java (pom.xml, build.gradle) and C# (.csproj, .sln) projects
-  - Glob-based manifest detection pattern via GLOB_MANIFEST_TAGS
+  - Glob-based manifest detection pattern via EXT_MANIFEST_TAGS
 affects: [21-02, skill-injection, adaptive-injector]
 
 tech-stack:
@@ -27,11 +27,11 @@ key-files:
     - src/skills/adaptive-injector.ts
 
 key-decisions:
-  - "GLOB_MANIFEST_TAGS pattern for extension-based detection (readdir + endsWith) vs exact filename access"
+  - "EXT_MANIFEST_TAGS pattern for extension-based detection (readdir + endsWith) vs exact filename access"
   - "Frontend-design skill piggybacks on existing javascript/typescript tags — no new MANIFEST_TAGS needed"
 
 patterns-established:
-  - "GLOB_MANIFEST_TAGS: extension-based file detection via readdir for languages with variable filenames"
+  - "EXT_MANIFEST_TAGS: extension-based file detection via readdir for languages with variable filenames"
 
 requirements-completed: [SKLL-10, SKLL-11, SKLL-12]
 
@@ -56,7 +56,7 @@ completed: 2026-04-03
 - Java patterns skill covers modern Java idioms, Spring Boot conventions, JPA/Hibernate, testing, and common pitfalls
 - C# patterns skill covers modern C# idioms, .NET DI, Entity Framework, async best practices, and common pitfalls
 - Frontend design skill covers component architecture, responsive design, accessibility, state management, animation, visual design, and design system integration
-- Stack detection wired for Java (3 manifest files) and C# (2 glob patterns via new GLOB_MANIFEST_TAGS)
+- Stack detection wired for Java (3 manifest files) and C# (2 glob patterns via new EXT_MANIFEST_TAGS)
 
 ## Task Commits
 
@@ -70,10 +70,10 @@ Each task was committed atomically:
 - `assets/skills/java-patterns/SKILL.md` - New Java patterns skill (258 lines)
 - `assets/skills/csharp-patterns/SKILL.md` - New C# patterns skill (327 lines)
 - `assets/skills/frontend-design/SKILL.md` - New frontend design skill (431 lines)
-- `src/skills/adaptive-injector.ts` - Added Java/C# MANIFEST_TAGS, GLOB_MANIFEST_TAGS, and readdir-based detection
+- `src/skills/adaptive-injector.ts` - Added Java/C# MANIFEST_TAGS, EXT_MANIFEST_TAGS, and readdir-based detection
 
 ## Decisions Made
-- Used GLOB_MANIFEST_TAGS with readdir + endsWith for C# detection because .csproj and .sln files have variable names (project-specific prefixes), making exact filename matching impossible
+- Used EXT_MANIFEST_TAGS with readdir + endsWith for C# detection because .csproj and .sln files have variable names (project-specific prefixes), making exact filename matching impossible
 - Frontend-design skill uses stacks: [javascript, typescript] which already matches existing package.json and tsconfig.json detection — no new MANIFEST_TAGS entries needed
 
 ## Deviations from Plan
@@ -94,7 +94,7 @@ None - all skills contain complete content with code examples.
 
 ## Next Phase Readiness
 - All four skills ready for adaptive injection when corresponding project stacks are detected
-- GLOB_MANIFEST_TAGS pattern available for future languages with variable filenames (e.g., .fsproj for F#)
+- EXT_MANIFEST_TAGS pattern available for future languages with variable filenames (e.g., .fsproj for F#)
 - Token budget (8000) should be monitored with 4 new skills added
 
 ---

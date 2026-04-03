@@ -10,6 +10,7 @@
 import { access, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { sanitizeTemplateContent } from "../review/sanitize";
+import { isEnoentError } from "../utils/fs-helpers";
 import { resolveDependencyOrder } from "./dependency-resolver";
 import type { LoadedSkill } from "./loader";
 
@@ -73,7 +74,7 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 		}
 	}
 
-	// Check glob-based manifests (file extension matching)
+	// Check extension-based manifests (e.g., *.csproj, *.sln)
 	try {
 		const entries = await readdir(projectRoot);
 		for (const [ext, extTags] of Object.entries(EXT_MANIFEST_TAGS)) {
@@ -83,8 +84,15 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 				}
 			}
 		}
-	} catch {
-		// readdir failure is non-fatal — skip glob detection
+	} catch (error: unknown) {
+		// ENOENT is expected (directory may not exist) — skip silently.
+		// Other errors (EACCES, etc.) are logged but non-fatal.
+		if (!isEnoentError(error)) {
+			console.error(
+				"[adaptive-injector] readdir failed for project root, skipping extension detection:",
+				error instanceof Error ? error.message : String(error),
+			);
+		}
 	}
 
 	return [...tags];
