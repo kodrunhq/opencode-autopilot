@@ -1,180 +1,174 @@
 # Project Research Summary
 
-**Project:** OpenCode Assets Plugin v2.0 -- Autonomous Orchestrator + Review Engine
-**Domain:** Autonomous SDLC orchestrator with embedded multi-agent code review engine (OpenCode plugin)
-**Researched:** 2026-03-31
-**Confidence:** MEDIUM-HIGH
+**Project:** OpenCode Autopilot v4.0 — Production Quality Milestone
+**Domain:** AI coding plugin — asset expansion, hardening, and polish
+**Researched:** 2026-04-03
+**Confidence:** HIGH
 
 ## Executive Summary
 
-OpenCode Assets v2.0 merges two proven systems -- the hands-free autonomous orchestrator (8-phase SDLC pipeline with 12 subagents) and the ace multi-agent review engine (30 review agents, 7-phase review pipeline) -- into the existing opencode-autopilot plugin. The key architectural insight is that OpenCode's plugin model requires a fundamentally different approach from the source systems: orchestrator logic must live in deterministic TypeScript code (not 2400-line markdown prompts), agents are dispatched indirectly through a tool-returns-instruction pattern (tools compute state, agents execute dispatch), and review specialists should be internal prompt templates rather than config-hook-injected agents. The existing plugin's patterns (tool registration, config hook, Zod validation, immutable data, atomic writes) extend naturally to support the new capabilities.
+OpenCode Autopilot v4.0 is a "polish and expand" milestone, not a greenfield effort. The plugin (v1.7.0) already ships 15 skills, 11 commands, 20 tools, a SQLite memory system, observability logging, adaptive skill injection, and a fallback chain. The v4.0 gaps are concentrated in three areas: agent presentation bugs (stocktake cannot see config-hook-injected agents, Tab cycle is uncontrolled), content expansion (OOP/SOLID coding standards, Java/C# language patterns, new agents), and production hardening (command namespace prefixing, mock fallback test mode, QA playbook). Competitors (oh-my-openagent, ECC, superpowers, GSD) have been thoroughly benchmarked in Phase 11 research; we have parity or better on skills, memory, observability, and adaptive loading.
 
-The recommended approach is bottom-up construction across 5 phases: foundation infrastructure (state machine, config, tooling), standalone review engine, orchestrator pipeline phases, adversarial intelligence features, and learning systems. Only one new runtime dependency is needed: mitt (200-byte event emitter). Everything else uses existing deps (Zod, yaml, node:fs/promises) or custom TypeScript. The review engine should ship before the orchestrator because it is simpler, independently useful, and required by the orchestrator's BUILD phase -- delivering value early while de-risking the harder integration.
+The recommended approach is zero new dependencies. Every v4.0 feature is achievable with the existing stack: Bun runtime, TypeScript, the @opencode-ai/plugin API, yaml for frontmatter, and zod for schema validation. The work is content authoring (markdown skills, agents, commands), config schema extensions (mock fallback test mode), and wiring fixes (stocktake registry-aware detection, command rename via DEPRECATED_ASSETS). The mock provider infrastructure, adaptive skill injector, dependency resolver, and config hook agent registration are all proven and operational.
 
-The top risks are: token budget explosion from nested prompt contexts (orchestrator dispatching review engine inside BUILD phase), architectural fragmentation from porting two independent state machines instead of designing one unified system, and the untested tool-returns-instruction dispatch pattern that is the logical design given OpenCode's constraints but has not been validated end-to-end. All three must be resolved in Phase 1 before any implementation begins.
+The key risks are: (1) command renaming without atomic migration leaves users with duplicate or missing commands, (2) stocktake remaining blind to config-hook agents undermines all agent expansion work, (3) adding too many primary agents pollutes the Tab cycle (strict subagent-only policy required), and (4) repeating the Phase 11 research-to-execution gap where planned features are silently dropped. Each risk has a concrete mitigation strategy documented in the pitfalls research.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack strategy is deliberately conservative: one new dependency (mitt, 200 bytes), everything else custom TypeScript. This matches the codebase philosophy of minimal external deps and leverages existing patterns.
+No changes to the technology stack for v4.0. The entire milestone is content authoring plus wiring changes on the existing foundation.
 
-**Core technologies:**
-- **Custom FSM (discriminated unions):** 8-phase orchestrator state machine -- ~80 lines of TypeScript, compile-time exhaustiveness checking, no library needed (XState rejected as overkill for a linear pipeline)
-- **JSON + Zod persistence:** State, confidence ledger, decision log -- extends existing config.ts atomic write pattern, zero new deps
-- **mitt (^3.0.1):** Typed event bus for lifecycle events -- 200 bytes, decouples state changes from consumers (logging, hooks, confidence ledger)
-- **Pure function registry:** Review dimension-to-agent mapping -- flat fan-out via dispatch instructions, not a DAG framework
-- **Config-hook agents:** 12+ orchestrator subagents registered via existing configHook pattern -- OpenCode handles all session management
+**Core technologies (unchanged):**
+- **Bun 1.3.11:** Runtime, test runner, package manager -- required by OpenCode plugin spec
+- **TypeScript ^6.0.2:** Type safety with `--noEmit` check
+- **@opencode-ai/plugin ^1.3.8:** The only way to register tools/hooks/agents in OpenCode
+- **yaml ^2.8.3:** All YAML frontmatter parsing for skills, agents, commands
+- **zod (transitive):** Schema validation for tool args and config (no separate install)
+- **Biome ^2.4.10:** Lint and format for all TS files
 
-**Critical stack decisions:**
-- No agent framework (LangChain, Mastra, ADK-TS) -- OpenCode IS the agent runtime
-- No database (bun:sqlite) -- JSON files sufficient for ~8 writes per run; upgrade path documented for future
-- No task queue -- subagent dispatch goes through OpenCode's Task tool
+**What NOT to add:** No mocking libraries (mock provider already built), no test frameworks for QA (playbooks are AI-executable markdown), no AST parsing (standards enforced via prompt injection), no agent frameworks (OpenCode IS the runtime), no template engines (pure TS functions).
 
 ### Expected Features
 
 **Must have (table stakes):**
-- State machine orchestrator with crash recovery and idempotent re-entry
-- Research, Architecture, Plan, Build, Review, Ship phases as subagents
-- Code review gate with review-fix loop (max 3 cycles)
-- Specialized review agents: logic auditor, test interrogator, contract verifier (core squad)
-- Dynamic agent selection (team lead) with parallel dispatch
-- Decision logging for accountability
-- Deterministic tooling in TypeScript (not LLM-generated state management)
-- User-configurable settings (autonomy, strictness, phase toggles)
-- Consolidated review report with severity levels
+- T-01: Fix agent visibility in Tab cycle and stocktake detection -- this is a bug, not a feature
+- T-02/T-03/T-04: Add Debugger, Planner, and Code Reviewer agents (all competitors have these)
+- T-05: Prefix all commands with `oc-` for namespace collision prevention
+- T-06: Remove `oc-configure` as slash command (CLI-only per PROJECT.md)
+- T-07: Fix stocktake agent detection (must see config-hook agents)
+- T-08: Expand coding-standards with OOP/SOLID/Clean Architecture principles
+- T-09: Add Java and C# language pattern skills
 
 **Should have (differentiators):**
-- Architecture Arena (2-3 parallel proposals + adversarial critic)
-- Confidence ledger driving pipeline depth decisions
-- Challenge phase (Ambition Engine) for scope enhancement
-- Cross-verification between review agents
-- Wave-based parallel build for independent tasks
-- Red team adversarial final pass
+- D-01: Mock/fail-forced fallback test mode (no competitor offers this)
+- D-05: Skill-aware doctor diagnostics (extend existing doctor tool)
+- D-06: Anti-slop comment checking hook
+- D-07: Agents.md curated template library for common project types
 
-**Defer (v2.1+):**
-- Divergent explorer (parallel prototyping) -- too complex, rare value
-- Ace enforcement pipeline (inline quality during build) -- separate product scope
-- Language-specific auditors beyond TypeScript -- add based on demand
-- Product thinker agent -- not needed for library/CLI projects
-- Full institutional memory with decay mechanisms -- needs real-world usage data first
+**Defer (post-v4.0):**
+- Per-language build/test/review commands (anti-feature: causes command bloat)
+- Cross-machine memory portability
+- Eval harness for agent effectiveness measurement
+- Multi-runtime targeting (stay OpenCode-only)
 
 ### Architecture Approach
 
-The architecture follows a strictly top-down dependency flow with clear component boundaries: tools call orchestrator/review modules, which call state management, which calls utilities. No cycles. Agent definitions are pure frozen data objects with no runtime logic. The critical pattern is "tool-returns-instruction": the orchestrator tool computes state and returns structured dispatch instructions, while a lean orchestrator agent (injected via config hook with Agent tool permission) executes them by dispatching subagents via Task tool. All machine state uses JSON (not markdown tables parsed by regex); markdown is reserved for human-readable artifacts.
+No new directories or subsystems are needed. All v4.0 changes modify existing components or add assets. The two-layer architecture (JS/TS module + filesystem assets) remains unchanged. The critical architectural fix is making stocktake registry-aware so it queries both filesystem agents AND config-hook agents, merging results with filesystem winning on name collision.
 
-**Major components:**
-1. **`src/orchestrator/`** -- State machine transitions, phase handlers (8 phases), dispatch instruction generation. Pure functions operating on immutable state.
-2. **`src/review/`** -- Review pipeline orchestration, team selection (deterministic TypeScript, not an agent), cross-verification, fix cycle, verdict computation. Usable standalone via `oc_review` tool.
-3. **`src/state/`** -- Atomic JSON read/write for pipeline state, confidence ledger, decision log, metrics. Single working directory, single config schema.
-4. **`src/tools/`** -- 6 new tools (`oc_orchestrate`, `oc_review`, `oc_state`, `oc_confidence`, `oc_phase`, `oc_plan`) following existing `*Core` + `tool()` wrapper pattern.
-5. **`src/agents/`** -- 12+ orchestrator subagents + review agents. Orchestrator agents are config-hook injected; review specialists are internal prompt templates (not config-hook agents).
+**Major components affected:**
+1. **src/tools/stocktake.ts** -- Add registry-aware agent detection (accept `registeredAgents` parameter from AGENT_REGISTRY)
+2. **src/installer.ts** -- Expand DEPRECATED_ASSETS for renamed commands; remove oc-configure from FORCE_UPDATE_ASSETS
+3. **src/agents/index.ts** -- Add new agent definitions (debugger, planner, reviewer) following existing frozen AgentConfig pattern
+4. **src/orchestrator/fallback/** -- Add testMode config-driven toggle with message counter and mock error injection
+5. **assets/skills/** -- Add 6+ new skill directories (oop-patterns, abstraction-layers, java-patterns, csharp-patterns, security-standards, api-design)
+6. **assets/commands/** -- Rename all to oc-* prefix, add oc-review-agents and oc-qa commands
+
+**Key patterns to follow:**
+- Deprecation-driven rename via DEPRECATED_ASSETS (proven for configure.md removal)
+- Config-driven feature toggle via Zod defaults (no schema version bump needed)
+- Strict subagent-only policy: only `autopilot` as mode "primary"; all others as "subagent"
 
 ### Critical Pitfalls
 
-1. **Token budget explosion** -- Nested prompts (orchestrator + review engine + diff) can exceed 30K tokens before analyzing code. Prevention: orchestrator logic in TypeScript code (not prompt), lazy-load reference material, compress agent prompts to ~50 lines, cap per-phase prompt budgets at 15K tokens.
+1. **Command rename breaks user workflows** -- Old commands silently disappear if DEPRECATED_ASSETS is not atomically updated. Prevention: add every old filename to DEPRECATED_ASSETS before release; test fresh install, upgrade, and customized-file scenarios.
 
-2. **Franken-architecture (dual state machines)** -- Porting hands-free and ace as independent systems creates two state machines, two configs, two memory stores. Prevention: single unified state machine, single Zod config schema, single working directory, single memory interface. Design from OpenCode's model backward, not port forward.
+2. **Stocktake blind to config-hook agents** -- Adding more agents via config hook while stocktake only scans filesystem compounds the visibility problem. Prevention: fix stocktake BEFORE any agent expansion work. Add `origin: "config-hook"` to AssetEntry.
 
-3. **Untested agent dispatch pattern** -- OpenCode tools cannot call Agent tool directly. The tool-returns-instruction pattern is the logical design but unvalidated. Prevention: build and test one agent dispatch end-to-end in Phase 1 before designing the full pipeline. If it fails, the entire architecture changes.
+3. **Tab-cycle pollution from primary agents** -- Every primary-mode agent appears in Tab cycle. Adding 6+ primary agents makes Tab unusable. Prevention: STRICT rule -- only `autopilot` is primary. All new agents are subagent mode. Add automated test enforcing this.
 
-4. **CJS-to-TypeScript behavioral drift** -- 3300 lines of battle-tested CJS tooling (regex parsers, sync I/O, lock files) will subtly change behavior when ported to async TypeScript with Zod. Prevention: port test suites first, parity test both implementations against same fixtures, port one module at a time.
+4. **Research-to-execution gap** -- Phase 11 research was good but execution fell short. Prevention: each implementation plan references specific gap IDs; each phase completion reconciles planned vs shipped features; scope ruthlessly upfront.
 
-5. **Agent count overwhelming the plugin** -- 30 ace agents pollute the config-hook namespace. Prevention: only orchestrator-level agents are config-hook injected (~12); review specialists are internal prompt templates loaded on demand. Team-lead selection becomes a deterministic TypeScript function, not an agent.
+5. **Token budget overflow from skill expansion** -- 8000-token budget for skills gets crowded with 20+ skills. Prevention: enforce 2000-token cap per skill in linter; methodology skills under 1000 tokens; add doctor warning at 80% budget usage.
 
 ## Implications for Roadmap
 
-### Phase 1: Foundation Infrastructure
-**Rationale:** Everything depends on the state machine, state management, and validated agent dispatch pattern. The dispatch pattern validation is a hard gate -- if it fails, the architecture must change before any other work proceeds.
-**Delivers:** State machine with transitions and resume, state management layer (atomic JSON read/write), confidence ledger, decision logging, 4 state tools (`oc_state`, `oc_confidence`, `oc_phase`, `oc_plan`), foundation utilities (markdown parser, slug, timestamp), validated agent dispatch proof-of-concept.
-**Addresses:** State machine orchestrator, deterministic tooling, decision logging, user-configurable settings (config schema extension).
-**Avoids:** Pitfall 2 (franken-architecture -- unified design from day one), Pitfall 3 (blind dispatch port -- validated before scaling), Pitfall 9 (config complexity -- single schema from the start), Pitfall 16 (orchestrator logic in code, not prompt).
+Based on research, suggested phase structure (5 phases):
 
-### Phase 2: Review Engine (Standalone)
-**Rationale:** The review engine is simpler than the orchestrator (stateless pipeline, no state machine), independently useful as a standalone `/review` capability, and required by the orchestrator's BUILD phase. Building it first delivers value early and de-risks the harder integration. The team-lead selection as deterministic TypeScript validates the approach of keeping review agents internal.
-**Delivers:** `oc_review` tool, team-lead selection function, core squad agents (logic, test, contract), parallel dispatch instructions, cross-verification, fix cycle (1-cycle default), verdict computation, consolidated report, severity definitions, agent catalog.
-**Addresses:** Specialized review agents, dynamic agent selection, parallel dispatch, cross-verification, consolidated report, review-fix loop.
-**Avoids:** Pitfall 5 (agent count -- review specialists are internal, not config-hook), Pitfall 8 (convergence cascade -- 1-cycle default, short-circuit on nitpicks).
+### Phase 1: Foundation and Namespace Cleanup
+**Rationale:** Zero-risk file renames and deprecation cleanup that must happen before adding new assets. Command renaming and oc-configure removal are prerequisites for a clean namespace.
+**Delivers:** All commands prefixed with `oc-*`, oc-configure removed, DEPRECATED_ASSETS updated for migration
+**Addresses:** T-05 (command prefix), T-06 (remove oc-configure)
+**Avoids:** Pitfall 1 (command rename breakage), Pitfall 8 (broken first-run UX from dangling oc-configure references)
 
-### Phase 3: Orchestrator Pipeline
-**Rationale:** With state management proven (Phase 1) and review engine available (Phase 2), the orchestrator phases can be built sequentially. Each phase is an independent handler with clear input/output contracts. The BUILD phase integrates the review engine.
-**Delivers:** `oc_orchestrate` tool, 8 phase handlers (RECON through RETROSPECTIVE), 12 orchestrator subagent definitions, orchestrator agent (lean prompt + tool loop), iterative build loop with branch/commit per task.
-**Addresses:** Research phase, architecture phase, task decomposition, iterative build, code review gate (via Phase 2 integration), ship package.
-**Avoids:** Pitfall 1 (token explosion -- lean orchestrator prompt, phase-specific context injection), Pitfall 13 (arena over-engineering -- confidence-gated depth, default shallow), Pitfall 7 (stale state -- git SHA checkpoints, artifact validation on resume).
+### Phase 2: Agent Visibility and Registry Fixes
+**Rationale:** Stocktake must see agents before adding new ones. This is the critical bug fix phase that unblocks all agent expansion work.
+**Delivers:** Registry-aware stocktake, correct agent mode assignments, Tab-cycle policy enforced
+**Addresses:** T-01 (agent visibility), T-07 (stocktake detection fix)
+**Avoids:** Pitfall 2 (invisible agents), Pitfall 3 (Tab-cycle pollution)
 
-### Phase 4: Adversarial Intelligence
-**Rationale:** These features enhance decision quality but require a stable base pipeline. They add compute cost and complexity. Shipping them after the pipeline is proven avoids premature optimization of features that may need redesign based on real usage.
-**Delivers:** Architecture Arena (parallel proposals + critic + mediator), Challenge phase (Ambition Engine, capped at 3 additions), confidence ledger wired into all agents for depth gating, negotiating reviewer dialogue protocol.
-**Addresses:** Architecture Arena, challenge phase, confidence-gated depth, negotiating reviewer.
-**Avoids:** Pitfall 13 (arena depth is configurable and confidence-gated from the start).
+### Phase 3: Agent and Skill Expansion
+**Rationale:** With namespace clean and stocktake working, add the content that achieves competitive parity. This is the largest phase by effort.
+**Delivers:** New agents (Debugger, Planner, Reviewer), expanded coding standards (OOP/SOLID), Java/C# language skills, agents.md review command
+**Addresses:** T-02, T-03, T-04 (new agents), T-08, T-09 (coding standards), T-10 (agents.md review), D-03 (Tab ordering), D-07 (template library)
+**Avoids:** Pitfall 5 (token budget overflow -- enforce per-skill caps), Pitfall 9 (dependency cycles -- linter validation), Pitfall 10 (agent name collisions -- oc- prefix), Pitfall 12 (subagent discovery)
 
-### Phase 5: Learning and Resilience
-**Rationale:** Institutional and project memory provide compounding value but require multiple successful runs to validate what data is actually useful to persist. Forensics (failure analysis) similarly needs real failure modes to design against.
-**Delivers:** Institutional memory store with recency weighting and size caps, project-specific memory, retrospective agent, forensics/failure analysis, memory injection into agent prompts (budgeted at 500 tokens per agent).
-**Addresses:** Institutional memory, project memory, forensics.
-**Avoids:** Pitfall 10 (unbounded memory growth -- size caps, recency weighting, garbage collection from day one).
+### Phase 4: Production Hardening
+**Rationale:** Independent from Phase 3 content work. Adds resilience testing and quality tooling. Can run in parallel with Phase 3.
+**Delivers:** Mock/fail fallback test mode via config toggle, skill-aware doctor diagnostics, anti-slop comment hook
+**Addresses:** D-01 (fallback test mode), D-05 (skill-aware doctor), D-06 (anti-slop hook)
+**Avoids:** Pitfall 6 (persistent mock state -- use session scope or TTL)
+
+### Phase 5: QA Playbook and Validation
+**Rationale:** Must come last because it tests everything above. The playbook documents the complete feature surface and validates the entire v4.0 delivery.
+**Delivers:** Manual QA playbook in `qa/` directory, test scenarios for all features, gap matrix reconciliation
+**Addresses:** D-02 (QA playbook), D-04 (context-aware commands)
+**Avoids:** Pitfall 4 (research-execution gap -- reconcile planned vs shipped), Pitfall 7 (write-once documentation -- use executable steps linked to test files)
 
 ### Phase Ordering Rationale
 
-- **Bottom-up construction:** Each phase depends only on phases before it. No forward references or circular dependencies between phases.
-- **Review before orchestrator:** The review engine is a prerequisite for the BUILD phase handler and is independently shippable. This follows the architecture research's build order recommendation.
-- **Adversarial features after base pipeline:** Arena, Challenge, and negotiating reviewer add cost and complexity. They need a stable pipeline to enhance, not a fragile one to destabilize.
-- **Learning systems last:** Memory requires real-world usage data to validate. The storage format is designed in Phase 1 (per Pitfall 10 prevention), but implementation waits until Phase 5.
-- **Config migration spans phases:** The Zod config schema is extended incrementally as each phase adds settings, not as a big-bang migration.
+- Phase 1 before Phase 2: Clean namespace is needed before stocktake fix so renamed commands are correctly detected
+- Phase 2 before Phase 3: Stocktake must work before adding agents, otherwise new agents are invisible and cannot be verified
+- Phase 3 and Phase 4 can run in parallel: Agent/skill expansion and fallback test mode are independent subsystems
+- Phase 5 must be last: QA playbook tests the complete feature surface from all prior phases
+- This mirrors the dependency graph from FEATURES.md: T-07 -> T-01 -> T-02/T-03/T-04 -> D-02
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 1:** Agent dispatch mechanism validation -- the tool-returns-instruction pattern is untested in OpenCode. A proof-of-concept spike is mandatory before full design.
-- **Phase 2:** OpenCode Agent tool concurrency limits -- parallel dispatch of 10+ review agents may hit undocumented rate limits or session caps.
-- **Phase 3:** BUILD phase git operations -- branching strategy, PR creation, and merge workflow need to support non-GitHub remotes and trunk-based development (Pitfall 14).
-- **Phase 5:** Institutional memory usefulness -- what data is actually valuable to persist across projects is unknown until real runs produce data. Research spike needed during implementation.
+- **Phase 2:** Tab-cycle ordering behavior in OpenCode is not fully documented. Need to verify how OpenCode orders agents in Tab cycle (alphabetical? registration order? configurable?). Feature request #16840 was closed/rejected.
+- **Phase 4:** FallbackManager mock error injection point needs careful analysis. The integration between test mode counter and the actual error surface where provider errors occur requires tracing the data flow through the fallback chain.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 1 (state management):** Atomic JSON write, Zod validation, discriminated union FSM -- all well-documented TypeScript patterns already used in the codebase.
-- **Phase 2 (review pipeline core):** Fan-out dispatch, severity aggregation, verdict computation -- straightforward data processing with no novel patterns.
-- **Phase 4 (Arena/Challenge):** These are subagent prompt engineering problems, not architectural problems. The dispatch mechanism is proven by Phase 3.
+- **Phase 1:** Exact same DEPRECATED_ASSETS + copyIfMissing pattern already proven for configure.md removal. No novelty.
+- **Phase 3:** Agent registration follows existing frozen AgentConfig pattern. Skill authoring follows existing SKILL.md format. Content work, not architecture work.
+- **Phase 5:** Pure documentation. Template structure already defined in ARCHITECTURE.md.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Only 1 new dep (mitt). All others are existing or custom TS. Alternatives thoroughly evaluated and rejected with clear rationale. |
-| Features | MEDIUM | Core features well-understood from source analysis. OpenCode plugin API constraints (agent dispatch, parallel execution limits) introduce uncertainty. Feature dependency tree is clear. |
-| Architecture | MEDIUM-HIGH | Component boundaries, dependency flow, and build order are well-designed. The tool-returns-instruction pattern is logical but unvalidated -- this is the single biggest uncertainty. |
-| Pitfalls | HIGH | All pitfalls derived from direct source code analysis of three codebases. Prevention strategies are specific and actionable. |
+| Stack | HIGH | Zero new dependencies; every integration point audited against codebase |
+| Features | HIGH | Exhaustive competitor inventory (Phase 11) cross-referenced with current codebase; clear gap analysis |
+| Architecture | HIGH | All changes modify existing components; patterns proven (DEPRECATED_ASSETS, configHook, Zod defaults) |
+| Pitfalls | HIGH | Based on codebase analysis, OpenCode docs, competitor patterns, and Phase 11 post-mortem |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Agent dispatch validation:** The tool-returns-instruction pattern (tools return dispatch instructions, orchestrator agent executes them) is the foundational pattern but has not been tested in OpenCode. Must be validated as Phase 1's first task. If it does not work, the entire architecture needs redesign.
-- **OpenCode concurrency limits:** How many parallel Agent tool calls can an agent make? If limited to 3-5 concurrent, the review engine's parallel dispatch strategy needs wave sizing adjustment.
-- **Institutional memory schema:** What data is useful to persist across projects is speculative. The storage format and interface should be designed early (Phase 1), but the actual content schema needs a research spike during Phase 5 implementation.
-- **Plugin load performance:** Registering 15+ agents via config hook at plugin load -- does this noticeably slow OpenCode startup? Need to measure after Phase 1 implementation.
-- **mitt compatibility with Bun:** mitt is a standard ESM package and should work fine, but must be verified in the Bun runtime during Phase 1 setup.
+- **Tab-cycle ordering:** No documented way to control agent order in OpenCode Tab cycle. If ordering matters, may need to investigate OpenCode internals or accept alphabetical ordering. Research during Phase 2 planning.
+- **Java/C# stack detection:** Adding `pom.xml` and `*.csproj` detection to MANIFEST_TAGS requires glob or directory scan for csproj files. The exact detection mechanism needs implementation design.
+- **Token budget under expansion:** With 20+ skills, the 8000-token budget may need to become configurable. Monitor during Phase 3 and raise budget if needed.
+- **Agent name collision policy:** Standard agents (researcher, documenter, etc.) are not oc-prefixed. Whether to rename them in v4.0 or defer is a scope decision for roadmap creation.
+- **FallbackManager injection point:** The exact code location where mock errors should be injected into the live fallback chain needs tracing during Phase 4 implementation.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- claude-hands-free source code at `/home/joseibanez/develop/projects/claude-hands-free/` -- 2413-line orchestrator, 12 agents, 3538 lines CJS tooling, 8-phase state machine
-- claude-ace source code at `/home/joseibanez/develop/projects/claude-ace/` -- 30 agents, 8-phase review pipeline, 6 bash scripts, references directory
-- opencode-autopilot source code at `/home/joseibanez/develop/projects/opencode-autopilot/src/` -- current plugin architecture, tool registration, config hook, agent definitions
-- OpenCode plugin API (`@opencode-ai/plugin` dist/index.d.ts) -- hooks interface, tool registration, config hook
-- [XState v5 documentation](https://stately.ai/docs/xstate) -- evaluated and rejected
-- [mitt GitHub](https://github.com/developit/mitt) -- 200-byte typed event emitter
+- Codebase audit: `src/observability/mock/`, `src/skills/adaptive-injector.ts`, `src/agents/index.ts`, `src/tools/stocktake.ts`, `src/installer.ts`, `src/config.ts`, `src/registry/model-groups.ts`
+- OpenCode documentation: [plugins](https://opencode.ai/docs/plugins/), [agents](https://opencode.ai/docs/agents/), [commands](https://opencode.ai/docs/commands/), [skills](https://opencode.ai/docs/skills)
+- Phase 11 deep-dives: GSD, superpowers, OMO, ECC, claude-mem at `.planning/phases/11-ecosystem-research/research/`
+- Phase 11 gap matrix: `.planning/phases/11-ecosystem-research/11-GAP-MATRIX.md` (73 gaps, 10 coverage areas)
 
 ### Secondary (MEDIUM confidence)
-- [OpenCode Plugin Documentation](https://opencode.ai/docs/plugins/) -- plugin API, config hook, event hooks
-- [OpenCode Agent Documentation](https://opencode.ai/docs/agents/) -- Task tool dispatch, subagent architecture
-- [oh-my-opencode / Sisyphus pattern](https://github.com/opensoft/oh-my-opencode) -- supervisor orchestrator pattern validation
-- [Supervisor pattern for agent orchestration](https://dev.to/programmingcentral/the-supervisor-pattern-stop-writing-monolithic-agents-and-start-orchestrating-teams-2olk) -- hub-and-spoke topology validation
-- hands-free v2 vision document -- Architecture Arena, Divergent Explorer, Ambition Engine design specs
+- [oh-my-openagent GitHub](https://github.com/code-yeongyu/oh-my-openagent) -- competitor agent count and architecture
+- OpenCode Tab-cycle ordering issue #16840 (closed/rejected)
+- Token waste analysis: https://dev.to/nicolalessi/i-tracked-every-token-my-ai-coding-agent-consumed-for-a-week-70-was-waste-465
 
 ### Tertiary (LOW confidence)
-- Tool-returns-instruction pattern -- logical design given OpenCode constraints, but untested in this plugin context. Needs validation spike.
-- OpenCode Agent tool concurrency limits -- not documented, needs empirical testing.
+- Exact OpenCode Tab-cycle ordering mechanism -- needs validation during implementation
 
 ---
-*Research completed: 2026-03-31*
+*Research completed: 2026-04-03*
 *Ready for roadmap: yes*

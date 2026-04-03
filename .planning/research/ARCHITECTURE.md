@@ -1,695 +1,475 @@
 # Architecture Patterns
 
-**Domain:** Autonomous SDLC orchestrator with embedded code review engine (OpenCode plugin)
-**Researched:** 2026-03-31
+**Domain:** OpenCode Autopilot v4.0 — production quality improvements to existing plugin
+**Researched:** 2026-04-03
+**Focus:** Integration of v4.0 features with existing two-layer architecture
 
-## Recommended Architecture
+## Current Architecture Summary
 
-The v2.0 architecture merges two distinct systems -- the hands-free orchestrator (state machine + subagent dispatch) and the ace review engine (phased review pipeline) -- into the existing opencode-autopilot plugin. The core design principle: **everything is a registered tool or config-hook-injected agent**, matching the existing plugin patterns exactly.
+The plugin has two layers that work differently for each asset type:
 
-### High-Level Structure
+| Asset Type | Registration Method | Discovery by Stocktake |
+|------------|-------------------|----------------------|
+| **Agents** | `configHook` mutates `Config.agent` at runtime | Scans filesystem `~/.config/opencode/agents/*.md` |
+| **Skills** | Filesystem: `~/.config/opencode/skills/<name>/SKILL.md` | Scans filesystem (works correctly) |
+| **Commands** | Filesystem: `~/.config/opencode/commands/*.md` | Scans filesystem (works correctly) |
 
-```
-src/
-  index.ts                    Plugin entry (MODIFIED: register new tools)
-  config.ts                   Plugin config (MODIFIED: add orchestrator settings)
-  installer.ts                Asset installer (UNCHANGED)
+The core problem: **agents live in two places**. Pipeline agents (oc-architect, oc-implementer, etc.) and standard agents (researcher, documenter, etc.) are injected programmatically via `configHook` in `src/agents/index.ts`. They exist only in memory after config hook runs. Stocktake scans the filesystem (`~/.config/opencode/agents/`) and finds nothing because these agents were never written to disk.
 
-  agents/                     Config-hook injected agents (MODIFIED: add 12+ new agents)
-    index.ts                  Agent registry + configHook (MODIFIED)
-    researcher.ts             (existing, unchanged)
-    metaprompter.ts           (existing, unchanged)
-    documenter.ts             (existing, unchanged)
-    pr-reviewer.ts            (existing, unchanged)
-    --- new orchestrator agents ---
-    hf-researcher.ts          RECON phase researcher
-    hf-challenge.ts           CHALLENGE phase enhancement proposer
-    hf-proposer.ts            Architecture Arena proposer
-    hf-critic.ts              Architecture Arena critic
-    hf-planner.ts             PLAN phase task planner
-    hf-implementer.ts         BUILD phase code writer
-    hf-reviewer.ts            BUILD phase PR reviewer
-    hf-mediator.ts            Dispute resolver
-    hf-comparator.ts          EXPLORE phase branch comparator
-    hf-qa.ts                  SHIP phase QA verifier
-    hf-shipper.ts             SHIP phase release packager
-    hf-retrospective.ts       RETROSPECTIVE phase learner
-    --- new review agents ---
-    ace-team-lead.ts          Review agent selector
-    ace-logic-auditor.ts      Core review agent
-    ace-test-interrogator.ts  Core review agent
-    ace-contract-verifier.ts  Core review agent
-    ace-security-auditor.ts   Parallel review specialist
-    ace-code-quality.ts       Parallel review specialist
-    (... additional ace specialists)
+### Existing Agent Inventory
 
-  tools/                      Registered tools (MODIFIED: add new tools)
-    create-agent.ts           (existing, unchanged)
-    create-skill.ts           (existing, unchanged)
-    create-command.ts         (existing, unchanged)
-    placeholder.ts            (existing, remove when orchestrator ready)
-    --- new ---
-    orchestrate.ts            oc_orchestrate: main state machine driver
-    review.ts                 oc_review: standalone review pipeline
-    state.ts                  oc_state: state read/update/patch
-    confidence.ts             oc_confidence: ledger read/append/summary
-    phase.ts                  oc_phase: phase transition
-    plan.ts                   oc_plan: task index/wave query
+**Standard agents** (registered in `src/agents/index.ts` `agents` map):
+- researcher, metaprompter, documenter, pr-reviewer, autopilot
 
-  orchestrator/               NEW: State machine + pipeline logic
-    state-machine.ts          Phase transition logic, valid transitions map
-    phase-handlers.ts         Handler dispatch table (phase -> handler function)
-    phases/
-      recon.ts                RECON phase handler
-      challenge.ts            CHALLENGE phase handler
-      architect.ts            ARCHITECT phase handler (Arena)
-      explore.ts              EXPLORE phase handler (Divergent Explorer)
-      plan.ts                 PLAN phase handler
-      build.ts                BUILD phase handler (wave executor)
-      ship.ts                 SHIP phase handler
-      retrospective.ts        RETROSPECTIVE phase handler
+**Pipeline agents** (registered in `src/agents/pipeline/index.ts` `pipelineAgents` map):
+- oc-researcher, oc-challenger, oc-architect, oc-critic, oc-explorer, oc-planner, oc-implementer, oc-reviewer, oc-shipper, oc-retrospector
 
-  review/                     NEW: Ace review engine
-    pipeline.ts               Review pipeline orchestration
-    team-selection.ts         Agent selection logic
-    cross-verification.ts     Phase 2 cross-check logic
-    fix-cycle.ts              Auto-fix + re-verify loop
-    verdict.ts                Verdict computation
-    agent-catalog.ts          Agent metadata registry
+**AGENT_REGISTRY** (in `src/registry/model-groups.ts`) maps all of these to 8 groups:
+- architects, challengers, builders, reviewers, red-team, researchers, communicators, utilities
 
-  state/                      NEW: State management (replaces hf-tools CJS CLI)
-    state-store.ts            Read/write .hands-free/state.json
-    confidence-ledger.ts      Read/append/summarize confidence entries
-    decision-log.ts           Append decisions
-    run-log.ts                Append run events
-    metrics.ts                Timing + cost tracking
+## Recommended Architecture for v4.0
 
-  templates/                  (existing + new)
-    agent-template.ts         (existing, unchanged)
-    skill-template.ts         (existing, unchanged)
-    command-template.ts       (existing, unchanged)
-    --- new ---
-    state-template.ts         Initial state content
-    review-finding.ts         Finding format template
-    review-report.ts          Final report template
+No new directories or subsystems needed. All v4.0 changes modify existing components or add assets.
 
-  utils/                      (existing + new)
-    validators.ts             (existing, unchanged)
-    paths.ts                  (existing, MODIFIED: add .hands-free paths)
-    fs-helpers.ts             (existing, unchanged)
-    --- new ---
-    markdown-parser.ts        Parse markdown tables, extract fields
-    slug.ts                   Text to URL-safe slug
-    timestamp.ts              ISO 8601 timestamp helpers
+### Component Boundaries (unchanged + additions)
 
-  references/                 NEW: Embedded reference data
-    severity-definitions.ts   Critical/Warning/Nitpick definitions
-    agent-hard-gates.ts       Per-agent verification requirements
-    stack-gate.ts             Stack-to-agent relevance mapping
-```
+| Component | Responsibility | Changes in v4.0 |
+|-----------|---------------|-----------------|
+| `src/agents/` | Agent definitions + configHook registration | Add new agents (debugger, etc.), export registry helper |
+| `src/tools/stocktake.ts` | Asset audit | Add config-hook agent detection |
+| `src/installer.ts` | Self-healing asset copier | Expand `DEPRECATED_ASSETS` for renamed commands |
+| `src/config.ts` | Config load/save/migrate | No changes needed (Zod defaults handle new fields) |
+| `src/orchestrator/fallback/` | Fallback chain management | Add test mode injection |
+| `src/registry/` | Agent-to-group mapping | Add new agent entries |
+| `assets/commands/` | Slash command templates | Rename to oc-* prefix, add new commands |
+| `assets/skills/` | Skill definitions | Add new skills for expanded coverage |
+| `qa/` (NEW) | Manual QA playbook | Entirely new directory (documentation only) |
 
-### Component Boundaries
+## Component Analysis: What Changes for v4.0
 
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| `index.ts` | Plugin entry, registers tools + config hook | tools/*, agents/index |
-| `agents/index.ts` | Config hook: injects all agents into OpenCode config | All agent definition files |
-| `tools/orchestrate.ts` | Entry point tool `oc_orchestrate` | orchestrator/state-machine |
-| `tools/review.ts` | Entry point tool `oc_review` | review/pipeline |
-| `tools/state.ts` | State query/mutation tool | state/state-store |
-| `tools/confidence.ts` | Confidence ledger tool | state/confidence-ledger |
-| `orchestrator/state-machine.ts` | Phase transitions, resume detection, circuit breakers | state/*, orchestrator/phases/* |
-| `orchestrator/phases/*` | Individual phase execution logic | state/* |
-| `review/pipeline.ts` | Review execution flow (selection -> parallel -> cross-verify -> fix) | review/*, state/* |
-| `state/state-store.ts` | Atomic read/write of `.hands-free/state.json` | utils/fs-helpers |
-| `state/confidence-ledger.ts` | Confidence tracking and aggregation | utils/markdown-parser |
-| `config.ts` | Plugin configuration (autonomy, strictness, model routing) | state/state-store |
+### 1. Stocktake Agent Detection Fix
 
-### Dependency Flow (strictly top-down, no cycles)
+**Root cause:** `stocktakeCore()` calls `safeReaddir(join(baseDir, "agents"))` which reads `~/.config/opencode/agents/`. Config-hook-injected agents don't exist there.
+
+**Recommended approach:** Add a registry-aware detection layer alongside filesystem scanning.
 
 ```
-index.ts
-  |
-  +-- tools/*
-  |     |
-  |     +-- orchestrator/*  (orchestrate.ts only)
-  |     +-- review/*        (review.ts only)
-  |     +-- state/*         (state.ts, confidence.ts, phase.ts, plan.ts)
-  |     +-- templates/*     (existing creation tools)
-  |     +-- utils/*
-  |
-  +-- agents/index.ts       (config hook)
-        |
-        +-- agents/*.ts     (agent definitions: pure data, no logic)
-
-orchestrator/*
-  |
-  +-- state/*               (read/write state, confidence, decisions)
-  +-- review/*              (BUILD phase invokes review pipeline)
-  +-- utils/*
-
-review/*
-  |
-  +-- state/*               (write findings, read config)
-  +-- references/*          (severity defs, hard gates, stack gate)
-  +-- utils/*
-
-state/*
-  |
-  +-- utils/*               (markdown parser, fs-helpers, paths)
-
-templates/*
-  |
-  +-- Node built-ins + yaml
-
-utils/*
-  |
-  +-- Node built-ins only
+BEFORE:  stocktake -> filesystem scan -> return results
+AFTER:   stocktake -> filesystem scan + registry lookup -> merge & deduplicate -> return results
 ```
 
-**Critical constraint:** `agents/*.ts` files are pure data (frozen AgentConfig objects with string prompts) with no imports from orchestrator/, review/, or state/. The orchestrator constructs dynamic prompts at runtime and dispatches agents by name.
+**New component:** None needed. Modify `stocktakeCore` to accept an optional `registeredAgents` parameter (a record of agent names from the config hook registry). The tool wrapper passes in the known agents from `AGENT_REGISTRY` + the `agents` map in `src/agents/index.ts`.
 
-### Data Flow
+**Implementation detail:**
+- Import `AGENT_REGISTRY` from `src/registry/model-groups.ts` for all registered agent names
+- The `agents` map and `pipelineAgents` map keys are a subset of `AGENT_REGISTRY` keys -- use the registry as the single source
+- For each registered agent, create an `AssetEntry` with `origin: "config-hook"` and `type: "agent"`
+- Lint is N/A for injected agents (no YAML frontmatter to lint) -- mark as `lint: { valid: true, errors: [], warnings: [] }` with a note
+- Deduplicate: if an agent exists both on filesystem and in registry, prefer the filesystem version (user may have customized it)
 
-#### Orchestration Flow
+**New `AssetEntry.origin` value:** Add `"config-hook"` to the union type. This clearly signals to the user that the agent was injected programmatically rather than being a filesystem file.
 
-```
-User invokes oc_orchestrate("Build a task tracker app")
-  |
-  v
-tools/orchestrate.ts
-  |-- Calls orchestrator/state-machine.ts.run(idea)
-  |
-  v
-state-machine.ts
-  |-- Checks .hands-free/state.json (resume or fresh start)
-  |-- If fresh: creates .hands-free/ directory structure + initial state
-  |-- Reads currentPhase, dispatches to phase handler
-  |
-  v
-phases/recon.ts (example phase)
-  |-- Idempotency check: .hands-free/RECON/research.md exists?
-  |-- Constructs prompt with idea + institutional memory
-  |-- Returns { status: "dispatch", agent, prompt } to state-machine
-  |
-  v
-state-machine.ts
-  |-- Returns dispatch instruction to orchestrate.ts tool
-  |
-  v
-tools/orchestrate.ts
-  |-- Returns structured result to calling agent
-  |-- Calling agent (orchestrator agent) dispatches hf-researcher via Agent tool
-  |-- Calling agent re-invokes oc_orchestrate to advance state
-  |
-  v
-Next phase...
+**Data flow change:**
+```typescript
+// BEFORE
+stocktakeCore(args: StocktakeArgs, baseDir: string): Promise<string>
+
+// AFTER
+stocktakeCore(
+  args: StocktakeArgs,
+  baseDir: string,
+  registeredAgents?: ReadonlyMap<string, string>  // name -> group
+): Promise<string>
 ```
 
-**Key architectural insight:** The orchestrator tool cannot directly invoke subagents because tools in OpenCode run in a sandboxed context without Agent tool access. Only agents can spawn other agents. The solution:
+The tool wrapper populates `registeredAgents` from `AGENT_REGISTRY`. The core function merges filesystem-found agents with registry agents, filesystem wins on name collision.
 
-1. A config-hook-injected `orchestrator` agent has `tools: Agent` permission
-2. Its static prompt instructs it to: call `oc_orchestrate` -> read dispatch instructions -> dispatch the named subagent via Agent tool -> call `oc_orchestrate` again to advance
-3. The tool is the brain (all state logic), the agent is the hands (agent dispatch)
+**Files modified:**
+- `src/tools/stocktake.ts` -- add registry-aware agent detection, new origin type
+- No changes to `src/agents/index.ts` needed -- `AGENT_REGISTRY` already exports all names
 
-This mirrors how hands-free works: the `hands-free.md` command IS an agent that calls `hf-tools.cjs` for every decision.
+**Files created:** None.
 
-#### Review Pipeline Flow
+**Confidence:** HIGH -- the registry data is already available, this is purely a wiring change.
 
-```
-oc_review invoked (standalone or from BUILD phase handler)
-  |
-  v
-review/pipeline.ts
-  |-- Gathers diff (via git commands in utils)
-  |-- Detects stack (via file analysis in utils)
-  |-- Loads project memory
-  |
-  v
-review/team-selection.ts
-  |-- Scores all agents against project + diff
-  |-- Returns selected parallel + sequenced agent names
-  |
-  v
-review/pipeline.ts
-  |-- Returns list of dispatch instructions:
-  |   { agents: ["ace-logic-auditor", "ace-security-auditor", ...],
-  |     prompts: { "ace-logic-auditor": "...", ... },
-  |     phase: "parallel-review" }
-  |-- Caller dispatches all in parallel via Agent tool
-  |-- Caller re-invokes oc_review with phase 1 findings
-  |
-  v
-review/cross-verification.ts (Phase 2)
-  |-- Creates cross-verification prompts per agent
-  |-- Returns dispatch instructions for re-dispatch
-  |
-  v
-review/fix-cycle.ts (Phase 5, if mode=fix)
-  |-- Sorts findings by severity + domain priority
-  |-- Returns fix instructions (which files, which edits)
-  |-- Iterates up to 3 re-verify cycles
-  |
-  v
-review/verdict.ts
-  |-- Aggregates all findings
-  |-- Computes verdict: CLEAN / APPROVED / CONCERNS / BLOCKED
-  |-- Returns structured report
-```
+### 2. Command Renaming (oc-* prefix)
 
-#### State Data Flow
+**Current state:** Commands are filesystem .md files in `assets/commands/`. Current names: `brainstorm.md`, `new-agent.md`, `new-command.md`, `new-skill.md`, `oc-configure.md`, `quick.md`, `review-pr.md`, `stocktake.md`, `tdd.md`, `update-docs.md`, `write-plan.md`.
 
-```
-.hands-free/                    Project-local working directory (.gitignored)
-  state.json                    Current phase, status, timestamps (machine-readable)
-  state.md                      Human-readable state view (generated from .json)
-  confidence.json               Confidence ledger entries
-  decision-log.md               All decisions with rationale (append-only)
-  run-log.md                    Chronological event log (append-only)
-  metrics.json                  Timing, PR counts, token estimates
-  idea.md                       Original user input (immutable after creation)
-  config.json                   Per-project config overrides
-  RECON/research.md             Research output
-  CHALLENGE/brief.md            Enhancement proposals
-  CHALLENGE/backlog.md          Deferred items
-  ARCHITECT/
-    proposals/proposal-A.md     Arena proposals
-    proposals/proposal-B.md
-    critique.md                 Critic output
-    debate.md                   Deliberation transcript
-    architecture.md             Winning architecture
-    stack.md                    Technology stack decisions
-  EXPLORE/
-    branch-a/                   Exploratory spike A
-    branch-b/                   Exploratory spike B
-    comparison.md               Comparison result
-  PLAN/
-    tasks.json                  Wave-grouped task list (machine-readable)
-    tasks.md                    Human-readable task view
-    dod.md                      Definition of Done
-    verification-dimensions.md  QA verification criteria
-  BUILD/
-    {task-id}.md                Per-task implementation report
-    {task-id}-rebuttal.md       Implementer rebuttals
-  review/
-    {task-id}-review.md         Review verdicts
-  SHIP/                         Release artifacts
-  RETROSPECTIVE/                Lessons learned
+Note: `oc-configure.md` already has the prefix.
 
-~/.config/opencode/             Global config (existing)
-  opencode-autopilot.json          Plugin config (MODIFIED: add orchestrator settings)
+**Target state:** All commands prefixed with `oc-` (e.g., `/oc-stocktake`, `/oc-quick`) for namespace clarity.
 
-~/.claude/hands-free-memory/    Institutional memory (cross-project)
-  {domain}/                     Domain-specific lessons
+**Migration concern:** Existing users have these files in `~/.config/opencode/commands/`. The installer uses `copyIfMissing` (COPYFILE_EXCL), so it will never overwrite existing files. Renaming source files alone won't affect existing installations.
+
+**Recommended approach: Deprecation-driven rename (proven pattern)**
+
+1. Rename all files in `assets/commands/` to `oc-*.md` (those without prefix)
+2. Add old filenames to `DEPRECATED_ASSETS` in `src/installer.ts` for cleanup
+3. The installer's existing deprecation cleanup removes old files on next load
+4. `copyIfMissing` installs new names since they don't exist yet
+
+**Files to rename:**
+| Old Name | New Name |
+|----------|----------|
+| `brainstorm.md` | `oc-brainstorm.md` |
+| `new-agent.md` | `oc-new-agent.md` |
+| `new-command.md` | `oc-new-command.md` |
+| `new-skill.md` | `oc-new-skill.md` |
+| `quick.md` | `oc-quick.md` |
+| `review-pr.md` | `oc-review-pr.md` |
+| `stocktake.md` | `oc-stocktake.md` |
+| `tdd.md` | `oc-tdd.md` |
+| `update-docs.md` | `oc-update-docs.md` |
+| `write-plan.md` | `oc-write-plan.md` |
+| `oc-configure.md` | (already prefixed) |
+
+**Files modified:**
+- `assets/commands/*.md` -- rename all to `oc-` prefix
+- `src/installer.ts` -- add 10 old command names to `DEPRECATED_ASSETS`
+- `src/utils/validators.ts` -- update `BUILT_IN_COMMANDS` set if it references old names
+- `src/tools/create-command.ts` -- verify `oc-` prefix enforcement in validation
+
+**Files created:** None (just renames).
+
+**Risk:** LOW. The `DEPRECATED_ASSETS` + `copyIfMissing` pattern is already proven -- see `commands/configure.md` already in `DEPRECATED_ASSETS`.
+
+**Confidence:** HIGH -- exact same pattern already used for the configure.md removal.
+
+### 3. Remove oc-configure as Slash Command
+
+**Current state:** `oc-configure.md` exists in `assets/commands/` and is in `FORCE_UPDATE_ASSETS`. The command tells users to run the CLI wizard instead.
+
+**Recommended approach:** 
+1. Remove `oc-configure.md` from `assets/commands/`
+2. Add `commands/oc-configure.md` to `DEPRECATED_ASSETS` in `src/installer.ts`
+3. Remove from `FORCE_UPDATE_ASSETS`
+
+**Risk:** LOW. Users who need to configure run the CLI wizard directly.
+
+**Confidence:** HIGH.
+
+### 4. Mock/Fail-Forced Fallback Mode
+
+**Current state:** `oc_mock_fallback` tool exists in `src/tools/mock-fallback.ts`. It generates mock errors and classifies them but does NOT trigger actual fallback in a live session. It's a diagnostic/educational tool.
+
+**The ask:** "Mock/fail-forced fallback mode accessible from CLI configure" -- a persistent config toggle that forces fallback behavior for testing.
+
+**Recommended architecture: Config-driven runtime toggle**
+
+Add a `testMode` field to the fallback config schema:
+
+```typescript
+// In src/orchestrator/fallback/fallback-config.ts
+testMode: z.object({
+  enabled: z.boolean().default(false),
+  failureMode: z.enum([
+    "rate_limit", "quota_exceeded", "timeout", "service_unavailable"
+  ]).default("rate_limit"),
+  failAfterMessages: z.number().min(1).default(3),
+}).default({ enabled: false, failureMode: "rate_limit", failAfterMessages: 3 })
 ```
 
-**Design decision: JSON for machine state, Markdown for human artifacts.** The hands-free source uses markdown tables parsed with regex for ALL state -- fragile and error-prone. The TypeScript port uses JSON for anything the code reads/writes programmatically (`state.json`, `confidence.json`, `tasks.json`, `metrics.json`, `config.json`). Markdown is reserved for human-readable artifacts that agents produce and consume (research, architecture, reviews, decisions).
+**Where it lives:** In the plugin config (`opencode-autopilot.json`) under `fallback.testMode`. Rationale:
+- It persists across sessions (unlike a runtime-only toggle that resets)
+- It's configurable via the CLI wizard or `oc_configure`
+- It's part of the fallback subsystem where it logically belongs
+- Zod `.default()` means existing configs auto-get the new field on parse -- no schema version bump needed
+
+**Data flow:**
+```
+Plugin loads config -> fallback.testMode.enabled === true
+  -> FallbackManager wraps provider calls with a counter
+  -> After N successful messages, inject mock error matching failureMode
+  -> Fallback chain activates as if real error occurred
+  -> Toast notification: "Test mode: simulating {failureMode}"
+  -> Session continues on fallback model
+```
+
+**Files modified:**
+- `src/orchestrator/fallback/fallback-config.ts` -- add `testMode` to schema
+- `src/orchestrator/fallback/index.ts` (FallbackManager) -- add test mode injection logic
+- `src/tools/configure.ts` -- expose test mode toggle in configure flow (new subcommand or parameter)
+
+**Files created:** None. The existing mock infrastructure (`src/observability/mock/`) provides error generators. FallbackManager calls `createMockError()` when test mode counter triggers.
+
+**Why not a separate CLI flag:** CLI flags are session-scoped and require custom argument parsing. Config-driven means the setting persists and is visible/editable alongside other fallback settings.
+
+**Why not just use `oc_mock_fallback`:** That tool only classifies errors -- it doesn't inject them into the live fallback chain. The test mode actually triggers the fallback flow end-to-end.
+
+**Confidence:** MEDIUM -- the FallbackManager integration needs careful testing to ensure the mock error injection point is correct (it must happen where real provider errors surface).
+
+### 5. New Agent Integration with configHook
+
+**Current pattern (well-established):**
+
+1. Define agent config in `src/agents/<name>.ts` as a frozen `AgentConfig` object
+2. Add to the `agents` map in `src/agents/index.ts` (standard agents) or `pipelineAgents` in `src/agents/pipeline/index.ts` (pipeline agents)
+3. Add to `AGENT_REGISTRY` in `src/registry/model-groups.ts` with group assignment
+4. `configHook` -> `registerAgents()` handles model resolution and injection
+
+**For new agents (debugger, etc.):**
+
+Follow the exact same pattern. No architectural changes needed.
+
+New agents should be:
+- **Subagent mode** (`mode: "subagent"`) for @-callable agents like debugger
+- Set `hidden: true` only for pipeline-internal agents not meant for direct user invocation
+- Added to appropriate group in `AGENT_REGISTRY`
+
+**Agent placement decision:** Should new agents go in `src/agents/` (standard) or `src/agents/pipeline/` (pipeline)?
+- Pipeline agents are orchestrator phases -- they run as part of `oc_orchestrate`
+- Standard agents are independently useful -- users invoke them via `@agent-name`
+- New debugger agent = standard (independently useful, not a pipeline phase)
+- New agents for expanded @-callable subagents = standard
+
+**For the agents.md review command:**
+This is a **command** (filesystem `.md` in `assets/commands/`), not a new agent. The command template instructs the LLM to read the project's `agents.md`, analyze it, and suggest improvements. It dispatches to the autopilot agent or a dedicated subagent.
+
+**Confidence:** HIGH -- follows exact existing patterns with zero architectural novelty.
+
+### 6. Tab-Cycle Ordering Fix
+
+**Current understanding:** Agent modes control Tab behavior:
+- `mode: "primary"` -- Tab-cycleable
+- `mode: "subagent"` -- @-callable only
+- `hidden: true` -- excluded from Tab AND @ autocomplete
+
+The "fix Tab-cycle ordering" requirement likely means ensuring only the right agents appear in Tab cycle and in the right order. This is controlled by:
+1. The `mode` field on each agent config
+2. OpenCode's internal ordering (likely alphabetical or registration order)
+
+**Approach:** Audit all registered agents and ensure correct `mode` values. If ordering within Tab cycle matters, investigate OpenCode's ordering behavior (may need `order` field if supported).
+
+**Confidence:** MEDIUM -- need to verify how OpenCode orders Tab-cycle agents.
+
+### 7. QA Playbook Structure
+
+**Recommended architecture: Markdown playbook in repo**
+
+The QA playbook is documentation for developers, not a runtime component.
+
+```
+qa/
+  PLAYBOOK.md              # Master index with test matrix
+  agents/
+    autopilot.md           # Test scenarios for autopilot agent
+    researcher.md          # Test scenarios for researcher
+    pipeline-agents.md     # Test scenarios for pipeline agents
+  tools/
+    configure.md           # Test scenarios for oc_configure
+    stocktake.md           # Test scenarios for oc_stocktake
+    create-tools.md        # Test scenarios for creation tools
+    mock-fallback.md       # Test scenarios for mock fallback
+  flows/
+    first-load.md          # First-load experience flow
+    full-pipeline.md       # End-to-end orchestration flow
+    fallback-chain.md      # Fallback activation and recovery
+    memory-capture.md      # Memory capture and injection
+  commands/
+    all-commands.md        # Test each slash command
+```
+
+**Why not an interactive test runner:** The plugin runs inside OpenCode's TUI. There's no stdin for interactive prompts. Manual QA tests test the TUI experience, agent prompt quality, and integration with the host. Automated tests already exist in `tests/`.
+
+**Each test file follows a template:**
+```markdown
+## Prerequisites
+[Setup steps]
+
+## Test Steps
+1. Step with expected outcome
+
+## Expected Behavior
+[What should happen]
+
+## Known Issues
+[Current bugs or limitations]
+```
+
+**Files created:** `qa/` directory tree.
+**Files modified:** None.
+
+**Confidence:** HIGH -- pure documentation structure.
 
 ## Patterns to Follow
 
-### Pattern 1: Tool-Returns-Instruction
-
-**What:** Tools compute state and return structured instructions; agents execute them.
-**When:** Whenever the orchestrator or review pipeline needs to dispatch a subagent.
-**Why:** OpenCode tools cannot call the Agent tool directly. Only agents can spawn subagents.
-
+### Pattern 1: Registry-Aware Stocktake
+**What:** Pass registered agent names into stocktakeCore alongside filesystem scan
+**When:** Any tool that needs to enumerate all assets regardless of registration method
+**Example:**
 ```typescript
-// tools/orchestrate.ts
-interface OrchestrateResult {
-  readonly status: "dispatch" | "complete" | "error";
-  readonly agent?: string;
-  readonly prompt?: string;
-  readonly phase?: string;
-  readonly progress?: string;
-}
-
-export async function orchestrateCore(
-  args: { idea?: string; resume?: boolean },
-  baseDir: string,
-): Promise<OrchestrateResult> {
-  const state = await loadState(baseDir);
-  if (!state) {
-    await initializeProject(args.idea!, baseDir);
-    return reconHandler(baseDir);
-  }
-  const handler = phaseHandlers[state.currentPhase];
-  return handler(state, baseDir);
-}
-```
-
-### Pattern 2: Agent Definition as Pure Data
-
-**What:** Agent definitions are readonly frozen objects with no runtime logic.
-**When:** Every agent registered via config hook.
-**Why:** Matches existing pattern in `agents/researcher.ts`. Keeps agent registry side-effect-free.
-
-```typescript
-// agents/hf-researcher.ts
-import type { AgentConfig } from "@opencode-ai/sdk";
-
-export const hfResearcherAgent: Readonly<AgentConfig> = Object.freeze({
-  description: "Conducts domain research during RECON phase",
-  mode: "subagent",
-  prompt: `You are hf-researcher. Your job is to conduct exhaustive domain
-research for a software product idea...
-
-## Output Contract
-Write your research to: .hands-free/RECON/research.md
-...`,
-  permission: {
-    read: "allow",
-    write: "allow",
-    bash: "allow",
-  },
-});
-```
-
-### Pattern 3: Idempotent Phase Handlers
-
-**What:** Every phase handler checks for existing artifacts before dispatching.
-**When:** Every phase in the state machine.
-**Why:** Enables resume after interruption. Prevents duplicate agent invocations.
-
-```typescript
-// orchestrator/phases/recon.ts
-export async function handleRecon(
-  state: PipelineState,
-  baseDir: string,
-): Promise<OrchestrateResult> {
-  const researchPath = join(baseDir, ".hands-free/RECON/research.md");
-
-  // Idempotency: if output exists, advance to next phase
-  if (await fileExists(researchPath)) {
-    const newState = await transitionPhase(state, "RECON", "CHALLENGE", baseDir);
-    return handleChallenge(newState, baseDir);
-  }
-
-  const idea = await readFile(join(baseDir, ".hands-free/idea.md"), "utf-8");
-  const memory = await getInstitutionalMemory("researcher", baseDir);
-
-  return {
-    status: "dispatch",
-    agent: "hf-researcher",
-    prompt: buildReconPrompt(idea, memory),
-    phase: "RECON",
-    progress: "Dispatching researcher for domain analysis",
-  };
-}
-```
-
-### Pattern 4: Immutable State Transitions
-
-**What:** State updates create new state objects; file writes are atomic via write-rename.
-**When:** Every state mutation in the pipeline.
-**Why:** Matches project immutability constraint. Prevents corrupted state on crash.
-
-```typescript
-// state/state-store.ts
-export async function transitionPhase(
-  currentState: Readonly<PipelineState>,
-  fromPhase: Phase,
-  toPhase: Phase,
-  baseDir: string,
-): Promise<PipelineState> {
-  if (!VALID_TRANSITIONS[fromPhase]?.includes(toPhase)) {
-    throw new Error(`Invalid transition: ${fromPhase} -> ${toPhase}`);
-  }
-
-  const timestamp = new Date().toISOString();
-  const newState: PipelineState = {
-    ...currentState,
-    currentPhase: toPhase,
-    lastUpdatedAt: timestamp,
-    phases: currentState.phases.map((p) =>
-      p.name === fromPhase
-        ? { ...p, status: "DONE" as const, completedAt: timestamp }
-        : p.name === toPhase
-          ? { ...p, status: "IN_PROGRESS" as const }
-          : p,
-    ),
-  };
-
-  await writeStateAtomic(newState, baseDir);
-  return newState;
-}
-```
-
-### Pattern 5: Confidence-Gated Depth
-
-**What:** The confidence ledger controls pipeline depth (Arena proposals, critique rounds, Explorer trigger).
-**When:** ARCHITECT phase (Arena depth) and post-Critic (Explorer trigger).
-**Why:** Avoids wasting compute on well-understood problems while investing more on uncertain ones.
-
-```typescript
-// orchestrator/phases/architect.ts
-function determineArenaDepth(
-  confidenceSummary: ConfidenceSummary,
-): { proposalCount: number; critiqueRounds: number } {
-  switch (confidenceSummary.dominant) {
-    case "HIGH":
-      return { proposalCount: 2, critiqueRounds: 1 };
-    case "MEDIUM":
-    case "LOW":
-    default:
-      return { proposalCount: 3, critiqueRounds: 2 };
-  }
-}
-```
-
-### Pattern 6: Tool Registration Following Existing Convention
-
-**What:** Each tool exports a `*Core` function (testable, accepts `baseDir`) and a `tool()` wrapper.
-**When:** Every new tool.
-**Why:** Matches the established pattern in `create-agent.ts` exactly.
-
-```typescript
-// tools/state.ts
-export async function stateCore(
-  args: { subcommand: string; field?: string; value?: string },
-  baseDir: string,
-): Promise<string> {
-  // Pure logic, testable with temp directories
-}
-
-export const ocState = tool({
-  description: "Read or update orchestrator pipeline state",
-  args: { /* Zod schema */ },
+// In stocktake tool wrapper
+export const ocStocktake = tool({
+  // ...
   async execute(args) {
-    return stateCore(args, getProjectDir());
+    const registeredAgents = new Map(
+      Object.entries(AGENT_REGISTRY).map(([name, entry]) => [name, entry.group])
+    );
+    return stocktakeCore(args, getGlobalConfigDir(), registeredAgents);
   },
 });
 ```
+
+### Pattern 2: Deprecation-Driven Rename
+**What:** Use `DEPRECATED_ASSETS` array + `copyIfMissing` for non-breaking renames
+**When:** Renaming any filesystem asset
+**Example:**
+```typescript
+// In src/installer.ts
+const DEPRECATED_ASSETS = [
+  "agents/placeholder-agent.md",
+  "commands/configure.md",
+  // v4.0: old unprefixed command names
+  "commands/stocktake.md",
+  "commands/quick.md",
+  "commands/brainstorm.md",
+  // ... etc
+] as const;
+```
+
+### Pattern 3: Config-Driven Feature Toggle via Zod Defaults
+**What:** New optional config fields with Zod defaults, no schema version bump needed
+**When:** Adding optional features like test mode
+**Why:** Zod `.default()` means existing configs auto-get the new field on parse. No migration function needed unless the field is required or restructures existing data.
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Tool Calling Agent Tool
+### Anti-Pattern 1: Filesystem Agents for Built-in Agents
+**What:** Writing agent .md files to `~/.config/opencode/agents/` for plugin-provided agents
+**Why bad:** Duplicates the configHook mechanism, creates two sources of truth. User edits to filesystem files get ignored when configHook runs since `registerAgents` skips agents already in `config.agent` (but they're set by the hook itself, not from filesystem).
+**Instead:** Always use configHook for plugin-provided agents. Filesystem agents are for user-created agents only.
 
-**What:** Trying to dispatch subagents from within a tool's `execute` function.
-**Why bad:** OpenCode tools run in a sandboxed context. They do not have access to the Agent tool. Only agents can spawn other agents.
-**Instead:** Return structured dispatch instructions from the tool. The orchestrator agent (injected via config hook) interprets and executes them.
+### Anti-Pattern 2: Schema Version Bump for Optional Fields
+**What:** Adding a v6 schema + migration for a new optional field like `testMode`
+**Why bad:** Unnecessary complexity. Zod `.default()` handles missing fields transparently on parse.
+**Instead:** Only bump schema version when restructuring existing fields or adding required fields.
 
-### Anti-Pattern 2: Monolithic Orchestrator Prompt
+### Anti-Pattern 3: Interactive CLI Inside TUI
+**What:** Building interactive test runners or wizards as OpenCode tools
+**Why bad:** OpenCode tools return JSON strings to the LLM. There's no stdin for interactive prompts within a tool.
+**Instead:** Interactive workflows go to the CLI binary (`bunx @kodrunhq/opencode-autopilot configure`). TUI tools are LLM-driven flows.
 
-**What:** Putting the entire 800-line hands-free.md orchestrator logic into a single agent prompt.
-**Why bad:** Agent prompts via config hook are static strings set at plugin load time. The hands-free orchestrator needs dynamic context injection (idea content, research output, confidence scores) at each phase. A static mega-prompt with all 8 phase handlers wastes context and cannot adapt to runtime state.
-**Instead:** Use a lean orchestrator agent prompt (~50 lines) that instructs the agent to call `oc_orchestrate` for every decision. The tool returns phase-specific context and dispatch instructions dynamically. The agent prompt is a loop: call tool -> dispatch agent -> call tool -> dispatch agent.
+### Anti-Pattern 4: Coupling Stocktake to Agent File Content
+**What:** Trying to read agent prompt content from config-hook-injected agents for linting
+**Why bad:** Injected agents are TypeScript objects in memory, not markdown files. There's no YAML frontmatter to lint.
+**Instead:** Skip linting for config-hook agents or add a separate validation path that checks the AgentConfig structure rather than markdown parsing.
 
-### Anti-Pattern 3: Markdown Files as Machine State
+## Data Flow (updated for v4.0)
 
-**What:** Parsing and writing markdown tables with regex for every state operation (the hf-tools CJS approach).
-**Why bad:** Regex parsing of markdown tables is fragile -- whitespace, missing columns, and malformed rows cause silent data corruption. No type safety. No atomic writes. The CJS CLI approach exists because Claude Code commands cannot use native TypeScript modules or import npm packages.
-**Instead:** Use JSON files for machine state (`state.json`, `confidence.json`, `tasks.json`). JSON.parse/stringify is deterministic, atomic write-rename is trivial, and Zod validates the schema. Generate markdown views for human readability as a separate (lossy) step.
+### Plugin Load (unchanged + deprecation cleanup)
+```
+index.ts
+  -> installAssets()
+       -> cleanupDeprecatedAssets()    # removes old unprefixed commands
+       -> forceUpdateAssets()          # (oc-configure removed from this list)
+       -> copyIfMissing()             # installs new oc-* prefixed commands
+  -> configHook(cfg)
+       -> registerAgents(agents, ...)      # researcher, documenter, etc.
+       -> registerAgents(pipelineAgents, ...) # oc-architect, etc.
+       -> registerAgents(newAgents, ...)   # debugger, etc. (v4.0)
+```
 
-### Anti-Pattern 4: Shell Scripts for Deterministic Logic
+### Stocktake (fixed)
+```
+oc_stocktake tool wrapper
+  -> builds registeredAgents map from AGENT_REGISTRY
+  -> stocktakeCore(args, baseDir, registeredAgents)
+       -> filesystem scan: skills/, commands/, agents/ dirs
+       -> registry lookup: iterate registeredAgents map
+       -> merge: filesystem entries + config-hook entries
+       -> dedup: filesystem wins on name collision
+       -> return combined inventory
+```
 
-**What:** Using bash scripts for diff-scope, stack detection, change classification (the ace approach with `scripts/diff-scope.sh`, `scripts/detect-stack.sh`, etc.).
-**Why bad:** In the plugin context, TypeScript functions are testable with `bun test`, type-safe, and do not require shell execution or path resolution. The ace scripts exist because Claude Code skills cannot bundle TypeScript modules -- they must use shell scripts and the Agent tool.
-**Instead:** Port all deterministic logic (diff gathering, stack detection, change classification) to TypeScript functions in `utils/` or domain-specific modules. Run `git diff` via `node:child_process` when needed.
-
-### Anti-Pattern 5: Global Mutable State via Config Mutation
-
-**What:** Storing runtime orchestrator state (current phase, confidence scores) in the Config object that the config hook mutates.
-**Why bad:** The config hook runs once at plugin load. It cannot track state changes during a session. Config mutation is reserved for agent registration.
-**Instead:** Config hook injects agents only (static data). All runtime state lives in `.hands-free/state.json` managed by `state/state-store.ts`.
-
-## Integration Points with Existing Code
-
-### Modified Files (5 files)
-
-| File | Change | Risk |
-|------|--------|------|
-| `src/index.ts` | Register 6 new tools in the `tool` object | LOW -- additive, no existing behavior changed |
-| `src/agents/index.ts` | Import and register 15+ new agents in configHook | LOW -- same deep-copy pattern, more entries |
-| `src/config.ts` | Extend pluginConfigSchema with v2 orchestrator settings | MEDIUM -- schema migration from version 1 to 2 |
-| `src/utils/paths.ts` | Add `getHandsFreeDir()` and `getProjectRoot()` helpers | LOW -- additive exports |
-| `package.json` | Add no new runtime deps (all Node built-ins) | LOW |
-
-### Unchanged Files (8 files)
-
-| File | Why Unchanged |
-|------|---------------|
-| `src/installer.ts` | Orchestrator state is project-local, not global assets |
-| `src/tools/create-agent.ts` | v1 creation tooling preserved as-is |
-| `src/tools/create-skill.ts` | v1 creation tooling preserved as-is |
-| `src/tools/create-command.ts` | v1 creation tooling preserved as-is |
-| `src/templates/agent-template.ts` | Existing template patterns unchanged |
-| `src/templates/skill-template.ts` | Existing template patterns unchanged |
-| `src/templates/command-template.ts` | Existing template patterns unchanged |
-| `src/utils/fs-helpers.ts` | Existing helpers reused, not modified |
-
-### New Directories (5 directories, ~40 files)
-
-| Directory | Purpose | Estimated Files |
-|-----------|---------|-----------------|
-| `src/orchestrator/` | State machine + phase dispatch | 2 files |
-| `src/orchestrator/phases/` | Individual phase handler modules | 8 files |
-| `src/review/` | Ace review engine | 6 files |
-| `src/state/` | State management layer | 5 files |
-| `src/references/` | Embedded reference data | 3 files |
-
-Plus ~18 new agent definition files in `src/agents/` and ~6 new tool files in `src/tools/`.
+### Fallback Test Mode (new)
+```
+loadConfig() -> fallback.testMode.enabled === true
+  -> FallbackManager.messageCount tracks successful messages
+  -> After failAfterMessages messages:
+       -> createMockError(testMode.failureMode)
+       -> Normal fallback chain activates
+       -> Toast: "Test mode: simulating {failureMode}"
+       -> Session continues on fallback model
+  -> Counter resets after fallback activates
+```
 
 ## Suggested Build Order
 
-The build order respects the dependency flow (bottom-up) and provides testable increments at each step. Each layer can be fully tested before building the next.
+Based on dependency analysis:
 
-### Layer 1: Foundation Utilities (no new dependencies)
+```
+Phase 1: Foundation (no dependencies, safe renames)
+  1a. Command renaming (oc-* prefix)          # File renames + DEPRECATED_ASSETS
+  1b. Remove oc-configure command              # DEPRECATED_ASSETS + remove FORCE_UPDATE
+  1c. QA playbook directory structure          # Pure documentation, no code
 
-**Build first -- everything else depends on these.**
+Phase 2: Bug Fixes (depends on understanding registry)
+  2a. Fix stocktake agent detection            # Modify stocktakeCore signature + logic
+  2b. Clarify/remove general/explore agents    # Registry cleanup in AGENT_REGISTRY
 
-1. `src/utils/markdown-parser.ts` -- Port hf-tools `core.cjs` markdown table parsing + field extraction to TypeScript
-2. `src/utils/slug.ts` -- Port slug generation from core.cjs
-3. `src/utils/timestamp.ts` -- Port timestamp formatting from core.cjs
-4. `src/utils/paths.ts` (modification) -- Add `getHandsFreeDir()`, `getProjectRoot()`
+Phase 3: New Assets (depends on Phase 1 naming, Phase 2 detection)
+  3a. Add debugger agent                       # New agent definition + registry entry
+  3b. Add agents.md review command             # New command file (oc-review-agents.md)
+  3c. Expand @-callable subagents              # New agent definitions
+  3d. Expand coding standards skills           # New skill directories
+  3e. Fix Tab-cycle ordering                   # Agent mode/hidden adjustments
 
-**Test gate:** Unit tests for each utility. Pure functions, zero side effects.
+Phase 4: Fallback Test Mode (independent, parallel with Phase 3)
+  4a. Add testMode to fallback config schema   # Schema extension with defaults
+  4b. FallbackManager test mode injection      # Runtime logic
+  4c. CLI configure test mode toggle           # Expose via configure subcommand
 
-### Layer 2: State Management (depends on Layer 1)
+Phase 5: QA Execution (depends on all above)
+  5a. Write QA test scenarios for all features
+  5b. Run playbook, document results
+```
 
-**Build second -- orchestrator and review engine both need persistent state.**
+**Rationale:**
+- Phase 1 is pure infrastructure/naming with zero risk to functionality
+- Phase 2 fixes the stocktake bug, needed to verify Phase 3 assets are detected correctly
+- Phase 3 is the bulk content work (new agents, skills, commands) -- most effort here
+- Phase 4 is isolated to the fallback subsystem, can run in parallel with Phase 3
+- Phase 5 must come last because it tests everything above
 
-5. `src/state/state-store.ts` -- Read/write pipeline state as JSON with atomic write-rename
-6. `src/state/confidence-ledger.ts` -- Confidence tracking, aggregation, phase filtering
-7. `src/state/decision-log.ts` -- Append-only decision logging to markdown
-8. `src/state/run-log.ts` -- Append-only event logging
-9. `src/state/metrics.ts` -- Timing, PR counts, token/cost estimates
+## New vs Modified Components Summary
 
-**Test gate:** Integration tests with temp directories. Verify atomic writes, resume detection, confidence math.
-
-### Layer 3: State Tools (depends on Layer 2)
-
-**Build third -- exposes state management as registered OpenCode tools.**
-
-10. `src/tools/state.ts` -- `oc_state` tool (load, get, update, patch)
-11. `src/tools/confidence.ts` -- `oc_confidence` tool (read, append, summary)
-12. `src/tools/phase.ts` -- `oc_phase` tool (complete, status)
-13. `src/tools/plan.ts` -- `oc_plan` tool (index, wave-group)
-
-**Test gate:** Tool unit tests following create-agent.ts pattern (`*Core` function + tool wrapper).
-
-### Layer 4: Review Engine Core (depends on Layers 1-2)
-
-**Build fourth -- needed by BUILD phase, also usable standalone.**
-
-14. `src/references/severity-definitions.ts` -- Severity level data
-15. `src/references/agent-hard-gates.ts` -- Per-agent verification requirements
-16. `src/references/stack-gate.ts` -- Stack-to-agent relevance mapping
-17. `src/review/agent-catalog.ts` -- Agent metadata registry
-18. `src/review/team-selection.ts` -- Agent scoring and selection logic
-19. `src/review/cross-verification.ts` -- Phase 2 cross-check prompt generation
-20. `src/review/fix-cycle.ts` -- Auto-fix + re-verify loop logic
-21. `src/review/verdict.ts` -- Verdict computation (CLEAN/APPROVED/CONCERNS/BLOCKED)
-22. `src/review/pipeline.ts` -- Review pipeline orchestration
-
-**Test gate:** Unit tests for selection logic, verdict computation, severity sorting. Integration tests for pipeline dispatch instruction generation.
-
-### Layer 5: Review Tool + Agents (depends on Layer 4)
-
-**Build fifth -- standalone review capability is usable before orchestrator.**
-
-23. `src/tools/review.ts` -- `oc_review` tool
-24. `src/agents/ace-team-lead.ts` -- Team lead agent definition
-25. `src/agents/ace-logic-auditor.ts` -- Core squad agent
-26. `src/agents/ace-test-interrogator.ts` -- Core squad agent
-27. `src/agents/ace-contract-verifier.ts` -- Core squad agent
-28. `src/agents/ace-*.ts` -- Remaining review specialist agents (batch: security-auditor, code-quality, dead-code-scanner, wiring-inspector, type-soundness, database-auditor, auth-flow-verifier, state-mgmt-auditor, concurrency-checker, scope-intent-verifier, spec-checker, product-thinker, red-team)
-
-**Test gate:** Review pipeline end-to-end test: given a diff, produces correct team selection and dispatch instructions.
-
-### Layer 6: Orchestrator State Machine (depends on Layers 2-3)
-
-**Build sixth -- the core state machine without phase implementations.**
-
-29. `src/orchestrator/state-machine.ts` -- Phase transitions, resume detection, circuit breakers, valid transition map
-30. `src/orchestrator/phase-handlers.ts` -- Handler dispatch table mapping Phase -> handler function
-31. `src/templates/state-template.ts` -- Initial state.json content factory
-
-**Test gate:** State machine unit tests covering: fresh start, resume from each phase, invalid transition rejection, circuit breaker at 3 attempts, idempotent re-entry.
-
-### Layer 7: Phase Handlers (depends on Layers 2, 4, 6)
-
-**Build seventh -- individual phase implementations. Order follows pipeline sequence.**
-
-32. `src/orchestrator/phases/recon.ts`
-33. `src/orchestrator/phases/challenge.ts`
-34. `src/orchestrator/phases/architect.ts` (includes Arena depth logic, proposer/critic dispatch)
-35. `src/orchestrator/phases/explore.ts` (includes Divergent Explorer, branch comparison)
-36. `src/orchestrator/phases/plan.ts` (includes scope fidelity check)
-37. `src/orchestrator/phases/build.ts` (depends on `review/pipeline.ts` for PR review integration)
-38. `src/orchestrator/phases/ship.ts` (depends on QA verification)
-39. `src/orchestrator/phases/retrospective.ts` (includes institutional memory writes)
-
-**Test gate:** Per-phase unit tests with mocked state and agent responses. Verify idempotency, correct dispatch instructions, state transitions.
-
-### Layer 8: Orchestrator Agents + Tool (depends on Layers 6-7)
-
-**Build eighth -- the orchestrator's own subagents and entry tool.**
-
-40. `src/agents/hf-researcher.ts` through `src/agents/hf-retrospective.ts` (12 agent definitions)
-41. `src/tools/orchestrate.ts` -- `oc_orchestrate` tool (the main entry point)
-
-**Test gate:** Full integration test: `orchestrateCore` returns correct dispatch instruction for each phase with mocked filesystem.
-
-### Layer 9: Registration + Config (depends on all above)
-
-**Build last -- ties everything together.**
-
-42. `src/agents/index.ts` (modification) -- Import and register all 15+ new agents in configHook
-43. `src/config.ts` (modification) -- Extend schema to version 2 with orchestrator settings (autonomy level, review strictness, model routing, phase toggles)
-44. `src/index.ts` (modification) -- Register all 6 new tools
-
-**Test gate:** Plugin load test: all tools registered, all agents injected via config hook, config schema validates both v1 and v2.
-
-### Build Order Rationale
-
-- **Bottom-up construction:** Each layer depends only on layers below it. No forward references or circular dependencies.
-- **Testable at every layer:** Each layer has clear test gates before proceeding. Catching bugs in the foundation prevents cascade failures.
-- **Review engine before orchestrator:** The review engine is simpler (stateless pipeline, no state machine), independently useful (standalone `/review` command), and required by the BUILD phase handler. Building it first delivers value early.
-- **State management as shared foundation:** Both orchestrator and review need to read/write state. Centralizing it in Layer 2 prevents duplication and ensures consistent atomic write patterns.
-- **Agents last:** Agent definitions are pure data objects with string prompts. They have zero runtime logic and can be written at any point, but registering them in the config hook should happen after the tools they interact with are tested and stable.
-- **Config migration last:** Extending the config schema is a breaking change that should happen only after all components are proven to work individually.
+| Item | New or Modified | File(s) | Risk |
+|------|----------------|---------|------|
+| Stocktake registry detection | Modified | `src/tools/stocktake.ts` | LOW |
+| Command oc-* prefix | Modified | `assets/commands/*.md`, `src/installer.ts` | LOW |
+| Remove oc-configure command | Modified | `src/installer.ts` | LOW |
+| Fallback test mode schema | Modified | `src/orchestrator/fallback/fallback-config.ts` | LOW |
+| Fallback test mode injection | Modified | `src/orchestrator/fallback/index.ts` | MEDIUM |
+| Configure test mode toggle | Modified | `src/tools/configure.ts` | LOW |
+| AGENT_REGISTRY entries | Modified | `src/registry/model-groups.ts` | LOW |
+| QA playbook | **New** | `qa/` directory tree | LOW |
+| Debugger agent | **New** | `src/agents/debugger.ts` | LOW |
+| Agents.md review command | **New** | `assets/commands/oc-review-agents.md` | LOW |
+| New skills (languages, OOP) | **New** | `assets/skills/<name>/SKILL.md` | LOW |
+| New subagents | **New** | `src/agents/<name>.ts` | LOW |
 
 ## Scalability Considerations
 
-| Concern | Single Project | 10 Concurrent Projects | Notes |
-|---------|---------------|----------------------|-------|
-| State isolation | `.hands-free/` per project | Each project has own state dir | No conflict -- state is project-local |
-| Agent count in config | 20+ agents registered | Same 20+ agents | Agents registered once globally via config hook |
-| Review parallelism | 10-20 agents per review | Same per review | Bounded by OpenCode Agent tool concurrency |
-| Memory usage | JSON state loaded on demand | One orchestration at a time | OpenCode is single-session; no multi-project concern |
-| Institutional memory | `~/.claude/hands-free-memory/` | Shared across projects | Cross-project learning is intentional |
-| Config schema | v2 schema | Same | Backward-compatible migration from v1 |
+| Concern | Current (20 agents) | At 50 agents | At 100+ agents |
+|---------|---------------------|--------------|----------------|
+| configHook injection time | <1ms | <5ms | <10ms (still fine) |
+| Stocktake scan time | <50ms | <100ms | Consider caching |
+| AGENT_REGISTRY size | Frozen object, instant lookup | Same | Same |
+| Command filesystem scan | <10ms | <20ms | Consider index file |
+
+No scalability concerns at v4.0 target sizes.
 
 ## Sources
 
-- hands-free orchestrator command: `/home/joseibanez/develop/projects/claude-hands-free/commands/hands-free.md` -- 800+ line state machine with 8 phases, Arena, Divergent Explorer (HIGH confidence: direct source analysis)
-- hands-free deterministic tools: `/home/joseibanez/develop/projects/claude-hands-free/bin/hf-tools.cjs` + `bin/lib/*.cjs` -- 13 CJS modules for state, config, confidence, phase, plan, arena, commit, validate (HIGH confidence: direct source analysis)
-- hands-free agents: `/home/joseibanez/develop/projects/claude-hands-free/agents/*.md` -- 12 specialized agents with output contracts and behavioral rules (HIGH confidence: direct source analysis)
-- hands-free hooks: `/home/joseibanez/develop/projects/claude-hands-free/hooks/hooks.json` -- SessionStart resume, PreCompact checkpoint, Stop recovery (HIGH confidence: direct source analysis)
-- ace review skill: `/home/joseibanez/develop/projects/claude-ace/skills/ace-full/SKILL.md` -- 7-phase review pipeline with team selection, parallel dispatch, cross-verification, auto-fix (HIGH confidence: direct source analysis)
-- ace orchestrator agent: `/home/joseibanez/develop/projects/claude-ace/agents/orchestrator.md` -- Programmatic dispatch for review-gateway (HIGH confidence: direct source analysis)
-- ace agent catalog: `/home/joseibanez/develop/projects/claude-ace/references/agent-catalog.md` -- 16 parallel specialists + 2 sequenced + 3 core squad (HIGH confidence: direct source analysis)
-- ace severity definitions: `/home/joseibanez/develop/projects/claude-ace/references/severity-definitions.md` -- Critical/Warning/Nitpick (HIGH confidence: direct source analysis)
-- existing plugin architecture: `/home/joseibanez/develop/projects/opencode-autopilot/src/` -- Current tool registration, config hook, agent definitions (HIGH confidence: direct source analysis)
-- OpenCode plugin API: `@opencode-ai/plugin` dist/index.d.ts -- Hooks interface with tool, config, event, chat.message, chat.params hooks (HIGH confidence: direct type analysis)
-- Tool-returns-instruction pattern: MEDIUM confidence -- this is the logical design given OpenCode's constraints, but untested in this plugin context. May need adjustment based on how OpenCode handles agent dispatch from tool responses.
+- `src/index.ts` lines 249-253 -- plugin configHook wiring, tool registration
+- `src/agents/index.ts` -- configHook implementation, registerAgents pattern
+- `src/agents/pipeline/index.ts` -- pipeline agent registration pattern
+- `src/tools/stocktake.ts` -- current filesystem-only agent scanning (the bug)
+- `src/installer.ts` -- DEPRECATED_ASSETS and FORCE_UPDATE_ASSETS patterns (proven migration)
+- `src/config.ts` -- v1-v5 migration chain, Zod schema with defaults (no v6 needed)
+- `src/registry/model-groups.ts` -- AGENT_REGISTRY with all 20 agents mapped to 8 groups
+- `src/tools/mock-fallback.ts` -- existing mock error infrastructure (createMockError)
+- `src/tools/configure.ts` -- configure subcommand pattern (start/assign/commit/doctor/reset)
+- `assets/commands/*.md` -- current command inventory (11 commands, 1 already prefixed)
+- `.planning/PROJECT.md` -- v4.0 requirements and constraints

@@ -1,266 +1,260 @@
 # Domain Pitfalls
 
-**Domain:** Porting autonomous SDLC orchestrator (hands-free) + multi-agent review engine (ace) into an existing OpenCode plugin (opencode-autopilot)
-**Researched:** 2026-03-31
-**Source analysis:** claude-hands-free (2413-line orchestrator, 12 agents, 3300 lines CJS tooling, 8-phase state machine), claude-ace (30 agents, 8-phase review pipeline, 6 bash scripts, references directory with hard gates), opencode-autopilot (924 lines TS, 4 agents, 3 creation tools)
+**Domain:** Production quality improvements to an AI coding plugin — asset expansion, command renaming, test infrastructure, QA playbook
+**Researched:** 2026-04-03
+**Milestone:** v4.0 Production Quality
+**Overall confidence:** HIGH (based on codebase analysis, OpenCode docs, ecosystem patterns, and Phase 11 post-mortem)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, token budget blowouts, or render the system unusable.
+Mistakes that cause broken user workflows, silent regressions, or require emergency patches.
 
-### Pitfall 1: Token Budget Explosion from Prompt Concatenation
+### Pitfall 1: Command Renaming Breaks User Muscle Memory with No Migration Path
 
-**What goes wrong:** The hands-free orchestrator is 2413 lines of markdown instruction. Ace's full pipeline requires loading agent-catalog.md (200 lines), agent-hard-gates.md (196 lines), enforcement-hard-gates.md (52 lines), orchestration-protocol.md (124 lines), team-lead-protocol.md (139 lines), and severity-definitions.md (40 lines) into context before dispatching any agent. When the orchestrator dispatches the ace review engine as a sub-pipeline within BUILD phase, the total prompt context easily exceeds 30K tokens before a single line of user code is analyzed.
+**What goes wrong:** Renaming commands from `brainstorm` to `oc-brainstorm` (or any oc- prefix) silently removes the old command. Users who type `/brainstorm` get "command not found" with no explanation, no alias, and no deprecation warning. OpenCode has zero alias support for commands — the filename IS the command name, period.
 
-**Why it happens:** Both systems were designed as standalone top-level dispatchers. Hands-free assumes it owns the entire context window. Ace-full's SKILL.md reads 10 reference files into context at Step 1 before doing anything. Neither was designed to be nested inside the other.
+**Why it happens:** The installer uses `copyIfMissing` with `COPYFILE_EXCL` — it only copies new files, never overwrites. So the new `oc-brainstorm.md` gets installed alongside the old `brainstorm.md`, but the old file never gets cleaned up automatically. The DEPRECATED_ASSETS list in `installer.ts` handles explicit removal, but someone has to manually add every renamed command to that list. If they forget, users have BOTH the old and new command, causing confusion ("why do I have two brainstorm commands?").
 
-**Consequences:** The orchestrator consumes half the context window on instructions alone. Subagent prompts that include "Full diff" plus agent instructions plus reference material overflow on medium-sized codebases. The convergence loop (Phase 6-7 re-verify + fix cycles) multiplies this by up to 3x. Real-world cost: a single hands-free run on a moderate project could dispatch 40+ agent calls, each loading substantial prompt material.
+**Consequences:** Users lose their workflows. The `/stocktake` command shows duplicate entries. Commands that delegate to agents (like `oc-configure.md` which sets `agent: autopilot`) break if the agent name also changed. This compounds: if a command references an agent by name and the agent name changed, the command silently delegates to the wrong agent or fails.
 
 **Prevention:**
-1. **Never embed the full orchestrator prompt in a tool description.** The orchestrator logic must be in TypeScript code (the `oc_orchestrate` tool implementation), not in a 2400-line system prompt that gets loaded into every context.
-2. **Lazy-load reference material.** Ace's references should be loaded only when the specific phase that needs them runs, not all upfront. The team-lead only needs agent-catalog.md and team-lead-protocol.md -- not hard-gates.md or finding-format.md.
-3. **Compress agent prompts.** Hands-free agents average 170 lines each. OpenCode agents are TypeScript objects with inline prompts (see researcher.ts at 43 lines). Port the essential behavioral contract, not the verbose instruction format.
-4. **Cap prompt budgets per phase.** Measure: if orchestrator prompt + phase-specific context + diff > 15K tokens, the architecture is wrong.
+1. Add every old command filename to the `DEPRECATED_ASSETS` array in `installer.ts` before releasing the rename
+2. Create a one-time migration in the installer that detects old-named files and replaces them (not just delete — preserve user customizations by checking if content differs from the built-in version)
+3. Ship the rename in a single atomic release — never ship new names without simultaneously removing old names
+4. Test the full lifecycle: fresh install (no old files), upgrade from v3.x (old files exist), upgrade with user-customized old files
 
-**Detection:** Measure total token consumption of a single orchestration run on a small project (< 500 lines changed). If it exceeds 200K tokens, the design is bloated. Compare: current hands-free + ace runs should be the baseline.
+**Detection:** Run `/stocktake` after upgrade — duplicate names (e.g., both `brainstorm` and `oc-brainstorm`) means the migration failed.
 
-**Phase to address:** Phase 1 (architecture design). This is a foundational constraint that shapes every subsequent decision.
+**Phase:** Must be addressed in the command-renaming implementation phase. Add to the first task.
 
 ---
 
-### Pitfall 2: Franken-Architecture -- Two State Machines Glued Together
+### Pitfall 2: Stocktake Cannot See Config-Hook-Injected Agents
 
-**What goes wrong:** Hands-free has an 8-phase state machine (RECON -> CHALLENGE -> ARCHITECT -> EXPLORE -> PLAN -> BUILD -> SHIP -> RETROSPECTIVE) with YAML frontmatter in state.md, a confidence ledger, and decision-log.md. Ace has its own 8-phase pipeline (Pre-flight -> Team Lead -> Phase 1-4 review -> Auto-fix -> Re-verify -> Verdict) with its own memory system (~/.claude/ace/<project-key>/). Naively porting both creates two independent state machines with two config systems, two memory stores, and no shared data model.
+**What goes wrong:** `oc_stocktake` scans `~/.config/opencode/agents/` for `.md` files (line 106 of `stocktake.ts`). But our agents (autopilot, researcher, metaprompter, documenter, pr-reviewer, plus 10 pipeline agents) are injected via the `configHook` in `src/agents/index.ts` — they never exist as filesystem files. Stocktake reports zero agents (or only user-created filesystem agents), making users think the plugin installed nothing.
 
-**Why it happens:** The temptation to "port first, integrate later" means each system retains its own state format. State.md uses schema_version: 2 with regex-based parsing. Ace uses script-based detection (detect-stack.sh, classify-changes.sh). The config files are incompatible: hands-free uses `.hands-free/config.md` with key-value pairs; ace uses script arguments and environment detection.
+**Why it happens:** Two-source architecture: filesystem agents (`.md` files) and config-hook agents (injected into `config.agent` at runtime). Stocktake was written to only scan the filesystem source. The gap was identified but never fixed because it requires either: (a) stocktake reading the runtime config object, or (b) a registry that both sources populate.
 
-**Consequences:** Dual state tracking means bugs where one state machine advances but the other doesn't. Configuration conflicts (hands-free's `review_provider: ace` vs ace's own config). Memory stored in two places (~/.claude/ace/ and .hands-free/) with no cross-reference. The user sees two mental models for what should be one system.
+**Consequences:** Users run `/stocktake` expecting to see all 15+ agents, get an empty list. They think installation failed. They try reinstalling. Support burden increases. The `summary.builtIn` count is wrong, the `summary.total` is misleadingly low.
 
 **Prevention:**
-1. **Single state machine.** Define one pipeline: the hands-free phases are the top-level flow; ace review is a sub-operation within BUILD phase (and optionally a standalone tool). Do not give ace its own pipeline state when running inside the orchestrator.
-2. **Single config schema.** Port both configs into the existing opencode-autopilot Zod-validated config system (src/config.ts). One schema, one load/save path.
-3. **Single working directory.** Use `.opencode/orchestrate/` (or similar) for all runtime state -- not `.hands-free/` and `~/.claude/ace/` separately. Follow OpenCode conventions, not Claude Code conventions.
-4. **Single memory interface.** Ace's project memory (findings, false-positives, fix-failures) and hands-free's institutional memory should share a storage abstraction.
+1. Stocktake must query BOTH sources: filesystem scan (existing) AND the agent registry (`AGENT_REGISTRY` from `src/registry/model-groups.ts` or the `agents` + `pipelineAgents` maps from `src/agents/index.ts`)
+2. Add an `origin: "config-hook"` value to `AssetEntry.origin` (currently only `"built-in" | "user-created"`)
+3. For linting config-hook agents, extract the system prompt from the agent definition object rather than reading a `.md` file
+4. Test with: zero filesystem agents (config-hook only), mixed (both sources), filesystem-only (plugin not loaded)
 
-**Detection:** If you find yourself writing two separate state-loading functions, or two config parsers, or checking two directories for runtime data -- stop. The architecture is fragmenting.
+**Detection:** If `stocktake` returns `agents: []` when the plugin is loaded, this bug is active.
 
-**Phase to address:** Phase 1 (architecture design). Must be settled before any code is written.
+**Phase:** Fix before any agent expansion work. If we add 10 more agents via config hook and stocktake still cannot see them, the problem compounds.
 
 ---
 
-### Pitfall 3: Blind Port of Claude Code Agent Dispatch to OpenCode
+### Pitfall 3: Tab-Cycle Pollution from Adding Too Many Primary Agents
 
-**What goes wrong:** Claude Code agents are markdown files with YAML frontmatter (`name`, `model`, `tools`, `permissionMode`, `maxTurns`). They are dispatched via the `Agent` tool with a string prompt. OpenCode agents are TypeScript objects with `AgentConfig` shape (`description`, `mode`, `prompt`, `permission`), injected via the config hook, and dispatched via OpenCode's internal agent system. The dispatch mechanisms are fundamentally different.
+**What goes wrong:** Every agent with `mode: "primary"` or `mode: "all"` (the default) appears in the Tab cycle. Adding a debugger, planner, documentation agent, etc. as primary agents means users must Tab through 8+ agents to find the one they want. The Tab cycle order is not configurable in OpenCode (feature request #16840 was closed/rejected). Users experience this as "the plugin took over my agent switching."
 
-**Why it happens:** The hands-free orchestrator dispatches agents by calling `Agent` tool with the agent name and a dynamic prompt. Ace does the same -- `ace-full` dispatches 21 agents via parallel `Agent` tool calls. But OpenCode's tool system, agent dispatch, and permission model are different from Claude Code's. The `Agent` tool may not exist in OpenCode, or may behave differently.
+**Why it happens:** The oh-my-opencode pattern demonstrates this: it injects 8+ agents, demotes Build to hidden, and sets its own default. The user ends up in a completely different agent experience. Our Phase 11 research correctly identified "all curated agents as subagents only" as a key decision, but implementation pressure can erode this discipline — "this agent would be so useful as a primary agent" is a tempting thought.
 
-**Consequences:** If agents are ported as markdown files and you assume `Agent` tool dispatch works identically, every single agent call will fail. If agents are ported as config-hook injections but the orchestrator tries to call them via `Agent` tool, the invocation path is wrong. The entire pipeline becomes non-functional.
+**Consequences:** Users who only want the autopilot agent must Tab through researcher, metaprompter, documenter, debugger, etc. every time they switch agents. This is especially bad because Tab cycling has no ordering mechanism — you cannot put your most-used agent first. Users uninstall the plugin to get their clean agent list back.
 
 **Prevention:**
-1. **Verify OpenCode's agent dispatch API first.** Before porting a single agent, confirm: How does an OpenCode tool invoke a subagent? Is there an `Agent` tool equivalent? Can tools dispatch agents programmatically?
-2. **If OpenCode lacks programmatic agent dispatch,** the orchestrator must use tool-based dispatch instead. Each "agent" becomes a tool that accepts a prompt and returns a result. This changes the entire architecture.
-3. **Port agent behavior as tool implementations, not markdown files.** The hands-free agents' behavioral contracts (what they read, what they write, what they return) matter more than their format. A TypeScript tool function with the right logic is more reliable than a markdown system prompt.
-4. **Test one agent dispatch path end-to-end before porting all 30+.** Confirm the pattern works before scaling it.
+1. STRICT RULE: Only `autopilot` should be `mode: "primary"`. Every other agent must be `mode: "subagent"` with `hidden: false` (visible in @ autocomplete but not in Tab cycle)
+2. Pipeline agents (oc-researcher, oc-planner, etc.) must be `mode: "subagent"` with `hidden: true` (internal-only, invoked by the orchestrator via Task tool)
+3. Verify in tests: iterate all agent definitions and assert no agent besides `autopilot` has `mode: "primary"` or `mode: "all"`
+4. Document this in CLAUDE.md as a constraint
 
-**Detection:** If the first dispatched agent doesn't produce expected output, the dispatch mechanism is wrong. Build a smoke test for single-agent dispatch in Phase 1.
+**Detection:** Manual test: install plugin, Tab through agents. If anything besides `autopilot` and OpenCode's built-in agents appears, this pitfall is active.
 
-**Phase to address:** Phase 1 (proof of concept). This is the first thing to validate.
+**Phase:** Enforce as a pre-condition for any agent expansion work. Add automated test immediately.
 
 ---
 
-### Pitfall 4: CJS-to-TypeScript Port Introduces Subtle Behavioral Drift
+### Pitfall 4: Research-to-Execution Gap (Phase 11 Pattern Repeating)
 
-**What goes wrong:** Hands-free has 3300 lines of CommonJS tooling (13 modules in bin/lib/) doing state parsing, confidence tracking, arena scoring, plan indexing, validation, and forensics. All use regex-based YAML frontmatter parsing, fs.readFileSync/writeFileSync, and a custom atomic write pattern with O_EXCL lock files. Porting to TypeScript with async fs operations and Zod validation subtly changes behavior in edge cases.
+**What goes wrong:** Phase 11 produced excellent research: 71 gaps, 56 planned features, detailed architecture specs. But the user explicitly flagged that "v3.0 Phase 11 research was good analysis but execution fell short." The risk is that v4.0 repeats this pattern: thorough planning documents that are ignored during implementation, features that drift from spec, and gaps that remain unfixed despite being cataloged.
 
-**Why it happens:** CJS tools use synchronous I/O for determinism -- no race conditions between state read and write. The regex parsers are battle-tested against specific state.md format quirks (hands-free went through 8 phases and 161 accumulated decisions to stabilize these parsers). Porting to async/await with node:fs/promises introduces timing windows. Replacing regex parsing with Zod schemas may reject states that the regex parser accepted (or vice versa).
+**Why it happens:** Research artifacts become "write-once, read-never" documents. Implementation proceeds based on what the developer remembers from research, not what the research actually says. No mechanism forces the implementer to cross-reference the gap matrix or phase scope during coding. Additionally, phase scopes defined 56 features across 6 phases — this is ambitious for any project and invites scope cutting.
 
-**Consequences:** State corruption during concurrent access (orchestrator and subagent both writing state). Confidence ledger entries lost due to async write interleaving. Validation rules that pass in CJS but fail in TS port (or vice versa), causing false pipeline halts.
-
-**Prevention:**
-1. **Port the test suite first, then the implementation.** Write TypeScript tests against the exact same input/output contracts as the CJS tools. Run both implementations against the same fixtures.
-2. **Keep synchronous writes for state.** Use `writeFileSync` for state.md mutations even in the TS port. The performance cost is negligible; the correctness guarantee is critical. OpenCode-assets already uses `writeFile(path, content, { flag: "wx" })` for atomic creation -- extend this pattern.
-3. **Port one module at a time with parity tests.** State module first (most critical), then confidence, then config. Each module gets a parity test suite before the next begins.
-4. **Preserve the lock file pattern for concurrent writes.** The O_EXCL spin-backoff-jitter pattern in core.cjs writeAtomic() exists for a reason -- don't replace it with "hope for the best" async writes.
-
-**Detection:** Run the CJS validation script (validate.cjs, 70+ structural checks) against state files produced by the TS port. Any divergence is a bug.
-
-**Phase to address:** Phase 2 (deterministic tooling port). Dedicated phase with parity testing.
-
----
-
-### Pitfall 5: Ace Agent Count Overwhelms the Plugin
-
-**What goes wrong:** Ace has 30 agents across three categories: 3 core squad, 16 parallel specialists, 2 sequenced specialists, and 9 enforcement pipeline agents. Injecting all 30 via OpenCode's config hook pollutes the agent namespace. The team-lead selection mechanism (score every agent 0-10, threshold >= 7) still requires loading the full agent catalog into context every time.
-
-**Why it happens:** Ace was designed for Claude Code where agents are filesystem markdown files that exist passively until dispatched. Loading 30 agent definitions into OpenCode's config hook means 30 entries in the agent configuration, even though most runs only dispatch 5-8 agents. The team-lead agent's scoring protocol requires the full catalog, consuming tokens for agents that won't be selected.
-
-**Consequences:** The config hook becomes a bottleneck. The agent catalog bloats context. Users see 30+ agents in their OpenCode agent list (unless all are hidden). Stack-irrelevant agents (go-idioms-auditor for a TypeScript project, rust-safety-auditor for a Python project) waste catalog space. The overhead of "select from 30, dispatch 5" is worse than "have 5, dispatch 5."
+**Consequences:** Features ship incomplete. The gap matrix shows "Phase 14: 22 features" but only 12 get implemented. The remaining 10 are quietly dropped without updating the tracking documents. Users get promised features that never arrive.
 
 **Prevention:**
-1. **Do not inject review agents as OpenCode agents.** Review specialists are internal implementation details of the review engine, not user-facing agents. They should be tool-internal prompt templates, not config-hook agents.
-2. **Hardcode the core squad.** Logic-auditor, test-interrogator, and contract-verifier always run. They don't need a selection mechanism. They're functions, not agents.
-3. **Make team-lead selection a TypeScript function.** Instead of dispatching a team-lead agent that reads a 200-line catalog, implement the scoring logic as a deterministic TypeScript function: given (detected stack, changed file types, diff size), return (selected agents). This eliminates an entire agent dispatch and catalog loading.
-4. **Lazy-load specialist prompts.** Only load the prompt template for an agent when it's actually selected for dispatch. Use a registry pattern: `agentPrompts.get("security-auditor")` loads from a template file on demand.
-5. **Cap visible agents.** Only the orchestrator-level agents (researcher, proposer, critic, implementer, reviewer, etc.) should be config-hook agents. Review specialists stay internal.
+1. Each implementation plan must explicitly reference gap IDs from the gap matrix
+2. Each phase completion must include a checklist: "Which gap IDs were addressed? Which were deferred? Update the matrix"
+3. Scope ruthlessly upfront: if 22 features in Phase 14 is unrealistic, split into Phase 14a/14b before starting, not after running out of time
+4. The QA playbook must include a "gap matrix reconciliation" step at each phase boundary
+5. For v4.0 specifically: the target feature list in PROJECT.md has 10 items. Each must have clear acceptance criteria before implementation begins
 
-**Detection:** Count the agents injected via config hook. If it exceeds 15, the design is leaking internal implementation as public API.
+**Detection:** At phase completion, diff the planned features against what actually shipped. If more than 20% were silently dropped, this pitfall is active.
 
-**Phase to address:** Phase 1 (architecture) for the boundary decision, Phase 3 (ace port) for implementation.
+**Phase:** Address during roadmap creation. Build gap-tracking into the phase transition process.
 
 ---
 
 ## Moderate Pitfalls
 
-### Pitfall 6: Shell Script Dependencies That Don't Exist in OpenCode
+Mistakes that cause wasted effort, degraded UX, or technical debt that compounds over time.
 
-**What goes wrong:** Ace relies on 6 bash scripts (diff-scope.sh, detect-stack.sh, load-memory.sh, classify-changes.sh, resolve-project-key.sh, codebase-scope.sh) for pre-flight data gathering. Hands-free uses shell scripts in hooks. These scripts assume a bash environment, specific git configurations, and filesystem paths that may differ in OpenCode's runtime context.
+### Pitfall 5: Coding Standards Skills Overflow Token Budget
 
-**Why it happens:** Both systems were built for Claude Code which runs in a local terminal with full shell access. OpenCode plugins run in Bun within the OpenCode process. While Bun can spawn processes, the overhead of shelling out for every pre-flight check is wasteful and fragile.
+**What goes wrong:** The adaptive skill injector has an 8000-token budget (`DEFAULT_TOKEN_BUDGET` in `adaptive-injector.ts`). Adding more language-specific skills (Go, Python, Rust patterns are already present, plus coding-standards, typescript-patterns) means the injector must fit more content into the same budget. When a project uses multiple languages (e.g., TypeScript + Go in a monorepo), all matching skills compete for the same 8000 tokens. Skills get truncated or dropped entirely.
+
+**Why it happens:** Skills are filtered by stack tags detected from manifest files. A project with both `tsconfig.json` and `go.mod` triggers both `typescript` and `go` tags. All matching skills are included up to the budget. Universal methodology skills (brainstorming, tdd-workflow, verification, etc.) always load because they have empty stack tags. If there are 5 universal skills at ~1000 tokens each, that leaves only 3000 tokens for language-specific content — not enough for a comprehensive Go patterns guide.
+
+**Consequences:** Language-specific skills get truncated mid-sentence. The AI receives half a coding standard and follows it inconsistently. Or worse, the skill injector silently drops entire skills because they do not fit, and the user never knows their Go patterns skill was not loaded.
 
 **Prevention:**
-1. **Port all shell scripts to TypeScript functions.** diff-scope becomes a function calling `git diff` via child_process, parsing the output in TS. detect-stack becomes a file-existence check function. These are deterministic operations that don't need shell scripting.
-2. **Use Bun's built-in APIs** for file operations and process spawning instead of bash wrappers.
-3. **Test each ported script** against the original's output on the same repo state.
+1. Each skill MUST stay under 2000 tokens (~8000 characters). Enforce this in the linter (`skills/linter.ts`)
+2. Methodology skills should be under 1000 tokens each — they are loaded for every project
+3. Consider raising the budget or making it configurable (the memory system already has `injectionBudget` in config)
+4. Add a warning to `oc_doctor` when total skill content exceeds 80% of the token budget
+5. Prioritize language-specific skills over methodology skills when both compete for budget (project-specific context is more valuable than generic methodology)
 
-**Phase to address:** Phase 2 (deterministic tooling).
+**Detection:** Run `oc_stocktake` with lint, then manually sum token estimates for all skills matching a multi-language project. If total exceeds 8000 tokens, skills are being silently dropped.
+
+**Phase:** Address during coding standards expansion. Add linter rule for skill length.
 
 ---
 
-### Pitfall 7: State Machine Resume Logic Assumes Session Continuity
+### Pitfall 6: Mock/Fail Mode Persists into Production Configuration
 
-**What goes wrong:** Hands-free's state machine is designed for crash recovery: the orchestrator loads state.md on every invocation, checks `currentPhase`, and resumes from where it left off. But it assumes the same session context (same working directory, same git state, same .hands-free/ directory contents). In OpenCode, if the user switches projects or the plugin is reloaded, the state machine may resume into an inconsistent environment.
+**What goes wrong:** The current `oc_mock_fallback` tool generates and classifies mock errors but does not actually trigger fallback in a live session (the code comments say this explicitly). But v4.0 plans to add "mock/fail-forced fallback mode accessible from CLI configure." If this becomes a persistent configuration toggle (stored in `opencode-autopilot.json`), a user could enable mock mode for testing and forget to disable it. Their production sessions then silently use mock behavior.
 
-**Why it happens:** Claude Code sessions are per-project directory. Hands-free's state machine stores absolute phase status but relative file paths. If state.md says "BUILD phase, task 3 of 7" but the git branch has been rebased or the plan files have been modified, resuming produces nonsensical behavior.
+**Why it happens:** The config system (`config.ts`) already has `fallback.enabled` as a persistent boolean. Adding a `fallback.mockMode: true` flag follows the same pattern. But unlike `fallback.enabled` (which users intentionally set), mock mode is a testing concern that should be transient.
+
+**Consequences:** User enables mock mode for testing, forgets to disable. Next day, their fallback system does not actually fall back on real errors — it either swallows errors silently or produces fake error classifications. They lose work because the safety net was disabled.
 
 **Prevention:**
-1. **Add a git SHA checkpoint to state.** Record the HEAD SHA at each phase transition. On resume, compare current HEAD to stored SHA. If they diverge, warn and offer to re-plan from the divergence point.
-2. **Validate working directory on resume.** Check that expected artifacts from previous phases actually exist (e.g., if PLAN is complete, verify plan files exist).
-3. **Add a "stale state" detection.** If state.md was last updated more than N hours ago, flag it as potentially stale and prompt for confirmation before resuming.
+1. Mock mode must be session-scoped, NOT config-persisted. It should be an in-memory flag that resets when OpenCode restarts
+2. If it must be config-persisted, add a TTL: `mockModeExpires: ISO-timestamp`. The plugin ignores mock mode if the timestamp has passed. Default TTL: 1 hour
+3. Show a persistent TUI toast warning while mock mode is active: "MOCK MODE ACTIVE — fallback disabled"
+4. The `oc_doctor` health check should flag active mock mode as a warning
+5. Never allow mock mode to be enabled without an explicit timeout parameter
 
-**Phase to address:** Phase 2 (state management tooling).
+**Detection:** Check config file for `mockMode: true` or equivalent without an expiry. Check if any warning is visible when mock mode is active.
+
+**Phase:** Address when implementing the mock/fail test mode feature.
 
 ---
 
-### Pitfall 8: Ace's Convergence Loop Creates Unbounded Agent Cascades
+### Pitfall 7: QA Playbook Becomes Write-Once Documentation
 
-**What goes wrong:** Ace's Phase 5-7 (Auto-fix -> Re-verify -> Converge) can loop up to 3 times. Each cycle re-dispatches all agents whose domains had findings. With 8 agents dispatched and 3 convergence cycles, that's 24 additional agent invocations after the initial review. Combined with hands-free's own review invocation during BUILD phase, a single task's review could spawn 50+ agent calls.
+**What goes wrong:** Internal QA playbooks that are too detailed become unmaintainable. Every time a feature changes, the playbook steps are stale. Conversely, playbooks that are too vague ("test the agent") provide no value. Both failure modes result in the playbook being ignored after the first month.
 
-**Why it happens:** Ace's convergence loop was designed for standalone reviews where cost is acceptable. Inside an autonomous pipeline processing multiple tasks (hands-free can have 10+ build tasks), the multiplicative effect is devastating: 10 tasks x 50 agent calls = 500 agent dispatches per pipeline run.
+**Why it happens:** QA playbooks are documentation, and documentation rots faster than code. There is no automated check that the playbook steps still match the actual tool behavior. A renamed command, a changed argument schema, or a new feature silently invalidates playbook steps.
+
+**Consequences:** New contributors run stale playbook steps that fail. They assume the feature is broken (not the docs). Or they skip the playbook entirely because it is clearly out of date. Manual QA coverage drops to zero without anyone noticing.
 
 **Prevention:**
-1. **Default convergence cycles to 1, not 3.** Most regressions from auto-fix are caught in the first re-verify. Allow configuration to increase if needed.
-2. **Short-circuit aggressively.** If all findings are nitpick severity, skip the fix cycle entirely. If fix-to-finding ratio is < 50% (more findings created than fixed), abort immediately, not after 3 cycles.
-3. **Use the confidence ledger to gate review depth.** If the confidence ledger shows HIGH confidence from prior phases, use a lighter review (core squad only, no convergence loop). Reserve full review for LOW confidence phases.
-4. **Budget agent calls per pipeline run.** Set a configurable cap (default: 100 agent dispatches per orchestration). If the pipeline approaches the cap, switch to abbreviated review mode.
+1. Playbook steps should be executable: each step is a concrete command with expected output (like a test case in prose)
+2. Where possible, convert playbook steps to actual test scripts (even simple bash scripts that invoke `bun test` with specific test files)
+3. Keep playbook granularity at feature-level, not step-level. "Test stocktake: run `/stocktake`, verify agents/skills/commands appear, verify lint errors are reported" — not "Step 1: Open TUI. Step 2: Type /stocktake. Step 3: Press Enter."
+4. Link each playbook section to the corresponding test file. If `tests/tools/stocktake.test.ts` exists, the playbook says "Automated: see tests/tools/stocktake.test.ts. Manual: verify TUI rendering"
+5. Review and update playbook at each milestone boundary, not continuously
 
-**Phase to address:** Phase 3 (ace review engine port).
+**Detection:** At each release, run through the playbook. If more than 30% of steps reference non-existent commands, changed arguments, or produce different output than documented, the playbook has rotted.
+
+**Phase:** Address when creating the QA playbook. Design the format to resist rot from the start.
 
 ---
 
-### Pitfall 9: Config Complexity Creates a Three-Layer Override Nightmare
+### Pitfall 8: oc-configure Removal Breaks First-Run Experience
 
-**What goes wrong:** Hands-free has global config (~/.claude/hands-free-config.md), project config (.hands-free/config.md), and runtime flags. Ace has project memory (~/.claude/ace/<project-key>/), script-based detection, and mode flags. The existing opencode-autopilot has its own Zod-validated config. Merging these creates a three-layer configuration system where the user has no idea which setting wins.
+**What goes wrong:** PROJECT.md says "Remove oc-configure as slash command (keep CLI-only)." But the current first-load experience (line 237-241 in `index.ts`) shows a toast: "Run /oc-configure to set up your model assignments." Removing the command without updating this toast leaves new users with a broken instruction pointing to a command that does not exist.
 
-**Why it happens:** Each system solves its own config needs independently. Hands-free's three-branch priority (global > ace auto-detect > defaults) is already confusing. Adding ace's memory directory and opencode-autopilot' config creates a system where a single setting like "review strictness" could be defined in five different places.
+**Why it happens:** The toast message is a string literal in `index.ts`, not linked to the command registry. Removing the command file from `assets/commands/` does not trigger any warning about dangling references. There may be other references to `/oc-configure` in agent prompts, skill files, or documentation.
+
+**Consequences:** New user installs the plugin, sees "Run /oc-configure", types it, gets "command not found." First impression is that the plugin is broken. They may never discover the actual CLI configure path.
 
 **Prevention:**
-1. **One config schema with clear precedence.** OpenCode-assets' Zod config is the single source of truth. All hands-free and ace settings get fields in this schema.
-2. **Precedence: user-explicit > project-detected > plugin-default.** Three layers maximum. Document it in the config schema comments.
-3. **No separate config files for sub-systems.** Don't create .hands-free/config.md or ~/.claude/ace/ directories. All config lives in the plugin's existing config system.
-4. **Provide a config dump tool.** `oc_config_dump` that shows all resolved settings with their source (explicit, detected, default). This is essential for debugging.
+1. Search the entire codebase for "/oc-configure" and "oc-configure" before removing the command
+2. Update the toast message to point to the correct CLI invocation
+3. Add the old command filename to `DEPRECATED_ASSETS` in `installer.ts` to clean up from existing installs
+4. Consider keeping a stub command that says "This command has moved to the CLI. Run `opencode autopilot configure` instead" (or whatever the CLI equivalent is)
+5. Grep agent system prompts and skill content for references to the old command
 
-**Phase to address:** Phase 1 (architecture design) for the schema, Phase 2 for implementation.
+**Detection:** Fresh install, first session — does the welcome toast give valid instructions?
+
+**Phase:** Address immediately when removing the command. This is a blocker.
 
 ---
 
-### Pitfall 10: Memory/Learning Systems Create Unbounded Growth
+### Pitfall 9: Skill Dependency Resolution Creates Silent Ordering Bugs
 
-**What goes wrong:** Hands-free has institutional memory (dual-indexed lessons in domain and pattern_type files at ~/.claude/memories/). Ace has project memory (findings.md, false-positives.md, fix-failures.md, project-profile.md per project). Both are append-only. Over months of use across multiple projects, these files grow unbounded and loading them into agent context consumes increasing tokens.
+**What goes wrong:** The skill system has dependency resolution via topological sort (`dependency-resolver.ts`). Adding more skills with interdependencies (e.g., `coding-standards` depends on `typescript-patterns`, `verification` depends on `tdd-workflow`) creates ordering constraints. If a cycle is introduced (A depends on B, B depends on A), the topological sort either fails silently or produces an arbitrary order.
 
-**Why it happens:** Neither system has a pruning or summarization mechanism. Ace appends every finding to findings.md. Hands-free appends every lesson to memory files. The memory injection mechanism (memory.cjs `inject` command) loads entire files into agent prompts.
+**Why it happens:** Skill dependencies are declared in SKILL.md frontmatter. When expanding from 15 skills to potentially 25+, the dependency graph becomes harder to reason about. No validation currently prevents circular dependencies from being declared.
 
-**Prevention:**
-1. **Cap memory file sizes.** When a memory file exceeds a threshold (e.g., 50 entries or 5000 tokens), summarize older entries and archive the full version.
-2. **Use recency weighting.** Most recent findings are most relevant. Load the last N entries, not all entries.
-3. **Budget memory injection.** Each agent prompt gets at most 500 tokens of memory context. If the memory file is larger, extract only entries relevant to the current stack/domain.
-4. **Implement memory garbage collection.** False positives should be used to prune future findings, not just stored alongside them.
-
-**Phase to address:** Phase 4 (memory/institutional learning), but design the storage format in Phase 1.
-
----
-
-### Pitfall 11: Permission Model Mismatch Between Platforms
-
-**What goes wrong:** Hands-free agents use `permissionMode: bypassPermissions` (Claude Code concept) -- the orchestrator, implementer, and shipper all need unrestricted tool access. OpenCode agents use granular `permission: { bash: "allow", edit: "allow" }`. Porting `bypassPermissions` to OpenCode either grants too much access (if OpenCode has a global bypass) or requires mapping every tool permission individually for 12+ agents.
-
-**Why it happens:** Hands-free made a deliberate decision (logged as decision [01-01]) to use `bypassPermissions` on destructive agents and `default` on read-only agents. This permission split doesn't map cleanly to OpenCode's model. The Phase 08 state file documents that all agents eventually got bypassPermissions due to permission degradation issues.
+**Consequences:** Skills load in wrong order. A skill that assumes `tdd-workflow` was already injected references concepts that have not been defined yet. The AI receives contradictory instructions from skills loaded in the wrong sequence. In the worst case, a circular dependency causes the dependency resolver to drop skills entirely.
 
 **Prevention:**
-1. **Audit each agent's actual tool usage.** Hands-free logged all tools per agent in its decisions. Map to OpenCode's permission model explicitly.
-2. **No blanket bypass.** The orchestrator tool itself should run with elevated permissions; individual review agents should be read-only.
-3. **Test permission boundaries.** Verify that read-only agents (researcher, critic, reviewer) can't accidentally write files, and that write agents (implementer, shipper) have the access they need.
+1. The linter must validate that declared dependencies reference existing skill names
+2. The dependency resolver must detect cycles and report them as lint errors (not silently drop)
+3. Add integration tests that load all bundled skills and verify the dependency graph is acyclic
+4. Document skill dependency conventions: methodology skills should be independent (no deps), language skills may depend on `coding-standards`
+5. Keep the dependency graph shallow: max depth 2 (A depends on B, B depends on nothing)
 
-**Phase to address:** Phase 1 (agent architecture).
+**Detection:** Run `oc_stocktake --lint` after adding new skills. If any skill references a dependency that does not exist, or if the resolver logs a cycle warning, this pitfall is active.
+
+**Phase:** Address during skill expansion. Add linter rules before adding new skills.
 
 ---
 
 ## Minor Pitfalls
 
-### Pitfall 12: Model Routing Assumptions Break Model Agnosticism
+Issues that cause friction or technical debt but are not blocking.
 
-**What goes wrong:** Hands-free hardcodes model preferences: Opus for orchestrator/architect/planner/critic, Sonnet for implementer/reviewer/qa/shipper, Haiku for researcher. Ace uses Sonnet for team-lead and orchestrator. OpenCode is model-agnostic -- the existing CLAUDE.md constraint says "Never hardcode model identifiers."
+### Pitfall 10: Agent Name Collisions with OpenCode Built-ins or Other Plugins
 
-**Prevention:** Never set `model` in agent definitions. Let the user's OpenCode configuration control model routing. If a specific agent benefits from deeper reasoning, document it in the agent's description but don't enforce it. Provide optional model routing config fields that the user can set.
-
-**Phase to address:** Phase 1 (agent definitions).
-
----
-
-### Pitfall 13: Arena Architecture Over-Engineering for Small Projects
-
-**What goes wrong:** Hands-free's Architecture Arena (ARCHITECT phase) dispatches 3 proposer agents with different framings (SIMPLICITY, SCALABILITY, ERGONOMICS), then a critic, then a mediator, then optionally a comparator. This is 5-6 agent dispatches for architecture selection on a project that might be a simple CLI tool. The arena mechanism is valuable for complex projects but wasteful for simple ones.
-
-**Prevention:** Make the arena opt-in or confidence-gated. If RECON confidence is HIGH and the project is small scope, skip the arena and use a single architecture proposal. The arena depth calculation already exists in arena.cjs -- port it faithfully and default to shallow.
-
-**Phase to address:** Phase 3 (orchestrator implementation).
-
----
-
-### Pitfall 14: Git Operations Assume GitHub-Only Workflow
-
-**What goes wrong:** Hands-free mandates "branch-from-main" as a hard rule, uses `gh pr create` for each task, squash merges, and assumes GitHub as the remote. Ace's diff-scope.sh assumes standard git diff formats. Porting these assumptions means the pipeline breaks for GitLab users, trunk-based development, or repos without a remote.
-
-**Prevention:** Abstract git operations behind a VCS interface. Default to GitHub-flavored workflows but make the PR creation, branching strategy, and merge method configurable. Support "no remote" mode where the pipeline just commits locally without PRs.
-
-**Phase to address:** Phase 2 (tooling), Phase 3 (orchestrator BUILD phase).
-
----
-
-### Pitfall 15: Testing an Autonomous Pipeline Is Fundamentally Hard
-
-**What goes wrong:** The orchestrator dispatches 12+ subagents across 8 phases. Each subagent reads and writes files, makes decisions, and affects subsequent phases. Testing this end-to-end requires either expensive LLM calls or a complex mock infrastructure that may not reflect real behavior.
+**What goes wrong:** Our config hook injects agents by name (e.g., `researcher`, `documenter`). If OpenCode adds a built-in agent with the same name, or another plugin also injects `researcher`, the `config.agent![name] === undefined` check (line 40 of `agents/index.ts`) means the first plugin to register wins. Our agent silently does not load.
 
 **Prevention:**
-1. **Test each phase independently.** Each phase is a function: given (state, config, previous phase artifacts) -> (updated state, new artifacts). Mock the agent dispatch, test the state transitions.
-2. **Test tooling with unit tests.** The deterministic tooling (state management, confidence tracking, etc.) is pure functions -- 100% unit testable without LLM calls.
-3. **Create fixture-based integration tests.** Record a real orchestration run's agent inputs/outputs as fixtures. Replay them in tests to verify pipeline coordination logic.
-4. **Test ace review agents with known-buggy code samples.** Create small code samples with known issues (SQL injection, unclosed resources, etc.) and verify agents detect them.
+1. Prefix all agent names with `oc-` (already done for pipeline agents: `oc-researcher`, `oc-planner`, etc.)
+2. The non-prefixed agents (`researcher`, `metaprompter`, `documenter`, `pr-reviewer`) should be renamed to `oc-researcher`, `oc-metaprompter`, etc. for consistency
+3. Check for conflicts at registration time and log a warning if an agent name was already taken
 
-**Phase to address:** Every phase, but the testing strategy must be designed in Phase 1.
+**Phase:** Address during the oc- prefix standardization work.
 
 ---
 
-### Pitfall 16: Orchestrator Prompt as Markdown vs Logic in Code
+### Pitfall 11: Asset Installer Never Updates Existing User Files
 
-**What goes wrong:** The hands-free orchestrator is a 2413-line markdown command file that embeds all pipeline logic as natural language instructions for the LLM. This works in Claude Code where commands ARE markdown files. In OpenCode, the equivalent would be either (a) a massive tool description string, or (b) a markdown command file -- neither of which is testable, type-safe, or maintainable.
+**What goes wrong:** The installer uses `copyIfMissing` — it never overwrites user files. This means bug fixes to shipped skills, commands, or agents never reach users who already have the old version. The `FORCE_UPDATE_ASSETS` mechanism exists but requires manually adding filenames for each update.
 
-**Why it happens:** Claude Code's design philosophy is "prompt engineering IS the programming." The orchestrator's logic (phase transitions, vague detection, state recovery, arena triggering) is all prose. Porting this verbatim means 2400 lines of untestable, unrefactorable string.
+**Prevention:**
+1. Consider a version field in skill/command frontmatter. The installer compares versions and prompts/warns if the shipped version is newer
+2. For critical fixes, use `FORCE_UPDATE_ASSETS` and accept that user customizations will be lost (document this in release notes)
+3. Add a `oc_doctor` check that compares installed asset hashes against bundled asset hashes and reports drift
 
-**Prevention:** Extract every deterministic decision from the orchestrator prompt into TypeScript functions. Phase transition logic, vague detection heuristics, state recovery, arena depth calculation -- all these become testable TS code. The orchestrator prompt shrinks to behavioral guidance ("be autonomous, log decisions") while the pipeline logic lives in code. The existing hands-free already partially did this with hf-tools.cjs -- continue that trajectory to its logical conclusion.
+**Phase:** Address when expanding the asset catalog. More assets = more update surface.
 
-**Phase to address:** Phase 1 (architecture). This is the single most impactful design decision.
+---
+
+### Pitfall 12: Expanding @-Callable Subagents Without Clear Discovery UX
+
+**What goes wrong:** Adding many subagents (debugger, planner, doc-updater, etc.) that are @-callable creates a discoverability problem. Users do not know which subagents exist or what they do. The @ autocomplete list becomes long and undifferentiated.
+
+**Prevention:**
+1. Use `oc_stocktake` as the discovery mechanism — ensure it shows subagents with descriptions
+2. Group subagents logically in the stocktake output (pipeline agents vs utility agents vs creation agents)
+3. Limit the number of non-hidden subagents to under 10. If a subagent is only invoked by the orchestrator, make it `hidden: true`
+
+**Phase:** Address during agent expansion. Set the hidden/visible policy before adding agents.
+
+---
+
+### Pitfall 13: Test Infrastructure Growth Without CI Integration
+
+**What goes wrong:** Adding more tests (for new agents, skills, commands) increases `bun test` execution time. Without CI, test regressions are only caught when a developer remembers to run tests locally. The QA playbook says "run tests" but nobody does because the test suite takes too long.
+
+**Prevention:**
+1. Keep test suite execution under 30 seconds total
+2. Organize tests by speed: unit tests (fast, no I/O) vs integration tests (filesystem, slower). Run unit tests on every change, integration tests before commits
+3. Add CI when the test suite exceeds 50 test files (currently ~25)
+4. Mock filesystem operations in unit tests to keep them fast
+
+**Phase:** Address as test coverage grows. Monitor test execution time.
 
 ---
 
@@ -268,36 +262,33 @@ Mistakes that cause rewrites, token budget blowouts, or render the system unusab
 
 | Phase Topic | Likely Pitfall | Mitigation |
 |-------------|---------------|------------|
-| Architecture design (Phase 1) | Porting both systems' architectures instead of designing a unified one (P2) | Start from OpenCode's plugin model and work backward to required capabilities |
-| Architecture design (Phase 1) | 2400-line orchestrator prompt doesn't fit in a tool description (P1, P16) | Orchestrator logic in TypeScript code, not in a system prompt |
-| Architecture design (Phase 1) | Agent dispatch mechanism unknown for OpenCode (P3) | Validate one agent dispatch end-to-end before designing the full pipeline |
-| Deterministic tooling (Phase 2) | Async/sync behavioral drift during CJS-to-TS port (P4) | Parity test suite: same inputs, same outputs, both implementations |
-| Deterministic tooling (Phase 2) | Shell scripts not portable to Bun runtime (P6) | Port all 6 ace scripts + hf hooks to TypeScript functions |
-| Ace review engine (Phase 3) | 30 agents overwhelming the system (P5), convergence loop unbounded (P8) | Internal agent registry (not config-hook), 1-cycle default convergence |
-| Orchestrator pipeline (Phase 3) | Arena over-engineering for small projects (P13) | Confidence-gated arena depth, default to shallow |
-| Memory/learning (Phase 4) | Unbounded memory growth, dual storage locations (P10) | Single storage abstraction, size caps, recency weighting |
-| Config unification (Phase 2) | Three-layer config override confusion (P9) | Single Zod schema, documented three-level precedence |
-| BUILD phase (Phase 3) | Git workflow assumes GitHub only (P14) | VCS abstraction layer, configurable workflow |
-| Testing strategy (all phases) | No way to test autonomous pipeline without LLM calls (P15) | Phase-independent testing, fixture-based integration, deterministic tooling unit tests |
+| Command renaming (oc- prefix) | Pitfall 1: broken workflows, duplicate commands | Atomic rename with DEPRECATED_ASSETS cleanup. Test upgrade path |
+| Stocktake fix | Pitfall 2: config-hook agents invisible | Query both filesystem AND agent registry. Add `origin: "config-hook"` |
+| Agent expansion | Pitfall 3: Tab-cycle pollution | Strict subagent-only policy. Automated test enforcing this |
+| Overall execution | Pitfall 4: research-execution gap | Gap ID tracking, acceptance criteria, phase reconciliation |
+| Coding standards expansion | Pitfall 5: token budget overflow | Per-skill token cap (2000), linter enforcement, budget monitoring |
+| Mock/fail mode | Pitfall 6: persistent mock state | Session-scoped only, TTL if persisted, visible warning |
+| QA playbook creation | Pitfall 7: write-once documentation | Executable steps, linked to test files, feature-level granularity |
+| oc-configure removal | Pitfall 8: broken first-run UX | Grep all references, update toast, add stub command |
+| Skill expansion | Pitfall 9: dependency cycles | Linter validation, cycle detection, max depth 2 |
+| Agent naming | Pitfall 10: name collisions | Prefix all agents with oc-, warn on conflict |
+| Asset updates | Pitfall 11: stale user files | Version field in frontmatter, hash comparison in doctor |
+| Subagent expansion | Pitfall 12: discovery UX | Stocktake as discovery, limit visible subagents to <10 |
+| Test growth | Pitfall 13: slow/skipped tests | 30s target, unit/integration split, CI threshold |
+
+---
 
 ## Sources
 
-- Direct analysis of claude-hands-free source code at /home/joseibanez/develop/projects/claude-hands-free/
-  - commands/hands-free.md (2413 lines, full orchestrator prompt)
-  - bin/hf-tools.cjs + bin/lib/*.cjs (3538 lines, 13 modules)
-  - agents/*.md (12 agents, 2051 lines total)
-  - .hands-free/config.md (config format: key-value pairs)
-  - .planning/STATE.md (161 accumulated decisions across 8 phases, state machine evolution)
-- Direct analysis of claude-ace source code at /home/joseibanez/develop/projects/claude-ace/
-  - agents/*.md (30 agents, 2275 lines total across review + enforcement categories)
-  - skills/ace-full/SKILL.md (528 lines, main pipeline with 8 steps)
-  - skills/ace-full/references/orchestration-protocol.md (124 lines, 8-phase pipeline)
-  - references/agent-catalog.md (200 lines, 16 parallel + 2 sequenced + 9 enforcement agents)
-  - references/enforcement-hard-gates.md (52 lines, mandatory gates per enforcement agent)
-  - scripts/*.sh (6 bash scripts for pre-flight data gathering)
-- Direct analysis of opencode-autopilot source code at /home/joseibanez/develop/projects/opencode-autopilot/
-  - src/index.ts (37 lines, plugin entry with tool + config hook registration)
-  - src/agents/index.ts (35 lines, config hook pattern for agent injection)
-  - src/agents/researcher.ts (43 lines, agent definition pattern -- contrast with hf-researcher.md at 170+ lines)
-  - src/config.ts (44 lines, Zod-validated config load/save)
-- Confidence levels: All findings are HIGH confidence -- derived from direct source code analysis of the three codebases, not from web searches or training data.
+- OpenCode agents documentation: https://opencode.ai/docs/agents/
+- OpenCode commands documentation: https://opencode.ai/docs/commands/
+- OpenCode agent Tab cycle ordering issue (closed): https://github.com/anomalyco/opencode/issues/16840
+- OpenCode plugin upgrade issue (stale dependencies): https://github.com/anomalyco/opencode/issues/10441
+- Token waste analysis in AI coding agents: https://dev.to/nicolalessi/i-tracked-every-token-my-ai-coding-agent-consumed-for-a-week-70-was-waste-465
+- Context window scaling challenges: https://factory.ai/news/context-window-problem
+- Codebase analysis: `src/installer.ts` (DEPRECATED_ASSETS, FORCE_UPDATE_ASSETS, copyIfMissing)
+- Codebase analysis: `src/tools/stocktake.ts` (filesystem-only agent scan)
+- Codebase analysis: `src/agents/index.ts` (configHook agent injection)
+- Codebase analysis: `src/skills/adaptive-injector.ts` (8000-token budget, stack tag detection)
+- Codebase analysis: `src/index.ts` (first-load toast referencing /oc-configure)
+- Phase 11 gap matrix: `.planning/phases/11-ecosystem-research/11-GAP-MATRIX.md`
