@@ -36,6 +36,7 @@ import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
 import { ocDoctor } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
+import { ocHashlineEdit } from "./tools/hashline-edit";
 import { ocLogs } from "./tools/logs";
 import { ocMemoryStatus } from "./tools/memory-status";
 import { ocMockFallback } from "./tools/mock-fallback";
@@ -214,6 +215,7 @@ const plugin: Plugin = async (input) => {
 			oc_doctor: ocDoctor,
 			oc_quick: ocQuick,
 			oc_forensics: ocForensics,
+			oc_hashline_edit: ocHashlineEdit,
 			oc_review: ocReview,
 			oc_logs: ocLogs,
 			oc_session_stats: ocSessionStats,

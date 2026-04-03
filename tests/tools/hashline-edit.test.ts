@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
 	CID_ALPHABET,
 	computeLineHash,
@@ -77,15 +77,9 @@ describe("hashlineEditCore", () => {
 		await rm(tmpDir, { recursive: true, force: true });
 	});
 
-	function createTestFile(lines: readonly string[]): string {
-		const filePath = join(tmpDir, "test.txt");
-		// Don't add trailing newline automatically -- let caller control content
-		return filePath;
-	}
-
 	async function writeTestFile(lines: readonly string[]): Promise<string> {
 		const filePath = join(tmpDir, "test.txt");
-		await writeFile(filePath, lines.join("\n") + "\n", "utf-8");
+		await writeFile(filePath, `${lines.join("\n")}\n`, "utf-8");
 		return filePath;
 	}
 
@@ -194,12 +188,7 @@ describe("hashlineEditCore", () => {
 	});
 
 	test("multiple edits applied bottom-up (highest line first) to avoid drift", async () => {
-		const filePath = await writeTestFile([
-			"line one",
-			"line two",
-			"line three",
-			"line four",
-		]);
+		const filePath = await writeTestFile(["line one", "line two", "line three", "line four"]);
 		const pos1 = anchor(1, "line one");
 		const pos4 = anchor(4, "line four");
 
