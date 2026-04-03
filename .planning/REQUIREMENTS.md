@@ -217,14 +217,33 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLLB-06 | Phase 9 | Complete |
 | FLLB-07 | Phase 9 | Complete |
 | FLLB-08 | Phase 9 | Complete |
+| BFIX-01 | Phase 19 | Pending |
+| BFIX-02 | Phase 18 | Pending |
+| BFIX-03 | Phase 18 | Pending |
+| BFIX-04 | Phase 19 | Pending |
+| AGNT-10 | Phase 20 | Pending |
+| AGNT-11 | Phase 20 | Pending |
+| AGNT-12 | Phase 20 | Pending |
+| AGNT-13 | Phase 20 | Pending |
+| AGNT-14 | Phase 19 | Pending |
+| SKLL-10 | Phase 21 | Pending |
+| SKLL-11 | Phase 21 | Pending |
+| SKLL-12 | Phase 21 | Pending |
+| CMND-10 | Phase 21 | Pending |
+| CMND-11 | Phase 21 | Pending |
+| HARD-01 | Phase 22 | Pending |
+| HARD-02 | Phase 22 | Pending |
+| HARD-03 | Phase 22 | Pending |
+| HARD-04 | Phase 22 | Pending |
+| QAPL-01 | Phase 23 | Pending |
 
 **Coverage:**
 - v1 requirements: 15 total (all Complete)
 - v2 requirements: 42 total (34 original + 8 fallback)
-- v4 requirements: 18 total
-- Mapped to phases: 42/42 (v1+v2), 0/18 (v4 — pending roadmap)
-- Unmapped: 18 (v4) ⚠️
+- v4 requirements: 19 total
+- Mapped to phases: 42/42 (v1+v2), 19/19 (v4)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-04-03 after v4.0 requirement definition*
+*Last updated: 2026-04-03 after v4.0 roadmap creation*

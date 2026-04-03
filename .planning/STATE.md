@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Production Quality
-status: Defining requirements
+status: Ready to plan
 stopped_at: null
-last_updated: "2026-04-03T07:00:00.000Z"
+last_updated: "2026-04-03T08:00:00.000Z"
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,14 +19,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** A single command transforms an idea into a shipped, reviewed, tested result
-**Current focus:** Not started (defining requirements)
+**Current focus:** Phase 18 - Namespace Cleanup
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-03 — Milestone v4.0 started
+Phase: 18 of 23 (Namespace Cleanup)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-04-03 — Roadmap created for v4.0
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -81,85 +83,10 @@ Last activity: 2026-04-03 — Milestone v4.0 started
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [v1.0]: Config hook mutates config.agent directly (Promise<void> by design)
-- [v1.0]: All curated agents use mode: subagent to avoid polluting Tab cycle
-- [v2.0]: Port hands-free + ace as unified tool-based orchestrator (not command)
-- [v2.0]: Port hf-tools to TypeScript (native Bun, testable)
-- [v2.0]: Ace embedded as built-in review engine (always available)
-- [v2.0]: Fully autonomous by default (no human checkpoints)
-- [Phase 04]: Pre-compute nested Zod defaults at module level for v4 compatibility
-- [Phase 04]: Config v2 auto-persists migrated config to disk on v1 detection
-- [Phase 04]: Zod parse on both load AND save for bidirectional validation
-- [Phase 04]: Atomic writes via temp-file-then-rename to prevent state corruption
-- [Phase 04]: All state update functions are pure (spread-based, no mutation)
-- [Phase 04]: VALID_TRANSITIONS uses Record<Phase, Phase|null> with RETROSPECTIVE as terminal
-- [Phase 04]: Arena depth inversely maps confidence: LOW=3 proposals, MEDIUM=2, HIGH=1
-- [Phase 04]: PHASE_AGENTS dispatch map uses placeholder agent names for Phase 5-6 wiring
-- [Phase 04]: Orchestrator agent prompt kept lean (<2000 chars) for minimal context overhead
-- [Phase 05]: Local ReviewAgent interface per file pending schemas integration from 05-01
-- [Phase 05]: Ace prompts compressed to 500-800 token behavioral contracts with JSON output format
-- [Phase 05]: Pipeline returns dispatch instructions only; orchestrator handles agent invocation
-- [Phase 05]: Added reviewMemorySchema, falsePositiveSchema, reviewStateSchema to schemas.ts for memory validation
-- [Phase 05]: startNewReview implemented in tool module (not pipeline) as tool-specific initialization
-- [Phase 06]: Pre-computed buildProgress defaults for Zod v4 nested default compatibility
-- [Phase 06]: oc-explorer agent added for AGENT_NAMES.EXPLORE completeness (plan omitted file)
-- [Phase 06]: oc-reviewer excluded from pipelineAgents barrel (no REVIEW phase in AGENT_NAMES)
-- [Phase 06]: BUILD handler returns dispatch instructions (not direct reviewCore calls) for orchestrator to execute
-- [Phase 06]: dispatch_multi used for concurrent wave tasks per D-06
-- [Phase 06]: EXPLORE returns complete immediately as skip stub (Phase 7 will add shouldTriggerExplorer)
-- [Phase 06]: Review triggers only after wave completion, not per-task (Pitfall 4 prevention)
-- [Phase 06]: orchestrateCore recursively invokes next handler on phase complete (no round-trip)
-- [Phase 06]: Review dispatch inlined via reviewCore when BUILD handler dispatches oc-review
-- [Phase 06]: Pipeline agents registered alongside v1 agents in configHook (14 total)
-- [Phase 07]: Lesson memory mirrors review/memory.ts pattern for cross-module consistency
-- [Phase 07]: 4 fixed domains (architecture, testing, review, planning) as frozen const array
-- [Phase 07]: Compressed retrospector prompt to fit 600-char agent constraint
-- [Phase 07]: Best-effort lesson injection: failures silently swallowed to never break dispatch
-- [Phase 07]: Invalid lesson domains silently skipped via safeParse (graceful degradation)
-- [Phase 08]: Single-job CI: lint->type-check->test ordering, Bun 1.3.11 pinned, no coverage upload service
-- Phase 9 added: Model Fallback Integration — per-agent model fallback from opencode-fallback plugin (MIT)
-- [Phase 09]: Immutable state transitions via spread-based updates for fallback state machine
-- [Phase 09]: Config v3 migration chains v1->v2->v3 reusing existing migration functions
-- [Phase 09]: Pre-computed fallbackDefaults at module level for Zod v4 nested default compatibility
-- [Phase 09]: Callback injection (resolveFallbackChain) keeps FallbackManager testable without OpenCode runtime
-- [Phase 09]: Guard-chain pattern in handleError: self-abort -> stale -> retryable -> lock -> state -> plan
-- [Phase 09]: SdkOperations interface abstracts SDK client calls for testable event handler factories
-- [Phase 09]: output.message.model mutation intentional (OpenCode hook API contract, same as configHook pattern)
-- [Phase 09]: resolveFallbackChain returns empty array placeholder (per-agent resolution deferred to follow-up)
-- Phase 10 added: UX Polish & Metaprompting — six-point improvement pass (severity alignment, agent modes, prompt rewrite, skill injection, fallback chain resolution, smart review agent selection)
-- [Phase 10]: MEDIUM severity tier for edge cases, minor perf, incomplete error context
-- [Phase 10]: Autopilot agent replaces orchestrator with mode: all for direct user access
-- [Phase 10]: Pipeline agents get hidden: true (internal only, not in autocomplete)
-- [Phase 10]: Structured prompt format: Role, Steps, Output Format, Constraints, Error Recovery for all pipeline agents
-- [Phase 10]: oc-implementer is most detailed (413 words) with CLAUDE.md and coding-standards references
-- [Phase 10]: Skill injection mirrors lesson-injection.ts pattern (best-effort, sanitized, swallowed errors)
-- [Phase 10]: resolveChain extracted as pure function for testable two-tier fallback resolution
-- [Phase 10]: openCodeConfig captured via configHook wrapper for per-agent fallback resolution
-- [Phase 10]: Universal specialized agents (7 of 13) always run; stack-gated agents (6 of 13) filter via relevantStacks
-- [Phase 10]: execFile (not exec) for shell-injection-safe git commands in getChangedFiles helper
-- [Phase 11]: No new phases beyond 11-17 needed -- all 7 novel opportunities fit existing phase structure (D-03 assessment)
-- [Phase 11]: Phase 16 should be scoped down or merged into Phase 14/17 -- skills > agents for most use cases
-- [Phase 11]: Self-Healing Doctor is highest-priority novel opportunity (Phase 12 quick win)
-- [Phase 11]: Cross-system integration (multi-system architecture) is the competitive moat -- novel opportunities that leverage it are hardest to copy
-- [Phase 11-ecosystem-research]: Brainstorming (superpowers, 131k stars) is #1 priority gap; skills > agents for methodology transfer
-- [Phase 11-ecosystem-research]: Avoid Chroma dependency for Phase 15 memory; use bun:sqlite with FTS5, embedding-in-SQLite for semantic search
-- [Phase 11-ecosystem-research]: Unified memory+learning system (neither ECC instincts-only nor claude-mem memory-only) for Phase 15
-- [Phase 11]: 73 gaps identified across 10 coverage areas: 12 CRITICAL, 26 HIGH, 24 MEDIUM, 11 LOW
-- [Phase 11]: All CRITICAL and HIGH gaps (38 total) assigned to phases; Phase 14 largest (22 features, split into 14a/14b)
-- [Phase 11]: Phase 16 scoped down to single integration plan (Option A) -- all 6 agent candidates better as skills/commands
-- [Phase 11]: Memory architecture: bun:sqlite + FTS5, 3-layer progressive disclosure, observation-based capture, 90-day decay, 2000-token injection cap
-- [Phase 11]: Self-healing doctor + plugin diagnostics as Phase 12 quick wins (CRITICAL priority)
-- [Phase 12-quick-wins]: Use modelData.id field over record key for provider-prefixed model path construction in configure wizard
-- [Phase 12-quick-wins]: Created src/health/ module from scratch as health check infrastructure for oc_doctor
-- [Phase 12-quick-wins]: Hook-registration check is informational only (always pass when oc_doctor callable)
-- [Phase 13-session-observability]: Observability event handler runs first as pure observer, before first-load toast and fallback handler
-- [Phase 13-session-observability]: SessionEvents-to-SessionLog adapter filters ObservabilityEvent types to schema-valid subset (fallback/error/decision/model_switch)
-- [Phase 14-skills-commands]: Manifest-based stack detection complements file-path detection for skill filtering
-- [Phase 14-skills-commands]: Token budget default 8000 tokens for multi-skill context injection
-- [Phase 15]: Per-session cache in injector avoids repeated DB reads within a session
-- [Phase 15]: Config v5 migration chain preserves all v4 fields, adds memory defaults
-- [Phase 15]: Memory capture positioned as event hook step 2 (after observability, before toast)
-- [Phase 17-integration-polish]: Version stays at 1.6.0 minor bump (not v3.0 major per D-11)
+- [v4.0]: Namespace cleanup (oc- prefix) must happen before agent/content expansion
+- [v4.0]: Stocktake fix before adding new agents (prevents invisible agents)
+- [v4.0]: Strict subagent-only policy for non-primary agents (avoid Tab pollution)
+- [v4.0]: Zero new dependencies for entire milestone (content + wiring only)
 
 ### Pending Todos
 
@@ -167,12 +94,12 @@ None yet.
 
 ### Blockers/Concerns
 
-- Agent dispatch pattern (tool-returns-instruction) is unvalidated -- hard gate for Phase 4
-- OpenCode Agent tool concurrency limits unknown -- affects Phase 5 parallel dispatch
-- Token budget explosion risk from nested prompt contexts (orchestrator + review + diff)
+- Tab-cycle ordering mechanism in OpenCode not fully documented -- needs validation in Phase 20
+- Token budget (8000) may need increase with 20+ skills -- monitor during Phase 21
+- FallbackManager mock injection point needs tracing during Phase 22
 
 ## Session Continuity
 
-Last session: 2026-04-02T22:08:46.845Z
-Stopped at: Completed 17-03-PLAN.md
+Last session: 2026-04-03
+Stopped at: Roadmap created for v4.0 Production Quality
 Resume file: None

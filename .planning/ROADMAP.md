@@ -4,7 +4,8 @@
 
 - **v1.0 MVP** - Phases 1-3 (shipped)
 - **v2.0 Autonomous Orchestrator** - Phases 4-10 (shipped)
-- **v3.0 Intelligence & Polish** - Phases 11-17 (in progress)
+- **v3.0 Intelligence & Polish** - Phases 11-17 (shipped)
+- **v4.0 Production Quality** - Phases 18-23 (in progress)
 
 ## Phases
 
@@ -101,10 +102,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Zod schemas, state persistence, confidence ledger, and path helpers
+- [x] 04-01-PLAN.md -- Zod schemas, state persistence, confidence ledger, and path helpers
 - [x] 04-02-PLAN.md -- Config v2 schema with orchestrator/confidence namespaces and v1 migration
-- [ ] 04-03-PLAN.md -- Phase transitions, plan indexing, and arena depth modules
-- [ ] 04-04-PLAN.md -- Tool registrations, orchestrator agent, plugin wiring, and dispatch proof
+- [x] 04-03-PLAN.md -- Phase transitions, plan indexing, and arena depth modules
+- [x] 04-04-PLAN.md -- Tool registrations, orchestrator agent, plugin wiring, and dispatch proof
 
 ### Phase 5: Review Engine
 **Goal**: Users can run a standalone multi-agent code review that selects relevant specialists, dispatches them in parallel, cross-verifies findings, and auto-fixes issues
@@ -134,8 +135,8 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- Foundation: handler types, artifacts module, 9 pipeline agent configs, schema extension
-- [ ] 06-02-PLAN.md -- Early pipeline handlers: RECON, CHALLENGE, ARCHITECT with Arena
+- [x] 06-01-PLAN.md -- Foundation: handler types, artifacts module, 9 pipeline agent configs, schema extension
+- [x] 06-02-PLAN.md -- Early pipeline handlers: RECON, CHALLENGE, ARCHITECT with Arena
 - [x] 06-03-PLAN.md -- Late pipeline handlers: PLAN, BUILD with review integration, SHIP, RETROSPECTIVE, EXPLORE
 - [x] 06-04-PLAN.md -- Wiring: handler dispatch map, enhanced orchestrateCore, configHook registration
 
@@ -157,7 +158,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> ...
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> ... -> 17 -> 18 -> 19 -> 20 -> 21 -> 22 -> 23
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -172,6 +173,18 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 9. Model Fallback Integration | v2.0 | 3/3 | Complete | - |
 | 10. UX Polish & Metaprompting | v2.0 | 4/4 | Complete | - |
 | 11. Ecosystem Research | v3.0 | 3/3 | Complete | 2026-04-02 |
+| 12. Quick Wins & Fixes | v3.0 | 2/2 | Complete | 2026-04-02 |
+| 13. Session Observability | v3.0 | 1/1 | Complete | 2026-04-02 |
+| 14. Skills & Commands | v3.0 | 6/6 | Complete | 2026-04-03 |
+| 15. Memory System | v3.0 | 1/1 | Complete | 2026-04-02 |
+| 16. Autopilot Integration | v3.0 | 0/0 | MERGED | - |
+| 17. Integration & Polish | v3.0 | 3/3 | Complete | 2026-04-03 |
+| 18. Namespace Cleanup | v4.0 | 0/TBD | Not started | - |
+| 19. Agent Visibility & Fixes | v4.0 | 0/TBD | Not started | - |
+| 20. New Primary Agents | v4.0 | 0/TBD | Not started | - |
+| 21. Content Expansion | v4.0 | 0/TBD | Not started | - |
+| 22. Production Hardening | v4.0 | 0/TBD | Not started | - |
+| 23. QA Playbook | v4.0 | 0/TBD | Not started | - |
 
 ### Phase 8: Testing & CI
 
@@ -221,15 +234,18 @@ Plans:
 - [x] 10-03-PLAN.md -- Skill injection into dispatch prompts and two-tier fallback chain resolution
 - [x] 10-04-PLAN.md -- Smart review agent selection: 13 new ReviewAgent implementations with stack-gated dispatch
 
+<details>
+<summary>v3.0 Intelligence & Polish (Phases 11-17) - SHIPPED</summary>
+
 ### v3.0 Intelligence & Polish
 
 - [x] **Phase 11: Ecosystem Research & Gap Analysis** - Deep competitive research across 5 plugins, gap matrix, defines scope for Phases 14-16
 - [x] **Phase 12: Quick Wins & Fixes** - Zen model display fix, small improvements surfaced by research (completed 2026-04-02)
 - [x] **Phase 13: Session Observability** - Structured event logging, session summaries, TUI dashboard, data retention, mock provider for fallback testing (completed 2026-04-02)
-- [ ] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.)
+- [x] **Phase 14: Skills & Commands** - New skills and commands identified by Phase 11 gap matrix (brainstorming, PR review, update-docs, etc.) (completed 2026-04-03)
 - [x] **Phase 15: Memory System** - Dual-scope smart memory (project patterns + user preferences), global storage, relevance-scored retrieval (completed 2026-04-02)
 - [x] **Phase 16: Autopilot Integration (Skills + Memory)** - MERGED INTO PHASE 17 (scope too thin for standalone phase)
-- [ ] **Phase 17: Integration & Polish** - Cross-feature integration, adaptive skill wiring, memory-based confidence tuning, final production polish
+- [x] **Phase 17: Integration & Polish** - Cross-feature integration, adaptive skill wiring, memory-based confidence tuning, final production polish (completed 2026-04-03)
 
 ## Phase Details (v3.0)
 
@@ -282,14 +298,14 @@ Plans:
   3. Every new skill/command follows established plugin patterns and feels native
   4. Adaptive skill loading auto-detects project stack and loads matching skills
   5. Composable skill chains resolve dependencies with cycle detection
-**Plans:** 1/6 plans executed
+**Plans:** 6/6 plans executed
 
 Plans:
-- [ ] 14-01-PLAN.md -- CRITICAL methodology skills: brainstorming, TDD workflow, systematic debugging
-- [ ] 14-02-PLAN.md -- HIGH methodology skills: verification, git worktrees, plan writing, plan executing
-- [ ] 14-03-PLAN.md -- MEDIUM methodology skills (code-review, compaction, E2E) + thin wrapper commands
-- [ ] 14-04-PLAN.md -- Language-specific pattern skills: TypeScript/Bun, Go, Python, Rust
-- [ ] 14-05-PLAN.md -- Tool-backed commands (/stocktake, /update-docs), asset linter, template updates
+- [x] 14-01-PLAN.md -- CRITICAL methodology skills: brainstorming, TDD workflow, systematic debugging
+- [x] 14-02-PLAN.md -- HIGH methodology skills: verification, git worktrees, plan writing, plan executing
+- [x] 14-03-PLAN.md -- MEDIUM methodology skills (code-review, compaction, E2E) + thin wrapper commands
+- [x] 14-04-PLAN.md -- Language-specific pattern skills: TypeScript/Bun, Go, Python, Rust
+- [x] 14-05-PLAN.md -- Tool-backed commands (/stocktake, /update-docs), asset linter, template updates
 - [x] 14-06-PLAN.md -- Adaptive skill loading infrastructure + composable skill chains
 
 ### Phase 15: Memory System
@@ -321,9 +337,88 @@ Plans:
   3. Memory-based confidence tuning adjusts Arena debate depth based on project error history
   4. Cross-feature integration tests exercise orchestrator + skills + memory + config migration
   5. Documentation updated (CLAUDE.md, CHANGELOG), version bumped, CI green
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed
 
 Plans:
 - [x] 17-01-PLAN.md -- Wire adaptive skill routing + memory-based confidence tuning
 - [x] 17-02-PLAN.md -- Cross-feature integration tests + config migration chain test
-- [ ] 17-03-PLAN.md -- Documentation polish, CHANGELOG, version bump to 1.6.0
+- [x] 17-03-PLAN.md -- Documentation polish, CHANGELOG, version bump to 1.6.0
+
+</details>
+
+### v4.0 Production Quality
+
+- [ ] **Phase 18: Namespace Cleanup** - Prefix all commands with oc- and remove oc-configure slash command
+- [ ] **Phase 19: Agent Visibility & Fixes** - Fix stocktake agent detection, clarify ambiguous agents, ensure config-hook agents appear in Tab cycle
+- [ ] **Phase 20: New Primary Agents** - Add Debugger, Planner, and Code Reviewer primary agents with intentional Tab-cycle ordering
+- [ ] **Phase 21: Content Expansion** - OOP/SOLID coding standards, Java/C# language skills, agents.md review command and starter templates
+- [ ] **Phase 22: Production Hardening** - Mock fallback test mode, context-aware commands, skill-aware doctor, anti-slop comment hook
+- [ ] **Phase 23: QA Playbook** - Internal manual QA playbook with step-by-step test procedures for every feature
+
+## Phase Details (v4.0)
+
+### Phase 18: Namespace Cleanup
+**Goal**: All plugin commands use a consistent `oc-` namespace prefix, and configuration is CLI-only (no slash command)
+**Depends on**: Phase 17 (v3.0 complete)
+**Requirements**: BFIX-02, BFIX-03
+**Success Criteria** (what must be TRUE):
+  1. Every plugin command is accessible via its `oc-` prefixed name (oc-brainstorm, oc-tdd, oc-quick, oc-write-plan, oc-stocktake, oc-review-pr, oc-update-docs, oc-new-agent, oc-new-skill, oc-new-command)
+  2. Old unprefixed command names are listed in DEPRECATED_ASSETS and cleaned up on plugin load so users upgrading from v3 get a seamless migration
+  3. The oc-configure slash command no longer exists -- configuration is only accessible via the CLI configure wizard
+**Plans**: TBD
+
+### Phase 19: Agent Visibility & Fixes
+**Goal**: Stocktake correctly detects all agents (filesystem and config-hook-injected), and ambiguous agents are replaced with well-defined alternatives
+**Depends on**: Phase 18
+**Requirements**: BFIX-01, BFIX-04, AGNT-14
+**Success Criteria** (what must be TRUE):
+  1. Running `/oc-stocktake` lists config-hook-injected agents alongside filesystem agents with an `origin` indicator (config-hook vs filesystem)
+  2. The "general" and "explore" agents are removed or replaced with clearly-scoped agents that have explicit purposes
+  3. Primary-mode agents registered via config hook appear correctly in the Tab cycle (not just in @ autocomplete)
+  4. Agent count reported by stocktake matches the actual number of registered agents (zero silent omissions)
+**Plans**: TBD
+
+### Phase 20: New Primary Agents
+**Goal**: Users can Tab-cycle through a curated set of primary agents -- Autopilot, Debugger, Planner, and Code Reviewer -- each loading relevant skills automatically
+**Depends on**: Phase 19
+**Requirements**: AGNT-10, AGNT-11, AGNT-12, AGNT-13
+**Success Criteria** (what must be TRUE):
+  1. User can Tab to a Debugger agent that loads the systematic-debugging skill and provides structured debugging guidance
+  2. User can Tab to a Planner agent that loads plan-writing and plan-executing skills and helps decompose work
+  3. User can Tab to a Code Reviewer agent that loads the code-review skill and can invoke oc_review for multi-agent review
+  4. Tab cycle follows the intentional order: Autopilot first, then Debugger, Planner, Reviewer (no other primary agents polluting the cycle)
+**Plans**: TBD
+
+### Phase 21: Content Expansion
+**Goal**: Coding standards cover OOP/SOLID principles, two new language-specific skills serve Java and C# developers, and a new command helps users audit and improve their project agents
+**Depends on**: Phase 19
+**Requirements**: SKLL-10, SKLL-11, SKLL-12, CMND-10, CMND-11
+**Success Criteria** (what must be TRUE):
+  1. Coding standards skill includes OOP/SOLID principles, Clean Architecture, dependency inversion, and composition-over-inheritance guidance that the LLM applies during code generation
+  2. Java developers get a language patterns skill with idiomatic Java, Spring Boot, and JPA conventions loaded automatically when Java project files are detected
+  3. C# developers get a language patterns skill with idiomatic C#, .NET patterns, and Entity Framework conventions loaded automatically when .csproj files are detected
+  4. User can run `/oc-review-agents` to validate and improve their project's agents.md file with structure and prompt quality feedback
+  5. Curated agents.md starter templates are available for common project types (web-api, cli-tool, library, fullstack)
+**Plans**: TBD
+
+### Phase 22: Production Hardening
+**Goal**: The plugin is resilient to model failures in test scenarios, auto-detects project language for commands, has deeper self-diagnostics, and prevents AI comment bloat
+**Depends on**: Phase 18
+**Requirements**: HARD-01, HARD-02, HARD-03, HARD-04
+**Success Criteria** (what must be TRUE):
+  1. User can enable a mock/fail-forced fallback test mode via CLI configure that simulates rate-limit, timeout, quota-exceeded, and malformed-response failures without hitting real APIs
+  2. Commands that vary by language auto-detect the project language from manifest files (package.json, pom.xml, *.csproj, go.mod, Cargo.toml) instead of requiring per-language variants
+  3. Doctor diagnostics report skill loading status per detected stack, memory DB health, and command accessibility alongside existing checks
+  4. Anti-slop comment hook detects and prevents AI-generated comment bloat (obvious comments, sycophantic language) with configurable enforcement profiles
+**Plans**: TBD
+
+### Phase 23: QA Playbook
+**Goal**: A comprehensive internal QA playbook documents step-by-step test procedures for every feature, enabling systematic manual validation of the entire plugin
+**Depends on**: Phase 18, Phase 19, Phase 20, Phase 21, Phase 22
+**Requirements**: QAPL-01
+**Success Criteria** (what must be TRUE):
+  1. Every command has a documented test procedure with expected inputs and outputs
+  2. Every agent has a documented test scenario verifying its availability, skill loading, and core behavior
+  3. Memory flow, fallback chain, and doctor diagnostics each have end-to-end test procedures
+  4. The playbook can be executed by a human (or AI) in a single session to validate a release
+**Plans**: TBD
