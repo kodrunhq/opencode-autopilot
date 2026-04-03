@@ -185,7 +185,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> ... -> 23 -> 24
 | 21. Content Expansion | v4.0 | 2/2 | Complete   | 2026-04-03 |
 | 22. Production Hardening | v4.0 | 4/4 | Complete   | 2026-04-03 |
 | 23. QA Playbook | v4.0 | 2/2 | Complete   | 2026-04-03 |
-| 24. Coder Agent & Built-in Replacements | v5.0 | 1/4 | In Progress|  |
+| 24. Coder Agent & Built-in Replacements | v5.0 | 3/4 | In Progress|  |
 
 ### Phase 8: Testing & CI
 
@@ -451,7 +451,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 24-01-PLAN.md -- Coder agent creation with embedded skills and /oc-tdd routing
+- [x] 24-01-PLAN.md -- Coder agent creation with embedded skills and /oc-tdd routing
 - [x] 24-02-PLAN.md -- oc_hashline_edit tool with FNV-1a hashing and CID alphabet
-- [ ] 24-03-PLAN.md -- Wave auto-assignment from task dependencies (Kahn's algorithm)
+- [x] 24-03-PLAN.md -- Wave auto-assignment from task dependencies (Kahn's algorithm)
 - [ ] 24-04-PLAN.md -- Agent prompt updates, Plan suppression, and wiring audit
