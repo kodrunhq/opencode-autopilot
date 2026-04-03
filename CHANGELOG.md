@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.11.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.10.0...opencode-autopilot-v1.11.0) (2026-04-03)
+
+
+### Features
+
+* **20-01:** create debugger, planner, and reviewer primary agents ([22214f3](https://github.com/kodrunhq/opencode-autopilot/commit/22214f3de39e23c9bcd1e2078873d07a8d4706fa))
+* **20-02:** wire debugger, planner, reviewer into agents map ([1fbfc0d](https://github.com/kodrunhq/opencode-autopilot/commit/1fbfc0dccaa0883a2ece9a5f765e0480396436bd))
+* **20:** add Debugger, Planner, and Reviewer primary agents ([a6737ba](https://github.com/kodrunhq/opencode-autopilot/commit/a6737ba565a80fdee2cb0cb68084e116b0089740))
+
+
+### Bug Fixes
+
+* **20:** address review findings — add agent tests, fix stale descriptions ([fa66c0e](https://github.com/kodrunhq/opencode-autopilot/commit/fa66c0e722a641942b3f574335c78f8f21f473ca))
+* **20:** resolve CI type errors and PR review comments ([b64a699](https://github.com/kodrunhq/opencode-autopilot/commit/b64a69969ed4987d890c23933692e8fc6fefa287))
+
 ## [1.10.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.9.0...opencode-autopilot-v1.10.0) (2026-04-03)
 
 
