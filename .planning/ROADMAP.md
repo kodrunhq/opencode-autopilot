@@ -180,7 +180,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 16. Autopilot Integration | v3.0 | 0/0 | MERGED | - |
 | 17. Integration & Polish | v3.0 | 3/3 | Complete | 2026-04-03 |
 | 18. Namespace Cleanup | v4.0 | 2/2 | Complete    | 2026-04-03 |
-| 19. Agent Visibility & Fixes | v4.0 | 1/2 | In progress | - |
+| 19. Agent Visibility & Fixes | v4.0 | 2/2 | Complete | 2026-04-03 |
 | 20. New Primary Agents | v4.0 | 0/TBD | Not started | - |
 | 21. Content Expansion | v4.0 | 0/TBD | Not started | - |
 | 22. Production Hardening | v4.0 | 0/TBD | Not started | - |
@@ -349,7 +349,7 @@ Plans:
 ### v4.0 Production Quality
 
 - [x] **Phase 18: Namespace Cleanup** - Prefix all commands with oc- and remove oc-configure slash command (completed 2026-04-03)
-- [ ] **Phase 19: Agent Visibility & Fixes** - Fix stocktake agent detection, clarify ambiguous agents, ensure config-hook agents appear in Tab cycle
+- [x] **Phase 19: Agent Visibility & Fixes** - Fix stocktake agent detection, clarify ambiguous agents, ensure config-hook agents appear in Tab cycle
 - [ ] **Phase 20: New Primary Agents** - Add Debugger, Planner, and Code Reviewer primary agents with intentional Tab-cycle ordering
 - [ ] **Phase 21: Content Expansion** - OOP/SOLID coding standards, Java/C# language skills, agents.md review command and starter templates
 - [ ] **Phase 22: Production Hardening** - Mock fallback test mode, context-aware commands, skill-aware doctor, anti-slop comment hook
@@ -384,7 +384,7 @@ Plans:
 
 Plans:
 - [x] 19-01-PLAN.md -- Fix agent modes (researcher/metaprompter to subagent), export agents map, visibility test suite
-- [ ] 19-02-PLAN.md -- Fix stocktake agent detection
+- [x] 19-02-PLAN.md -- Fix stocktake agent detection
 
 ### Phase 20: New Primary Agents
 **Goal**: Users can Tab-cycle through a curated set of primary agents -- Autopilot, Debugger, Planner, and Code Reviewer -- each loading relevant skills automatically
