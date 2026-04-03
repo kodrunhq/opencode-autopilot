@@ -42,6 +42,7 @@ export const taskSchema = z.object({
 	title: z.string().max(2048),
 	status: z.enum(["PENDING", "IN_PROGRESS", "DONE", "FAILED", "SKIPPED", "BLOCKED"]),
 	wave: z.number(),
+	depends_on: z.array(z.number()).default([]),
 	attempt: z.number().default(0),
 	strike: z.number().default(0),
 });

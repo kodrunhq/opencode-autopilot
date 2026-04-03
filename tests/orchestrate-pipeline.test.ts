@@ -119,8 +119,24 @@ describe("orchestrateCore pipeline dispatch", () => {
 			...state,
 			currentPhase: "BUILD" as Phase,
 			tasks: [
-				{ id: 1, title: "Task A", status: "PENDING" as const, wave: 1, attempt: 0, strike: 0 },
-				{ id: 2, title: "Task B", status: "PENDING" as const, wave: 1, attempt: 0, strike: 0 },
+				{
+					id: 1,
+					title: "Task A",
+					status: "PENDING" as const,
+					wave: 1,
+					depends_on: [],
+					attempt: 0,
+					strike: 0,
+				},
+				{
+					id: 2,
+					title: "Task B",
+					status: "PENDING" as const,
+					wave: 1,
+					depends_on: [],
+					attempt: 0,
+					strike: 0,
+				},
 			],
 			buildProgress: {
 				currentTask: null,
@@ -153,7 +169,17 @@ describe("orchestrateCore pipeline dispatch", () => {
 		const buildState = {
 			...state,
 			currentPhase: "BUILD" as Phase,
-			tasks: [{ id: 1, title: "Task A", status: "DONE" as const, wave: 1, attempt: 0, strike: 0 }],
+			tasks: [
+				{
+					id: 1,
+					title: "Task A",
+					status: "DONE" as const,
+					wave: 1,
+					depends_on: [],
+					attempt: 0,
+					strike: 0,
+				},
+			],
 			buildProgress: {
 				currentTask: null,
 				currentWave: 1,

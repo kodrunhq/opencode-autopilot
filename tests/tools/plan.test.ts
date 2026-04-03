@@ -21,9 +21,9 @@ function stateWithTasks(): PipelineState {
 	return {
 		...state,
 		tasks: [
-			{ id: 1, title: "Task A", status: "DONE", wave: 1, attempt: 1, strike: 0 },
-			{ id: 2, title: "Task B", status: "PENDING", wave: 1, attempt: 0, strike: 0 },
-			{ id: 3, title: "Task C", status: "PENDING", wave: 2, attempt: 0, strike: 0 },
+			{ id: 1, title: "Task A", status: "DONE", wave: 1, depends_on: [], attempt: 1, strike: 0 },
+			{ id: 2, title: "Task B", status: "PENDING", wave: 1, depends_on: [], attempt: 0, strike: 0 },
+			{ id: 3, title: "Task C", status: "PENDING", wave: 2, depends_on: [], attempt: 0, strike: 0 },
 		],
 	};
 }

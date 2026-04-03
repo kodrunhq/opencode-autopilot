@@ -2,6 +2,7 @@ import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
 import type { BuildProgress, Task } from "../types";
+import { assignWaves } from "../wave-assigner";
 import type { DispatchResult, PhaseHandler } from "./types";
 import { AGENT_NAMES } from "./types";
 
@@ -130,6 +131,28 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 		} satisfies DispatchResult);
 	}
 
+	// Auto-assign waves from depends_on declarations (D-15)
+	let effectiveTasks = tasks;
+	const hasDependencies = tasks.some((t) => t.depends_on && t.depends_on.length > 0);
+	if (hasDependencies) {
+		const waveResult = assignWaves(
+			tasks.map((t) => ({ id: t.id, depends_on: t.depends_on ?? [] })),
+		);
+		if (waveResult.cycles.length > 0) {
+			const cycleSet = new Set(waveResult.cycles);
+			effectiveTasks = tasks.map((t) => {
+				if (cycleSet.has(t.id)) return { ...t, status: "BLOCKED" as const };
+				const assigned = waveResult.assignments.get(t.id);
+				return assigned !== undefined ? { ...t, wave: assigned } : t;
+			});
+		} else {
+			effectiveTasks = tasks.map((t) => {
+				const assigned = waveResult.assignments.get(t.id);
+				return assigned !== undefined ? { ...t, wave: assigned } : t;
+			});
+		}
+	}
+
 	// Case 1: Review pending + result provided -> process review outcome
 	if (buildProgress.reviewPending && result) {
 		if (hasCriticalFindings(result)) {
@@ -157,7 +180,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 		}
 
 		// No critical -> advance to next wave
-		const waveMap = groupByWave(tasks);
+		const waveMap = groupByWave(effectiveTasks);
 		const nextWave = findCurrentWave(waveMap);
 
 		if (nextWave === null) {
@@ -205,7 +228,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			phase: "BUILD",
 			progress: `Wave ${nextWave} — ${pendingTasks.length} concurrent tasks`,
 			_stateUpdates: {
-				tasks: [...markTasksInProgress(tasks, dispatchedIds)],
+				tasks: [...markTasksInProgress(effectiveTasks, dispatchedIds)],
 				buildProgress: { ...updatedProgress, currentTask: null },
 			},
 		} satisfies DispatchResult);
@@ -214,9 +237,9 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 	// Case 2: Result provided + not review pending -> mark task done
 	// For dispatch_multi, currentTask may be null — find the first IN_PROGRESS task instead
 	const taskToComplete =
-		buildProgress.currentTask ?? tasks.find((t) => t.status === "IN_PROGRESS")?.id ?? null;
+		buildProgress.currentTask ?? effectiveTasks.find((t) => t.status === "IN_PROGRESS")?.id ?? null;
 	if (result && !buildProgress.reviewPending && taskToComplete !== null) {
-		const updatedTasks = markTaskDone(tasks, taskToComplete);
+		const updatedTasks = markTaskDone(effectiveTasks, taskToComplete);
 		const waveMap = groupByWave(updatedTasks);
 		const currentWave = buildProgress.currentWave ?? 1;
 
@@ -280,7 +303,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 	}
 
 	// Case 3: No result (first call or resume) -> find first pending wave
-	const waveMap = groupByWave(tasks);
+	const waveMap = groupByWave(effectiveTasks);
 	const currentWave = findCurrentWave(waveMap);
 
 	if (currentWave === null) {
@@ -352,7 +375,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 		phase: "BUILD",
 		progress: `Wave ${currentWave} — ${pendingTasks.length} concurrent tasks`,
 		_stateUpdates: {
-			tasks: [...markTasksInProgress(tasks, dispatchedIds)],
+			tasks: [...markTasksInProgress(effectiveTasks, dispatchedIds)],
 			buildProgress: {
 				...buildProgress,
 				currentTask: null,

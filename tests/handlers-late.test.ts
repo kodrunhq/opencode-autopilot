@@ -145,7 +145,7 @@ describe("handleBuild", () => {
 	): PipelineState {
 		return makeState({
 			currentPhase: "BUILD",
-			tasks: tasks.map((t) => ({ ...t, attempt: 0, strike: 0 })),
+			tasks: tasks.map((t) => ({ ...t, depends_on: [], attempt: 0, strike: 0 })),
 			buildProgress: {
 				currentTask: null,
 				currentWave: null,
