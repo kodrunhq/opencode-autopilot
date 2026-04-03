@@ -1,8 +1,8 @@
 # QA Playbook -- OpenCode Autopilot Plugin
 
-**Version:** 1.0
+**Version:** 2.0
 **Date:** 2026-04-03
-**Coverage:** Commands (11), Agents (8), Tools (20)
+**Coverage:** Commands (11), Agents (8), Tools (20), Skills (18), Memory, Fallback, Doctor, Observability, Orchestrator E2E
 
 ---
 
@@ -1236,3 +1236,541 @@ All tools are registered programmatically via the plugin entry point (`src/index
 **Pass/Fail:**
 - PASS: Starts review on scope, selects agents based on detected stacks, dispatches in stages, completes with structured report. State persisted to disk. Error on no args without state.
 - FAIL: No agent selection, state not persisted, or crashes on empty invocation.
+
+---
+
+## Skills and Adaptive Injection
+
+The plugin ships 18 skills in `assets/skills/`. Skills are loaded from `~/.config/opencode/skills/`, filtered by detected project stack, ordered by dependencies, and injected into the system prompt within a token budget. The adaptive injection system is implemented in `src/skills/adaptive-injector.ts`, `src/skills/loader.ts`, `src/skills/dependency-resolver.ts`, and `src/skills/linter.ts`.
+
+### Skill Loading
+
+**Prerequisites:**
+- Plugin installed with assets copied to `~/.config/opencode/skills/`
+- All 18 skill directories present: brainstorming, code-review, coding-standards, csharp-patterns, e2e-testing, frontend-design, git-worktrees, go-patterns, java-patterns, plan-executing, plan-writing, python-patterns, rust-patterns, strategic-compaction, systematic-debugging, tdd-workflow, typescript-patterns, verification
+
+**Steps:**
+1. Run `oc_doctor` and check the `skill-loading` health check result.
+2. Alternatively, invoke `oc_stocktake` and inspect the `skills` array in the response.
+3. Verify each skill has a valid SKILL.md with YAML frontmatter containing `name` and `description` fields.
+
+**Expected Output:**
+- `oc_doctor` skill-loading check reports "pass" with the count of loaded skills (18/18 or a filtered subset depending on detected stack).
+- `oc_stocktake` skills array contains 18 entries, each with `name`, `type: "skill"`, and `origin: "built-in"`.
+
+**Negative Test:**
+- Delete a single skill's SKILL.md file (e.g., remove `~/.config/opencode/skills/brainstorming/SKILL.md`).
+- Run `oc_stocktake` again.
+- Expected: The deleted skill is missing from the skills array. The remaining 17 skills still load. No crash or error.
+
+**Pass/Fail:**
+- PASS: All 18 skills load without errors. Missing individual SKILL.md files are gracefully skipped without affecting other skills.
+- FAIL: Skills fail to load, count is incorrect, or a missing file causes a crash.
+
+---
+
+### Stack Detection
+
+**Prerequisites:**
+- Plugin installed
+- Access to project directories with different manifest files
+
+**Steps:**
+1. Open an OpenCode session in a TypeScript project (has `package.json` and `tsconfig.json`).
+2. Run `oc_doctor` and observe the `skill-loading` check output.
+3. Note the detected stacks (should include "javascript", "typescript").
+4. Repeat in a Go project (has `go.mod`) -- should detect "go".
+5. Repeat in a Python project (has `pyproject.toml` or `requirements.txt`) -- should detect "python".
+6. Repeat in a Rust project (has `Cargo.toml`) -- should detect "rust".
+7. Repeat in a Java project (has `pom.xml` or `build.gradle`) -- should detect "java".
+8. Repeat in a C# project (has `*.csproj` or `*.sln` file at root) -- should detect "csharp".
+
+**Expected Output:**
+- Each project type produces the correct stack tags based on manifest files.
+- `MANIFEST_TAGS` checks: `package.json` -> javascript, `tsconfig.json` -> typescript, `bunfig.toml` -> bun+typescript, `go.mod` -> go, `Cargo.toml` -> rust, `pyproject.toml`/`requirements.txt`/`Pipfile` -> python, `Gemfile` -> ruby, `pom.xml`/`build.gradle`/`build.gradle.kts` -> java.
+- `EXT_MANIFEST_TAGS` checks: `*.csproj`/`*.sln` -> csharp (via readdir extension matching).
+- Multiple manifest files produce merged tags (e.g., TypeScript project with Bun: ["javascript", "typescript", "bun"]).
+
+**Negative Test:**
+- Open a session in an empty directory with no manifest files.
+- Expected: Detected stacks is empty (`[]`). All methodology skills (those with empty `stacks` arrays) still load.
+
+**Pass/Fail:**
+- PASS: Correct stack tags detected for all 6 major ecosystems (TypeScript, Go, Python, Rust, Java, C#). Empty directories produce empty tags.
+- FAIL: Wrong tags detected, missing ecosystem support, or crash on empty directory.
+
+---
+
+### Adaptive Filtering
+
+**Prerequisites:**
+- Plugin installed with all 18 skills
+- A TypeScript project directory
+
+**Steps:**
+1. Open an OpenCode session in a TypeScript project.
+2. Run `oc_doctor` and note the skill-loading output: `Detected stacks: [javascript, typescript], N/18 skills matched`.
+3. Verify that the matched skills include:
+   - Language-specific: `typescript-patterns` (stacks: ["typescript"])
+   - Methodology skills (empty stacks): `coding-standards`, `code-review`, `tdd-workflow`, `plan-writing`, `plan-executing`, `brainstorming`, `systematic-debugging`, `verification`, `strategic-compaction`, `e2e-testing`, `frontend-design`, `git-worktrees`
+4. Verify that excluded skills are NOT matched:
+   - `go-patterns` (stacks: ["go"]), `python-patterns` (stacks: ["python"]), `rust-patterns` (stacks: ["rust"]), `java-patterns` (stacks: ["java"]), `csharp-patterns` (stacks: ["csharp"])
+
+**Expected Output:**
+- Skills with empty `stacks` arrays are ALWAYS included (methodology skills).
+- Skills with non-empty `stacks` arrays are included only when at least one tag matches the detected project stack.
+- For a TypeScript project: ~13 skills matched out of 18.
+
+**Negative Test:**
+- Open a session in a Go project directory.
+- Expected: `go-patterns` is included; `typescript-patterns`, `python-patterns`, `rust-patterns`, `java-patterns`, `csharp-patterns` are excluded. Methodology skills are still included.
+
+**Pass/Fail:**
+- PASS: Only matching language skills inject for the detected stack. All methodology skills always inject. Non-matching language skills are excluded.
+- FAIL: Non-matching language skills inject, methodology skills are excluded, or filtering logic is inverted.
+
+---
+
+### Dependency Resolution
+
+**Prerequisites:**
+- Plugin installed
+- Skills with `requires` fields exist in the skills directory
+
+**Steps:**
+1. Run `oc_stocktake` with `lint: true`.
+2. Inspect skills that have non-empty `requires` arrays in their frontmatter.
+3. Verify that when skills are injected into the system prompt, prerequisite skills appear before dependent skills.
+4. Create a test skill with `requires: ["coding-standards"]` and verify it loads after `coding-standards`.
+
+**Expected Output:**
+- The dependency resolver uses topological sort (iterative DFS) to order skills.
+- Skills with prerequisites are placed after their dependencies in the injection order.
+- Unknown dependencies (not in the loaded skill set) are silently skipped (graceful degradation).
+
+**Negative Test (Circular Dependency):**
+- Create two test skills: `skill-a` with `requires: ["skill-b"]` and `skill-b` with `requires: ["skill-a"]`.
+- Expected: Both skills are detected as cycle participants and excluded from injection. Other skills are unaffected. No crash or infinite loop.
+- The dependency resolver has a hard cap of 500 skills (MAX_SKILLS) to prevent DoS.
+
+**Pass/Fail:**
+- PASS: Skills are ordered by dependencies. Circular dependencies are detected and excluded without crashing. Unknown dependencies are skipped gracefully.
+- FAIL: Skills are in wrong order, circular dependencies cause a hang, or unknown dependencies cause errors.
+
+---
+
+### Token Budgeting
+
+**Prerequisites:**
+- Plugin installed with skills
+- A project with a detected stack
+
+**Steps:**
+1. Open a session in a TypeScript project.
+2. Observe that injected skill context does not exceed the default 8000-token budget (approximately 32,000 characters at 4 chars/token).
+3. Optionally create many large custom skills to test budget enforcement.
+
+**Expected Output:**
+- The `buildMultiSkillContext` function concatenates skills in dependency order until the character budget (tokenBudget * 4) is exhausted.
+- When the budget is reached mid-skill, that skill and all subsequent skills are omitted (no partial injection).
+- The injected context is prefixed with "Skills context (follow these conventions and methodologies):".
+
+**Negative Test:**
+- Set an extremely low token budget (e.g., 10 tokens = 40 characters).
+- Expected: Either zero or one very small skill injects. No crash. Returns empty string if no skill fits.
+
+**Pass/Fail:**
+- PASS: Skill injection respects the 8000-token default budget. No partial skills injected. Empty result when budget is too small.
+- FAIL: Budget exceeded, partial skills injected, or crash on low budget.
+
+---
+
+### Skill Linter
+
+**Prerequisites:**
+- Plugin installed
+
+**Steps:**
+1. Run `oc_stocktake` with `lint: true`.
+2. Inspect the `lint` field on each skill entry.
+3. Verify all built-in skills have `valid: true` with no errors.
+
+**Expected Output:**
+- Each skill's lint result includes `valid` (boolean), `errors` (array), and `warnings` (array).
+- Valid skills: `valid: true`, `errors: []`.
+- The linter checks: YAML frontmatter exists, required fields (`name`, `description`) are present and non-empty, `stacks` and `requires` contain only strings, body content exists after frontmatter.
+- Missing recommended fields (`stacks`, `requires`) produce warnings, not errors.
+
+**Negative Test (Missing Frontmatter):**
+- Create a skill file with no YAML frontmatter (just plain text).
+- Expected: `valid: false`, `errors: ["Missing YAML frontmatter"]`.
+
+**Negative Test (Invalid Frontmatter):**
+- Create a skill with `stacks: [123, true]` (non-string values).
+- Expected: `valid: false`, `errors: ["stacks must contain only strings"]`.
+
+**Negative Test (Empty Body):**
+- Create a skill with valid frontmatter but no content after the `---` block.
+- Expected: `valid: true` (body is a warning, not an error), `warnings: ["Skill has no content after frontmatter"]`.
+
+**Pass/Fail:**
+- PASS: All built-in skills pass linting. Invalid skills produce specific error messages. Warnings are distinct from errors.
+- FAIL: Built-in skills fail linting, invalid frontmatter is not detected, or linter crashes.
+
+---
+
+## Memory System
+
+The memory system provides smart dual-scope memory (project patterns + user preferences) using SQLite with FTS5 full-text search. It captures observations from session events, scores them by relevance with time-based decay, and injects the most relevant context into the system prompt. Implemented in `src/memory/`.
+
+### Memory Database Setup
+
+**Prerequisites:**
+- Plugin installed
+- First session in any project (triggers DB creation)
+
+**Steps:**
+1. Check if `~/.config/opencode/memory/memory.db` exists.
+2. If not, open an OpenCode session (triggers `getMemoryDb()` which creates the DB).
+3. Verify the DB file is created at the expected path.
+4. Run `oc_doctor` and check the `memory-db` health check.
+
+**Expected Output:**
+- SQLite database created at `~/.config/opencode/memory/memory.db`.
+- Database uses WAL journal mode, foreign keys enabled, 5000ms busy timeout.
+- Schema includes 3 tables: `projects`, `observations`, `preferences`.
+- FTS5 virtual table `observations_fts` created for full-text search on `content` and `summary`.
+- Triggers maintain FTS5 index on insert, update, and delete.
+- Indexes on `observations(project_id)` and `observations(type)`.
+
+**Negative Test:**
+- Delete the memory DB file and run `oc_doctor`.
+- Expected: `memory-db` check reports "pass" with message "Memory DB not yet initialized -- will be created on first memory capture". No crash.
+
+**Pass/Fail:**
+- PASS: DB created with correct schema (3 tables, FTS5, triggers, indexes). WAL mode enabled. Missing DB handled gracefully.
+- FAIL: DB not created, schema incomplete, or missing DB causes crash.
+
+---
+
+### Observation Capture
+
+**Prerequisites:**
+- Plugin installed with memory system active
+- An active OpenCode session
+
+**Steps:**
+1. Open an OpenCode session in a project directory.
+2. Perform actions that generate memory-worthy events:
+   - Make a decision (triggers `app.decision` event) -- e.g., run the orchestrator.
+   - Trigger a phase transition (triggers `app.phase_transition` event).
+   - Cause a session error (triggers `session.error` event).
+3. Run `oc_memory_status` to verify observations were captured.
+
+**Expected Output:**
+- The capture handler (`createMemoryCaptureHandler`) listens for specific event types: `session.created`, `session.deleted`, `session.error`, `app.decision`, `app.phase_transition`.
+- Noisy events (`tool_complete`, `context_warning`, `session_start/end`) are filtered out.
+- `session.created`: Initializes project key and session ID, upserts project record.
+- `app.decision`: Creates observation with type "decision", confidence 0.8.
+- `app.phase_transition`: Creates observation with type "pattern", confidence 0.6.
+- `session.error`: Creates observation with type "error", confidence 0.7.
+- `session.deleted`: Triggers deferred pruning of stale observations.
+- Each observation includes: `projectId`, `sessionId`, `type`, `content`, `summary` (truncated to 200 chars), `confidence`, `createdAt`, `lastAccessed`.
+
+**Negative Test:**
+- Send an event with no session ID.
+- Expected: Capture handler silently returns without inserting. No crash.
+
+**Pass/Fail:**
+- PASS: Decision, phase transition, and error events produce observations in the DB. Noisy events are filtered. Missing session IDs are handled gracefully.
+- FAIL: Events not captured, wrong observation types, or noisy events create observations.
+
+---
+
+### Retrieval and Ranking
+
+**Prerequisites:**
+- Memory DB exists with at least 5 observations
+
+**Steps:**
+1. Open a session in a project with existing memory observations.
+2. Invoke `oc_memory_status` with `detail: "full"`.
+3. Observe the `recentObservations` array -- observations should be ordered by relevance score (highest first).
+4. Verify the 3-layer progressive disclosure:
+   - Layer 1 (always): Observation summaries grouped by type (up to 5 per group).
+   - Layer 2 (if budget allows): Recent Activity timeline (last 5 sessions).
+   - Layer 3 (if budget allows): Full content for top 1-2 observations.
+
+**Expected Output:**
+- Relevance score formula: `timeDecay * frequencyWeight * typeWeight`.
+  - `timeDecay = exp(-ageDays / halfLifeDays)` (default half-life: 90 days).
+  - `frequencyWeight = max(log2(accessCount + 1), 1)`.
+  - `typeWeight`: per-type multiplier from constants (decisions weighted highest).
+- Section order in injected context: Key Decisions, Patterns, Recent Errors, Learned Preferences, Context Notes, Tool Usage Patterns.
+- Max 5 observations per group in Layer 1.
+- Layer 2 threshold: 500 chars remaining budget.
+- Layer 3 threshold: 1000 chars remaining budget.
+
+**Negative Test:**
+- Empty memory store (no observations).
+- Expected: `buildMemoryContext` returns empty string. No injection occurs. No crash.
+
+**Pass/Fail:**
+- PASS: Observations ranked by relevance score (descending). 3-layer progressive disclosure respects token budget. Empty memory returns empty string.
+- FAIL: Wrong ranking order, layers overflow budget, or empty memory causes error.
+
+---
+
+### System Prompt Injection
+
+**Prerequisites:**
+- Plugin installed with memory system active
+- At least one prior session with observations in the DB
+
+**Steps:**
+1. Open a new session in a project with existing memory.
+2. Observe the system prompt content (via session logs or tool inspection).
+3. Verify memory context is injected via the `experimental.chat.system.transform` hook.
+
+**Expected Output:**
+- The memory injector (`createMemoryInjector`) is registered on the system prompt transform hook.
+- On first message of a session, it retrieves memory context for the project path.
+- Context is cached per session ID (subsequent messages reuse the cached context).
+- Injected context starts with: `## Project Memory (auto-injected)`.
+- Includes project name and last session date.
+- If no session ID is provided, injection is skipped.
+
+**Negative Test:**
+- Start a session with no prior observations for the project.
+- Expected: Memory injector retrieves empty context. Nothing is pushed to `output.system`. No crash.
+
+**Negative Test (DB Error):**
+- Corrupt the memory database file.
+- Expected: Memory injector catches the error silently (best-effort pattern), logs a warning, and does not inject any context. Session continues normally.
+
+**Pass/Fail:**
+- PASS: Memory context appears in system prompt on sessions with prior observations. Cached per session. Empty memory produces no injection. DB errors are silently caught.
+- FAIL: Memory not injected, cache not working, or DB error crashes the session.
+
+---
+
+### Decay and Pruning
+
+**Prerequisites:**
+- Memory DB with observations of varying ages and access counts
+
+**Steps:**
+1. Create observations with different `lastAccessed` timestamps and `accessCount` values.
+2. Observe relevance scores via `oc_memory_status`.
+3. End a session (triggers `session.deleted`, which defers `pruneStaleObservations`).
+4. Verify old/low-relevance observations are pruned.
+
+**Expected Output:**
+- Exponential decay: observations last accessed 90 days ago have ~37% of a fresh observation's time decay score (at default 90-day half-life).
+- Observations last accessed 180 days ago have ~13.5% time decay.
+- Frequency boost: `log2(accessCount + 1)` -- a 7-access observation gets 3x boost over a 0-access one.
+- Pruning phase 1: Remove observations below `MIN_RELEVANCE_THRESHOLD`.
+- Pruning phase 2: If remaining count exceeds `MAX_OBSERVATIONS_PER_PROJECT`, remove lowest-scored until at cap.
+- Pruning runs asynchronously (deferred via `setTimeout`) on session end.
+
+**Negative Test:**
+- Project with zero observations.
+- Expected: `pruneStaleObservations` returns `{ pruned: 0 }`. No crash.
+
+**Pass/Fail:**
+- PASS: Old observations decay in relevance. Pruning removes stale entries. Cap enforced. Empty projects handled gracefully.
+- FAIL: Decay formula incorrect, pruning not triggered, or cap not enforced.
+
+---
+
+### Cross-Project Isolation
+
+**Prerequisites:**
+- Memory DB with observations from at least two different projects
+
+**Steps:**
+1. Open sessions in two different project directories (e.g., `project-a/` and `project-b/`).
+2. Generate observations in both sessions.
+3. Open a new session in `project-a/`.
+4. Invoke `oc_memory_status` and verify only `project-a` observations appear.
+
+**Expected Output:**
+- Each project gets a unique `projectId` computed from `computeProjectKey(projectRoot)`.
+- `getObservationsByProject` filters by `project_id` column.
+- Memory context injection retrieves only the current project's observations.
+- Preferences are global (not project-scoped) -- they appear in all projects.
+
+**Negative Test:**
+- Open a session in a brand-new project directory with no prior observations.
+- Expected: Memory status shows zero observations. No observations from other projects leak in.
+
+**Pass/Fail:**
+- PASS: Project-level observations are isolated. No cross-project leakage. Preferences are global. New projects start with empty memory.
+- FAIL: Observations from other projects appear, or project keys collide.
+
+---
+
+## Fallback Chain
+
+The fallback chain provides automatic model failover when API calls fail. It classifies errors, transitions between models via a state machine, and degrades message content across 3 tiers for maximum compatibility. Implemented in `src/orchestrator/fallback/`.
+
+### Mock Fallback Mode
+
+**Prerequisites:**
+- Plugin installed
+
+**Steps:**
+1. Invoke `oc_mock_fallback` with `mode: "list"`.
+2. Observe the 5 available failure modes: `rate_limit`, `quota_exceeded`, `timeout`, `malformed`, `service_unavailable`.
+3. Invoke `oc_mock_fallback` with `mode: "rate_limit"`.
+4. Observe the generated mock error with classification and retryability fields.
+5. Repeat for each failure mode.
+
+**Expected Output:**
+- `rate_limit`: classification "rate_limit", retryable true, status 429.
+- `quota_exceeded`: classification "quota_exceeded", retryable true.
+- `timeout`: retryable true.
+- `malformed`: retryable false (corrupt response cannot be retried).
+- `service_unavailable`: classification "service_unavailable", retryable true, status 503.
+- The `MockInterceptor` class cycles through a configured sequence of failure modes deterministically.
+
+**Negative Test:**
+- Invoke `oc_mock_fallback` with `mode: "nonexistent"`.
+- Expected: Returns `action: "error"` with message `Invalid failure mode. Use 'list' to see available modes.`
+
+**Pass/Fail:**
+- PASS: All 5 failure modes generate correct classifications and retryability. Deterministic cycling works. Invalid modes return clear errors.
+- FAIL: Wrong classifications, incorrect retryability, or crash on invalid mode.
+
+---
+
+### Error Classification
+
+**Prerequisites:**
+- Plugin installed
+
+**Steps:**
+1. Use `oc_mock_fallback` to generate errors for each failure mode.
+2. Verify the error classifier (`classifyErrorType`) categorizes each correctly:
+   - Status 429 or "rate limit" / "too many requests" patterns -> `rate_limit`
+   - "quota exceeded" / "insufficient credits" patterns -> `quota_exceeded`
+   - "service unavailable" / "overloaded" patterns -> `service_unavailable`
+   - "api key" + "missing" / "not found" patterns -> `missing_api_key`
+   - "model not found" patterns -> `model_not_found`
+   - "content filter" patterns -> `content_filter`
+   - "context length" patterns -> `context_length`
+   - Anything else -> `unknown`
+3. Verify retryability rules:
+   - `content_filter` and `context_length` are NOT retryable (same content will fail on any model).
+   - `missing_api_key` and `model_not_found` ARE retryable (different model may work).
+   - Rate limit, quota, and service unavailable ARE retryable.
+
+**Expected Output:**
+- Classification uses cascading checks: status code first, then message pattern matching.
+- Built-in patterns include 15+ regexes for retryable errors (including status codes 429, 503, 529).
+- User-provided patterns are also checked (with ReDoS protection: nested quantifiers and backtracking-risk patterns are skipped).
+
+**Negative Test:**
+- Provide an error with no message and no status code.
+- Expected: Classified as `unknown`. Not retryable by default.
+
+**Pass/Fail:**
+- PASS: All error types classified correctly. Retryability matches expected rules. ReDoS protection active for user patterns.
+- FAIL: Misclassification, wrong retryability, or ReDoS vulnerability.
+
+---
+
+### State Machine Transitions
+
+**Prerequisites:**
+- Plugin installed with fallback chain configured (primary + fallback models)
+
+**Steps:**
+1. Simulate a primary model failure using `oc_mock_fallback`.
+2. Observe the fallback state machine transitions:
+   - `createFallbackState(model)`: Creates initial state on primary model (fallbackIndex: -1, attemptCount: 0).
+   - `planFallback(state, chain, maxAttempts, cooldownMs)`: Finds next available model not in cooldown.
+   - `commitFallback(state, plan)`: Applies the planned transition, returns new state (never mutates input).
+3. Verify the transition: primary -> fallback model.
+4. Simulate a second failure on the fallback model.
+5. Observe: State machine attempts next model in chain or reports exhaustion.
+
+**Expected Output:**
+- State machine is purely functional (plan/commit pattern, never mutates state).
+- `planFallback` skips the current model and models in cooldown.
+- `commitFallback` returns `{ committed: true, state: newState }` on success.
+- `commitFallback` returns `{ committed: false }` if the plan is stale (current model changed).
+- Max attempts enforcement: returns failure reason when `attemptCount >= maxAttempts`.
+- Chain exhaustion: returns "All fallback models exhausted or in cooldown" when no models are available.
+
+**Negative Test (All Models Exhausted):**
+- Configure a fallback chain with 2 models. Fail both (set both in cooldown).
+- Expected: `planFallback` returns `{ success: false, reason: "All fallback models exhausted or in cooldown" }`.
+
+**Negative Test (Invalid Fallback Config):**
+- Configure an empty fallback chain.
+- Expected: `planFallback` immediately returns failure (no models to try).
+
+**Pass/Fail:**
+- PASS: State transitions are correct (primary -> fallback -> exhausted). Plan/commit pattern ensures immutability. Cooldown and max attempts enforced.
+- FAIL: State mutated in place, cooldown not respected, or max attempts not enforced.
+
+---
+
+### Message Replay
+
+**Prerequisites:**
+- Plugin installed
+
+**Steps:**
+1. Create a message with multiple part types: text, image, tool_call, tool_result.
+2. Apply `replayWithDegradation` with attempt 0.
+3. Observe: Tier 1 -- all parts included (full fidelity).
+4. Apply with attempt 1.
+5. Observe: Tier 2 -- text + images only (tool_call and tool_result filtered out).
+6. Apply with attempt 2.
+7. Observe: Tier 3 -- text only (maximum compatibility).
+
+**Expected Output:**
+- `filterPartsByTier(parts, 1)`: Returns all parts unchanged.
+- `filterPartsByTier(parts, 2)`: Filters out `tool_call` and `tool_result` parts.
+- `filterPartsByTier(parts, 3)`: Returns only `text` parts.
+- Tier selection based on attempt: 0 -> Tier 1, 1 -> Tier 2, 2+ -> Tier 3.
+
+**Negative Test:**
+- Apply degradation to an empty parts array.
+- Expected: Returns `{ parts: [], tier: N }`. No crash.
+
+**Pass/Fail:**
+- PASS: 3-tier content degradation works correctly. Each tier filters the correct part types. Empty arrays handled gracefully.
+- FAIL: Wrong parts filtered, tier mapping incorrect, or crash on empty input.
+
+---
+
+### Cooldown Recovery
+
+**Prerequisites:**
+- Plugin installed with fallback chain configured
+- A model that was previously failed (in cooldown)
+
+**Steps:**
+1. Trigger a fallback transition (primary fails, switches to fallback model).
+2. Wait for the cooldown period to elapse (or simulate time advancement).
+3. Call `recoverToOriginal(state, cooldownMs)`.
+4. Observe: Returns new state with `currentModel` set back to `originalModel` and `fallbackIndex` reset to -1.
+
+**Expected Output:**
+- `recoverToOriginal` checks if the original model's cooldown has expired.
+- If cooldown expired: returns new state with original model restored.
+- If cooldown still active: returns `null` (recovery not yet possible).
+- If already on original model: returns `null` (no recovery needed).
+
+**Negative Test:**
+- Call `recoverToOriginal` when already on the original model.
+- Expected: Returns `null`. No state change.
+- Call `recoverToOriginal` when the original model is still in cooldown.
+- Expected: Returns `null`. Model remains on fallback.
+
+**Pass/Fail:**
+- PASS: Recovery returns to original model after cooldown. Returns null when already on original or still in cooldown.
+- FAIL: Recovery happens during cooldown, state not properly reset, or crash on edge cases.
