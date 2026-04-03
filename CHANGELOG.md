@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.7.0...opencode-autopilot-v1.8.0) (2026-04-03)
+
+
+### Features
+
+* **18:** rename all command files to oc- prefix and delete oc-configure ([1ef8e3a](https://github.com/kodrunhq/opencode-autopilot/commit/1ef8e3afa795600d767506106d2cd0a4451ff87a))
+* **18:** update DEPRECATED_ASSETS and clear FORCE_UPDATE_ASSETS ([5610815](https://github.com/kodrunhq/opencode-autopilot/commit/5610815806a3f664de796124420cf3a98225c9c0))
+* **18:** update source code references to oc- prefixed command names ([9327bba](https://github.com/kodrunhq/opencode-autopilot/commit/9327bbae529744f95d8a4ba0180d00572194a892))
+* namespace cleanup — prefix all commands with oc- ([39e826d](https://github.com/kodrunhq/opencode-autopilot/commit/39e826d4102b0f832bbe24a928f406bc07841770))
+
+
+### Bug Fixes
+
+* **18:** address PR review comments and CI failure ([49cc26b](https://github.com/kodrunhq/opencode-autopilot/commit/49cc26b00e26cf3e5e48de9a0ab0090596d14a0b))
+* **18:** resolve stale command references and add deprecation test ([4ee636e](https://github.com/kodrunhq/opencode-autopilot/commit/4ee636e9092bf593801d4d06d05c8a4cd11a6484))
+
 ## [1.7.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.6.0...opencode-autopilot-v1.7.0) (2026-04-02)
 
 
