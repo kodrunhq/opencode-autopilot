@@ -2,6 +2,7 @@ import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
 import { runHealthChecks } from "./health/runner";
+import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { installAssets } from "./installer";
 import { createMemoryCaptureHandler, createMemoryInjector, getMemoryDb } from "./memory";
 import { ContextMonitor } from "./observability/context-monitor";
@@ -150,6 +151,9 @@ const plugin: Plugin = async (input) => {
 	const chatMessageHandler = createChatMessageHandler(manager);
 	const toolExecuteAfterHandler = createToolExecuteAfterHandler(manager);
 
+	// --- Anti-slop hook initialization ---
+	const antiSlopHandler = createAntiSlopHandler({ showToast: sdkOps.showToast });
+
 	// --- Memory subsystem initialization ---
 	const memoryConfig = config?.memory ?? {
 		enabled: true,
@@ -287,6 +291,13 @@ const plugin: Plugin = async (input) => {
 			// Fallback handling
 			if (fallbackConfig.enabled) {
 				await toolExecuteAfterHandler(hookInput, output);
+			}
+
+			// Anti-slop comment detection (best-effort, non-blocking)
+			try {
+				await antiSlopHandler(hookInput, output);
+			} catch {
+				// best-effort
 			}
 		},
 		"experimental.chat.system.transform": async (input, output) => {

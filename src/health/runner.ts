@@ -1,5 +1,12 @@
 import type { Config } from "@opencode-ai/plugin";
-import { agentHealthCheck, assetHealthCheck, configHealthCheck } from "./checks";
+import {
+	agentHealthCheck,
+	assetHealthCheck,
+	commandHealthCheck,
+	configHealthCheck,
+	memoryHealthCheck,
+	skillHealthCheck,
+} from "./checks";
 import type { HealthReport, HealthResult } from "./types";
 
 /**
@@ -31,6 +38,7 @@ export async function runHealthChecks(options?: {
 	openCodeConfig?: Config | null;
 	assetsDir?: string;
 	targetDir?: string;
+	projectRoot?: string;
 }): Promise<HealthReport> {
 	const start = Date.now();
 
@@ -38,9 +46,19 @@ export async function runHealthChecks(options?: {
 		configHealthCheck(options?.configPath),
 		agentHealthCheck(options?.openCodeConfig ?? null),
 		assetHealthCheck(options?.assetsDir, options?.targetDir),
+		skillHealthCheck(options?.projectRoot ?? process.cwd()),
+		memoryHealthCheck(options?.targetDir),
+		commandHealthCheck(options?.targetDir),
 	]);
 
-	const fallbackNames = ["config-validity", "agent-injection", "asset-directories"];
+	const fallbackNames = [
+		"config-validity",
+		"agent-injection",
+		"asset-directories",
+		"skill-loading",
+		"memory-db",
+		"command-accessibility",
+	];
 	const results: readonly HealthResult[] = Object.freeze(
 		settled.map((outcome, i) => settledToResult(outcome, fallbackNames[i])),
 	);

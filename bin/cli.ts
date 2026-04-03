@@ -308,7 +308,7 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 
 function printUsage(): void {
 	console.log("");
-	console.log(bold("Usage:") + " opencode-autopilot <command>");
+	console.log(`${bold("Usage:")} opencode-autopilot <command>`);
 	console.log("");
 	console.log("Commands:");
 	console.log("  install     Register the plugin and create starter config");
