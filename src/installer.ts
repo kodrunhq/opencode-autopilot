@@ -7,14 +7,28 @@ import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
  * Assets that were previously shipped but have since been removed from the source repo.
  * These are cleaned up from the target directory on every install to avoid stale files.
  */
-const DEPRECATED_ASSETS = ["agents/placeholder-agent.md", "commands/configure.md"] as const;
+const DEPRECATED_ASSETS = [
+	"agents/placeholder-agent.md",
+	"commands/configure.md",
+	"commands/oc-configure.md",
+	"commands/brainstorm.md",
+	"commands/new-agent.md",
+	"commands/new-command.md",
+	"commands/new-skill.md",
+	"commands/quick.md",
+	"commands/review-pr.md",
+	"commands/stocktake.md",
+	"commands/tdd.md",
+	"commands/update-docs.md",
+	"commands/write-plan.md",
+] as const;
 
 /**
  * Assets that must be overwritten on every install, even if the user has a copy.
  * Used when the shipped version has critical fixes that override user customizations.
  * Remove entries once the fix has been deployed long enough.
  */
-const FORCE_UPDATE_ASSETS = ["commands/oc-configure.md"] as const;
+const FORCE_UPDATE_ASSETS = [] as const;
 
 export interface InstallResult {
 	readonly copied: readonly string[];
