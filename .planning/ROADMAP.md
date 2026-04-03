@@ -180,7 +180,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 16. Autopilot Integration | v3.0 | 0/0 | MERGED | - |
 | 17. Integration & Polish | v3.0 | 3/3 | Complete | 2026-04-03 |
 | 18. Namespace Cleanup | v4.0 | 2/2 | Complete    | 2026-04-03 |
-| 19. Agent Visibility & Fixes | v4.0 | 0/TBD | Not started | - |
+| 19. Agent Visibility & Fixes | v4.0 | 1/2 | In progress | - |
 | 20. New Primary Agents | v4.0 | 0/TBD | Not started | - |
 | 21. Content Expansion | v4.0 | 0/TBD | Not started | - |
 | 22. Production Hardening | v4.0 | 0/TBD | Not started | - |
@@ -380,7 +380,11 @@ Plans:
   2. The "general" and "explore" agents are removed or replaced with clearly-scoped agents that have explicit purposes
   3. Primary-mode agents registered via config hook appear correctly in the Tab cycle (not just in @ autocomplete)
   4. Agent count reported by stocktake matches the actual number of registered agents (zero silent omissions)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [x] 19-01-PLAN.md -- Fix agent modes (researcher/metaprompter to subagent), export agents map, visibility test suite
+- [ ] 19-02-PLAN.md -- Fix stocktake agent detection
 
 ### Phase 20: New Primary Agents
 **Goal**: Users can Tab-cycle through a curated set of primary agents -- Autopilot, Debugger, Planner, and Code Reviewer -- each loading relevant skills automatically
