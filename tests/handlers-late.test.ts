@@ -48,8 +48,9 @@ describe("handlePlan", () => {
 		const state = makeState({ currentPhase: "PLAN" });
 		const result = await handlePlan(state, "/tmp/artifacts", "tasks written");
 
-		expect(result.action).toBe("complete");
+		expect(result.action).toBe("error");
 		expect(result.phase).toBe("PLAN");
+		expect(result.message).toContain("Failed to load PLAN tasks");
 	});
 });
 
