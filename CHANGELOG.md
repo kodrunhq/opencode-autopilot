@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.15.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.15.0...opencode-autopilot-v1.15.1) (2026-04-04)
+
+
+### Bug Fixes
+
+* align tab agent visibility with custom planner/coder/researcher ([e435384](https://github.com/kodrunhq/opencode-autopilot/commit/e435384387d70548041b3aa4e341ad79f86de6a8))
+* align Tab agent visibility with planner/coder/researcher ([a6a01d9](https://github.com/kodrunhq/opencode-autopilot/commit/a6a01d9a06c2d773541de6be2aaca7aaef789fb2))
+
 ## [1.15.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.14.1...opencode-autopilot-v1.15.0) (2026-04-04)
 
 
