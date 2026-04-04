@@ -60,11 +60,21 @@ describe("Cross-feature integration: orchestrator + skills + memory", () => {
 	});
 
 	test("dispatch_multi enrichment produces valid JSON with enriched prompts", async () => {
-		// Set up state at ARCHITECT phase (which uses dispatch_multi for Arena)
+		// Set up state at ARCHITECT phase with MEDIUM confidence to trigger Arena (depth=2)
 		const state = createInitialState("multi dispatch test");
 		const architectState = {
 			...state,
 			currentPhase: "ARCHITECT" as Phase,
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "MEDIUM" as const,
+					area: "general",
+					rationale: "moderate signal",
+					timestamp: new Date().toISOString(),
+				},
+			],
 			phases: state.phases.map((p) =>
 				["RECON", "CHALLENGE"].includes(p.name)
 					? { ...p, status: "DONE" as const }
@@ -75,7 +85,7 @@ describe("Cross-feature integration: orchestrator + skills + memory", () => {
 		};
 		await saveState(architectState, tempDir);
 
-		// Resume at ARCHITECT with no result — should dispatch_multi
+		// Resume at ARCHITECT with no result — MEDIUM confidence triggers dispatch_multi
 		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
 

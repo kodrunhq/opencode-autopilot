@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: rust-patterns
 description: Rust patterns covering ownership, error handling with Result/Option, unsafe guidelines, and testing conventions
 stacks:

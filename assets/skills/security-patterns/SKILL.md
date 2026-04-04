@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: security-patterns
 description: OWASP Top 10 security patterns, authentication, authorization, input validation, secret management, and secure coding practices
 stacks: []

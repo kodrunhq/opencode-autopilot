@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createAntiSlopHandler, isCodeFile, scanForSlopComments } from "../../src/hooks/anti-slop";
+import {
+	clearScanTimestamps,
+	createAntiSlopHandler,
+	isCodeFile,
+	scanForSlopComments,
+} from "../../src/hooks/anti-slop";
+import { isExcludedHashLine, MINIMUM_SLOP_INDICATORS } from "../../src/hooks/slop-patterns";
 
 describe("isCodeFile", () => {
 	it("returns true for .ts files", () => {
@@ -22,10 +28,11 @@ describe("isCodeFile", () => {
 });
 
 describe("scanForSlopComments", () => {
-	it("detects obvious 'this function handles' comment in .ts", () => {
-		const content = "// This function handles the logic\nconst x = 1;";
+	it("detects multiple slop patterns in .ts (meets MINIMUM_SLOP_INDICATORS)", () => {
+		// Two distinct patterns: "this function handles" + "elegantly"
+		const content = "// This function handles the logic\n// This elegantly solves it\nconst x = 1;";
 		const findings = scanForSlopComments(content, ".ts");
-		expect(findings.length).toBeGreaterThan(0);
+		expect(findings.length).toBe(2);
 		expect(findings[0].line).toBe(1);
 		expect(findings[0].text).toContain("This function handles the logic");
 	});
@@ -36,23 +43,52 @@ describe("scanForSlopComments", () => {
 		expect(findings).toHaveLength(0);
 	});
 
-	it("detects sycophantic 'elegantly' in .py comment", () => {
-		const content = "# This elegantly handles errors\nx = 1";
+	it("detects sycophantic patterns in .py when 2+ distinct matches", () => {
+		// Two distinct patterns: "elegantly" + "seamlessly"
+		const content = "# This elegantly handles errors\n# Seamlessly integrated\nx = 1";
 		const findings = scanForSlopComments(content, ".py");
-		expect(findings.length).toBeGreaterThan(0);
+		expect(findings.length).toBe(2);
 		expect(findings[0].text).toContain("elegantly");
 	});
 
-	it("detects 'increment counter by 1' in .ts comment", () => {
+	it("returns empty when only 1 distinct pattern matches (below threshold)", () => {
 		const content = "// increment counter by 1\ncounter++;";
 		const findings = scanForSlopComments(content, ".ts");
-		expect(findings.length).toBeGreaterThan(0);
+		// Single pattern match is below MINIMUM_SLOP_INDICATORS
+		expect(findings).toHaveLength(0);
 	});
 
 	it("does not flag 'robust' in code, only in comments", () => {
 		const content = "const robust = true;";
 		const findings = scanForSlopComments(content, ".ts");
 		expect(findings).toHaveLength(0);
+	});
+
+	it("does not flag 'robust' without narrating context in comments", () => {
+		// Bare "robust" in comment should not match (requires "this/the/it/our" prefix)
+		const content = "// A robust implementation\n// Uses seamless design";
+		const findings = scanForSlopComments(content, ".ts");
+		// "robust" alone has no narrating context, "seamless" is 1 pattern -> below threshold
+		expect(findings).toHaveLength(0);
+	});
+
+	it("requires MINIMUM_SLOP_INDICATORS distinct patterns", () => {
+		expect(MINIMUM_SLOP_INDICATORS).toBe(2);
+	});
+});
+
+describe("isExcludedHashLine", () => {
+	it("excludes shebangs", () => {
+		expect(isExcludedHashLine("#!/usr/bin/env python3")).toBe(true);
+	});
+
+	it("excludes hex colors", () => {
+		expect(isExcludedHashLine("color = #FF5733")).toBe(true);
+		expect(isExcludedHashLine("bg: #abc")).toBe(true);
+	});
+
+	it("does not exclude normal comments", () => {
+		expect(isExcludedHashLine("# This is a comment")).toBe(false);
 	});
 });
 
@@ -63,6 +99,8 @@ describe("createAntiSlopHandler", () => {
 		// Use cwd-relative path so hook's path validation passes
 		tempDir = join(process.cwd(), `.test-anti-slop-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
+		// Clear debounce timestamps between tests
+		clearScanTimestamps();
 	});
 
 	afterEach(async () => {
@@ -101,7 +139,11 @@ describe("createAntiSlopHandler", () => {
 		);
 		const handler = createAntiSlopHandler({ showToast });
 		const tsPath = join(tempDir, "app.ts");
-		await writeFile(tsPath, "// This function handles the logic\nconst x = 1;");
+		// Two distinct slop patterns to meet MINIMUM_SLOP_INDICATORS threshold
+		await writeFile(
+			tsPath,
+			"// This function handles the logic\n// This elegantly solves it\nconst x = 1;",
+		);
 
 		await handler(
 			{
@@ -157,5 +199,38 @@ describe("createAntiSlopHandler", () => {
 		);
 
 		expect(showToast).not.toHaveBeenCalled();
+	});
+
+	it("debounces: second call within window does not fire toast again", async () => {
+		const showToast = mock((_t: string, _m: string, _v: "info" | "warning" | "error") =>
+			Promise.resolve(),
+		);
+		const handler = createAntiSlopHandler({ showToast });
+		const tsPath = join(tempDir, "debounce.ts");
+		await writeFile(
+			tsPath,
+			"// This function handles the logic\n// This elegantly solves it\nconst x = 1;",
+		);
+
+		const hookInput = {
+			tool: "write_file" as const,
+			sessionID: "s1",
+			callID: "c1",
+			args: { file_path: tsPath },
+		};
+		const hookOutput = { title: "", output: "done", metadata: {} };
+
+		// First call should fire
+		await handler(hookInput, hookOutput);
+		expect(showToast).toHaveBeenCalledTimes(1);
+
+		// Second call within debounce window should be skipped
+		await handler(hookInput, hookOutput);
+		expect(showToast).toHaveBeenCalledTimes(1);
+
+		// After clearing timestamps, the next call should fire again
+		clearScanTimestamps();
+		await handler(hookInput, hookOutput);
+		expect(showToast).toHaveBeenCalledTimes(2);
 	});
 });

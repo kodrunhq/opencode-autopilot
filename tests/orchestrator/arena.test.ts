@@ -42,8 +42,8 @@ describe("getDebateDepth", () => {
 		expect(getDebateDepth(entries)).toBe(1);
 	});
 
-	test("empty entries returns depth 2 (default MEDIUM dominant)", () => {
-		expect(getDebateDepth([])).toBe(2);
+	test("empty entries returns depth 1 (default HIGH dominant — fast path)", () => {
+		expect(getDebateDepth([])).toBe(1);
 	});
 });
 

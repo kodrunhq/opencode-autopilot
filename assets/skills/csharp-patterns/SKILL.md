@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: csharp-patterns
 description: Idiomatic C# patterns including records, .NET DI, Entity Framework, and async best practices
 stacks:

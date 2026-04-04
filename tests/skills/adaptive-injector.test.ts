@@ -3,15 +3,23 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+	buildAdaptiveSkillContext,
 	buildMultiSkillContext,
+	buildSkillSummary,
 	detectProjectStackTags,
 	filterSkillsByStack,
+	PHASE_SKILL_MAP,
 } from "../../src/skills/adaptive-injector";
 import type { LoadedSkill } from "../../src/skills/loader";
 
-function makeSkill(name: string, stacks: string[], requires: string[] = []): LoadedSkill {
+function makeSkill(
+	name: string,
+	stacks: string[],
+	requires: string[] = [],
+	description = "",
+): LoadedSkill {
 	return {
-		frontmatter: { name, description: "", stacks, requires },
+		frontmatter: { name, description, stacks, requires },
 		content: `---\nname: ${name}\n---\n# ${name} content`,
 		path: `/fake/${name}/SKILL.md`,
 	};
@@ -168,8 +176,21 @@ describe("buildMultiSkillContext", () => {
 		expect(result).toContain("[Skill: coding-standards]");
 	});
 
-	it("respects token budget", () => {
-		// Create a skill with very large content
+	it("respects token budget by excluding skills that exceed it", () => {
+		const bigSkill: LoadedSkill = {
+			frontmatter: { name: "big", description: "x".repeat(300), stacks: [], requires: [] },
+			content: "x".repeat(50000),
+			path: "/fake/big/SKILL.md",
+		};
+
+		const skills = new Map<string, LoadedSkill>([["big", bigSkill]]);
+
+		// Budget of 1 token = 4 chars total — even a summary header can't fit
+		const result = buildMultiSkillContext(skills, 1, "summary");
+		expect(result).toBe("");
+	});
+
+	it("respects token budget in full mode by truncating at section boundaries", () => {
 		const bigContent = "x".repeat(50000);
 		const bigSkill: LoadedSkill = {
 			frontmatter: { name: "big", description: "", stacks: [], requires: [] },
@@ -179,9 +200,13 @@ describe("buildMultiSkillContext", () => {
 
 		const skills = new Map<string, LoadedSkill>([["big", bigSkill]]);
 
-		// With very small token budget (100 tokens = 400 chars), skill should be excluded
-		const result = buildMultiSkillContext(skills, 100);
-		expect(result).toBe("");
+		// 100 tokens = 400 chars — full mode truncates content to fit within budget
+		const result = buildMultiSkillContext(skills, 100, "full");
+		// The header + wrapper add overhead, so total output stays within budget
+		const charBudget = 100 * 4;
+		// The wrapper line is outside the budget accounting, but the skill section fits
+		const skillSection = result.slice(result.indexOf("[Skill:"));
+		expect(skillSection.length).toBeLessThanOrEqual(charBudget);
 	});
 
 	it("orders skills by dependency", () => {
@@ -194,5 +219,174 @@ describe("buildMultiSkillContext", () => {
 		const basicsIdx = result.indexOf("[Skill: basics]");
 		const advancedIdx = result.indexOf("[Skill: advanced]");
 		expect(basicsIdx).toBeLessThan(advancedIdx);
+	});
+
+	it("skills are sorted alphabetically in output when Map is pre-sorted by loader", () => {
+		// Simulate loader output: Map entries sorted alphabetically by name.
+		// The dependency resolver preserves this order for independent nodes.
+		const unsorted = new Map<string, LoadedSkill>([
+			["zebra-skill", makeSkill("zebra-skill", [])],
+			["alpha-skill", makeSkill("alpha-skill", [])],
+			["middle-skill", makeSkill("middle-skill", [])],
+		]);
+		// Sort as loader.ts does: alphabetical by key
+		const skills = new Map([...unsorted.entries()].sort(([a], [b]) => a.localeCompare(b)));
+
+		const result = buildMultiSkillContext(skills);
+		const alphaIdx = result.indexOf("[Skill: alpha-skill]");
+		const middleIdx = result.indexOf("[Skill: middle-skill]");
+		const zebraIdx = result.indexOf("[Skill: zebra-skill]");
+		expect(alphaIdx).toBeLessThan(middleIdx);
+		expect(middleIdx).toBeLessThan(zebraIdx);
+	});
+
+	it("summary mode produces compact output (< 500 chars per skill)", () => {
+		const longContent = "x".repeat(5000);
+		const skill: LoadedSkill = {
+			frontmatter: {
+				name: "verbose-skill",
+				description: "A short description",
+				stacks: [],
+				requires: [],
+			},
+			content: longContent,
+			path: "/fake/verbose-skill/SKILL.md",
+		};
+
+		const skills = new Map<string, LoadedSkill>([["verbose-skill", skill]]);
+		const result = buildMultiSkillContext(skills, 8000, "summary");
+
+		// Extract just the skill section (after the header line)
+		const sectionStart = result.indexOf("[Skill: verbose-skill]");
+		expect(sectionStart).toBeGreaterThan(-1);
+		const sectionContent = result.slice(sectionStart);
+		expect(sectionContent.length).toBeLessThan(500);
+	});
+
+	it("full mode preserves structure and includes content", () => {
+		const skill: LoadedSkill = {
+			frontmatter: {
+				name: "structured",
+				description: "A skill with sections",
+				stacks: [],
+				requires: [],
+			},
+			content:
+				"---\nname: structured\n---\n# Heading\n\nParagraph one.\n\n## Section Two\n\nMore text.",
+			path: "/fake/structured/SKILL.md",
+		};
+
+		const skills = new Map<string, LoadedSkill>([["structured", skill]]);
+		const result = buildMultiSkillContext(skills, 8000, "full");
+		expect(result).toContain("[Skill: structured]");
+		expect(result).toContain("Heading");
+	});
+});
+
+describe("buildSkillSummary", () => {
+	it("returns name and description header", () => {
+		const skill = makeSkill("test-skill", [], [], "My skill description");
+		const summary = buildSkillSummary(skill);
+		expect(summary).toContain("[Skill: test-skill]");
+		expect(summary).toContain("My skill description");
+	});
+
+	it("truncates description to 200 chars", () => {
+		const longDesc = "A".repeat(300);
+		const skill = makeSkill("long-desc", [], [], longDesc);
+		const summary = buildSkillSummary(skill);
+		// Description portion must be at most 200 chars
+		const descPart = summary.split("\n")[1];
+		expect(descPart.length).toBeLessThanOrEqual(200);
+	});
+
+	it("handles empty description gracefully", () => {
+		const skill = makeSkill("no-desc", []);
+		const summary = buildSkillSummary(skill);
+		expect(summary).toContain("[Skill: no-desc]");
+		expect(summary).toBe("[Skill: no-desc]\n");
+	});
+});
+
+describe("buildAdaptiveSkillContext", () => {
+	it("phase filtering only includes phase-relevant skills", () => {
+		const skills = new Map<string, LoadedSkill>([
+			["coding-standards", makeSkill("coding-standards", [], [], "Coding conventions")],
+			["tdd-workflow", makeSkill("tdd-workflow", [], [], "Test-driven dev")],
+			["plan-writing", makeSkill("plan-writing", [], [], "Writing plans")],
+			["plan-executing", makeSkill("plan-executing", [], [], "Executing plans")],
+		]);
+
+		// BUILD phase should only include coding-standards and tdd-workflow
+		const buildResult = buildAdaptiveSkillContext(skills, { phase: "BUILD" });
+		expect(buildResult).toContain("coding-standards");
+		expect(buildResult).toContain("tdd-workflow");
+		expect(buildResult).not.toContain("plan-writing");
+		expect(buildResult).not.toContain("plan-executing");
+
+		// PLAN phase should only include plan-writing and plan-executing
+		const planResult = buildAdaptiveSkillContext(skills, { phase: "PLAN" });
+		expect(planResult).toContain("plan-writing");
+		expect(planResult).toContain("plan-executing");
+		expect(planResult).not.toContain("coding-standards");
+		expect(planResult).not.toContain("tdd-workflow");
+	});
+
+	it("returns empty string for phases with no mapped skills", () => {
+		const skills = new Map<string, LoadedSkill>([
+			["coding-standards", makeSkill("coding-standards", [], [], "Coding conventions")],
+		]);
+
+		const result = buildAdaptiveSkillContext(skills, { phase: "RETROSPECTIVE" });
+		expect(result).toBe("");
+	});
+
+	it("returns empty string for unknown phase", () => {
+		const skills = new Map<string, LoadedSkill>([
+			["coding-standards", makeSkill("coding-standards", [], [], "Coding conventions")],
+		]);
+
+		const result = buildAdaptiveSkillContext(skills, { phase: "UNKNOWN_PHASE" });
+		expect(result).toBe("");
+	});
+
+	it("without phase, includes all provided skills", () => {
+		const skills = new Map<string, LoadedSkill>([
+			["coding-standards", makeSkill("coding-standards", [], [], "Coding conventions")],
+			["plan-writing", makeSkill("plan-writing", [], [], "Writing plans")],
+		]);
+
+		const result = buildAdaptiveSkillContext(skills);
+		expect(result).toContain("coding-standards");
+		expect(result).toContain("plan-writing");
+	});
+
+	it("respects custom budget", () => {
+		const skills = new Map<string, LoadedSkill>([
+			["coding-standards", makeSkill("coding-standards", [], [], "Coding conventions")],
+			["tdd-workflow", makeSkill("tdd-workflow", [], [], "Test-driven dev")],
+		]);
+
+		// Very small budget should limit output
+		const result = buildAdaptiveSkillContext(skills, { phase: "BUILD", budget: 5 });
+		// 5 tokens = 20 chars total budget -- may fit zero or one summary
+		expect(result.length).toBeLessThan(200);
+	});
+
+	it("PHASE_SKILL_MAP covers all 8 pipeline phases", () => {
+		const expectedPhases = [
+			"RECON",
+			"CHALLENGE",
+			"ARCHITECT",
+			"PLAN",
+			"BUILD",
+			"SHIP",
+			"RETROSPECTIVE",
+			"EXPLORE",
+		];
+		for (const phase of expectedPhases) {
+			expect(PHASE_SKILL_MAP[phase]).toBeDefined();
+			expect(Array.isArray(PHASE_SKILL_MAP[phase])).toBe(true);
+		}
 	});
 });

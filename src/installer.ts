@@ -1,4 +1,4 @@
-import { access, copyFile, readdir, unlink } from "node:fs/promises";
+import { access, copyFile, open, readdir, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { copyIfMissing, ensureDir, isEnoentError } from "./utils/fs-helpers";
 import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
@@ -139,14 +139,41 @@ async function processSkills(sourceDir: string, targetDir: string): Promise<Inst
 	return { copied, skipped, errors };
 }
 
+/** Marker string present in installer-generated file frontmatter. */
+const INSTALLER_MARKER = "opencode-autopilot";
+
+/** Read the first 200 bytes of a file to check for the installer marker. */
+async function hasInstallerMarker(filePath: string): Promise<boolean> {
+	let fh: import("node:fs/promises").FileHandle | undefined;
+	try {
+		fh = await open(filePath, "r");
+		const buf = Buffer.alloc(200);
+		const { bytesRead } = await fh.read(buf, 0, 200, 0);
+		const head = buf.toString("utf-8", 0, bytesRead);
+		return head.includes(INSTALLER_MARKER);
+	} finally {
+		try {
+			await fh?.close();
+		} catch {
+			/* ignore close errors to avoid masking the primary exception */
+		}
+	}
+}
+
 async function cleanupDeprecatedAssets(
 	targetDir: string,
 ): Promise<{ readonly removed: readonly string[]; readonly errors: readonly string[] }> {
 	const removed: string[] = [];
 	const errors: string[] = [];
 	for (const asset of DEPRECATED_ASSETS) {
+		const filePath = join(targetDir, asset);
 		try {
-			await unlink(join(targetDir, asset));
+			// Only delete if the file contains the installer marker.
+			// User-created files (without the marker) are left untouched.
+			const isOurs = await hasInstallerMarker(filePath);
+			if (!isOurs) continue;
+
+			await unlink(filePath);
 			removed.push(asset);
 		} catch (error: unknown) {
 			if (!isEnoentError(error)) {

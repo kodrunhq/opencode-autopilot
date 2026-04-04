@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: typescript-patterns
 description: TypeScript and Bun runtime patterns, testing idioms, type-level programming, and performance best practices
 stacks:

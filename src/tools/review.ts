@@ -12,6 +12,7 @@
  */
 
 import { execFile } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -110,7 +111,7 @@ async function saveReviewState(state: ReviewState, artifactDir: string): Promise
 	// Validate before writing (bidirectional validation, same as orchestrator state)
 	const validated = reviewStateSchema.parse(state);
 	const statePath = join(artifactDir, STATE_FILE);
-	const tmpPath = `${statePath}.tmp.${Date.now()}`;
+	const tmpPath = `${statePath}.tmp.${randomBytes(8).toString("hex")}`;
 	await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
 	await rename(tmpPath, statePath);
 }

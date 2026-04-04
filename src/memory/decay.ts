@@ -16,6 +16,7 @@ import {
 	MIN_RELEVANCE_THRESHOLD,
 	TYPE_WEIGHTS,
 } from "./constants";
+import { getMemoryDb } from "./database";
 import { deleteObservation, getObservationsByProject } from "./repository";
 import type { ObservationType } from "./types";
 
@@ -87,6 +88,16 @@ export function pruneStaleObservations(
 		for (const entry of toRemove) {
 			deleteObservation(entry.id, db);
 			pruned++;
+		}
+	}
+
+	// Optimize the FTS5 index after pruning to reclaim space and improve query speed
+	if (pruned > 0) {
+		try {
+			const resolvedDb = db ?? getMemoryDb();
+			resolvedDb.run("INSERT INTO observations_fts(observations_fts) VALUES('optimize')");
+		} catch {
+			// best-effort — FTS optimize failure is non-critical
 		}
 	}
 

@@ -22,6 +22,7 @@ export interface DispatchResult {
 	readonly progress?: string;
 	readonly message?: string;
 	readonly _stateUpdates?: Partial<PipelineState>;
+	readonly _userProgress?: string;
 }
 
 export type PhaseHandler = (

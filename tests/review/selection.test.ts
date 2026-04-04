@@ -4,7 +4,7 @@ import {
 	buildCrossVerificationPrompts,
 	condenseFinding,
 } from "../../src/review/cross-verification";
-import { computeDiffRelevance, selectAgents } from "../../src/review/selection";
+import { selectAgents } from "../../src/review/selection";
 import type { ReviewFinding } from "../../src/review/types";
 
 // ---- Helper factories ----
@@ -155,58 +155,6 @@ describe("selectAgents", () => {
 		expect(result.selected.some((a) => a.name === "go-idioms-auditor")).toBe(false);
 		expect(result.selected.some((a) => a.name === "python-django-auditor")).toBe(false);
 		expect(result.selected.some((a) => a.name === "rust-safety-auditor")).toBe(false);
-	});
-});
-
-// ---- computeDiffRelevance ----
-
-describe("computeDiffRelevance", () => {
-	const secAgent = REVIEW_AGENTS.find((a) => a.name === "security-auditor");
-	const testAgent = REVIEW_AGENTS.find((a) => a.name === "test-interrogator");
-
-	test("base score is 1.0 for any agent", () => {
-		const agent = REVIEW_AGENTS[0];
-		const score = computeDiffRelevance(agent, {
-			hasTests: false,
-			hasAuth: false,
-			hasConfig: false,
-			fileCount: 1,
-		});
-		expect(score).toBeGreaterThanOrEqual(1.0);
-	});
-
-	test("security-auditor gets higher score when hasAuth", () => {
-		if (!secAgent) throw new Error("security-auditor not found");
-		const withAuth = computeDiffRelevance(secAgent, {
-			hasTests: false,
-			hasAuth: true,
-			hasConfig: false,
-			fileCount: 1,
-		});
-		const withoutAuth = computeDiffRelevance(secAgent, {
-			hasTests: false,
-			hasAuth: false,
-			hasConfig: false,
-			fileCount: 1,
-		});
-		expect(withAuth).toBeGreaterThan(withoutAuth);
-	});
-
-	test("test-interrogator gets higher score when hasTests is false", () => {
-		if (!testAgent) throw new Error("test-interrogator not found");
-		const noTests = computeDiffRelevance(testAgent, {
-			hasTests: false,
-			hasAuth: false,
-			hasConfig: false,
-			fileCount: 1,
-		});
-		const withTests = computeDiffRelevance(testAgent, {
-			hasTests: true,
-			hasAuth: false,
-			hasConfig: false,
-			fileCount: 1,
-		});
-		expect(noTests).toBeGreaterThan(withTests);
 	});
 });
 

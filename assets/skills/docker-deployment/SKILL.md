@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: docker-deployment
 description: Dockerfile best practices, container orchestration, CI/CD deployment patterns, container security, and health checks
 stacks: []

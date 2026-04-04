@@ -9,6 +9,7 @@
  * to prevent corruption.
  */
 
+import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
@@ -76,7 +77,7 @@ export async function saveLessonMemory(memory: LessonMemory, projectRoot: string
 	const dir = join(projectRoot, ".opencode-autopilot");
 	await ensureDir(dir);
 	const memoryPath = join(dir, LESSON_FILE);
-	const tmpPath = `${memoryPath}.tmp.${Date.now()}`;
+	const tmpPath = `${memoryPath}.tmp.${randomBytes(8).toString("hex")}`;
 	await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
 	await rename(tmpPath, memoryPath);
 }

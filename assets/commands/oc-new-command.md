@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Create a new OpenCode command from within this session
 agent: metaprompter
 ---

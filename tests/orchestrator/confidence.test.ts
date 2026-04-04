@@ -63,13 +63,13 @@ describe("summarizeConfidence", () => {
 		expect(summary.dominant).toBe("HIGH");
 	});
 
-	test("empty array returns zeros with dominant MEDIUM", () => {
+	test("empty array returns zeros with dominant HIGH (avoids unnecessary arena depth)", () => {
 		const summary = summarizeConfidence([]);
 		expect(summary.HIGH).toBe(0);
 		expect(summary.MEDIUM).toBe(0);
 		expect(summary.LOW).toBe(0);
 		expect(summary.total).toBe(0);
-		expect(summary.dominant).toBe("MEDIUM");
+		expect(summary.dominant).toBe("HIGH");
 	});
 
 	test("tie-break prefers higher confidence (HIGH > MEDIUM > LOW)", () => {

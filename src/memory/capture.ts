@@ -104,7 +104,11 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 		readonly event: { readonly type: string; readonly [key: string]: unknown };
 	}): Promise<void> => {
 		const { event } = input;
-		const properties = (event.properties ?? {}) as Record<string, unknown>;
+		const rawProps = event.properties ?? {};
+		const properties: Record<string, unknown> =
+			rawProps !== null && typeof rawProps === "object" && !Array.isArray(rawProps)
+				? (rawProps as Record<string, unknown>)
+				: {};
 
 		// Skip noisy events early
 		if (!CAPTURE_EVENT_TYPES.has(event.type)) return;
@@ -144,15 +148,16 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 				currentSessionId = null;
 				currentProjectKey = null;
 
-				// Defer pruning to avoid blocking the event loop
+				// Defer pruning to avoid blocking the session.deleted handler.
+				// Best-effort: will not run if the process exits before this microtask drains.
 				if (projectKey) {
-					setTimeout(() => {
+					queueMicrotask(() => {
 						try {
 							pruneStaleObservations(projectKey, db);
 						} catch (err) {
 							console.warn("[opencode-autopilot] pruneStaleObservations failed:", err);
 						}
-					}, 0);
+					});
 				}
 				return;
 			}

@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Audit all installed skills, commands, and agents with optional lint validation
 agent: metaprompter
 ---

@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Implement a feature using strict RED-GREEN-REFACTOR TDD methodology
 agent: coder
 ---

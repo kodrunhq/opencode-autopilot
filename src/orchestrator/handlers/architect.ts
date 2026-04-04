@@ -27,11 +27,14 @@ export async function handleArchitect(
 	artifactDir: string,
 	_result?: string,
 ): Promise<DispatchResult> {
+	// _result is received from the orchestrator but completion is determined by
+	// artifact existence (design.md/critique.md), not by result truthiness.
+	// This preserves the three-step arena flow: proposals → critic → complete.
 	const phaseDir = getPhaseDir(artifactDir, "ARCHITECT");
 	const critiqueExists = await fileExists(join(phaseDir, "critique.md"));
 	const designExists = await fileExists(join(phaseDir, "design.md"));
 
-	// Step 3: critique or design exists -> complete
+	// Step 3: critique or design exists -> complete (idempotency on resume)
 	if (critiqueExists || designExists) {
 		return Object.freeze({
 			action: "complete" as const,
@@ -49,9 +52,9 @@ export async function handleArchitect(
 			action: "dispatch" as const,
 			agent: AGENT_NAMES.CRITIC,
 			prompt: [
-				`Review architecture proposals in phases/ARCHITECT/proposals/`,
-				`Read ${getArtifactRef("RECON", "report.md")} and ${getArtifactRef("CHALLENGE", "brief.md")} for context.`,
-				`Write comparative critique to ${getArtifactRef("ARCHITECT", "critique.md")}`,
+				`Review architecture proposals in ${proposalsDir}/`,
+				`Read ${getArtifactRef(artifactDir, "RECON", "report.md")} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md")} for context.`,
+				`Write comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md")}`,
 				`Include: strengths, weaknesses, recommendation, confidence (HIGH/MEDIUM/LOW).`,
 			].join("\n"),
 			phase: "ARCHITECT",
@@ -63,8 +66,8 @@ export async function handleArchitect(
 	await ensurePhaseDir(artifactDir, "ARCHITECT");
 	const reconEntries = filterByPhase(state.confidence, "RECON");
 	const depth = getMemoryTunedDepth(reconEntries, join(artifactDir, ".."));
-	const reconRef = getArtifactRef("RECON", "report.md");
-	const challengeRef = getArtifactRef("CHALLENGE", "brief.md");
+	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md");
+	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
 	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
 
 	if (depth === 1) {
@@ -74,7 +77,7 @@ export async function handleArchitect(
 			prompt: [
 				`Read ${reconRef} and ${challengeRef} for context.`,
 				`Design architecture for: ${safeIdea}`,
-				`Write design to ${getArtifactRef("ARCHITECT", "design.md")}`,
+				`Write design to ${getArtifactRef(artifactDir, "ARCHITECT", "design.md")}`,
 				`Include: component diagram, data flow, technology choices, confidence (HIGH/MEDIUM/LOW).`,
 			].join("\n"),
 			phase: "ARCHITECT",
@@ -90,7 +93,7 @@ export async function handleArchitect(
 				`Read ${reconRef} and ${challengeRef} for context.`,
 				`Design architecture for: ${safeIdea}`,
 				`Constraint: ${constraint}`,
-				`Write proposal to phases/ARCHITECT/proposals/proposal-${label}.md`,
+				`Write proposal to ${join(proposalsDir, `proposal-${label}.md`)}`,
 				`Include: component diagram, data flow, technology choices, confidence (HIGH/MEDIUM/LOW).`,
 			].join("\n"),
 		});

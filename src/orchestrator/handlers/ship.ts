@@ -1,8 +1,8 @@
-import { getArtifactRef } from "../artifacts";
+import { getArtifactRef, getPhaseDir } from "../artifacts";
 import type { DispatchResult, PhaseHandler } from "./types";
 import { AGENT_NAMES } from "./types";
 
-export const handleShip: PhaseHandler = async (_state, _artifactDir, result?) => {
+export const handleShip: PhaseHandler = async (_state, artifactDir, result?) => {
 	if (result) {
 		return Object.freeze({
 			action: "complete",
@@ -11,10 +11,11 @@ export const handleShip: PhaseHandler = async (_state, _artifactDir, result?) =>
 		} satisfies DispatchResult);
 	}
 
-	const reconRef = getArtifactRef("RECON", "report.md");
-	const challengeRef = getArtifactRef("CHALLENGE", "brief.md");
-	const architectRef = getArtifactRef("ARCHITECT", "design.md");
-	const planRef = getArtifactRef("PLAN", "tasks.md");
+	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md");
+	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
+	const architectRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
+	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.md");
+	const shipDir = getPhaseDir(artifactDir, "SHIP");
 
 	const prompt = [
 		"Review all prior phase artifacts:",
@@ -25,7 +26,7 @@ export const handleShip: PhaseHandler = async (_state, _artifactDir, result?) =>
 		"Produce walkthrough.md (architecture overview),",
 		"decisions.md (key decisions with rationale),",
 		"changelog.md (user-facing changes).",
-		"Write output to phases/SHIP/.",
+		`Write output to ${shipDir}/.`,
 	].join(" ");
 
 	return Object.freeze({

@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Decompose a feature into a structured implementation plan with tasks and dependency waves
 agent: planner
 ---

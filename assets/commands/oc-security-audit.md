@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Run a security audit of recent code changes
 agent: security-auditor
 ---

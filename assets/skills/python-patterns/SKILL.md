@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: python-patterns
 description: Pythonic patterns covering type hints, error handling, async, testing with pytest, and project organization
 stacks:

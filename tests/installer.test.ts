@@ -135,17 +135,37 @@ describe("installAssets", () => {
 		expect(result.errors).toHaveLength(0);
 	});
 
-	test("removes deprecated assets from target directory", async () => {
-		// Simulate a user upgrading from v3 who has old unprefixed command files
+	test("removes deprecated assets that contain the opencode-autopilot marker", async () => {
+		// Simulate a user upgrading from v3 who has old installer-generated command files
 		await mkdir(join(targetDir, "commands"), { recursive: true });
-		await writeFile(join(targetDir, "commands", "brainstorm.md"), "old content");
-		await writeFile(join(targetDir, "commands", "tdd.md"), "old content");
+		await writeFile(
+			join(targetDir, "commands", "brainstorm.md"),
+			"---\n# opencode-autopilot generated\n---\nold content",
+		);
+		await writeFile(
+			join(targetDir, "commands", "tdd.md"),
+			"---\n# opencode-autopilot generated\n---\nold content",
+		);
 
 		const result = await installAssets(sourceDir, targetDir);
 
-		// Old deprecated files should be removed
+		// Installer-generated deprecated files should be removed
 		expect(await fileExists(join(targetDir, "commands", "brainstorm.md"))).toBe(false);
 		expect(await fileExists(join(targetDir, "commands", "tdd.md"))).toBe(false);
+		expect(result.errors).toHaveLength(0);
+	});
+
+	test("preserves deprecated assets that are user-created (no marker)", async () => {
+		// Simulate a user who created their own brainstorm.md without the marker
+		await mkdir(join(targetDir, "commands"), { recursive: true });
+		await writeFile(join(targetDir, "commands", "brainstorm.md"), "my custom brainstorm command");
+
+		const result = await installAssets(sourceDir, targetDir);
+
+		// User-created file should be preserved
+		expect(await fileExists(join(targetDir, "commands", "brainstorm.md"))).toBe(true);
+		const content = await readFile(join(targetDir, "commands", "brainstorm.md"), "utf-8");
+		expect(content).toBe("my custom brainstorm command");
 		expect(result.errors).toHaveLength(0);
 	});
 
@@ -162,5 +182,32 @@ describe("installAssets", () => {
 
 		// Restore permissions for cleanup
 		await chmod(agentPath, 0o644);
+	});
+
+	test("hasInstallerMarker deletes deprecated asset when marker is within 200 bytes", async () => {
+		// "opencode-autopilot" is 18 bytes. Place it starting at byte 180 so it
+		// ends at byte 198, well within the 200-byte read window.
+		await mkdir(join(targetDir, "commands"), { recursive: true });
+		const padding = " ".repeat(180);
+		const content = padding + "opencode-autopilot\nold content after marker";
+		await writeFile(join(targetDir, "commands", "brainstorm.md"), content);
+
+		await installAssets(sourceDir, targetDir);
+
+		expect(await fileExists(join(targetDir, "commands", "brainstorm.md"))).toBe(false);
+	});
+
+	test("hasInstallerMarker preserves deprecated asset when marker is beyond 200 bytes", async () => {
+		// Pad with 201 bytes of spaces so "opencode-autopilot" starts at byte 201,
+		// outside the 200-byte read window. The marker should NOT be detected.
+		await mkdir(join(targetDir, "commands"), { recursive: true });
+		const padding = " ".repeat(201);
+		const content = padding + "opencode-autopilot\nold content after marker";
+		await writeFile(join(targetDir, "commands", "brainstorm.md"), content);
+
+		await installAssets(sourceDir, targetDir);
+
+		// File should still exist because the marker was not found in the first 200 bytes
+		expect(await fileExists(join(targetDir, "commands", "brainstorm.md"))).toBe(true);
 	});
 });

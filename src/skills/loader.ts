@@ -84,5 +84,8 @@ export async function loadAllSkills(skillsDir: string): Promise<ReadonlyMap<stri
 		if (!isEnoentError(error)) throw error;
 	}
 
-	return skills;
+	// Sort alphabetically by name for deterministic ordering regardless of
+	// filesystem readdir order (which varies across OS and FS types).
+	const sorted = new Map([...skills.entries()].sort(([a], [b]) => a.localeCompare(b)));
+	return Object.freeze(sorted);
 }

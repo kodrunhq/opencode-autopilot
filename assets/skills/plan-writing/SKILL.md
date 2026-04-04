@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: plan-writing
 description: Methodology for decomposing features into bite-sized implementation tasks with file paths, dependencies, and verification criteria
 stacks: []

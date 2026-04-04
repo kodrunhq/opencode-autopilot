@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: strategic-compaction
 description: Context window management through strategic summarization -- keep working memory lean without losing critical information
 stacks: []

@@ -8,6 +8,8 @@ import {
 	CODE_EXTENSIONS,
 	COMMENT_PATTERNS,
 	EXT_COMMENT_STYLE,
+	isExcludedHashLine,
+	MINIMUM_SLOP_INDICATORS,
 	SLOP_PATTERNS,
 } from "./slop-patterns";
 
@@ -36,8 +38,12 @@ export function scanForSlopComments(content: string, ext: string): readonly Slop
 
 	const lines = content.split("\n");
 	const findings: SlopFinding[] = [];
+	const matchedPatternSources = new Set<string>();
 
 	for (let i = 0; i < lines.length; i++) {
+		// Exclude shebangs and hex-color lines from # comment scanning
+		if (commentStyle === "#" && isExcludedHashLine(lines[i])) continue;
+
 		const match = commentRegex.exec(lines[i]);
 		if (!match?.[1]) continue;
 
@@ -45,6 +51,7 @@ export function scanForSlopComments(content: string, ext: string): readonly Slop
 
 		for (const pattern of SLOP_PATTERNS) {
 			if (pattern.test(commentText)) {
+				matchedPatternSources.add(pattern.source);
 				findings.push(
 					Object.freeze({
 						line: i + 1,
@@ -57,6 +64,11 @@ export function scanForSlopComments(content: string, ext: string): readonly Slop
 		}
 	}
 
+	// Only report when enough distinct patterns match to reduce false positives
+	if (matchedPatternSources.size < MINIMUM_SLOP_INDICATORS) {
+		return Object.freeze([]);
+	}
+
 	return Object.freeze(findings);
 }
 
@@ -64,6 +76,17 @@ export function scanForSlopComments(content: string, ext: string): readonly Slop
 const FILE_WRITING_TOOLS: ReadonlySet<string> = Object.freeze(
 	new Set(["write_file", "edit_file", "write", "edit", "create_file"]),
 );
+
+/** Debounce interval: skip re-scanning a file if it was scanned within this window (ms). */
+const SCAN_DEBOUNCE_MS = 5000;
+
+/** Module-level debounce map: filePath -> lastScanTimestamp. */
+const scanTimestamps: Map<string, number> = new Map();
+
+/** Clear the debounce map. Exported for test isolation. */
+export function clearScanTimestamps(): void {
+	scanTimestamps.clear();
+}
 
 /**
  * Creates a tool.execute.after handler that scans for slop comments.
@@ -101,6 +124,21 @@ export function createAntiSlopHandler(options: {
 		if (!resolved.startsWith(`${cwd}/`) && resolved !== cwd) return;
 
 		if (!isCodeFile(resolved)) return;
+
+		// Debounce: skip if this file was scanned within the debounce window
+		const now = Date.now();
+		const lastScan = scanTimestamps.get(resolved);
+		if (lastScan !== undefined && now - lastScan < SCAN_DEBOUNCE_MS) return;
+
+		// Claim the slot before yielding the event loop to prevent TOCTOU races
+		scanTimestamps.set(resolved, now);
+		if (scanTimestamps.size > 10_000) {
+			const cutoff = now - SCAN_DEBOUNCE_MS;
+			for (const [path, ts] of scanTimestamps) {
+				if (ts < cutoff) scanTimestamps.delete(path);
+			}
+		}
+
 		const ext = extname(resolved).toLowerCase();
 
 		// Read the actual file content — output.output is the tool's result message, not file content
@@ -108,7 +146,8 @@ export function createAntiSlopHandler(options: {
 		try {
 			fileContent = await readFile(resolved, "utf-8");
 		} catch {
-			return; // file unreadable — best-effort, skip
+			scanTimestamps.delete(resolved); // clear slot so next attempt is not blocked
+			return;
 		}
 
 		const findings = scanForSlopComments(fileContent, ext);

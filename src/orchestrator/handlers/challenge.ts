@@ -1,4 +1,5 @@
 import { sanitizeTemplateContent } from "../../review/sanitize";
+import { fileExists } from "../../utils/fs-helpers";
 import { ensurePhaseDir, getArtifactRef } from "../artifacts";
 import type { PipelineState } from "../types";
 import { AGENT_NAMES, type DispatchResult } from "./types";
@@ -13,6 +14,11 @@ export async function handleChallenge(
 	result?: string,
 ): Promise<DispatchResult> {
 	if (result) {
+		// Warn if artifact wasn't written (best-effort — still complete the phase)
+		const artifactPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
+		if (!(await fileExists(artifactPath))) {
+			console.warn("[opencode-autopilot] CHALLENGE completed but artifact not found");
+		}
 		return Object.freeze({
 			action: "complete" as const,
 			phase: "CHALLENGE",
@@ -21,8 +27,8 @@ export async function handleChallenge(
 	}
 
 	await ensurePhaseDir(artifactDir, "CHALLENGE");
-	const reconRef = getArtifactRef("RECON", "report.md");
-	const outputRef = getArtifactRef("CHALLENGE", "brief.md");
+	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md");
+	const outputPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
 
 	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
 
@@ -32,7 +38,7 @@ export async function handleChallenge(
 		prompt: [
 			`Read ${reconRef} for research context.`,
 			`Original idea: ${safeIdea}`,
-			`Propose up to 3 enhancements. Write ambitious brief to ${outputRef}`,
+			`Propose up to 3 enhancements. Write ambitious brief to ${outputPath}`,
 			`For each: name, user value, complexity (LOW/MEDIUM/HIGH), accept/reject rationale.`,
 		].join("\n"),
 		phase: "CHALLENGE",

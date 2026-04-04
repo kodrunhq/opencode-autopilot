@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Review and improve your project's agents.md file with structure validation and prompt quality feedback
 argument-hint: "[path-to-agents.md]"
 agent: metaprompter

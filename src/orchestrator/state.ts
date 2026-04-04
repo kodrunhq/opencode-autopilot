@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
@@ -45,7 +46,7 @@ export async function saveState(state: PipelineState, artifactDir: string): Prom
 	const validated = pipelineStateSchema.parse(state);
 	await ensureDir(artifactDir);
 	const statePath = join(artifactDir, STATE_FILE);
-	const tmpPath = `${statePath}.tmp.${Date.now()}`;
+	const tmpPath = `${statePath}.tmp.${randomBytes(8).toString("hex")}`;
 	await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
 	await rename(tmpPath, statePath);
 }

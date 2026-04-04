@@ -11,9 +11,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { sanitizeTemplateContent } from "../review/sanitize";
 import {
-	buildMultiSkillContext,
+	buildAdaptiveSkillContext,
 	detectProjectStackTags,
 	filterSkillsByStack,
+	type SkillMode,
 } from "../skills/adaptive-injector";
 import { loadAllSkills } from "../skills/loader";
 import { isEnoentError } from "../utils/fs-helpers";
@@ -69,7 +70,11 @@ export function buildSkillContext(skillContent: string): string {
 export async function loadAdaptiveSkillContext(
 	baseDir: string,
 	projectRoot: string,
-	tokenBudget?: number,
+	options?: {
+		readonly phase?: string;
+		readonly budget?: number;
+		readonly mode?: SkillMode;
+	},
 ): Promise<string> {
 	try {
 		const skillsDir = join(baseDir, "skills");
@@ -81,10 +86,10 @@ export async function loadAdaptiveSkillContext(
 		if (allSkills.size === 0) return "";
 
 		const matchingSkills = filterSkillsByStack(allSkills, projectTags);
-		return buildMultiSkillContext(matchingSkills, tokenBudget);
-	} catch {
-		// Best-effort: all errors return empty string. Caller (injectSkillContext)
-		// logs the error — no need to re-throw since the call site is also best-effort.
+		return buildAdaptiveSkillContext(matchingSkills, options);
+	} catch (err) {
+		// Best-effort: all errors return empty string.
+		console.warn("[opencode-autopilot] adaptive skill load failed:", err);
 		return "";
 	}
 }

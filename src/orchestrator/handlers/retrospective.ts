@@ -105,7 +105,9 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 
 	const artifactRefs = Object.entries(PHASE_ARTIFACTS)
 		.filter(([phase, files]) => files.length > 0 && phase !== "RETROSPECTIVE")
-		.flatMap(([phase, files]) => files.map((file) => getArtifactRef(phase as Phase, file)));
+		.flatMap(([phase, files]) =>
+			files.map((file) => getArtifactRef(artifactDir, phase as Phase, file)),
+		);
 
 	const prompt = [
 		"Analyze all phase artifacts:",
