@@ -91,6 +91,85 @@ export async function agentHealthCheck(config: Config | null): Promise<HealthRes
 }
 
 /**
+ * Check that OpenCode native plan/build agents are suppressed by the plugin.
+ * Contract: both entries must have disable=true, mode=subagent, hidden=true.
+ */
+export async function nativeAgentSuppressionHealthCheck(
+	config: Config | null,
+): Promise<HealthResult> {
+	if (!config?.agent) {
+		return Object.freeze({
+			name: "native-agent-suppression",
+			status: "fail" as const,
+			message: "No OpenCode config or agent map available",
+		});
+	}
+
+	const agentMap = config.agent as Record<string, unknown>;
+	const issues: string[] = [];
+	const requiredKeys = ["plan", "build"] as const;
+	const optionalKeys = ["Plan", "Build", "Planner", "Builder"] as const;
+
+	for (const key of requiredKeys) {
+		const raw = agentMap[key];
+		if (raw === undefined) {
+			issues.push(`${key}: missing config entry`);
+			continue;
+		}
+		if (typeof raw !== "object" || raw === null) {
+			issues.push(`${key}: invalid config entry type`);
+			continue;
+		}
+
+		const entry = raw as Record<string, unknown>;
+		if (entry.disable !== true) {
+			issues.push(`${key}: disable must be true`);
+		}
+		if (entry.mode !== "subagent") {
+			issues.push(`${key}: mode must be subagent`);
+		}
+		if (entry.hidden !== true) {
+			issues.push(`${key}: hidden must be true`);
+		}
+	}
+
+	for (const key of optionalKeys) {
+		const raw = agentMap[key];
+		if (raw === undefined) continue;
+		if (typeof raw !== "object" || raw === null) {
+			issues.push(`${key}: invalid config entry type`);
+			continue;
+		}
+
+		const entry = raw as Record<string, unknown>;
+		if (entry.disable !== true) {
+			issues.push(`${key}: disable must be true`);
+		}
+		if (entry.mode !== "subagent") {
+			issues.push(`${key}: mode must be subagent`);
+		}
+		if (entry.hidden !== true) {
+			issues.push(`${key}: hidden must be true`);
+		}
+	}
+
+	if (issues.length > 0) {
+		return Object.freeze({
+			name: "native-agent-suppression",
+			status: "fail" as const,
+			message: `${issues.length} native suppression issue(s) found`,
+			details: Object.freeze([...issues]),
+		});
+	}
+
+	return Object.freeze({
+		name: "native-agent-suppression",
+		status: "pass" as const,
+		message: "Native plan/build agents are suppressed",
+	});
+}
+
+/**
  * Check that the source and target asset directories exist and are accessible.
  */
 export async function assetHealthCheck(

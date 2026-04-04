@@ -563,7 +563,8 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 ### oc_doctor
 
-**Purpose:** Run plugin health diagnostics. Reports pass/fail status for config, agents, assets, skills, memory, commands, and hooks.
+**Purpose:** Run plugin health diagnostics. Reports pass/fail status for config, agents,
+native plan/build suppression, assets, skills, memory, commands, and hooks.
 
 **Input Parameters:**
 - None (no arguments)
@@ -577,7 +578,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 
 **Expected Output:**
 - JSON with `action: "doctor"`, `checks` array, `allPassed` boolean, `displayText`, and `duration` in milliseconds.
-- Checks include: `config-validity`, `agent-injection`, `asset-directories`, `skill-loading`, `memory-db`, `command-accessibility`, `hook-registration`.
+- Checks include: `config-validity`, `agent-injection`, `native-agent-suppression`, `asset-directories`, `skill-loading`, `memory-db`, `command-accessibility`, `hook-registration`.
 - Each check has `name`, `status` ("pass" or "fail"), `message`, and `fixSuggestion` (null if passing).
 - `displayText` shows human-readable `[OK]` or `[FAIL]` per check with fix suggestions.
 
@@ -586,7 +587,7 @@ All tools are registered programmatically via the plugin entry point (`src/index
 - Expected: The `config-validity` check reports "fail" with a fix suggestion: "Run `bunx @kodrunhq/opencode-autopilot configure` to reconfigure."
 
 **Pass/Fail:**
-- PASS: Returns structured JSON with all 7 checks. Failed checks include actionable fix suggestions. `allPassed` is true only when every check passes.
+- PASS: Returns structured JSON with all 8 checks. Failed checks include actionable fix suggestions. `allPassed` is true only when every check passes.
 - FAIL: Missing checks, no fix suggestions on failures, or tool crashes.
 
 ---
@@ -1781,7 +1782,7 @@ The fallback chain provides automatic model failover when API calls fail. It cla
 
 ## Doctor and Health Checks
 
-The `oc_doctor` tool runs 6 independent health checks and reports pass/fail status for each. Health checks are implemented in `src/health/checks.ts` and aggregated by `src/health/runner.ts`. The anti-slop comment hook detects AI-generated comment bloat in code files.
+The `oc_doctor` tool runs 7 independent health checks and reports pass/fail status for each. Health checks are implemented in `src/health/checks.ts` and aggregated by `src/health/runner.ts`. The anti-slop comment hook detects AI-generated comment bloat in code files.
 
 ### config-validity
 
@@ -1829,6 +1830,35 @@ The `oc_doctor` tool runs 6 independent health checks and reports pass/fail stat
 **Pass/Fail:**
 - PASS: All agents detected when properly registered. Missing agents listed by name.
 - FAIL: Missing agents not detected, or false positives reported.
+
+---
+
+### native-agent-suppression
+
+**What it checks:** OpenCode native `plan` and `build` entries are suppressed so they do
+not appear as primary Tab agents.
+
+Suppression contract for both keys in `config.agent`:
+- `disable: true`
+- `mode: "subagent"`
+- `hidden: true`
+
+**Steps:**
+1. Invoke `oc_doctor`.
+2. Locate the `native-agent-suppression` check.
+
+**Expected Output:**
+- Pass: `Native plan/build agents are suppressed`.
+- Fail: `{N} native suppression issue(s) found` with details (e.g., `plan: mode must be subagent`).
+
+**Negative Test:**
+- Simulate conflicting config that sets `plan` or `build` to primary mode.
+- Run `oc_doctor`.
+- Expected: `native-agent-suppression` reports fail with actionable fix suggestion.
+
+**Pass/Fail:**
+- PASS: Both native entries satisfy suppression contract.
+- FAIL: Any missing key or incorrect suppression field is reported.
 
 ---
 
@@ -1944,7 +1974,7 @@ The `oc_doctor` tool runs 6 independent health checks and reports pass/fail stat
 2. Observe the full JSON response.
 
 **Expected Output:**
-- JSON with `action: "doctor"`, `checks` array (6 entries), `allPassed` boolean, `displayText`, and `duration` in milliseconds.
+- JSON with `action: "doctor"`, `checks` array (7 health entries + 1 hook check), `allPassed` boolean, `displayText`, and `duration` in milliseconds.
 - Each check runs independently (Promise.allSettled) -- a failure in one does not skip others.
 - `allPassed` is true only when every check's status is "pass".
 - `displayText` shows human-readable `[OK]` or `[FAIL]` per check with fix suggestions for failures.
@@ -1956,7 +1986,7 @@ The `oc_doctor` tool runs 6 independent health checks and reports pass/fail stat
 - Expected: Each affected check reports "fail" independently. Working components still report "pass". `allPassed` is false.
 
 **Pass/Fail:**
-- PASS: All 7 checks run independently (6 health checks + 1 informational hook-registration). Failed checks include actionable messages. `allPassed` correctly reflects aggregate status. Duration is reasonable (<5 seconds).
+- PASS: All 8 checks run independently (7 health checks + 1 informational hook-registration). Failed checks include actionable messages. `allPassed` correctly reflects aggregate status. Duration is reasonable (<5 seconds).
 - FAIL: Checks not independent (one failure blocks others), missing fix suggestions, or incorrect aggregate status.
 
 ---
@@ -2226,12 +2256,12 @@ The orchestrator pipeline drives the full SDLC: RECON, CHALLENGE, ARCHITECT, EXP
 A rapid 10-item checklist for validating core plugin functionality before a release. Each item should take less than 1 minute to verify.
 
 - [ ] **Plugin loads:** OpenCode starts without errors when the plugin is configured in `opencode.json`.
-- [ ] **Tools register:** Invoke `oc_doctor` -- should return JSON with `action: "doctor"` and 7 checks (6 health + 1 hook-registration).
+- [ ] **Tools register:** Invoke `oc_doctor` -- should return JSON with `action: "doctor"` and 8 checks (7 health + 1 hook-registration).
 - [ ] **Commands accessible:** Type `/oc-` in the OpenCode TUI -- at least 11 commands should appear in autocomplete.
-- [ ] **Agents visible:** Press Tab to cycle primary agents -- autopilot, coder, debugger, planner, researcher, reviewer should be available. Type `@` and verify metaprompter, documenter, pr-reviewer are @-callable.
+- [ ] **Agents visible:** Press Tab to cycle primary agents -- autopilot, coder, debugger, planner, researcher, reviewer should be available. Native `plan` and `build` should NOT appear. Type `@` and verify metaprompter, documenter, pr-reviewer are @-callable.
 - [ ] **Skills inject:** Run `oc_doctor` in a TypeScript project -- `skill-loading` check should report detected stacks and matched skills.
 - [ ] **Memory captures:** Run `oc_memory_status` -- should return `stats` object (or null if DB not yet created). After a session with decisions, stats should show non-zero observation counts.
-- [ ] **Doctor passes:** Run `oc_doctor` -- all 7 checks should report "pass" with `allPassed: true`.
+- [ ] **Doctor passes:** Run `oc_doctor` -- all 8 checks should report "pass" with `allPassed: true`.
 - [ ] **Logs write:** End a session, then check `~/.config/opencode/logs/` for a new JSON log file.
 - [ ] **Config saves:** Run `oc_configure` start/assign/commit cycle -- config should persist to `~/.config/opencode/opencode-autopilot.json`.
 - [ ] **Stocktake counts match:** Run `oc_stocktake` -- summary counts should match: 18 skills, 11 commands, 8+ agents (standard + pipeline).

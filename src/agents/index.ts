@@ -71,19 +71,57 @@ function registerAgents(
 	}
 }
 
-function suppressBuiltInVariants(
-	variants: readonly string[],
-	builtInKeys: ReadonlySet<string>,
-	config: Config,
-): void {
+const nativeSuppressionPatch = Object.freeze({
+	disable: true,
+	mode: "subagent" as const,
+	hidden: true,
+});
+
+const optionalNativePlanBuildKeys = Object.freeze(["Plan", "Build", "Planner", "Builder"] as const);
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function mergeSuppressionPatch(entry: unknown): Record<string, unknown> {
+	if (isObjectRecord(entry)) {
+		return {
+			...entry,
+			...nativeSuppressionPatch,
+		};
+	}
+
+	return { ...nativeSuppressionPatch };
+}
+
+function suppressNativePlanBuildAgents(config: Config): void {
 	if (!config.agent) return;
-	for (const variant of variants) {
-		if (builtInKeys.has(variant) && config.agent[variant] !== undefined) {
-			config.agent[variant] = {
-				...config.agent[variant],
-				disable: true,
-			};
+
+	const agentRef = config.agent as Record<string, unknown>;
+
+	// Deterministically suppress native lowercase keys even if OpenCode did not
+	// pre-populate them before configHook execution.
+	for (const key of ["plan", "build"] as const) {
+		agentRef[key] = mergeSuppressionPatch(agentRef[key]);
+	}
+
+	// Also suppress optional native variants when present.
+	for (const key of optionalNativePlanBuildKeys) {
+		if (agentRef[key] !== undefined) {
+			agentRef[key] = mergeSuppressionPatch(agentRef[key]);
 		}
+	}
+}
+
+function suppressLegacyModePlanBuild(config: Config): void {
+	if (!config.mode) return;
+
+	const modeRef = config.mode as Record<string, unknown>;
+	for (const key of ["plan", "build", ...optionalNativePlanBuildKeys] as const) {
+		const existing = modeRef[key];
+		if (existing === undefined) continue;
+		if (!isObjectRecord(existing)) continue;
+		modeRef[key] = mergeSuppressionPatch(existing);
 	}
 }
 
@@ -105,21 +143,16 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 	const groups: Readonly<Record<string, GroupModelAssignment>> = pluginConfig?.groups ?? {};
 	const overrides: Readonly<Record<string, AgentOverride>> = pluginConfig?.overrides ?? {};
 
-	// Snapshot built-in agent keys BEFORE we register ours — we only suppress
-	// built-in Plan/Build variants, never our custom planner/coder agents.
-	const builtInKeys = new Set(Object.keys(config.agent));
-
 	// Register standard agents and pipeline agents (v2 orchestrator subagents)
 	registerAgents(agents, config, groups, overrides);
 	registerAgents(pipelineAgents, config, groups, overrides);
 
-	// Suppress built-in Plan/Build agents — planner/coder replace them.
-	// Only disable keys that existed before our registration (built-ins).
-	const planVariants = ["Plan", "plan", "Planner", "planner"] as const;
-	suppressBuiltInVariants(planVariants, builtInKeys, config);
+	// Suppress native built-in Plan/Build agents. This is deterministic and does
+	// not rely on whether OpenCode pre-populated keys before configHook runs.
+	suppressNativePlanBuildAgents(config);
 
-	const buildVariants = ["Build", "build", "Builder", "builder"] as const;
-	suppressBuiltInVariants(buildVariants, builtInKeys, config);
+	// Backward compatibility for legacy mode.plan/mode.build config shape.
+	suppressLegacyModePlanBuild(config);
 }
 
 export { autopilotAgent } from "./autopilot";

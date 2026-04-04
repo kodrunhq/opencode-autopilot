@@ -5,6 +5,7 @@ import {
 	commandHealthCheck,
 	configHealthCheck,
 	memoryHealthCheck,
+	nativeAgentSuppressionHealthCheck,
 	skillHealthCheck,
 } from "./checks";
 import type { HealthReport, HealthResult } from "./types";
@@ -45,6 +46,7 @@ export async function runHealthChecks(options?: {
 	const settled = await Promise.allSettled([
 		configHealthCheck(options?.configPath),
 		agentHealthCheck(options?.openCodeConfig ?? null),
+		nativeAgentSuppressionHealthCheck(options?.openCodeConfig ?? null),
 		assetHealthCheck(options?.assetsDir, options?.targetDir),
 		skillHealthCheck(options?.projectRoot ?? process.cwd()),
 		memoryHealthCheck(options?.targetDir),
@@ -54,6 +56,7 @@ export async function runHealthChecks(options?: {
 	const fallbackNames = [
 		"config-validity",
 		"agent-injection",
+		"native-agent-suppression",
 		"asset-directories",
 		"skill-loading",
 		"memory-db",

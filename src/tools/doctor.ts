@@ -63,6 +63,8 @@ const FIX_SUGGESTIONS: Readonly<Record<string, string>> = Object.freeze({
 	"config-validity":
 		"Run `bunx @kodrunhq/opencode-autopilot configure` to reconfigure, or delete ~/.config/opencode/opencode-autopilot.json to reset",
 	"agent-injection": "Restart OpenCode to trigger agent re-injection via config hook",
+	"native-agent-suppression":
+		"Restart OpenCode and verify plugin config hook runs. If issue persists, check for conflicting plugin config overriding plan/build entries",
 	"asset-directories": "Restart OpenCode to trigger asset reinstallation",
 	"skill-loading": "Ensure skills directory exists in ~/.config/opencode/skills/",
 	"memory-db":
@@ -143,7 +145,7 @@ export async function doctorCore(options?: DoctorOptions): Promise<string> {
 export const ocDoctor = tool({
 	description:
 		"Run plugin health diagnostics. Reports pass/fail status for config, agents, " +
-		"assets, and hooks. Like `brew doctor` for opencode-autopilot.",
+		"native suppression, assets, and hooks. Like `brew doctor` for opencode-autopilot.",
 	args: {},
 	async execute() {
 		return doctorCore();

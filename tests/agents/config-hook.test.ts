@@ -5,6 +5,14 @@ import { join } from "node:path";
 import type { Config } from "@opencode-ai/plugin";
 import { configHook } from "../../src/agents";
 
+function expectSuppressedNativeAgent(agent: unknown): void {
+	expect(agent).toBeDefined();
+	const record = agent as Record<string, unknown>;
+	expect(record.disable).toBe(true);
+	expect(record.mode).toBe("subagent");
+	expect(record.hidden).toBe(true);
+}
+
 describe("configHook", () => {
 	test("adds all 8 standard agents to an empty config object", async () => {
 		const config = { agent: {} } as Config;
@@ -55,10 +63,9 @@ describe("configHook", () => {
 		} as Config;
 		await configHook(config);
 
-		expect(config.agent?.build).toEqual({
-			...buildAgent,
-			disable: true,
-		});
+		expectSuppressedNativeAgent(config.agent?.build);
+		expect((config.agent?.build as Record<string, unknown>).description).toBe("build agent");
+		expect((config.agent?.build as Record<string, unknown>).prompt).toBe("build");
 	});
 
 	test("suppresses built-in plan agent with disable: true", async () => {
@@ -68,10 +75,49 @@ describe("configHook", () => {
 		} as Config;
 		await configHook(config);
 
-		expect(config.agent?.plan).toEqual({
-			...planAgent,
-			disable: true,
-		});
+		expectSuppressedNativeAgent(config.agent?.plan);
+		expect((config.agent?.plan as Record<string, unknown>).description).toBe("plan agent");
+		expect((config.agent?.plan as Record<string, unknown>).prompt).toBe("plan");
+	});
+
+	test("deterministically suppresses native plan/build keys when they are absent in initial config", async () => {
+		const config = {
+			agent: {},
+		} as Config;
+		await configHook(config);
+
+		expectSuppressedNativeAgent(config.agent?.plan);
+		expectSuppressedNativeAgent(config.agent?.build);
+	});
+
+	test("suppresses uppercase Plan/Build variants when pre-populated", async () => {
+		const config = {
+			agent: {
+				Plan: { prompt: "native Plan" },
+				Build: { prompt: "native Build" },
+			},
+		} as Config;
+		await configHook(config);
+
+		expectSuppressedNativeAgent(config.agent?.Plan);
+		expectSuppressedNativeAgent(config.agent?.Build);
+		expect((config.agent?.Plan as Record<string, unknown>).prompt).toBe("native Plan");
+		expect((config.agent?.Build as Record<string, unknown>).prompt).toBe("native Build");
+	});
+
+	test("suppresses uppercase Planner/Builder variants when pre-populated", async () => {
+		const config = {
+			agent: {
+				Planner: { prompt: "native Planner" },
+				Builder: { prompt: "native Builder" },
+			},
+		} as Config;
+		await configHook(config);
+
+		expectSuppressedNativeAgent(config.agent?.Planner);
+		expectSuppressedNativeAgent(config.agent?.Builder);
+		expect((config.agent?.Planner as Record<string, unknown>).prompt).toBe("native Planner");
+		expect((config.agent?.Builder as Record<string, unknown>).prompt).toBe("native Builder");
 	});
 
 	test("does NOT suppress custom planner agent registered by the plugin", async () => {
@@ -84,6 +130,69 @@ describe("configHook", () => {
 		const planner = config.agent?.planner as Record<string, unknown> | undefined;
 		expect(planner).toBeDefined();
 		expect(planner?.disable).toBeUndefined();
+		expect(planner?.mode).toBe("all");
+		expect(planner?.hidden).toBeUndefined();
+
+		const coder = config.agent?.coder as Record<string, unknown> | undefined;
+		expect(coder).toBeDefined();
+		expect(coder?.disable).toBeUndefined();
+		expect(coder?.mode).toBe("all");
+		expect(coder?.hidden).toBeUndefined();
+	});
+
+	test("suppresses legacy mode.plan/mode.build when provided", async () => {
+		const modeConfig = {
+			plan: { description: "legacy plan" },
+			build: { description: "legacy build" },
+		} as NonNullable<Config["mode"]>;
+		const config = {
+			agent: {},
+			mode: modeConfig,
+		} as Config;
+		await configHook(config);
+
+		const plan = config.mode?.plan as Record<string, unknown> | undefined;
+		const build = config.mode?.build as Record<string, unknown> | undefined;
+		expect(plan).toBeDefined();
+		expect(build).toBeDefined();
+		expect(plan?.disable).toBe(true);
+		expect(plan?.mode).toBe("subagent");
+		expect(plan?.hidden).toBe(true);
+		expect(build?.disable).toBe(true);
+		expect(build?.mode).toBe("subagent");
+		expect(build?.hidden).toBe(true);
+	});
+
+	test("suppresses legacy mode.Plan/mode.Build and mode.Planner/mode.Builder when provided", async () => {
+		const modeConfig = {
+			Plan: { description: "legacy Plan" },
+			Build: { description: "legacy Build" },
+			Planner: { description: "legacy Planner" },
+			Builder: { description: "legacy Builder" },
+		} as NonNullable<Config["mode"]>;
+		const config = {
+			agent: {},
+			mode: modeConfig,
+		} as Config;
+		await configHook(config);
+
+		const plan = config.mode?.Plan as Record<string, unknown> | undefined;
+		const build = config.mode?.Build as Record<string, unknown> | undefined;
+		const planner = config.mode?.Planner as Record<string, unknown> | undefined;
+		const builder = config.mode?.Builder as Record<string, unknown> | undefined;
+
+		expect(plan?.disable).toBe(true);
+		expect(plan?.mode).toBe("subagent");
+		expect(plan?.hidden).toBe(true);
+		expect(build?.disable).toBe(true);
+		expect(build?.mode).toBe("subagent");
+		expect(build?.hidden).toBe(true);
+		expect(planner?.disable).toBe(true);
+		expect(planner?.mode).toBe("subagent");
+		expect(planner?.hidden).toBe(true);
+		expect(builder?.disable).toBe(true);
+		expect(builder?.mode).toBe("subagent");
+		expect(builder?.hidden).toBe(true);
 	});
 });
 
