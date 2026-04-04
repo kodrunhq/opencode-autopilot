@@ -71,6 +71,22 @@ function registerAgents(
 	}
 }
 
+function suppressBuiltInVariants(
+	variants: readonly string[],
+	builtInKeys: ReadonlySet<string>,
+	config: Config,
+): void {
+	if (!config.agent) return;
+	for (const variant of variants) {
+		if (builtInKeys.has(variant) && config.agent[variant] !== undefined) {
+			config.agent[variant] = {
+				...config.agent[variant],
+				disable: true,
+			};
+		}
+	}
+}
+
 export async function configHook(config: Config, configPath?: string): Promise<void> {
 	if (!config.agent) {
 		config.agent = {};
@@ -90,24 +106,20 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 	const overrides: Readonly<Record<string, AgentOverride>> = pluginConfig?.overrides ?? {};
 
 	// Snapshot built-in agent keys BEFORE we register ours — we only suppress
-	// built-in Plan variants, not our own custom "planner" agent.
+	// built-in Plan/Build variants, never our custom planner/coder agents.
 	const builtInKeys = new Set(Object.keys(config.agent));
 
 	// Register standard agents and pipeline agents (v2 orchestrator subagents)
 	registerAgents(agents, config, groups, overrides);
 	registerAgents(pipelineAgents, config, groups, overrides);
 
-	// Suppress built-in Plan agent — our planner agent replaces it (D-17).
+	// Suppress built-in Plan/Build agents — planner/coder replace them.
 	// Only disable keys that existed before our registration (built-ins).
 	const planVariants = ["Plan", "plan", "Planner", "planner"] as const;
-	for (const variant of planVariants) {
-		if (builtInKeys.has(variant) && config.agent[variant] !== undefined) {
-			config.agent[variant] = {
-				...config.agent[variant],
-				disable: true,
-			};
-		}
-	}
+	suppressBuiltInVariants(planVariants, builtInKeys, config);
+
+	const buildVariants = ["Build", "build", "Builder", "builder"] as const;
+	suppressBuiltInVariants(buildVariants, builtInKeys, config);
 }
 
 export { autopilotAgent } from "./autopilot";

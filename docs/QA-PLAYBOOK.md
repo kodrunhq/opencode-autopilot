@@ -454,8 +454,8 @@ All agents are injected via the config hook at plugin load time. Primary agents 
 - Plugin installed and loaded
 
 **Availability Test:**
-- Type `@researcher` in the chat. It should appear in @-mention autocomplete (mode: `subagent`).
-- It should NOT appear in Tab cycle (subagent mode only).
+- Press Tab to cycle through primary agents. Researcher should appear (mode: `all`).
+- Type `@researcher` in the chat. It should also be available via @-mention (mode `all` means both Tab and @-mention).
 
 **Skill Loading Test:**
 - No embedded skills (general-purpose research via web fetch).
@@ -2228,7 +2228,7 @@ A rapid 10-item checklist for validating core plugin functionality before a rele
 - [ ] **Plugin loads:** OpenCode starts without errors when the plugin is configured in `opencode.json`.
 - [ ] **Tools register:** Invoke `oc_doctor` -- should return JSON with `action: "doctor"` and 7 checks (6 health + 1 hook-registration).
 - [ ] **Commands accessible:** Type `/oc-` in the OpenCode TUI -- at least 11 commands should appear in autocomplete.
-- [ ] **Agents visible:** Press Tab to cycle primary agents -- autopilot, debugger, planner, reviewer should be available. Type `@` and verify researcher, metaprompter, documenter, pr-reviewer are @-callable.
+- [ ] **Agents visible:** Press Tab to cycle primary agents -- autopilot, coder, debugger, planner, researcher, reviewer should be available. Type `@` and verify metaprompter, documenter, pr-reviewer are @-callable.
 - [ ] **Skills inject:** Run `oc_doctor` in a TypeScript project -- `skill-loading` check should report detected stacks and matched skills.
 - [ ] **Memory captures:** Run `oc_memory_status` -- should return `stats` object (or null if DB not yet created). After a session with decisions, stats should show non-zero observation counts.
 - [ ] **Doctor passes:** Run `oc_doctor` -- all 7 checks should report "pass" with `allPassed: true`.
