@@ -2,7 +2,25 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { doctorCore } from "../../src/tools/doctor";
+import type { ToolContext } from "@opencode-ai/plugin";
+import {
+	doctorCore,
+	ocDoctor,
+	setOpenCodeConfig as setDoctorOpenCodeConfig,
+} from "../../src/tools/doctor";
+
+function createToolContext(directory: string): ToolContext {
+	return {
+		sessionID: "ses-test",
+		messageID: "msg-test",
+		agent: "tester",
+		directory,
+		worktree: directory,
+		abort: new AbortController().signal,
+		metadata(_input: Parameters<ToolContext["metadata"]>[0]) {},
+		ask: async (_input: Parameters<ToolContext["ask"]>[0]) => {},
+	};
+}
 
 describe("doctorCore", () => {
 	test("returns allPassed true when plugin is healthy", async () => {
@@ -250,6 +268,58 @@ describe("doctorCore", () => {
 		expect(result.contractHealth.legacyTasksFallbackSeen).toBe(true);
 		expect(result.contractHealth.legacyResultParserSeen).toBe(true);
 
+		await rm(tempDir, { recursive: true, force: true });
+	});
+});
+
+describe("ocDoctor tool wrapper", () => {
+	test("uses injected OpenCode config for native-agent-suppression check", async () => {
+		setDoctorOpenCodeConfig({
+			agent: {
+				plan: { disable: true, mode: "subagent", hidden: true },
+				build: { disable: true, mode: "subagent", hidden: true },
+			},
+		} as unknown as import("@opencode-ai/plugin").Config);
+
+		const tempDir = join(tmpdir(), `doctor-wrapper-config-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+
+		const result = JSON.parse(await ocDoctor.execute({}, createToolContext(tempDir)));
+		const suppressionCheck = result.checks.find(
+			(c: { name: string }) => c.name === "native-agent-suppression",
+		);
+
+		expect(suppressionCheck).toBeDefined();
+		expect(suppressionCheck.status).toBe("pass");
+
+		setDoctorOpenCodeConfig(null);
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("uses tool context directory as projectRoot for contract health detection", async () => {
+		setDoctorOpenCodeConfig({
+			agent: {
+				plan: { disable: true, mode: "subagent", hidden: true },
+				build: { disable: true, mode: "subagent", hidden: true },
+			},
+		} as unknown as import("@opencode-ai/plugin").Config);
+
+		const tempDir = join(tmpdir(), `doctor-wrapper-contract-${Date.now()}`);
+		await mkdir(join(tempDir, ".opencode-autopilot"), { recursive: true });
+		await writeFile(
+			join(tempDir, ".opencode-autopilot", "orchestration.jsonl"),
+			`${[
+				"[opencode-autopilot] PLAN fallback: parsed legacy tasks.md (tasks.json missing)",
+				"[opencode-autopilot] Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
+			].join("\n")}\n`,
+			"utf-8",
+		);
+
+		const result = JSON.parse(await ocDoctor.execute({}, createToolContext(tempDir)));
+		expect(result.contractHealth.legacyTasksFallbackSeen).toBe(true);
+		expect(result.contractHealth.legacyResultParserSeen).toBe(true);
+
+		setDoctorOpenCodeConfig(null);
 		await rm(tempDir, { recursive: true, force: true });
 	});
 });
