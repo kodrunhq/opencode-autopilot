@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.13.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.12.2...opencode-autopilot-v1.13.0) (2026-04-04)
+
+
+### Features
+
+* **25-01:** add database-patterns and docker-deployment skills ([99794f4](https://github.com/kodrunhq/opencode-autopilot/commit/99794f4053c7fa766952fe19528b333a46401568))
+* **25-01:** add security-patterns and api-design skills ([9a190bd](https://github.com/kodrunhq/opencode-autopilot/commit/9a190bd56d26b2f29c1925b61123ba8b9eef589b))
+* **25-02:** create 4 subagent agents with embedded skills ([03b77ed](https://github.com/kodrunhq/opencode-autopilot/commit/03b77ed34dee07b25bf3def2b5c84d6a17e7376d))
+* **25-02:** wire 4 agents into index.ts and create 2 commands ([de61d45](https://github.com/kodrunhq/opencode-autopilot/commit/de61d45df3ad0032cfba18051e0d4dc61001fc4b))
+* **25:** content & agent expansion — 4 skills, 4 agents, 2 commands ([a2b2062](https://github.com/kodrunhq/opencode-autopilot/commit/a2b20627f02b2cb5e553bd0038ec05b9bccc3d77))
+
+
+### Bug Fixes
+
+* **25:** add subagent tests and fix embedded credential example ([638e4a6](https://github.com/kodrunhq/opencode-autopilot/commit/638e4a6992c62bbcb2ad52e62f2f686774aeb4ab))
+* **25:** resolve CI lint errors and PR review comments ([3edbd0c](https://github.com/kodrunhq/opencode-autopilot/commit/3edbd0cc5a6868d866390b122472995318b913a6))
+* **25:** resolve review findings — permissions, content quality, duplicates ([5ddad24](https://github.com/kodrunhq/opencode-autopilot/commit/5ddad2410479f0ca951c87aad94ce8035a28ed80))
+
 ## [1.12.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.12.1...opencode-autopilot-v1.12.2) (2026-04-03)
 
 
