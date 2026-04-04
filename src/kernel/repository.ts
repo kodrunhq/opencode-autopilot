@@ -415,7 +415,7 @@ export function loadLessonMemoryFromKernel(artifactDir: string): LessonMemory | 
 		}
 
 		if (!tableExists(db, "project_lesson_memory")) {
-			return parseLessonRows([]);
+			return null;
 		}
 
 		const row = db
