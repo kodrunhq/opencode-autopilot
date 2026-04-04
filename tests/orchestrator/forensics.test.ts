@@ -370,5 +370,29 @@ describe("forensicsCore", () => {
 
 		const result = JSON.parse(await forensicsCore({}, projectRoot));
 		expect(result.phasesCompleted).toEqual(["RECON", "CHALLENGE", "ARCHITECT"]);
+		expect(Array.isArray(result.deterministicErrorCodes)).toBe(true);
+	});
+
+	test("surfaces deterministic error codes from orchestration log", async () => {
+		const { forensicsCore } = await import("../../src/tools/forensics");
+		const state = makeMinimalState({
+			status: "FAILED",
+			failureContext: {
+				failedPhase: "BUILD",
+				failedAgent: null,
+				errorMessage: "failure",
+				timestamp: new Date().toISOString(),
+				lastSuccessfulPhase: "PLAN",
+			},
+		});
+		await writeState(tmpDir, state);
+		await writeFile(
+			join(tmpDir, "orchestration.jsonl"),
+			`${JSON.stringify({ action: "error", message: "E_DUPLICATE_RESULT: duplicate" })}\n`,
+			"utf-8",
+		);
+
+		const result = JSON.parse(await forensicsCore({}, projectRoot));
+		expect(result.deterministicErrorCodes).toContain("E_DUPLICATE_RESULT");
 	});
 });

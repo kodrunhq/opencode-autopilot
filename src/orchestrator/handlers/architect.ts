@@ -6,7 +6,7 @@ import { getMemoryTunedDepth } from "../arena";
 import { ensurePhaseDir, getArtifactRef, getPhaseDir } from "../artifacts";
 import { filterByPhase } from "../confidence";
 import type { PipelineState } from "../types";
-import { AGENT_NAMES, type DispatchResult } from "./types";
+import { AGENT_NAMES, type DispatchResult, type PhaseHandlerContext } from "./types";
 
 const CONSTRAINT_FRAMINGS: readonly string[] = Object.freeze([
 	"Optimize for simplicity and minimal dependencies",
@@ -26,6 +26,7 @@ export async function handleArchitect(
 	state: Readonly<PipelineState>,
 	artifactDir: string,
 	_result?: string,
+	_context?: PhaseHandlerContext,
 ): Promise<DispatchResult> {
 	// _result is received from the orchestrator but completion is determined by
 	// artifact existence (design.md/critique.md), not by result truthiness.
@@ -51,6 +52,7 @@ export async function handleArchitect(
 		return Object.freeze({
 			action: "dispatch" as const,
 			agent: AGENT_NAMES.CRITIC,
+			resultKind: "phase_output",
 			prompt: [
 				`Review architecture proposals in ${proposalsDir}/`,
 				`Read ${getArtifactRef(artifactDir, "RECON", "report.md")} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md")} for context.`,
@@ -74,6 +76,7 @@ export async function handleArchitect(
 		return Object.freeze({
 			action: "dispatch" as const,
 			agent: AGENT_NAMES.ARCHITECT,
+			resultKind: "phase_output",
 			prompt: [
 				`Read ${reconRef} and ${challengeRef} for context.`,
 				`Design architecture for: ${safeIdea}`,
@@ -89,6 +92,7 @@ export async function handleArchitect(
 		const label = String.fromCharCode(65 + i); // A, B, C
 		return Object.freeze({
 			agent: AGENT_NAMES.ARCHITECT,
+			resultKind: "phase_output" as const,
 			prompt: [
 				`Read ${reconRef} and ${challengeRef} for context.`,
 				`Design architecture for: ${safeIdea}`,

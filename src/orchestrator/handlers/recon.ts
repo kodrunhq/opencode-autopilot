@@ -2,7 +2,7 @@ import { sanitizeTemplateContent } from "../../review/sanitize";
 import { fileExists } from "../../utils/fs-helpers";
 import { ensurePhaseDir, getArtifactRef } from "../artifacts";
 import type { PipelineState } from "../types";
-import { AGENT_NAMES, type DispatchResult } from "./types";
+import { AGENT_NAMES, type DispatchResult, type PhaseHandlerContext } from "./types";
 
 /**
  * RECON phase handler — dispatches oc-researcher with idea and artifact path.
@@ -12,6 +12,7 @@ export async function handleRecon(
 	state: Readonly<PipelineState>,
 	artifactDir: string,
 	result?: string,
+	_context?: PhaseHandlerContext,
 ): Promise<DispatchResult> {
 	if (result) {
 		// Warn if artifact wasn't written (best-effort — still complete the phase)
@@ -34,6 +35,7 @@ export async function handleRecon(
 	return Object.freeze({
 		action: "dispatch" as const,
 		agent: AGENT_NAMES.RECON,
+		resultKind: "phase_output",
 		prompt: [
 			`Research the following idea and write findings to ${outputPath}`,
 			`Idea: ${safeIdea}`,

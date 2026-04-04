@@ -2,7 +2,7 @@ import { sanitizeTemplateContent } from "../../review/sanitize";
 import { fileExists } from "../../utils/fs-helpers";
 import { ensurePhaseDir, getArtifactRef } from "../artifacts";
 import type { PipelineState } from "../types";
-import { AGENT_NAMES, type DispatchResult } from "./types";
+import { AGENT_NAMES, type DispatchResult, type PhaseHandlerContext } from "./types";
 
 /**
  * CHALLENGE phase handler — dispatches oc-challenger with RECON artifact references.
@@ -12,6 +12,7 @@ export async function handleChallenge(
 	state: Readonly<PipelineState>,
 	artifactDir: string,
 	result?: string,
+	_context?: PhaseHandlerContext,
 ): Promise<DispatchResult> {
 	if (result) {
 		// Warn if artifact wasn't written (best-effort — still complete the phase)
@@ -35,6 +36,7 @@ export async function handleChallenge(
 	return Object.freeze({
 		action: "dispatch" as const,
 		agent: AGENT_NAMES.CHALLENGE,
+		resultKind: "phase_output",
 		prompt: [
 			`Read ${reconRef} for research context.`,
 			`Original idea: ${safeIdea}`,

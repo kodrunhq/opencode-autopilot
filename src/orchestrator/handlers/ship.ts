@@ -6,6 +6,7 @@ export const handleShip: PhaseHandler = async (_state, artifactDir, result?) => 
 	if (result) {
 		return Object.freeze({
 			action: "complete",
+			resultKind: "phase_output",
 			phase: "SHIP",
 			progress: "Shipping complete — documentation written",
 		} satisfies DispatchResult);
@@ -14,7 +15,7 @@ export const handleShip: PhaseHandler = async (_state, artifactDir, result?) => 
 	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md");
 	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
 	const architectRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
-	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.md");
+	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.json");
 	const shipDir = getPhaseDir(artifactDir, "SHIP");
 
 	const prompt = [
@@ -32,6 +33,7 @@ export const handleShip: PhaseHandler = async (_state, artifactDir, result?) => 
 	return Object.freeze({
 		action: "dispatch",
 		agent: AGENT_NAMES.SHIP,
+		resultKind: "phase_output",
 		prompt,
 		phase: "SHIP",
 		progress: "Dispatching shipper",

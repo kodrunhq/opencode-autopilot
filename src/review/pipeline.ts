@@ -19,8 +19,8 @@ const STAGE3_NAMES: ReadonlySet<string> = new Set(STAGE3_AGENTS.map((a) => a.nam
 
 import { buildFixInstructions, determineFixableFindings } from "./fix-cycle";
 import { buildReport } from "./report";
-import { reviewFindingSchema } from "./schemas";
-import type { ReviewFinding, ReviewReport, ReviewState } from "./types";
+import { reviewFindingSchema, reviewFindingsEnvelopeSchema } from "./schemas";
+import type { ReviewFinding, ReviewFindingsEnvelope, ReviewReport, ReviewState } from "./types";
 
 export type { ReviewState };
 
@@ -32,8 +32,19 @@ export interface ReviewStageResult {
 	readonly stage?: number;
 	readonly agents?: readonly { readonly name: string; readonly prompt: string }[];
 	readonly report?: ReviewReport;
+	readonly findingsEnvelope?: ReviewFindingsEnvelope;
 	readonly message?: string;
 	readonly state?: ReviewState;
+	readonly parseMode?: "typed" | "legacy";
+}
+
+function parseTypedFindingsEnvelope(raw: string): ReviewFindingsEnvelope | null {
+	try {
+		const parsed = JSON.parse(raw);
+		return reviewFindingsEnvelopeSchema.parse(parsed);
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -145,8 +156,11 @@ export function advancePipeline(
 	currentState: ReviewState,
 	agentName = "unknown",
 ): ReviewStageResult {
-	// Parse new findings
-	const newFindings = parseAgentFindings(findingsJson, agentName);
+	const typedEnvelope = parseTypedFindingsEnvelope(findingsJson);
+	const parseMode = typedEnvelope ? "typed" : "legacy";
+	const newFindings = typedEnvelope
+		? typedEnvelope.findings
+		: parseAgentFindings(findingsJson, agentName);
 	const accumulated = [...currentState.accumulatedFindings, ...newFindings];
 
 	const nextStage = currentState.stage + 1;
@@ -169,6 +183,7 @@ export function advancePipeline(
 				action: "dispatch" as const,
 				stage: nextStage,
 				agents: prompts,
+				parseMode,
 				state: newState,
 			});
 		}
@@ -193,6 +208,7 @@ export function advancePipeline(
 				action: "dispatch" as const,
 				stage: nextStage,
 				agents: Object.freeze(stage3Prompts.map((p) => Object.freeze(p))),
+				parseMode,
 				state: newState,
 			});
 		}
@@ -217,18 +233,37 @@ export function advancePipeline(
 					stage: nextStage,
 					message: "Fix cycle: CRITICAL findings with actionable suggestions detected.",
 					agents: Object.freeze(fixAgents),
+					parseMode,
 					state: newState,
 				});
 			}
 			// No fix cycle needed -- complete
 			const report = buildReport(accumulated, currentState.scope, currentState.selectedAgentNames);
-			return Object.freeze({ action: "complete" as const, report });
+			return Object.freeze({
+				action: "complete" as const,
+				report,
+				findingsEnvelope: Object.freeze({
+					schemaVersion: 1 as const,
+					kind: "review_findings" as const,
+					findings: accumulated,
+				}),
+				parseMode,
+			});
 		}
 
 		case 4: {
 			// Stage 4 -> complete: Build final report with all findings
 			const report = buildReport(accumulated, currentState.scope, currentState.selectedAgentNames);
-			return Object.freeze({ action: "complete" as const, report });
+			return Object.freeze({
+				action: "complete" as const,
+				report,
+				findingsEnvelope: Object.freeze({
+					schemaVersion: 1 as const,
+					kind: "review_findings" as const,
+					findings: accumulated,
+				}),
+				parseMode,
+			});
 		}
 
 		default:

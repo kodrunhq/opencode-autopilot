@@ -4,6 +4,7 @@ import type {
 	falsePositiveSchema,
 	reviewConfigSchema,
 	reviewFindingSchema,
+	reviewFindingsEnvelopeSchema,
 	reviewMemorySchema,
 	reviewReportSchema,
 	reviewStateSchema,
@@ -14,6 +15,7 @@ import type {
 export type Severity = z.infer<typeof severitySchema>;
 export type Verdict = z.infer<typeof verdictSchema>;
 export type ReviewFinding = z.infer<typeof reviewFindingSchema>;
+export type ReviewFindingsEnvelope = z.infer<typeof reviewFindingsEnvelopeSchema>;
 export type AgentResult = z.infer<typeof agentResultSchema>;
 export type ReviewReport = z.infer<typeof reviewReportSchema>;
 export type ReviewConfig = z.infer<typeof reviewConfigSchema>;

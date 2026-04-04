@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { loadState } from "../orchestrator/state";
 import { getProjectArtifactDir } from "../utils/paths";
@@ -19,6 +21,36 @@ function getSuggestedAction(failedPhase: string, recoverable: boolean): "resume"
 	if (!recoverable) return "restart";
 	if (failedPhase === "RECON") return "restart";
 	return "resume";
+}
+
+async function readRecentContractEvents(artifactDir: string): Promise<readonly string[]> {
+	try {
+		const raw = await readFile(join(artifactDir, "orchestration.jsonl"), "utf-8");
+		const lines = raw
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean)
+			.slice(-120);
+		const codes = new Set<string>();
+		for (const line of lines) {
+			for (const code of [
+				"E_INVALID_RESULT",
+				"E_STALE_RESULT",
+				"E_PHASE_MISMATCH",
+				"E_UNKNOWN_DISPATCH",
+				"E_DUPLICATE_RESULT",
+				"E_BUILD_TASK_ID_REQUIRED",
+				"E_BUILD_UNKNOWN_TASK",
+			]) {
+				if (line.includes(code)) {
+					codes.add(code);
+				}
+			}
+		}
+		return Object.freeze([...codes].sort());
+	} catch {
+		return Object.freeze([]);
+	}
 }
 
 export async function forensicsCore(
@@ -66,6 +98,7 @@ export async function forensicsCore(
 	const recoverable = isRecoverable(failureContext.failedPhase);
 	const suggestedAction = getSuggestedAction(failureContext.failedPhase, recoverable);
 	const phasesCompleted = state.phases.filter((p) => p.status === "DONE").map((p) => p.name);
+	const deterministicErrorCodes = await readRecentContractEvents(artifactDir);
 
 	return JSON.stringify({
 		failedPhase: failureContext.failedPhase,
@@ -75,6 +108,7 @@ export async function forensicsCore(
 		recoverable,
 		suggestedAction,
 		phasesCompleted,
+		deterministicErrorCodes,
 	});
 }
 

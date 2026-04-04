@@ -80,6 +80,7 @@ describe("advancePipeline with expanded agent set", () => {
 		const state = makeState();
 		const result = advancePipeline('{"findings": []}', state);
 		expect(result.action).toBe("dispatch");
+		expect(result.parseMode).toBe("legacy");
 		expect(result.stage).toBe(2);
 		// Cross-verification prompts should be generated for selected agents
 		if (result.agents) {
@@ -110,6 +111,20 @@ describe("advancePipeline with expanded agent set", () => {
 		const result = advancePipeline('{"findings": []}', state);
 		expect(result.action).toBe("complete");
 		expect(result.report).toBeDefined();
+		expect(result.findingsEnvelope).toBeDefined();
+		expect(result.findingsEnvelope?.kind).toBe("review_findings");
+	});
+
+	test("typed findings envelope uses typed parse mode", () => {
+		const state = makeState();
+		const typed = JSON.stringify({
+			schemaVersion: 1,
+			kind: "review_findings",
+			findings: [],
+		});
+		const result = advancePipeline(typed, state);
+		expect(result.action).toBe("dispatch");
+		expect(result.parseMode).toBe("typed");
 	});
 
 	test("pipeline handles selectedAgentNames with specialized agents throughout", () => {

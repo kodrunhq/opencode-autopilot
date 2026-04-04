@@ -49,6 +49,8 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 	const quickState = pipelineStateSchema.parse({
 		schemaVersion: 2,
 		status: "IN_PROGRESS",
+		runId: `quick-${Date.now()}`,
+		stateRevision: 0,
 		idea: args.idea,
 		currentPhase: "PLAN",
 		startedAt: now,
@@ -71,6 +73,8 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 		tasks: [],
 		arenaConfidence: null,
 		exploreTriggered: false,
+		pendingDispatches: [],
+		processedResultIds: [],
 	});
 
 	// 4. Persist quick state to disk

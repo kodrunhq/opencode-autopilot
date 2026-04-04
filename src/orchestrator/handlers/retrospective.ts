@@ -12,6 +12,8 @@ import type { Phase } from "../types";
 import type { DispatchResult, PhaseHandler } from "./types";
 import { AGENT_NAMES } from "./types";
 
+export const LESSONS_PARSE_ERROR_CODE = "E_RETRO_PARSE";
+
 /**
  * Parse and validate lessons from the agent's JSON output.
  * Returns only valid lessons; invalid entries are silently skipped (graceful degradation).
@@ -61,6 +63,8 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 		if (parseError) {
 			return Object.freeze({
 				action: "complete",
+				code: LESSONS_PARSE_ERROR_CODE,
+				resultKind: "phase_output",
 				phase: "RETROSPECTIVE",
 				progress: "Retrospective complete -- no lessons extracted (parse error)",
 			} satisfies DispatchResult);
@@ -69,6 +73,7 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 		if (valid.length === 0) {
 			return Object.freeze({
 				action: "complete",
+				resultKind: "phase_output",
 				phase: "RETROSPECTIVE",
 				progress: "Retrospective complete -- 0 lessons extracted",
 			} satisfies DispatchResult);
@@ -91,6 +96,7 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 			const msg = raw.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 256);
 			return Object.freeze({
 				action: "complete",
+				resultKind: "phase_output",
 				phase: "RETROSPECTIVE",
 				progress: `Retrospective complete — ${valid.length} lessons extracted (persistence failed: ${msg})`,
 			} satisfies DispatchResult);
@@ -98,6 +104,7 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 
 		return Object.freeze({
 			action: "complete",
+			resultKind: "phase_output",
 			phase: "RETROSPECTIVE",
 			progress: `Retrospective complete -- ${valid.length} lessons extracted`,
 		} satisfies DispatchResult);
@@ -118,6 +125,7 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 	return Object.freeze({
 		action: "dispatch",
 		agent: AGENT_NAMES.RETROSPECTIVE,
+		resultKind: "phase_output",
 		prompt,
 		phase: "RETROSPECTIVE",
 		progress: "Dispatching retrospector",

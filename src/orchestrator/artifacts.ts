@@ -26,7 +26,7 @@ export const PHASE_ARTIFACTS: Readonly<Record<string, readonly string[]>> = Obje
 	CHALLENGE: Object.freeze(["brief.md"]),
 	ARCHITECT: Object.freeze(["design.md"]),
 	EXPLORE: Object.freeze([]),
-	PLAN: Object.freeze(["tasks.md"]),
+	PLAN: Object.freeze(["tasks.json", "tasks.md"]),
 	BUILD: Object.freeze([]),
 	SHIP: Object.freeze(["walkthrough.md", "decisions.md", "changelog.md"]),
 	RETROSPECTIVE: Object.freeze(["lessons.json"]),

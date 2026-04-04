@@ -1,7 +1,10 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { Config } from "@opencode-ai/plugin";
 import { tool } from "@opencode-ai/plugin";
 import { runHealthChecks } from "../health/runner";
 import type { HealthResult } from "../health/types";
+import { getProjectArtifactDir } from "../utils/paths";
 
 /**
  * A single check in the doctor report, with an optional fix suggestion.
@@ -11,6 +14,35 @@ interface DoctorCheck {
 	readonly status: "pass" | "fail";
 	readonly message: string;
 	readonly fixSuggestion: string | null;
+}
+
+interface ContractHealth {
+	readonly legacyTasksFallbackSeen: boolean;
+	readonly legacyResultParserSeen: boolean;
+}
+
+async function detectContractHealth(projectRoot?: string): Promise<ContractHealth> {
+	if (!projectRoot) {
+		return {
+			legacyTasksFallbackSeen: false,
+			legacyResultParserSeen: false,
+		};
+	}
+
+	try {
+		const artifactDir = getProjectArtifactDir(projectRoot);
+		const logPath = join(artifactDir, "orchestration.jsonl");
+		const content = await readFile(logPath, "utf-8");
+		return {
+			legacyTasksFallbackSeen: content.includes("PLAN fallback: parsed legacy tasks.md"),
+			legacyResultParserSeen: content.includes("Legacy result parser path used"),
+		};
+	} catch {
+		return {
+			legacyTasksFallbackSeen: false,
+			legacyResultParserSeen: false,
+		};
+	}
 }
 
 /**
@@ -92,6 +124,7 @@ export async function doctorCore(options?: DoctorOptions): Promise<string> {
 	});
 
 	const allChecks = [...healthChecks, hookCheck];
+	const contractHealth = await detectContractHealth(options?.projectRoot);
 	const allPassed = report.allPassed && hookCheck.status === "pass";
 	const displayText = buildDisplayText(allChecks, report.duration);
 
@@ -99,6 +132,7 @@ export async function doctorCore(options?: DoctorOptions): Promise<string> {
 		action: "doctor",
 		checks: allChecks,
 		allPassed,
+		contractHealth,
 		displayText,
 		duration: report.duration,
 	});

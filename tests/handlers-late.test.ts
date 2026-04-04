@@ -65,7 +65,7 @@ describe("handleShip", () => {
 		expect(result.prompt).toContain("phases/RECON/report.md");
 		expect(result.prompt).toContain("phases/CHALLENGE/brief.md");
 		expect(result.prompt).toContain("phases/ARCHITECT/design.md");
-		expect(result.prompt).toContain("phases/PLAN/tasks.md");
+		expect(result.prompt).toContain("phases/PLAN/tasks.json");
 		expect(result.prompt).toContain("walkthrough.md");
 		expect(result.prompt).toContain("decisions.md");
 		expect(result.prompt).toContain("changelog.md");
@@ -340,6 +340,33 @@ describe("handleBuild", () => {
 		if (updatedTasks) {
 			expect(updatedTasks.find((t) => t.id === 1)?.status).toBe("DONE");
 		}
+	});
+
+	test("typed context requires taskId for dispatch_multi completion", async () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 },
+				{ id: 2, title: "Task B", status: "IN_PROGRESS", wave: 1 },
+			],
+			{ currentTask: null, currentWave: 1 },
+		);
+		const result = await handleBuild(state, "/tmp/artifacts", "done", {
+			envelope: {
+				schemaVersion: 1,
+				resultId: "r1",
+				runId: "run-1",
+				phase: "BUILD",
+				dispatchId: "d1",
+				agent: "oc-implementer",
+				kind: "task_completion",
+				taskId: null,
+				payload: { text: "done" },
+			},
+			legacy: false,
+		});
+
+		expect(result.action).toBe("error");
+		expect(result.code).toBe("E_BUILD_TASK_ID_REQUIRED");
 	});
 
 	test("strike count > 3 returns error", async () => {
