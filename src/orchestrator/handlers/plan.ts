@@ -1,59 +1,76 @@
 import { readFile } from "node:fs/promises";
+import { isEnoentError } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
 import { taskSchema } from "../schemas";
 import type { Task } from "../types";
 import type { DispatchResult, PhaseHandler } from "./types";
 import { AGENT_NAMES } from "./types";
 
+const EXPECTED_COLUMN_COUNT = 6;
+const taskIdPattern = /^W(\d+)-T(\d+)$/i;
+const separatorCellPattern = /^:?-{3,}:?$/;
+
+function parseTableColumns(line: string): readonly string[] | null {
+	const trimmed = line.trim();
+	if (!trimmed.includes("|")) {
+		return null;
+	}
+
+	const withoutLeadingBoundary = trimmed.startsWith("|") ? trimmed.slice(1) : trimmed;
+	const normalized = withoutLeadingBoundary.endsWith("|")
+		? withoutLeadingBoundary.slice(0, -1)
+		: withoutLeadingBoundary;
+
+	return normalized.split("|").map((col) => col.trim());
+}
+
+function isSeparatorRow(columns: readonly string[]): boolean {
+	return columns.length > 0 && columns.every((col) => separatorCellPattern.test(col));
+}
+
 /**
  * Parse tasks from markdown table in tasks.md.
- * Expected format: | ID | Title | Description | Files | Wave | Criteria |
+ * Expected format: | Task ID | Title | Description | Files | Wave | Criteria |
  * Returns array of Task objects.
  */
 async function loadTasksFromMarkdown(tasksPath: string): Promise<Task[]> {
 	const content = await readFile(tasksPath, "utf-8");
 	const lines = content.split("\n");
 
-	// Find the table header row and data rows
-	const tableStartIndex = lines.findIndex((line) => line.startsWith("| Task ID"));
-	if (tableStartIndex === -1) {
-		return [];
-	}
-
-	// Skip header and separator lines, collect data rows
 	const tasks: Task[] = [];
-	let taskIndex = 0;
-	for (let i = tableStartIndex + 2; i < lines.length; i++) {
-		const line = lines[i].trim();
-		if (!line.startsWith("|") || line.startsWith("|---")) {
+	for (const line of lines) {
+		const columns = parseTableColumns(line);
+		if (columns === null || columns.length < EXPECTED_COLUMN_COUNT || isSeparatorRow(columns)) {
 			continue;
 		}
 
-		// Parse CSV-like: | W1-T01 | Title | Description | Files | Wave | Criteria |
-		const columns = line
-			.slice(1, -1)
-			.split("|")
-			.map((col) => col.trim());
-
-		if (columns.length < 5) {
+		if (columns[0].toLowerCase() === "task id") {
 			continue;
 		}
 
-		// Use sequential index as task ID (1-based)
-		taskIndex++;
+		const idMatch = taskIdPattern.exec(columns[0]);
+		if (idMatch === null) {
+			continue;
+		}
+
+		const waveFromId = Number.parseInt(idMatch[1], 10);
 		const title = columns[1];
-		const wave = Number.parseInt(columns[4], 10);
+		const waveFromColumn = Number.parseInt(columns[4], 10);
 
-		if (Number.isNaN(wave) || !title) {
+		if (!title || Number.isNaN(waveFromId) || Number.isNaN(waveFromColumn)) {
+			continue;
+		}
+
+		if (waveFromId !== waveFromColumn) {
 			continue;
 		}
 
 		tasks.push(
 			taskSchema.parse({
-				id: taskIndex,
+				id: tasks.length + 1,
 				title,
 				status: "PENDING",
-				wave,
+				wave: waveFromColumn,
 				depends_on: [],
 				attempt: 0,
 				strike: 0,
@@ -61,30 +78,42 @@ async function loadTasksFromMarkdown(tasksPath: string): Promise<Task[]> {
 		);
 	}
 
+	if (tasks.length === 0) {
+		throw new Error("No valid task rows found in PLAN tasks.md");
+	}
+
 	return tasks;
 }
 
-export const handlePlan: PhaseHandler = async (state, artifactDir, result?) => {
+export const handlePlan: PhaseHandler = async (_state, artifactDir, result?) => {
 	// When result is provided, the planner has completed writing tasks
 	// Load them from tasks.md and populate state.tasks
 	if (result) {
 		const tasksPath = getArtifactRef(artifactDir, "PLAN", "tasks.md");
-		let loadedTasks: Task[] = [];
-
 		try {
-			loadedTasks = await loadTasksFromMarkdown(tasksPath);
-		} catch {
-			// If loading fails, continue with empty tasks (will be handled in BUILD)
-		}
+			const loadedTasks = await loadTasksFromMarkdown(tasksPath);
+			return Object.freeze({
+				action: "complete",
+				phase: "PLAN",
+				progress: `Planning complete — loaded ${loadedTasks.length} task(s)`,
+				_stateUpdates: {
+					tasks: loadedTasks,
+				},
+			} satisfies DispatchResult);
+		} catch (error: unknown) {
+			const reason = isEnoentError(error)
+				? "tasks.md not found after planner completion"
+				: error instanceof Error
+					? error.message
+					: "Unknown parsing error";
 
-		return Object.freeze({
-			action: "complete",
-			phase: "PLAN",
-			progress: "Planning complete — tasks written",
-			_stateUpdates: {
-				tasks: loadedTasks,
-			},
-		} satisfies DispatchResult);
+			return Object.freeze({
+				action: "error",
+				phase: "PLAN",
+				message: `Failed to load PLAN tasks: ${reason}`,
+				progress: "Planning failed — task extraction error",
+			} satisfies DispatchResult);
+		}
 	}
 
 	const architectRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
