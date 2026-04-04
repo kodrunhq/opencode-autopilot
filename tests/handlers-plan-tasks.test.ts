@@ -81,6 +81,26 @@ describe("handlePlan task loading", () => {
 			wave: 2,
 			status: "PENDING",
 		});
+
+		const jsonRaw = await readFile(join(tempDir, "phases", "PLAN", "tasks.json"), "utf-8");
+		const parsed = JSON.parse(jsonRaw) as {
+			schemaVersion: number;
+			tasks: Array<{ taskId: string; title: string; wave: number; depends_on: string[] }>;
+		};
+		expect(parsed.schemaVersion).toBe(1);
+		expect(parsed.tasks).toHaveLength(3);
+		expect(parsed.tasks[0]).toMatchObject({
+			taskId: "W1-T01",
+			title: "Add v1 API schemas",
+			wave: 1,
+			depends_on: [],
+		});
+		expect(parsed.tasks[2]).toMatchObject({
+			taskId: "W2-T01",
+			title: "Build repositories",
+			wave: 2,
+			depends_on: [],
+		});
 	});
 
 	test("loads tasks from tasks.json and writes derived tasks.md", async () => {

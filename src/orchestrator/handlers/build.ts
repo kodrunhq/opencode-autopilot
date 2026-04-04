@@ -1,4 +1,5 @@
 import { sanitizeTemplateContent } from "../../review/sanitize";
+import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
 import type { BuildProgress, Task } from "../types";
@@ -55,12 +56,14 @@ function markTasksInProgress(tasks: readonly Task[], taskIds: readonly number[])
 /**
  * Build a prompt for a single task dispatch.
  */
-function buildTaskPrompt(task: Task, artifactDir: string): string {
+async function buildTaskPrompt(task: Task, artifactDir: string): Promise<string> {
 	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.json");
+	const planFallbackRef = getArtifactRef(artifactDir, "PLAN", "tasks.md");
 	const designRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
+	const planPath = (await fileExists(planRef)) ? planRef : planFallbackRef;
 	return [
 		`Implement task ${task.id}: ${task.title}.`,
-		`Reference the plan at ${planRef}`,
+		`Reference the plan at ${planPath}`,
 		`and architecture at ${designRef}.`,
 		`If a CLAUDE.md file exists in the project root, read it for project-specific conventions.`,
 		`Check ~/.config/opencode/skills/coding-standards/SKILL.md for coding standards.`,
@@ -244,10 +247,11 @@ export const handleBuild: PhaseHandler = async (
 
 		if (pendingTasks.length === 1) {
 			const task = pendingTasks[0];
+			const prompt = await buildTaskPrompt(task, artifactDir);
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.BUILD,
-				prompt: buildTaskPrompt(task, artifactDir),
+				prompt,
 				phase: "BUILD",
 				resultKind: "task_completion",
 				taskId: task.id,
@@ -259,11 +263,17 @@ export const handleBuild: PhaseHandler = async (
 		}
 
 		const dispatchedIds = pendingTasks.map((t) => t.id);
+		const promptsByTaskId = new Map<number, string>();
+		await Promise.all(
+			pendingTasks.map(async (task) => {
+				promptsByTaskId.set(task.id, await buildTaskPrompt(task, artifactDir));
+			}),
+		);
 		return Object.freeze({
 			action: "dispatch_multi",
 			agents: pendingTasks.map((task) => ({
 				agent: AGENT_NAMES.BUILD,
-				prompt: buildTaskPrompt(task, artifactDir),
+				prompt: promptsByTaskId.get(task.id) ?? "",
 				taskId: task.id,
 				resultKind: "task_completion" as const,
 			})),
@@ -350,10 +360,11 @@ export const handleBuild: PhaseHandler = async (
 		const pendingInWave = findPendingTasks(waveMap, currentWave);
 		if (pendingInWave.length > 0) {
 			const next = pendingInWave[0];
+			const prompt = await buildTaskPrompt(next, artifactDir);
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.BUILD,
-				prompt: buildTaskPrompt(next, artifactDir),
+				prompt,
 				phase: "BUILD",
 				resultKind: "task_completion",
 				taskId: next.id,
@@ -436,10 +447,11 @@ export const handleBuild: PhaseHandler = async (
 
 	if (pendingTasks.length === 1) {
 		const task = pendingTasks[0];
+		const prompt = await buildTaskPrompt(task, artifactDir);
 		return Object.freeze({
 			action: "dispatch",
 			agent: AGENT_NAMES.BUILD,
-			prompt: buildTaskPrompt(task, artifactDir),
+			prompt,
 			phase: "BUILD",
 			resultKind: "task_completion",
 			taskId: task.id,
@@ -456,11 +468,17 @@ export const handleBuild: PhaseHandler = async (
 
 	// Multiple pending tasks in wave -> dispatch_multi
 	const dispatchedIds = pendingTasks.map((t) => t.id);
+	const promptsByTaskId = new Map<number, string>();
+	await Promise.all(
+		pendingTasks.map(async (task) => {
+			promptsByTaskId.set(task.id, await buildTaskPrompt(task, artifactDir));
+		}),
+	);
 	return Object.freeze({
 		action: "dispatch_multi",
 		agents: pendingTasks.map((task) => ({
 			agent: AGENT_NAMES.BUILD,
-			prompt: buildTaskPrompt(task, artifactDir),
+			prompt: promptsByTaskId.get(task.id) ?? "",
 			taskId: task.id,
 			resultKind: "task_completion" as const,
 		})),

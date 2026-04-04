@@ -80,6 +80,9 @@ describe("orchestrateCore", () => {
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("error");
 		expect(parsed.code).toBe("E_STALE_RESULT");
+
+		const logRaw = await readFile(join(tempDir, "orchestration.jsonl"), "utf-8");
+		expect(logRaw).toContain("E_STALE_RESULT");
 	});
 
 	test("at final phase returns complete", async () => {

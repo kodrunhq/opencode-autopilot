@@ -105,6 +105,23 @@ async function loadTasksFromJson(tasksPath: string): Promise<Task[]> {
 	);
 }
 
+function buildTasksArtifactFromLegacyTasks(tasks: readonly Task[]) {
+	const countersByWave = new Map<number, number>();
+	return planTasksArtifactSchema.parse({
+		schemaVersion: 1,
+		tasks: tasks.map((task) => {
+			const nextIndex = (countersByWave.get(task.wave) ?? 0) + 1;
+			countersByWave.set(task.wave, nextIndex);
+			return {
+				taskId: `W${task.wave}-T${String(nextIndex).padStart(2, "0")}`,
+				title: task.title,
+				wave: task.wave,
+				depends_on: [] as string[],
+			};
+		}),
+	});
+}
+
 export const handlePlan: PhaseHandler = async (_state, artifactDir, result?) => {
 	// When result is provided, the planner has completed writing tasks
 	// Load them from tasks.json (canonical) and populate state.tasks.
@@ -136,6 +153,9 @@ export const handlePlan: PhaseHandler = async (_state, artifactDir, result?) => 
 					action: "error",
 					message: msg,
 				});
+
+				const artifact = buildTasksArtifactFromLegacyTasks(loadedTasks);
+				await writeFile(tasksJsonPath, JSON.stringify(artifact, null, 2), "utf-8");
 			} else {
 				const artifact = planTasksArtifactSchema.parse(
 					JSON.parse(await readFile(tasksJsonPath, "utf-8")),

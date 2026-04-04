@@ -187,12 +187,16 @@ describe("doctorCore", () => {
 		await mkdir(join(tempDir, ".opencode-autopilot"), { recursive: true });
 		await writeFile(
 			join(tempDir, ".opencode-autopilot", "orchestration.jsonl"),
-			"[opencode-autopilot] PLAN fallback: parsed legacy tasks.md (tasks.json missing)\n",
+			[
+				"[opencode-autopilot] PLAN fallback: parsed legacy tasks.md (tasks.json missing)",
+				"[opencode-autopilot] Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
+			].join("\n") + "\n",
 			"utf-8",
 		);
 
 		const result = JSON.parse(await doctorCore({ projectRoot: tempDir }));
 		expect(result.contractHealth.legacyTasksFallbackSeen).toBe(true);
+		expect(result.contractHealth.legacyResultParserSeen).toBe(true);
 
 		await rm(tempDir, { recursive: true, force: true });
 	});

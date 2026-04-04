@@ -59,16 +59,19 @@ describe("handleShip", () => {
 	test("dispatches oc-shipper with refs to all prior phase artifacts", async () => {
 		const state = makeState({ currentPhase: "SHIP" });
 		const result = await handleShip(state, "/tmp/artifacts");
+		const prompt = result.prompt ?? "";
 
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe(AGENT_NAMES.SHIP);
-		expect(result.prompt).toContain("phases/RECON/report.md");
-		expect(result.prompt).toContain("phases/CHALLENGE/brief.md");
-		expect(result.prompt).toContain("phases/ARCHITECT/design.md");
-		expect(result.prompt).toContain("phases/PLAN/tasks.json");
-		expect(result.prompt).toContain("walkthrough.md");
-		expect(result.prompt).toContain("decisions.md");
-		expect(result.prompt).toContain("changelog.md");
+		expect(prompt).toContain("phases/RECON/report.md");
+		expect(prompt).toContain("phases/CHALLENGE/brief.md");
+		expect(prompt).toContain("phases/ARCHITECT/design.md");
+		expect(
+			prompt.includes("phases/PLAN/tasks.json") || prompt.includes("phases/PLAN/tasks.md"),
+		).toBe(true);
+		expect(prompt).toContain("walkthrough.md");
+		expect(prompt).toContain("decisions.md");
+		expect(prompt).toContain("changelog.md");
 		expect(result.phase).toBe("SHIP");
 	});
 

@@ -74,6 +74,20 @@ function asErrorJson(code: string, message: string): string {
 	return JSON.stringify({ action: "error", code, message });
 }
 
+function logDeterministicError(
+	artifactDir: string,
+	phase: string,
+	code: string,
+	message: string,
+): void {
+	logOrchestrationEvent(artifactDir, {
+		timestamp: new Date().toISOString(),
+		phase,
+		action: "error",
+		message: `${code}: ${message}`.slice(0, 500),
+	});
+}
+
 function inferExpectedResultKindForAgent(
 	agent?: string,
 ): "phase_output" | "task_completion" | "review_findings" {
@@ -355,14 +369,17 @@ async function processHandlerResult(
 	let currentState = await applyStateUpdates(state, normalizedResult, artifactDir);
 
 	switch (normalizedResult.action) {
-		case "error":
+		case "error": {
+			const codePrefix = normalizedResult.code ? `${normalizedResult.code}: ` : "";
+			const messageBody = normalizedResult.message ?? "Handler returned error";
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
 				phase: normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN",
 				action: "error",
-				message: normalizedResult.message?.slice(0, 500),
+				message: `${codePrefix}${messageBody}`.slice(0, 500),
 			});
 			return JSON.stringify(normalizedResult);
+		}
 
 		case "dispatch": {
 			// Circuit breaker
@@ -633,10 +650,14 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 			if (typeof args.result === "string") {
 				const phaseHint = detectPhaseFromPending(state);
 				if (phaseHint === null) {
-					return asErrorJson(
+					const msg = "Received result but no pending dispatch exists.";
+					logDeterministicError(
+						artifactDir,
+						state.currentPhase ?? "UNKNOWN",
 						ORCHESTRATE_ERROR_CODES.STALE_RESULT,
-						"Received result but no pending dispatch exists.",
+						msg,
 					);
+					return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg);
 				}
 
 				try {
@@ -648,17 +669,26 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 					});
 
 					if (parsed.envelope.runId !== state.runId) {
-						return asErrorJson(
+						const msg = `Result runId ${parsed.envelope.runId} does not match active run ${state.runId}.`;
+						logDeterministicError(
+							artifactDir,
+							state.currentPhase ?? phaseHint,
 							ORCHESTRATE_ERROR_CODES.STALE_RESULT,
-							`Result runId ${parsed.envelope.runId} does not match active run ${state.runId}.`,
+							msg,
 						);
+						return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg);
 					}
 
 					if (parsed.legacy && state.pendingDispatches.length > 1) {
-						return asErrorJson(
+						const msg =
+							"Legacy result payload cannot be attributed with multiple pending dispatches. Provide typed envelope with dispatchId/taskId.";
+						logDeterministicError(
+							artifactDir,
+							state.currentPhase ?? phaseHint,
 							ORCHESTRATE_ERROR_CODES.INVALID_RESULT,
-							"Legacy result payload cannot be attributed with multiple pending dispatches. Provide typed envelope with dispatchId/taskId.",
+							msg,
 						);
+						return asErrorJson(ORCHESTRATE_ERROR_CODES.INVALID_RESULT, msg);
 					}
 
 					const allowMissingPending = parsed.legacy && state.pendingDispatches.length === 0;
@@ -668,9 +698,15 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 					await saveState(nextState, artifactDir);
 					state = nextState;
 					if (!allowMissingPending && parsed.legacy) {
-						console.warn(
-							"[opencode-autopilot] Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
-						);
+						const legacyMsg =
+							"Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.";
+						logOrchestrationEvent(artifactDir, {
+							timestamp: new Date().toISOString(),
+							phase: state.currentPhase ?? phaseHint,
+							action: "error",
+							message: legacyMsg,
+						});
+						console.warn(`[opencode-autopilot] ${legacyMsg}`);
 					}
 
 					phaseHandlerContext = {
