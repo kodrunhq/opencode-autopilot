@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.14.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.14.0...opencode-autopilot-v1.14.1) (2026-04-04)
+
+
+### Bug Fixes
+
+* harden PLAN task parsing and error handling ([42408e3](https://github.com/kodrunhq/opencode-autopilot/commit/42408e35aa712076a783899c6ed1b590d1bb2df8))
+* load tasks from tasks.md into pipeline state ([ba3de3f](https://github.com/kodrunhq/opencode-autopilot/commit/ba3de3fb8b8e65c1be14da7cf141ae7b28f83db8))
+* load tasks from tasks.md into pipeline state ([e3d4839](https://github.com/kodrunhq/opencode-autopilot/commit/e3d4839ac3574ad6738db9aa0171b9d7bcd756df))
+
 ## [1.14.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.13.0...opencode-autopilot-v1.14.0) (2026-04-04)
 
 
