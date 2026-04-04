@@ -14,7 +14,12 @@
 import type { Database } from "bun:sqlite";
 import { CHARS_PER_TOKEN, DEFAULT_INJECTION_BUDGET } from "./constants";
 import { computeRelevanceScore } from "./decay";
-import { getAllPreferences, getObservationsByProject, getProjectByPath } from "./repository";
+import {
+	getAllPreferences,
+	getObservationsByProject,
+	getProjectByPath,
+	updateAccessCount,
+} from "./repository";
 import type { Observation, Preference } from "./types";
 
 /**
@@ -249,6 +254,18 @@ export function retrieveMemoryContext(
 	const observations = getObservationsByProject(project.id, 100, db);
 	const scored = scoreAndRankObservations(observations, halfLifeDays);
 	const preferences = getAllPreferences(db);
+
+	// Update access counts for observations that make it into context.
+	// Best-effort: failures are swallowed to avoid blocking retrieval.
+	for (const obs of scored) {
+		if (obs.id !== undefined) {
+			try {
+				updateAccessCount(obs.id, db);
+			} catch {
+				// best-effort — access count update is non-critical
+			}
+		}
+	}
 
 	return buildMemoryContext({
 		projectName: project.name,

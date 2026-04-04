@@ -146,13 +146,13 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 
 				// Defer pruning to avoid blocking the event loop
 				if (projectKey) {
-					setTimeout(() => {
+					queueMicrotask(() => {
 						try {
 							pruneStaleObservations(projectKey, db);
 						} catch (err) {
 							console.warn("[opencode-autopilot] pruneStaleObservations failed:", err);
 						}
-					}, 0);
+					});
 				}
 				return;
 			}

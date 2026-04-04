@@ -1,10 +1,8 @@
 /**
- * Two-pass deterministic agent selection for the review pipeline.
+ * Deterministic agent selection for the review pipeline.
  *
- * Pass 1: Stack gate -- agents with empty relevantStacks always pass;
- *         agents with non-empty relevantStacks require at least one match.
- * Pass 2: Diff relevance scoring -- currently used for future ordering,
- *         all stack-passing agents run regardless of score.
+ * Stack gate: agents with empty relevantStacks always pass;
+ * agents with non-empty relevantStacks require at least one match.
  */
 
 /** Minimal agent shape needed for selection (compatible with ReviewAgent from agents/). */
@@ -38,7 +36,7 @@ export interface SelectionResult {
  */
 export function selectAgents(
 	detectedStacks: readonly string[],
-	diffAnalysis: DiffAnalysisInput,
+	_diffAnalysis: DiffAnalysisInput,
 	agents: readonly SelectableAgent[],
 ): SelectionResult {
 	const stackSet = new Set(detectedStacks);
@@ -65,34 +63,8 @@ export function selectAgents(
 		}
 	}
 
-	// Pass 2: Compute relevance scores (stored for future ordering, no filtering)
-	// Scores are intentionally not used for filtering yet
-	for (const agent of selected) {
-		computeDiffRelevance(agent, diffAnalysis);
-	}
-
 	return Object.freeze({
 		selected: Object.freeze(selected),
 		excluded: Object.freeze(excluded),
 	});
-}
-
-/**
- * Compute diff-based relevance score for an agent.
- * Base score of 1.0 with bonuses for specific agent-analysis matches.
- * Used for future prioritization/ordering, not for filtering.
- */
-export function computeDiffRelevance(agent: SelectableAgent, analysis: DiffAnalysisInput): number {
-	let score = 1.0;
-
-	if (agent.name === "security-auditor") {
-		if (analysis.hasAuth) score += 0.5;
-		if (analysis.hasConfig) score += 0.3;
-	}
-
-	if (agent.name === "test-interrogator") {
-		if (!analysis.hasTests) score += 0.5;
-	}
-
-	return score;
 }

@@ -13,6 +13,16 @@ export async function handleRecon(
 	result?: string,
 ): Promise<DispatchResult> {
 	if (result) {
+		// Warn if artifact wasn't written (best-effort — still complete the phase)
+		const artifactPath = getArtifactRef(artifactDir, "RECON", "report.md");
+		try {
+			const { existsSync } = await import("node:fs");
+			if (!existsSync(artifactPath)) {
+				console.warn(`[opencode-autopilot] RECON completed but ${artifactPath} not found`);
+			}
+		} catch {
+			/* best-effort */
+		}
 		return Object.freeze({
 			action: "complete" as const,
 			phase: "RECON",
