@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.15.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.15.1...opencode-autopilot-v1.15.2) (2026-04-04)
+
+
+### Bug Fixes
+
+* deterministically suppress native plan/build agents ([de346c1](https://github.com/kodrunhq/opencode-autopilot/commit/de346c1241052b3cc19aa5eea2742539397c7935))
+* deterministically suppress native plan/build agents ([dfee743](https://github.com/kodrunhq/opencode-autopilot/commit/dfee7431ca8d52d27723b57111eea5cd0a6e5fcc))
+* wire oc_doctor to runtime OpenCode config context ([7f2056b](https://github.com/kodrunhq/opencode-autopilot/commit/7f2056bee69644704c7e35ddf5bc2bfab48cf9ca))
+
 ## [1.15.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.15.0...opencode-autopilot-v1.15.1) (2026-04-04)
 
 
