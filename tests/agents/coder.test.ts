@@ -7,6 +7,10 @@ describe("coder agent config", () => {
 		expect(coderAgent.mode).toBe("all");
 	});
 
+	test("agents map exposes coder as mode 'all'", () => {
+		expect(agents.coder.mode).toBe("all");
+	});
+
 	test("has a non-empty description", () => {
 		expect(typeof coderAgent.description).toBe("string");
 		expect(coderAgent.description?.length).toBeGreaterThan(0);

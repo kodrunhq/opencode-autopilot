@@ -48,14 +48,17 @@ describe("configHook", () => {
 		expect(config.agent?.researcher?.description).toBe("custom researcher");
 	});
 
-	test("does not touch built-in keys (build) if they exist", async () => {
+	test("suppresses built-in build agent with disable: true", async () => {
 		const buildAgent = { description: "build agent", prompt: "build" };
 		const config = {
 			agent: { build: buildAgent },
 		} as Config;
 		await configHook(config);
 
-		expect(config.agent?.build).toBe(buildAgent);
+		expect(config.agent?.build).toEqual({
+			...buildAgent,
+			disable: true,
+		});
 	});
 
 	test("suppresses built-in plan agent with disable: true", async () => {

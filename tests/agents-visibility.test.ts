@@ -32,8 +32,8 @@ describe("Agent visibility invariants", () => {
 			expect(agents.reviewer.mode).toBe("all");
 		});
 
-		it("researcher has mode 'subagent' (not 'all')", () => {
-			expect(agents.researcher.mode).toBe("subagent");
+		it("researcher has mode 'all'", () => {
+			expect(agents.researcher.mode).toBe("all");
 		});
 
 		it("metaprompter has mode 'subagent' (not 'all')", () => {
@@ -48,7 +48,7 @@ describe("Agent visibility invariants", () => {
 			expect(agents["pr-reviewer"].mode).toBe("subagent");
 		});
 
-		it("exactly 5 agents have mode 'all': autopilot, coder, debugger, planner, reviewer", () => {
+		it("exactly 6 agents have mode 'all': autopilot, coder, debugger, planner, researcher, reviewer", () => {
 			const primaryAgents = Object.entries(agents)
 				.filter(([_, agent]) => agent.mode === "all")
 				.map(([name]) => name);
@@ -57,6 +57,7 @@ describe("Agent visibility invariants", () => {
 				"coder",
 				"debugger",
 				"planner",
+				"researcher",
 				"reviewer",
 			]);
 		});
@@ -76,12 +77,20 @@ describe("Agent visibility invariants", () => {
 				.filter(([_, agent]) => agent.mode === "all")
 				.map(([name]) => name);
 			const sorted = [...primaryNames].sort();
-			expect(sorted).toEqual(["autopilot", "coder", "debugger", "planner", "reviewer"]);
+			expect(sorted).toEqual([
+				"autopilot",
+				"coder",
+				"debugger",
+				"planner",
+				"researcher",
+				"reviewer",
+			]);
 			expect(sorted[0]).toBe("autopilot");
 			expect(sorted[1]).toBe("coder");
 			expect(sorted[2]).toBe("debugger");
 			expect(sorted[3]).toBe("planner");
-			expect(sorted[4]).toBe("reviewer");
+			expect(sorted[4]).toBe("researcher");
+			expect(sorted[5]).toBe("reviewer");
 		});
 	});
 
