@@ -1,8 +1,13 @@
 import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
+import { runKernelMigrations } from "../../src/kernel/migrations";
 import { CHARS_PER_TOKEN } from "../../src/memory/constants";
 import { initMemoryDb } from "../../src/memory/database";
-import { insertObservation, upsertProject } from "../../src/memory/repository";
+import {
+	insertObservation,
+	upsertPreferenceRecord,
+	upsertProject,
+} from "../../src/memory/repository";
 import {
 	buildMemoryContext,
 	retrieveMemoryContext,
@@ -33,7 +38,7 @@ function makeScoredObs(overrides: Partial<ScoredObservation> = {}): ScoredObserv
 		id: 1,
 		projectId: "test-project",
 		sessionId: "session-1",
-		type: "decision",
+		type: "error",
 		content: "Use repository pattern for data access layer",
 		summary: "Repository pattern for data access",
 		confidence: 0.8,
@@ -72,8 +77,9 @@ describe("buildMemoryContext", () => {
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: null,
-			observations: [],
+			lessons: [],
 			preferences: emptyPrefs,
+			recentFailures: [],
 		});
 		expect(result).toBe("");
 	});
@@ -82,8 +88,9 @@ describe("buildMemoryContext", () => {
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: "2026-01-01",
-			observations: [makeScoredObs()],
+			lessons: [],
 			preferences: emptyPrefs,
+			recentFailures: [makeScoredObs()],
 		});
 		expect(result).toContain("## Project Memory");
 	});
@@ -92,8 +99,9 @@ describe("buildMemoryContext", () => {
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: "2026-01-01",
-			observations: [makeScoredObs()],
+			lessons: [],
 			preferences: emptyPrefs,
+			recentFailures: [makeScoredObs()],
 		});
 		expect(result).toContain("my-project");
 		expect(result).toContain("2026-01-01");
@@ -103,33 +111,50 @@ describe("buildMemoryContext", () => {
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: null,
-			observations: [makeScoredObs()],
+			lessons: [],
 			preferences: emptyPrefs,
+			recentFailures: [makeScoredObs()],
 		});
 		expect(result).toContain("first session");
 	});
 
-	it("groups observations by type (Key Decisions, Patterns, Recent Errors)", () => {
-		const observations: ScoredObservation[] = [
-			makeScoredObs({ id: 1, type: "decision", summary: "Decision A" }),
-			makeScoredObs({ id: 2, type: "pattern", summary: "Pattern A" }),
-			makeScoredObs({ id: 3, type: "error", summary: "Error A" }),
-		];
-
+	it("renders explicit preference, lesson, and failure sections", () => {
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: "2026-01-01",
-			observations,
-			preferences: emptyPrefs,
+			preferences: [
+				{
+					id: "pref-1",
+					key: "editor",
+					value: "vim",
+					confidence: 0.9,
+					scope: "project",
+					projectId: "test-project",
+					status: "confirmed",
+					evidenceCount: 2,
+					sourceSession: null,
+					createdAt: new Date().toISOString(),
+					lastUpdated: new Date().toISOString(),
+				},
+			],
+			lessons: [
+				{
+					content: "Keep inspection read-only.",
+					domain: "review",
+					extractedAt: "2026-01-01T00:00:00Z",
+					sourcePhase: "RETROSPECTIVE",
+				},
+			],
+			recentFailures: [makeScoredObs({ id: 3, type: "error", summary: "Error A" })],
 		});
 
-		expect(result).toContain("### Key Decisions");
-		expect(result).toContain("### Patterns");
-		expect(result).toContain("### Recent Errors");
+		expect(result).toContain("### Confirmed Project Preferences");
+		expect(result).toContain("### Recent Lessons");
+		expect(result).toContain("### Failure Avoidance Notes");
 	});
 
-	it("respects token budget: small budget only includes Layer 1", () => {
-		const observations: ScoredObservation[] = Array.from({ length: 20 }, (_, i) =>
+	it("respects token budget", () => {
+		const failures: ScoredObservation[] = Array.from({ length: 20 }, (_, i) =>
 			makeScoredObs({
 				id: i + 1,
 				summary: `Decision ${i + 1} summary text that is reasonably long`,
@@ -139,21 +164,21 @@ describe("buildMemoryContext", () => {
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: "2026-01-01",
-			observations,
+			lessons: [],
 			preferences: emptyPrefs,
+			recentFailures: failures,
 			tokenBudget: 100,
 		});
 
-		// Should be within budget
 		const charBudget = 100 * CHARS_PER_TOKEN;
 		expect(result.length).toBeLessThanOrEqual(charBudget);
 	});
 
 	it("never exceeds char budget (tokenBudget * CHARS_PER_TOKEN)", () => {
-		const observations: ScoredObservation[] = Array.from({ length: 50 }, (_, i) =>
+		const failures: ScoredObservation[] = Array.from({ length: 50 }, (_, i) =>
 			makeScoredObs({
 				id: i + 1,
-				type: i % 3 === 0 ? "decision" : i % 3 === 1 ? "pattern" : "error",
+				type: "error",
 				summary: `Observation ${i + 1}: ${"x".repeat(100)}`,
 				content: `Full content for observation ${i + 1}: ${"y".repeat(500)}`,
 			}),
@@ -163,8 +188,9 @@ describe("buildMemoryContext", () => {
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: "2026-01-01",
-			observations,
+			lessons: [],
 			preferences: emptyPrefs,
+			recentFailures: failures,
 			tokenBudget: budget,
 		});
 
@@ -178,6 +204,10 @@ describe("buildMemoryContext", () => {
 				key: "preferred_language",
 				value: "TypeScript",
 				confidence: 0.9,
+				scope: "global",
+				projectId: null,
+				status: "confirmed",
+				evidenceCount: 1,
 				sourceSession: null,
 				createdAt: new Date().toISOString(),
 				lastUpdated: new Date().toISOString(),
@@ -187,26 +217,28 @@ describe("buildMemoryContext", () => {
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: "2026-01-01",
-			observations: [makeScoredObs()],
+			lessons: [],
 			preferences: prefs,
+			recentFailures: [makeScoredObs()],
 		});
 
-		expect(result).toContain("### Preferences");
+		expect(result).toContain("### Confirmed User Preferences");
 		expect(result).toContain("preferred_language");
 		expect(result).toContain("TypeScript");
 	});
 
-	it("sorts observations by relevance score (highest first in each group)", () => {
-		const observations: ScoredObservation[] = [
-			makeScoredObs({ id: 1, type: "decision", summary: "Low priority", relevanceScore: 0.5 }),
-			makeScoredObs({ id: 2, type: "decision", summary: "High priority", relevanceScore: 2.0 }),
+	it("sorts failure observations by relevance score", () => {
+		const failures: ScoredObservation[] = [
+			makeScoredObs({ id: 1, type: "error", summary: "Low priority", relevanceScore: 0.5 }),
+			makeScoredObs({ id: 2, type: "error", summary: "High priority", relevanceScore: 2.0 }),
 		];
 
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: "2026-01-01",
-			observations,
+			lessons: [],
 			preferences: emptyPrefs,
+			recentFailures: failures,
 		});
 
 		const highIdx = result.indexOf("High priority");
@@ -214,20 +246,23 @@ describe("buildMemoryContext", () => {
 		expect(highIdx).toBeLessThan(lowIdx);
 	});
 
-	it("with budget=2000 includes Layer 1 + Layer 2 (timeline)", () => {
-		const observations: ScoredObservation[] = [makeScoredObs({ id: 1, summary: "A decision" })];
-
+	it("includes lesson content when present", () => {
 		const result = buildMemoryContext({
 			projectName: "my-project",
 			lastSessionDate: "2026-01-01",
-			observations,
+			lessons: [
+				{
+					content: "Prefer read-only inspection paths.",
+					domain: "architecture",
+					extractedAt: "2026-01-01T00:00:00Z",
+					sourcePhase: "RETROSPECTIVE",
+				},
+			],
 			preferences: emptyPrefs,
-			tokenBudget: 2000,
+			recentFailures: [],
 		});
 
-		expect(result).toContain("### Key Decisions");
-		// With budget of 2000 tokens (8000 chars), there's room for timeline
-		expect(result).toContain("Recent Activity");
+		expect(result).toContain("Prefer read-only inspection paths.");
 	});
 });
 
@@ -257,6 +292,7 @@ describe("retrieveMemoryContext access-count integration", () => {
 	it("increments access_count for retrieved observations", () => {
 		db = new Database(":memory:");
 		initMemoryDb(db);
+		runKernelMigrations(db);
 
 		const testPath = "/tmp/test-project-access-count";
 		const projectId = "proj-access-test";
@@ -264,13 +300,25 @@ describe("retrieveMemoryContext access-count integration", () => {
 
 		upsertProject({ id: projectId, path: testPath, name: "access-test", lastUpdated: now }, db);
 
+		upsertPreferenceRecord(
+			{
+				key: "editor",
+				value: "vim",
+				scope: "project",
+				projectId,
+				createdAt: now,
+				lastUpdated: now,
+			},
+			db,
+		);
+
 		insertObservation(
 			{
 				projectId,
 				sessionId: "sess-1",
-				type: "decision",
-				content: "Use repository pattern",
-				summary: "Repository pattern adopted",
+				type: "error",
+				content: "Avoid nested transactions during project resolution",
+				summary: "Nested transaction failure",
 				confidence: 0.8,
 				accessCount: 0,
 				createdAt: now,
@@ -279,11 +327,10 @@ describe("retrieveMemoryContext access-count integration", () => {
 			db,
 		);
 
-		// Retrieve context — this should increment access_count
 		const ctx = retrieveMemoryContext(testPath, 2000, db);
-		expect(ctx).toContain("Repository pattern adopted");
+		expect(ctx).toContain("Nested transaction failure");
+		expect(ctx).toContain("editor");
 
-		// Verify access_count was incremented
 		const row = db
 			.query("SELECT access_count FROM observations WHERE project_id = ?")
 			.get(projectId) as { access_count: number };

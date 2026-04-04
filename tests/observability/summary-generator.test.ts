@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createForensicEvent } from "../../src/observability/forensic-log";
 import {
 	computeDuration,
 	formatCost,
@@ -11,6 +12,7 @@ function makeSessionLog(overrides?: Partial<SessionLog>): SessionLog {
 	return {
 		schemaVersion: 1 as const,
 		sessionId: "test-session-001",
+		projectRoot: "/tmp/project",
 		startedAt: "2026-04-01T10:00:00.000Z",
 		endedAt: "2026-04-01T10:30:00.000Z",
 		events: [],
@@ -18,6 +20,10 @@ function makeSessionLog(overrides?: Partial<SessionLog>): SessionLog {
 		errorSummary: {},
 		...overrides,
 	};
+}
+
+function event(input: Parameters<typeof createForensicEvent>[0]) {
+	return createForensicEvent(input);
 }
 
 describe("generateSessionSummary", () => {
@@ -64,22 +70,26 @@ describe("generateSessionSummary", () => {
 	test("includes errors section when error events exist", () => {
 		const log = makeSessionLog({
 			events: [
-				{
+				event({
+					projectRoot: "/tmp/project",
+					domain: "session",
 					timestamp: "2026-04-01T10:05:00Z",
 					sessionId: "test-session-001",
 					type: "error",
-					errorType: "rate_limit",
-					model: "anthropic/claude-3-opus",
+					code: "rate_limit",
 					message: "Rate limited by provider",
-				},
-				{
+					payload: { errorType: "rate_limit", model: "anthropic/claude-3-opus" },
+				}),
+				event({
+					projectRoot: "/tmp/project",
+					domain: "session",
 					timestamp: "2026-04-01T10:06:00Z",
 					sessionId: "test-session-001",
 					type: "error",
-					errorType: "quota_exceeded",
-					model: "anthropic/claude-3-sonnet",
+					code: "quota_exceeded",
 					message: "Quota exceeded",
-				},
+					payload: { errorType: "quota_exceeded", model: "anthropic/claude-3-sonnet" },
+				}),
 			],
 			errorSummary: {
 				rate_limit: 1,
@@ -98,15 +108,20 @@ describe("generateSessionSummary", () => {
 	test("includes fallback section when fallback events exist", () => {
 		const log = makeSessionLog({
 			events: [
-				{
+				event({
+					projectRoot: "/tmp/project",
+					domain: "session",
 					timestamp: "2026-04-01T10:05:00Z",
 					sessionId: "test-session-001",
 					type: "fallback",
-					failedModel: "anthropic/claude-3-opus",
-					nextModel: "anthropic/claude-3-sonnet",
-					reason: "rate_limit",
-					success: true,
-				},
+					code: "FALLBACK",
+					payload: {
+						failedModel: "anthropic/claude-3-opus",
+						nextModel: "anthropic/claude-3-sonnet",
+						reason: "rate_limit",
+						success: true,
+					},
+				}),
 			],
 		});
 
@@ -136,14 +151,18 @@ describe("generateSessionSummary", () => {
 	test("includes model switch section when model_switch events exist", () => {
 		const log = makeSessionLog({
 			events: [
-				{
+				event({
+					projectRoot: "/tmp/project",
+					domain: "session",
 					timestamp: "2026-04-01T10:05:00Z",
 					sessionId: "test-session-001",
 					type: "model_switch",
-					fromModel: "anthropic/claude-3-opus",
-					toModel: "anthropic/claude-3-sonnet",
-					trigger: "fallback",
-				},
+					payload: {
+						fromModel: "anthropic/claude-3-opus",
+						toModel: "anthropic/claude-3-sonnet",
+						trigger: "fallback",
+					},
+				}),
 			],
 		});
 
@@ -158,14 +177,16 @@ describe("generateSessionSummary", () => {
 	test("includes strategic summary paragraph", () => {
 		const log = makeSessionLog({
 			events: [
-				{
+				event({
+					projectRoot: "/tmp/project",
+					domain: "session",
 					timestamp: "2026-04-01T10:05:00Z",
 					sessionId: "test-session-001",
 					type: "error",
-					errorType: "rate_limit",
-					model: "test-model",
+					code: "rate_limit",
 					message: "Rate limited",
-				},
+					payload: { errorType: "rate_limit", model: "test-model" },
+				}),
 			],
 			decisions: [
 				{

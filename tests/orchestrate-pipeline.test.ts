@@ -135,7 +135,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 		expect(parsed.agent).toBeDefined();
 	});
 
-	test("handler returning dispatch_multi returns dispatch_multi JSON", async () => {
+	test("BUILD with multiple pending tasks dispatches one task sequentially", async () => {
 		const { orchestrateCore } = await import("../src/tools/orchestrate");
 		// Set state at BUILD with tasks in a multi-task wave
 		const state = createInitialState("test idea");
@@ -181,9 +181,9 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
-		expect(parsed.action).toBe("dispatch_multi");
-		expect(parsed.agents).toBeDefined();
-		expect(parsed.agents.length).toBe(2);
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.taskId).toBe(1);
+		expect(parsed.agent).toBe(AGENT_NAMES.BUILD);
 	});
 
 	test("BUILD phase with reviewPending triggers reviewCore directly", async () => {
@@ -330,7 +330,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 		expect(parsed._userProgress).toContain("8/8");
 	});
 
-	test("_userProgress contains Phase and phase name for dispatch_multi", async () => {
+	test("_userProgress contains Phase and phase name for sequential BUILD dispatch", async () => {
 		const { orchestrateCore } = await import("../src/tools/orchestrate");
 		const state = createInitialState("test idea");
 		const buildState = {
@@ -375,9 +375,60 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("dispatch");
 		expect(parsed._userProgress).toBeDefined();
 		expect(parsed._userProgress).toContain("Phase");
 		expect(parsed._userProgress).toContain("BUILD");
+	});
+
+	test("orchestrateCore fails closed when BUILD has pending dispatch but no result is provided", async () => {
+		const { orchestrateCore } = await import("../src/tools/orchestrate");
+		const state = createInitialState("gloomberg regression");
+		const buildState = {
+			...state,
+			currentPhase: "BUILD" as Phase,
+			tasks: [
+				{
+					id: 1,
+					title: "Task A",
+					status: "IN_PROGRESS" as const,
+					wave: 1,
+					depends_on: [],
+					attempt: 0,
+					strike: 0,
+				},
+			],
+			buildProgress: {
+				currentTask: 1,
+				currentWave: 1,
+				attemptCount: 0,
+				strikeCount: 0,
+				reviewPending: false,
+			},
+			pendingDispatches: [
+				{
+					dispatchId: "dispatch_build_1",
+					phase: "BUILD" as const,
+					agent: AGENT_NAMES.BUILD,
+					issuedAt: new Date().toISOString(),
+					resultKind: "task_completion" as const,
+					taskId: 1,
+				},
+			],
+			phases: state.phases.map((p) =>
+				["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN"].includes(p.name)
+					? { ...p, status: "DONE" as const }
+					: p.name === "BUILD"
+						? { ...p, status: "IN_PROGRESS" as const }
+						: p,
+			),
+		};
+		await saveState(buildState, tempDir);
+
+		const result = await orchestrateCore({}, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.code).toBe("E_PENDING_RESULT_REQUIRED");
 	});
 
 	test("JSONL logging side-effect: orchestration.jsonl contains dispatch event", async () => {
@@ -391,7 +442,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 		const hasDispatch = lines.some((line) => {
 			const entry = JSON.parse(line);
-			return entry.action === "dispatch" && entry.phase === "RECON";
+			return entry.type === "dispatch" && entry.phase === "RECON";
 		});
 		expect(hasDispatch).toBe(true);
 	});

@@ -33,6 +33,13 @@ function collectPendingDispatchKeys(state: Readonly<PipelineState>): readonly st
 	return state.pendingDispatches.map((entry) => `${entry.dispatchId}|${entry.phase}`);
 }
 
+function hasPendingDispatchOutsideCurrentPhase(state: Readonly<PipelineState>): boolean {
+	if (state.currentPhase === null) {
+		return state.pendingDispatches.length > 0;
+	}
+	return state.pendingDispatches.some((entry) => entry.phase !== state.currentPhase);
+}
+
 export function validateStateInvariants(
 	state: Readonly<PipelineState>,
 ): readonly InvariantViolation[] {
@@ -90,6 +97,13 @@ export function validateStateInvariants(
 		violations.push({
 			code: "E_INVARIANT_PENDING_DISPATCH_DUP",
 			message: "pendingDispatches contains duplicate dispatch-phase keys",
+		});
+	}
+
+	if (hasPendingDispatchOutsideCurrentPhase(state)) {
+		violations.push({
+			code: "E_INVARIANT_PENDING_PHASE",
+			message: "pendingDispatches must belong to the current active phase only",
 		});
 	}
 

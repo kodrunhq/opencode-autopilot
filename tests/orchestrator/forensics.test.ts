@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createForensicEvent } from "../../src/observability/forensic-log";
 import { failureContextSchema, PHASES, pipelineStateSchema } from "../../src/orchestrator/schemas";
 import type { FailureContext, PipelineState } from "../../src/orchestrator/types";
 
@@ -9,17 +10,42 @@ import type { FailureContext, PipelineState } from "../../src/orchestrator/types
 
 function makeMinimalState(overrides: Record<string, unknown> = {}): PipelineState {
 	const now = new Date().toISOString();
+	const status = (overrides.status as PipelineState["status"] | undefined) ?? "IN_PROGRESS";
+	const currentPhase =
+		(overrides.currentPhase as PipelineState["currentPhase"] | undefined) ??
+		(status === "COMPLETED" ? null : "RECON");
+	const phases =
+		(overrides.phases as PipelineState["phases"] | undefined) ??
+		PHASES.map((name) => ({
+			name,
+			status: currentPhase === null ? "PENDING" : name === currentPhase ? "IN_PROGRESS" : "PENDING",
+		}));
 	return pipelineStateSchema.parse({
 		schemaVersion: 2,
-		status: "IN_PROGRESS",
+		status,
+		runId: "run-forensics-test",
+		stateRevision: 0,
 		idea: "test idea",
-		currentPhase: "RECON",
+		currentPhase,
 		startedAt: now,
 		lastUpdatedAt: now,
-		phases: PHASES.map((name) => ({
-			name,
-			status: "PENDING",
-		})),
+		phases,
+		decisions: [],
+		confidence: [],
+		tasks: [],
+		arenaConfidence: null,
+		exploreTriggered: false,
+		buildProgress: {
+			currentTask: null,
+			currentWave: null,
+			attemptCount: 0,
+			strikeCount: 0,
+			reviewPending: false,
+		},
+		pendingDispatches: [],
+		processedResultIds: [],
+		failureContext: null,
+		phaseDispatchCounts: {},
 		...overrides,
 	});
 }
@@ -388,7 +414,15 @@ describe("forensicsCore", () => {
 		await writeState(tmpDir, state);
 		await writeFile(
 			join(tmpDir, "orchestration.jsonl"),
-			`${JSON.stringify({ action: "error", message: "E_DUPLICATE_RESULT: duplicate" })}\n`,
+			`${JSON.stringify(
+				createForensicEvent({
+					projectRoot,
+					domain: "contract",
+					type: "error",
+					code: "E_DUPLICATE_RESULT",
+					message: "E_DUPLICATE_RESULT: duplicate",
+				}),
+			)}\n`,
 			"utf-8",
 		);
 

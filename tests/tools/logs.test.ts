@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createForensicEvent } from "../../src/observability/forensic-log";
 import { logsCore } from "../../src/tools/logs";
+import { writeForensicSession } from "../observability/test-helpers";
 
 describe("oc_logs tool", () => {
 	let testDir: string;
@@ -17,45 +19,49 @@ describe("oc_logs tool", () => {
 		await rm(testDir, { recursive: true, force: true });
 	});
 
-	function createSessionLog(
+	async function createSessionLog(
 		sessionId: string,
 		overrides?: Partial<{
 			startedAt: string;
 			endedAt: string | null;
-			events: unknown[];
-			decisions: unknown[];
+			events: ReturnType<typeof createForensicEvent>[];
+			decisions: Parameters<typeof writeForensicSession>[0]["decisions"];
 		}>,
-	) {
-		return {
-			schemaVersion: 1,
+	): Promise<void> {
+		await writeForensicSession({
+			projectRoot: testDir,
 			sessionId,
 			startedAt: overrides?.startedAt ?? "2026-04-01T10:00:00Z",
 			endedAt: overrides?.endedAt ?? "2026-04-01T10:30:00Z",
 			events: overrides?.events ?? [
-				{
-					type: "error",
+				createForensicEvent({
+					projectRoot: testDir,
+					domain: "session",
 					timestamp: "2026-04-01T10:05:00Z",
 					sessionId,
-					errorType: "rate_limit",
-					model: "claude-sonnet-4-20250514",
+					type: "error",
+					code: "rate_limit",
 					message: "Rate limited",
-				},
+					payload: {
+						errorType: "rate_limit",
+						model: "claude-sonnet-4-20250514",
+					},
+				}),
 			],
 			decisions: overrides?.decisions ?? [
 				{
+					timestamp: null,
 					phase: "BUILD",
 					agent: "oc-implementer",
 					decision: "Use TDD approach",
 					rationale: "Test coverage requirement",
 				},
 			],
-			errorSummary: { rate_limit: 1 },
-		};
+		});
 	}
 
 	test("logsCore list returns session list with displayText", async () => {
-		const log = createSessionLog("session-abc");
-		await writeFile(join(testDir, "session-abc.json"), JSON.stringify(log));
+		await createSessionLog("session-abc");
 
 		const result = JSON.parse(await logsCore("list", undefined, testDir));
 		expect(result.action).toBe("logs_list");
@@ -65,10 +71,8 @@ describe("oc_logs tool", () => {
 	});
 
 	test("logsCore list returns multiple sessions sorted newest first", async () => {
-		const older = createSessionLog("session-old", { startedAt: "2026-04-01T08:00:00Z" });
-		const newer = createSessionLog("session-new", { startedAt: "2026-04-01T12:00:00Z" });
-		await writeFile(join(testDir, "session-old.json"), JSON.stringify(older));
-		await writeFile(join(testDir, "session-new.json"), JSON.stringify(newer));
+		await createSessionLog("session-old", { startedAt: "2026-04-01T08:00:00Z" });
+		await createSessionLog("session-new", { startedAt: "2026-04-01T12:00:00Z" });
 
 		const result = JSON.parse(await logsCore("list", undefined, testDir));
 		expect(result.sessions).toBeArrayOfSize(2);
@@ -77,8 +81,7 @@ describe("oc_logs tool", () => {
 	});
 
 	test("logsCore detail with sessionID returns full log and summary", async () => {
-		const log = createSessionLog("session-detail");
-		await writeFile(join(testDir, "session-detail.json"), JSON.stringify(log));
+		await createSessionLog("session-detail");
 
 		const result = JSON.parse(await logsCore("detail", { sessionID: "session-detail" }, testDir));
 		expect(result.action).toBe("logs_detail");
@@ -88,10 +91,8 @@ describe("oc_logs tool", () => {
 	});
 
 	test("logsCore detail without sessionID uses latest session", async () => {
-		const older = createSessionLog("session-old", { startedAt: "2026-04-01T08:00:00Z" });
-		const newer = createSessionLog("session-latest", { startedAt: "2026-04-01T14:00:00Z" });
-		await writeFile(join(testDir, "session-old.json"), JSON.stringify(older));
-		await writeFile(join(testDir, "session-latest.json"), JSON.stringify(newer));
+		await createSessionLog("session-old", { startedAt: "2026-04-01T08:00:00Z" });
+		await createSessionLog("session-latest", { startedAt: "2026-04-01T14:00:00Z" });
 
 		const result = JSON.parse(await logsCore("detail", undefined, testDir));
 		expect(result.action).toBe("logs_detail");
@@ -99,28 +100,23 @@ describe("oc_logs tool", () => {
 	});
 
 	test("logsCore search filters events by type", async () => {
-		const log = createSessionLog("session-search", {
+		await createSessionLog("session-search", {
 			events: [
-				{
-					type: "error",
+				createForensicEvent({
+					projectRoot: testDir,
+					domain: "session",
 					timestamp: "2026-04-01T10:05:00Z",
 					sessionId: "session-search",
-					errorType: "rate_limit",
-					model: "claude-sonnet-4-20250514",
+					type: "error",
+					code: "rate_limit",
 					message: "Rate limited",
-				},
-				{
-					type: "decision",
-					timestamp: "2026-04-01T10:10:00Z",
-					sessionId: "session-search",
-					phase: "BUILD",
-					agent: "oc-implementer",
-					decision: "Use TDD",
-					rationale: "Coverage",
-				},
+					payload: {
+						errorType: "rate_limit",
+						model: "claude-sonnet-4-20250514",
+					},
+				}),
 			],
 		});
-		await writeFile(join(testDir, "session-search.json"), JSON.stringify(log));
 
 		const result = JSON.parse(
 			await logsCore("search", { sessionID: "session-search", eventType: "error" }, testDir),

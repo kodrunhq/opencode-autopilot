@@ -1,27 +1,32 @@
-/**
- * Session log reading, listing, searching, and filtering.
- *
- * Provides query capabilities over persisted session logs:
- * - Read a specific session by ID
- * - List all sessions sorted by startedAt (newest first)
- * - Read the most recent session
- * - Search/filter events within a session by type and time range
- *
- * All functions handle missing directories gracefully (D-16).
- */
-
-import { readdir, readFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { isEnoentError } from "../utils/fs-helpers";
-import { getLogsDir } from "./log-writer";
-import { sessionLogSchema } from "./schemas";
-import type { SessionEvent, SessionLog } from "./types";
+import { getProjectRootFromArtifactDir } from "../utils/paths";
+import { readForensicEvents } from "./forensic-log";
+import type { ForensicEvent } from "./forensic-types";
 
-/**
- * Summary entry for session listing (lightweight, no full event data).
- */
+export interface SessionDecision {
+	readonly timestamp: string | null;
+	readonly phase: string;
+	readonly agent: string;
+	readonly decision: string;
+	readonly rationale: string;
+}
+
+export interface SessionLog {
+	readonly schemaVersion: 1;
+	readonly sessionId: string;
+	readonly projectRoot: string;
+	readonly startedAt: string;
+	readonly endedAt: string | null;
+	readonly events: readonly ForensicEvent[];
+	readonly decisions: readonly SessionDecision[];
+	readonly errorSummary: Readonly<Record<string, number>>;
+}
+
 export interface SessionLogEntry {
 	readonly sessionId: string;
+	readonly projectRoot: string;
 	readonly startedAt: string;
 	readonly endedAt: string | null;
 	readonly eventCount: number;
@@ -29,124 +34,150 @@ export interface SessionLogEntry {
 	readonly errorCount: number;
 }
 
-/**
- * Filters for searching events within a session log.
- */
 export interface EventSearchFilters {
 	readonly type?: string;
 	readonly after?: string;
 	readonly before?: string;
+	readonly domain?: string;
 }
 
-/**
- * Reads and parses a specific session log by ID.
- *
- * Returns null on: non-existent file, malformed JSON, invalid schema.
- * Never throws for expected failure modes.
- */
+function isSessionForProject(event: Readonly<ForensicEvent>, sessionId: string): boolean {
+	return event.domain === "session" && event.sessionId === sessionId;
+}
+
+function buildErrorSummary(events: readonly ForensicEvent[]): Readonly<Record<string, number>> {
+	const summary: Record<string, number> = {};
+	for (const event of events) {
+		if (event.type !== "error") {
+			continue;
+		}
+		const code =
+			event.code ?? (typeof event.payload.errorType === "string" ? event.payload.errorType : null);
+		const key = code ?? "unknown";
+		summary[key] = (summary[key] ?? 0) + 1;
+	}
+	return Object.freeze(summary);
+}
+
+function buildDecisions(events: readonly ForensicEvent[]): readonly SessionDecision[] {
+	return Object.freeze(
+		events
+			.filter((event) => event.type === "decision")
+			.map((event) => ({
+				timestamp: event.timestamp,
+				phase: event.phase ?? "UNKNOWN",
+				agent: event.agent ?? "unknown",
+				decision:
+					typeof event.payload.decision === "string"
+						? event.payload.decision
+						: (event.message ?? "decision recorded"),
+				rationale:
+					typeof event.payload.rationale === "string"
+						? event.payload.rationale
+						: (event.message ?? ""),
+			})),
+	);
+}
+
+function buildSessionLog(
+	projectRoot: string,
+	sessionId: string,
+	events: readonly ForensicEvent[],
+): SessionLog | null {
+	if (events.length === 0) {
+		return null;
+	}
+
+	const sessionEvents = events
+		.filter((event) => event.sessionId === sessionId)
+		.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+	if (sessionEvents.length === 0) {
+		return null;
+	}
+
+	const started = sessionEvents.find((event) => event.type === "session_start");
+	const ended = [...sessionEvents].reverse().find((event) => event.type === "session_end");
+
+	return {
+		schemaVersion: 1,
+		sessionId,
+		projectRoot,
+		startedAt: started?.timestamp ?? sessionEvents[0].timestamp,
+		endedAt: ended?.timestamp ?? null,
+		events: Object.freeze(sessionEvents),
+		decisions: buildDecisions(sessionEvents),
+		errorSummary: buildErrorSummary(sessionEvents),
+	};
+}
+
 export async function readSessionLog(
 	sessionId: string,
-	logsDir?: string,
+	artifactDirOrProjectRoot: string,
 ): Promise<SessionLog | null> {
-	const dir = logsDir ?? getLogsDir();
-	const logPath = join(dir, `${sessionId}.json`);
-
-	try {
-		const content = await readFile(logPath, "utf-8");
-		const parsed = JSON.parse(content);
-		const result = sessionLogSchema.safeParse(parsed);
-		return result.success ? result.data : null;
-	} catch (error: unknown) {
-		if (isEnoentError(error)) return null;
-		// Recover from malformed JSON
-		if (error instanceof SyntaxError) return null;
-		throw error;
-	}
+	const projectRoot = getProjectRootFromArtifactDir(artifactDirOrProjectRoot);
+	const events = await readForensicEvents(projectRoot);
+	return buildSessionLog(projectRoot, sessionId, events);
 }
 
-/**
- * Lists all session logs sorted by startedAt descending (newest first).
- *
- * Returns a lightweight SessionLogEntry for each log (no full event data).
- * Skips non-JSON files and malformed logs.
- * Returns empty array for missing or empty directories.
- */
-export async function listSessionLogs(logsDir?: string): Promise<readonly SessionLogEntry[]> {
-	const dir = logsDir ?? getLogsDir();
+export async function listSessionLogs(
+	artifactDirOrProjectRoot: string,
+): Promise<readonly SessionLogEntry[]> {
+	const projectRoot = getProjectRootFromArtifactDir(artifactDirOrProjectRoot);
+	const events = await readForensicEvents(projectRoot);
+	const sessionIds = [
+		...new Set(events.map((event) => event.sessionId).filter((value): value is string => !!value)),
+	];
 
-	let files: string[];
-	try {
-		files = await readdir(dir);
-	} catch (error: unknown) {
-		if (isEnoentError(error)) return [];
-		throw error;
-	}
+	const entries = sessionIds
+		.map((sessionId) => buildSessionLog(projectRoot, sessionId, events))
+		.filter((entry): entry is SessionLog => entry !== null)
+		.map((log) => ({
+			sessionId: log.sessionId,
+			projectRoot: log.projectRoot,
+			startedAt: log.startedAt,
+			endedAt: log.endedAt,
+			eventCount: log.events.length,
+			decisionCount: log.decisions.length,
+			errorCount: Object.values(log.errorSummary).reduce((sum, count) => sum + count, 0),
+		}))
+		.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 
-	const jsonFiles = files.filter((f) => f.endsWith(".json"));
-	const entries: SessionLogEntry[] = [];
-
-	for (const file of jsonFiles) {
-		try {
-			const content = await readFile(join(dir, file), "utf-8");
-			const parsed = JSON.parse(content);
-			const result = sessionLogSchema.safeParse(parsed);
-
-			if (result.success) {
-				const log = result.data;
-				const errorCount = log.events.filter((e) => e.type === "error").length;
-
-				entries.push({
-					sessionId: log.sessionId,
-					startedAt: log.startedAt,
-					endedAt: log.endedAt,
-					eventCount: log.events.length,
-					decisionCount: log.decisions.length,
-					errorCount,
-				});
-			}
-		} catch (innerError: unknown) {
-			// SyntaxError = malformed JSON, expected and skipped.
-			// I/O errors (permissions, etc.) are unexpected — log them.
-			if (!(innerError instanceof SyntaxError) && !isEnoentError(innerError)) {
-				console.error("[opencode-autopilot] Unexpected error reading log file:", file, innerError);
-			}
-		}
-	}
-
-	// Sort by startedAt descending (newest first)
-	entries.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-
-	return entries;
+	return Object.freeze(entries);
 }
 
-/**
- * Returns the most recent session log (by startedAt).
- *
- * Returns null when no valid logs exist.
- */
-export async function readLatestSessionLog(logsDir?: string): Promise<SessionLog | null> {
-	const entries = await listSessionLogs(logsDir);
-
-	if (entries.length === 0) return null;
-
-	// Entries are already sorted newest-first
-	return readSessionLog(entries[0].sessionId, logsDir);
+export async function readLatestSessionLog(
+	artifactDirOrProjectRoot: string,
+): Promise<SessionLog | null> {
+	const entries = await listSessionLogs(artifactDirOrProjectRoot);
+	if (entries.length === 0) {
+		return null;
+	}
+	return readSessionLog(entries[0].sessionId, artifactDirOrProjectRoot);
 }
 
-/**
- * Filters events by type and/or time range.
- *
- * Pure function (no I/O, no side effects).
- * Accepts a readonly array of events and returns a filtered copy.
- */
 export function searchEvents(
-	events: readonly SessionEvent[],
+	events: readonly ForensicEvent[],
 	filters: EventSearchFilters,
-): readonly SessionEvent[] {
+): readonly ForensicEvent[] {
 	return events.filter((event) => {
 		if (filters.type && event.type !== filters.type) return false;
+		if (filters.domain && event.domain !== filters.domain) return false;
 		if (filters.after && event.timestamp <= filters.after) return false;
 		if (filters.before && event.timestamp >= filters.before) return false;
 		return true;
 	});
+}
+
+export async function listProjectRootsWithLogs(rootDir: string): Promise<readonly string[]> {
+	try {
+		const entries = await readdir(rootDir, { withFileTypes: true });
+		return Object.freeze(
+			entries.filter((entry) => entry.isDirectory()).map((entry) => join(rootDir, entry.name)),
+		);
+	} catch (error: unknown) {
+		if (isEnoentError(error)) {
+			return Object.freeze([]);
+		}
+		throw error;
+	}
 }

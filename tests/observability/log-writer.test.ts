@@ -1,156 +1,122 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createForensicEvent } from "../../src/observability/forensic-log";
 import { writeSessionLog } from "../../src/observability/log-writer";
-import type { SessionEvent } from "../../src/observability/types";
 
-function makeEvents(sessionId: string): readonly SessionEvent[] {
+function makeEvents(projectRoot: string, sessionId: string) {
 	return [
-		{
+		createForensicEvent({
+			projectRoot,
+			domain: "session",
 			timestamp: "2026-04-01T10:00:00.000Z",
 			sessionId,
 			type: "error",
-			errorType: "rate_limit",
-			model: "anthropic/claude-3-opus",
+			code: "rate_limit",
 			message: "Rate limited",
-		},
-		{
+			payload: { errorType: "rate_limit", model: "anthropic/claude-3-opus" },
+		}),
+		createForensicEvent({
+			projectRoot,
+			domain: "session",
 			timestamp: "2026-04-01T10:00:05.000Z",
 			sessionId,
 			type: "fallback",
-			failedModel: "anthropic/claude-3-opus",
-			nextModel: "anthropic/claude-3-sonnet",
-			reason: "rate_limit",
-			success: true,
-		},
-		{
+			code: "FALLBACK",
+			payload: {
+				failedModel: "anthropic/claude-3-opus",
+				nextModel: "anthropic/claude-3-sonnet",
+				reason: "rate_limit",
+				success: true,
+			},
+		}),
+		createForensicEvent({
+			projectRoot,
+			domain: "session",
 			timestamp: "2026-04-01T10:01:00.000Z",
 			sessionId,
-			type: "decision",
 			phase: "BUILD",
 			agent: "oc-implementer",
-			decision: "Use spread pattern for immutability",
-			rationale: "Follows project CLAUDE.md constraints",
-		},
-		{
+			type: "decision",
+			payload: {
+				decision: "Use spread pattern for immutability",
+				rationale: "Follows project CLAUDE.md constraints",
+			},
+		}),
+		createForensicEvent({
+			projectRoot,
+			domain: "session",
 			timestamp: "2026-04-01T10:02:00.000Z",
 			sessionId,
 			type: "model_switch",
-			fromModel: "anthropic/claude-3-opus",
-			toModel: "anthropic/claude-3-sonnet",
-			trigger: "fallback",
-		},
+			payload: {
+				fromModel: "anthropic/claude-3-opus",
+				toModel: "anthropic/claude-3-sonnet",
+				trigger: "fallback",
+			},
+		}),
 	] as const;
 }
 
 describe("writeSessionLog", () => {
-	let logsDir: string;
+	let projectRoot: string;
+	let artifactDir: string;
 
 	beforeEach(async () => {
-		logsDir = join(tmpdir(), `log-writer-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-		await mkdir(logsDir, { recursive: true });
+		projectRoot = join(tmpdir(), `log-writer-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+		artifactDir = join(projectRoot, ".opencode-autopilot");
+		await mkdir(artifactDir, { recursive: true });
 	});
 
 	afterEach(async () => {
-		await rm(logsDir, { recursive: true, force: true });
+		await rm(projectRoot, { recursive: true, force: true });
 	});
 
-	test("creates a JSON file at {logsDir}/{sessionID}.json", async () => {
+	test("appends forensic JSONL lines to orchestration log", async () => {
 		const sessionId = "test-session-001";
-		const events = makeEvents(sessionId);
-		const startedAt = "2026-04-01T10:00:00.000Z";
+		await writeSessionLog({
+			projectRoot,
+			sessionId,
+			startedAt: "2026-04-01T10:00:00.000Z",
+			events: makeEvents(projectRoot, sessionId),
+		});
 
-		await writeSessionLog({ sessionId, startedAt, events }, logsDir);
-
-		const files = await readdir(logsDir);
-		expect(files).toContain(`${sessionId}.json`);
+		const content = await readFile(join(artifactDir, "orchestration.jsonl"), "utf-8");
+		const lines = content.trim().split("\n");
+		expect(lines).toHaveLength(4);
+		const first = JSON.parse(lines[0]);
+		expect(first.domain).toBe("session");
+		expect(first.type).toBe("error");
 	});
 
-	test("uses atomic write pattern (temp file not visible after write)", async () => {
-		const sessionId = "test-session-atomic";
-		const events = makeEvents(sessionId);
-
-		await writeSessionLog({ sessionId, startedAt: "2026-04-01T10:00:00.000Z", events }, logsDir);
-
-		// After write completes, only the final JSON file should exist (no .tmp files)
-		const files = await readdir(logsDir);
-		const tmpFiles = files.filter((f) => f.includes(".tmp."));
-		expect(tmpFiles).toHaveLength(0);
-		expect(files).toContain(`${sessionId}.json`);
-	});
-
-	test("creates logs directory if it does not exist", async () => {
-		const nestedDir = join(logsDir, "nested", "deep");
-		const sessionId = "test-session-mkdir";
-
-		await writeSessionLog(
-			{ sessionId, startedAt: "2026-04-01T10:00:00.000Z", events: makeEvents(sessionId) },
-			nestedDir,
-		);
-
-		const files = await readdir(nestedDir);
-		expect(files).toContain(`${sessionId}.json`);
-	});
-
-	test("persisted JSON contains valid session log structure", async () => {
+	test("persists decision and model metadata in payload", async () => {
 		const sessionId = "test-session-structure";
-		const events = makeEvents(sessionId);
-		const startedAt = "2026-04-01T10:00:00.000Z";
+		await writeSessionLog({
+			projectRoot,
+			sessionId,
+			startedAt: "2026-04-01T10:00:00.000Z",
+			events: makeEvents(projectRoot, sessionId),
+		});
 
-		await writeSessionLog({ sessionId, startedAt, events }, logsDir);
+		const content = await readFile(join(artifactDir, "orchestration.jsonl"), "utf-8");
+		const parsed = content
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
 
-		const content = await readFile(join(logsDir, `${sessionId}.json`), "utf-8");
-		const parsed = JSON.parse(content);
-
-		expect(parsed.schemaVersion).toBe(1);
-		expect(parsed.sessionId).toBe(sessionId);
-		expect(parsed.startedAt).toBe(startedAt);
-		expect(parsed.endedAt).toBeTypeOf("string");
-		expect(parsed.events).toHaveLength(4);
-	});
-
-	test("extracts decisions from events into decisions array", async () => {
-		const sessionId = "test-session-decisions";
-		const events = makeEvents(sessionId);
-
-		await writeSessionLog({ sessionId, startedAt: "2026-04-01T10:00:00.000Z", events }, logsDir);
-
-		const content = await readFile(join(logsDir, `${sessionId}.json`), "utf-8");
-		const parsed = JSON.parse(content);
-
-		expect(parsed.decisions).toHaveLength(1);
-		expect(parsed.decisions[0].phase).toBe("BUILD");
-		expect(parsed.decisions[0].agent).toBe("oc-implementer");
-		expect(parsed.decisions[0].decision).toBe("Use spread pattern for immutability");
-	});
-
-	test("counts errors by type in errorSummary", async () => {
-		const sessionId = "test-session-errors";
-		const events = makeEvents(sessionId);
-
-		await writeSessionLog({ sessionId, startedAt: "2026-04-01T10:00:00.000Z", events }, logsDir);
-
-		const content = await readFile(join(logsDir, `${sessionId}.json`), "utf-8");
-		const parsed = JSON.parse(content);
-
-		expect(parsed.errorSummary).toBeDefined();
-		expect(parsed.errorSummary.rate_limit).toBe(1);
+		expect(parsed.some((event) => event.type === "decision")).toBe(true);
+		expect(parsed.some((event) => event.type === "model_switch")).toBe(true);
 	});
 
 	test("handles empty events gracefully", async () => {
-		const sessionId = "test-session-empty";
+		await writeSessionLog({
+			projectRoot,
+			sessionId: "test-session-empty",
+			startedAt: "2026-04-01T10:00:00.000Z",
+			events: [],
+		});
 
-		await writeSessionLog(
-			{ sessionId, startedAt: "2026-04-01T10:00:00.000Z", events: [] },
-			logsDir,
-		);
-
-		const content = await readFile(join(logsDir, `${sessionId}.json`), "utf-8");
-		const parsed = JSON.parse(content);
-
-		expect(parsed.events).toHaveLength(0);
-		expect(parsed.decisions).toHaveLength(0);
-		expect(parsed.errorSummary).toEqual({});
+		await expect(readFile(join(artifactDir, "orchestration.jsonl"), "utf-8")).rejects.toThrow();
 	});
 });

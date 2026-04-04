@@ -1,14 +1,8 @@
 /**
- * Session summary generator.
- *
- * Transforms structured SessionLog data into human-readable markdown summaries
- * for post-session analysis. All functions are pure (no I/O, no side effects).
- *
- * Summaries include: metadata, decisions, errors, fallbacks, model switches,
- * and a strategic one-paragraph analysis (D-03, D-11, D-42, D-43).
+ * Session summary generator over the unified forensic event stream.
  */
 
-import type { SessionEvent, SessionLog } from "./types";
+import type { ForensicEvent, SessionLog } from "./types";
 
 /**
  * Computes session duration in milliseconds from startedAt/endedAt.
@@ -61,7 +55,7 @@ export function generateSessionSummary(log: SessionLog): string {
 
 	// Errors section (conditional)
 	const errorEvents = log.events.filter(
-		(e): e is SessionEvent & { type: "error" } => e.type === "error",
+		(e): e is ForensicEvent & { type: "error" } => e.type === "error",
 	);
 	if (errorEvents.length > 0) {
 		sections.push(renderErrors(errorEvents, log.errorSummary));
@@ -69,7 +63,7 @@ export function generateSessionSummary(log: SessionLog): string {
 
 	// Fallbacks section (conditional)
 	const fallbackEvents = log.events.filter(
-		(e): e is SessionEvent & { type: "fallback" } => e.type === "fallback",
+		(e): e is ForensicEvent & { type: "fallback" } => e.type === "fallback",
 	);
 	if (fallbackEvents.length > 0) {
 		sections.push(renderFallbacks(fallbackEvents));
@@ -77,7 +71,7 @@ export function generateSessionSummary(log: SessionLog): string {
 
 	// Model switches section (conditional)
 	const switchEvents = log.events.filter(
-		(e): e is SessionEvent & { type: "model_switch" } => e.type === "model_switch",
+		(e): e is ForensicEvent & { type: "model_switch" } => e.type === "model_switch",
 	);
 	if (switchEvents.length > 0) {
 		sections.push(renderModelSwitches(switchEvents));
@@ -121,7 +115,7 @@ function renderDecisions(log: SessionLog): string {
 }
 
 function renderErrors(
-	events: readonly (SessionEvent & { type: "error" })[],
+	events: readonly (ForensicEvent & { type: "error" })[],
 	errorSummary: Record<string, number>,
 ): string {
 	const lines = [
@@ -133,8 +127,13 @@ function renderErrors(
 
 	for (const e of events) {
 		const safeMsg = (e.message ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
-		const safeModel = (e.model ?? "").replace(/\|/g, "\\|");
-		lines.push(`| ${e.timestamp} | ${e.errorType} | ${safeModel} | ${safeMsg} |`);
+		const safeModel = (typeof e.payload.model === "string" ? e.payload.model : "").replace(
+			/\|/g,
+			"\\|",
+		);
+		const errorCode =
+			e.code ?? (typeof e.payload.errorType === "string" ? e.payload.errorType : "unknown");
+		lines.push(`| ${e.timestamp} | ${errorCode} | ${safeModel} | ${safeMsg} |`);
 	}
 
 	// Error summary counts
@@ -150,7 +149,7 @@ function renderErrors(
 	return lines.join("\n");
 }
 
-function renderFallbacks(events: readonly (SessionEvent & { type: "fallback" })[]): string {
+function renderFallbacks(events: readonly (ForensicEvent & { type: "fallback" })[]): string {
 	const lines = [
 		"## Fallbacks",
 		"",
@@ -159,15 +158,23 @@ function renderFallbacks(events: readonly (SessionEvent & { type: "fallback" })[
 	];
 
 	for (const e of events) {
+		const failedModel =
+			typeof e.payload.failedModel === "string" ? e.payload.failedModel : "unknown";
+		const nextModel = typeof e.payload.nextModel === "string" ? e.payload.nextModel : "unknown";
+		const reason =
+			typeof e.payload.reason === "string" ? e.payload.reason : (e.message ?? "unknown");
+		const success = e.payload.success === true;
 		lines.push(
-			`| ${e.timestamp} | ${e.failedModel} | ${e.nextModel} | ${e.reason} | ${e.success ? "Yes" : "No"} |`,
+			`| ${e.timestamp} | ${failedModel} | ${nextModel} | ${reason} | ${success ? "Yes" : "No"} |`,
 		);
 	}
 
 	return lines.join("\n");
 }
 
-function renderModelSwitches(events: readonly (SessionEvent & { type: "model_switch" })[]): string {
+function renderModelSwitches(
+	events: readonly (ForensicEvent & { type: "model_switch" })[],
+): string {
 	const lines = [
 		"## Model Switches",
 		"",
@@ -176,7 +183,10 @@ function renderModelSwitches(events: readonly (SessionEvent & { type: "model_swi
 	];
 
 	for (const e of events) {
-		lines.push(`| ${e.timestamp} | ${e.fromModel} | ${e.toModel} | ${e.trigger} |`);
+		const fromModel = typeof e.payload.fromModel === "string" ? e.payload.fromModel : "unknown";
+		const toModel = typeof e.payload.toModel === "string" ? e.payload.toModel : "unknown";
+		const trigger = typeof e.payload.trigger === "string" ? e.payload.trigger : "unknown";
+		lines.push(`| ${e.timestamp} | ${fromModel} | ${toModel} | ${trigger} |`);
 	}
 
 	return lines.join("\n");
@@ -194,7 +204,9 @@ function renderStrategicSummary(log: SessionLog): string {
 	);
 
 	if (errorCount > 0) {
-		const successfulFallbacks = log.events.filter((e) => e.type === "fallback" && e.success).length;
+		const successfulFallbacks = log.events.filter(
+			(e) => e.type === "fallback" && e.payload.success === true,
+		).length;
 		parts.push(
 			`Encountered ${errorCount} errors; ${fallbackCount} fallback attempts (${successfulFallbacks} successful).`,
 		);

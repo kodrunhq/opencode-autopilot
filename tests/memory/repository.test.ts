@@ -3,13 +3,22 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { initMemoryDb } from "../../src/memory/database";
 import {
 	deleteObservation,
+	deletePreferenceRecord,
+	deletePreferencesByKey,
 	getAllPreferences,
+	getConfirmedPreferencesForProject,
 	getObservationsByProject,
 	getProjectByPath,
 	insertObservation,
+	listPreferenceEvidence,
+	listPreferenceRecords,
+	listRelevantLessons,
+	prunePreferenceEvidence,
+	prunePreferences,
 	searchObservations,
 	updateAccessCount,
 	upsertPreference,
+	upsertPreferenceRecord,
 	upsertProject,
 } from "../../src/memory/repository";
 
@@ -19,6 +28,19 @@ describe("repository", () => {
 	beforeEach(() => {
 		db = new Database(":memory:");
 		initMemoryDb(db);
+		db.run(
+			`CREATE TABLE IF NOT EXISTS project_lessons (
+				lesson_id INTEGER PRIMARY KEY AUTOINCREMENT,
+				project_id TEXT NOT NULL,
+				content TEXT NOT NULL,
+				domain TEXT NOT NULL,
+				extracted_at TEXT NOT NULL,
+				source_phase TEXT NOT NULL,
+				last_updated_at TEXT,
+				FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+				UNIQUE(project_id, extracted_at, domain, source_phase, content)
+			)`,
+		);
 	});
 
 	afterEach(() => {
@@ -244,6 +266,8 @@ describe("repository", () => {
 			expect(prefs.length).toBe(1);
 			expect(prefs[0].key).toBe("editor.theme");
 			expect(prefs[0].value).toBe("dark");
+			expect(prefs[0].scope).toBe("global");
+			expect(prefs[0].status).toBe("confirmed");
 		});
 
 		test("updates existing preference by key", () => {
@@ -274,6 +298,252 @@ describe("repository", () => {
 			const prefs = getAllPreferences(db);
 			expect(prefs.length).toBe(1);
 			expect(prefs[0].value).toBe("light");
+		});
+
+		test("stores project-scoped preference records with evidence", () => {
+			upsertProject(
+				{
+					id: "proj-1",
+					path: "/test",
+					name: "test",
+					lastUpdated: "2026-01-01T00:00:00Z",
+				},
+				db,
+			);
+
+			const record = upsertPreferenceRecord(
+				{
+					key: "code_style.indent",
+					value: "tabs",
+					scope: "project",
+					projectId: "proj-1",
+					confidence: 0.95,
+					sourceSession: "sess-1",
+					createdAt: "2026-01-01T00:00:00Z",
+					lastUpdated: "2026-01-01T00:00:00Z",
+					evidence: [
+						{
+							sessionId: "sess-1",
+							statement: "Use tabs in this repo.",
+							confirmed: true,
+						},
+					],
+				},
+				db,
+			);
+
+			const records = listPreferenceRecords({ scope: "project", projectId: "proj-1" }, db);
+			expect(records).toHaveLength(1);
+			expect(records[0]?.id).toBe(record.id);
+			expect(records[0]?.evidenceCount).toBe(1);
+
+			const evidence = listPreferenceEvidence(record.id, db);
+			expect(evidence).toHaveLength(1);
+			expect(evidence[0]?.statement).toBe("Use tabs in this repo.");
+
+			const compatPrefs = getAllPreferences(db);
+			expect(compatPrefs).toHaveLength(1);
+			expect(compatPrefs[0]?.scope).toBe("project");
+		});
+
+		test("returns confirmed global and project preferences for retrieval", () => {
+			upsertProject(
+				{
+					id: "proj-1",
+					path: "/test",
+					name: "test",
+					lastUpdated: "2026-01-01T00:00:00Z",
+				},
+				db,
+			);
+
+			upsertPreferenceRecord(
+				{
+					key: "editor",
+					value: "vim",
+					scope: "global",
+					createdAt: "2026-01-01T00:00:00Z",
+					lastUpdated: "2026-01-01T00:00:00Z",
+				},
+				db,
+			);
+			upsertPreferenceRecord(
+				{
+					key: "testing.framework",
+					value: "bun:test",
+					scope: "project",
+					projectId: "proj-1",
+					createdAt: "2026-01-01T00:00:00Z",
+					lastUpdated: "2026-01-01T00:00:00Z",
+				},
+				db,
+			);
+
+			const prefs = getConfirmedPreferencesForProject("proj-1", db);
+			expect(prefs).toHaveLength(2);
+			expect(prefs.some((pref) => pref.scope === "global" && pref.key === "editor")).toBe(true);
+			expect(
+				prefs.some((pref) => pref.scope === "project" && pref.key === "testing.framework"),
+			).toBe(true);
+		});
+
+		test("deletes a preference record and its evidence", () => {
+			const record = upsertPreferenceRecord(
+				{
+					key: "editor",
+					value: "vim",
+					scope: "global",
+					createdAt: "2026-01-01T00:00:00Z",
+					lastUpdated: "2026-01-01T00:00:00Z",
+					evidence: [{ statement: "I prefer vim.", confirmed: true }],
+				},
+				db,
+			);
+
+			const result = deletePreferenceRecord(record.id, db);
+			expect(result.deletedPreferences).toBe(1);
+			expect(result.deletedEvidence).toBe(1);
+			expect(listPreferenceRecords({}, db)).toEqual([]);
+			expect(getAllPreferences(db)).toEqual([]);
+		});
+
+		test("deletes preferences by key within scope", () => {
+			upsertProject(
+				{
+					id: "proj-1",
+					path: "/test",
+					name: "test",
+					lastUpdated: "2026-01-01T00:00:00Z",
+				},
+				db,
+			);
+			upsertPreferenceRecord(
+				{
+					key: "editor",
+					value: "vim",
+					scope: "global",
+					createdAt: "2026-01-01T00:00:00Z",
+					lastUpdated: "2026-01-01T00:00:00Z",
+				},
+				db,
+			);
+			upsertPreferenceRecord(
+				{
+					key: "editor",
+					value: "helix",
+					scope: "project",
+					projectId: "proj-1",
+					createdAt: "2026-01-01T00:00:00Z",
+					lastUpdated: "2026-01-01T00:00:00Z",
+				},
+				db,
+			);
+
+			const result = deletePreferencesByKey(
+				"editor",
+				{ scope: "project", projectId: "proj-1" },
+				db,
+			);
+			expect(result.deletedPreferences).toBe(1);
+			expect(listPreferenceRecords({ scope: "global" }, db)).toHaveLength(1);
+			expect(listPreferenceRecords({ scope: "project", projectId: "proj-1" }, db)).toHaveLength(0);
+		});
+
+		test("prunes old unconfirmed preferences", () => {
+			upsertPreferenceRecord(
+				{
+					key: "candidate.pref",
+					value: "maybe use yarn",
+					status: "candidate",
+					scope: "global",
+					createdAt: "2025-01-01T00:00:00Z",
+					lastUpdated: "2025-01-01T00:00:00Z",
+				},
+				db,
+			);
+			upsertPreferenceRecord(
+				{
+					key: "confirmed.pref",
+					value: "use bun",
+					status: "confirmed",
+					scope: "global",
+					createdAt: "2025-01-01T00:00:00Z",
+					lastUpdated: "2025-01-01T00:00:00Z",
+				},
+				db,
+			);
+
+			const result = prunePreferences({ olderThanDays: 30 }, db);
+			expect(result.deletedPreferences).toBe(1);
+			expect(listPreferenceRecords({}, db)).toHaveLength(1);
+			expect(listPreferenceRecords({}, db)[0]?.key).toBe("confirmed.pref");
+		});
+
+		test("prunes old evidence while keeping newest rows", () => {
+			const record = upsertPreferenceRecord(
+				{
+					key: "editor",
+					value: "vim",
+					scope: "global",
+					createdAt: "2026-01-01T00:00:00Z",
+					lastUpdated: "2026-01-01T00:00:00Z",
+					evidence: [
+						{ statement: "I prefer vim.", createdAt: "2025-01-01T00:00:00Z", confirmed: true },
+						{
+							statement: "Please keep using vim.",
+							createdAt: "2026-01-01T00:00:00Z",
+							confirmed: true,
+						},
+					],
+				},
+				db,
+			);
+
+			const result = prunePreferenceEvidence(
+				{ olderThanDays: 30, keepLatestPerPreference: 1, status: "any" },
+				db,
+			);
+			expect(result.deletedEvidence).toBe(1);
+			const evidence = listPreferenceEvidence(record.id, db);
+			expect(evidence).toHaveLength(1);
+			expect(evidence[0]?.statement).toContain("keep using vim");
+		});
+	});
+
+	describe("listRelevantLessons", () => {
+		test("returns normalized lessons from kernel tables", () => {
+			upsertProject(
+				{
+					id: "proj-1",
+					path: "/test",
+					name: "test",
+					lastUpdated: "2026-01-01T00:00:00Z",
+				},
+				db,
+			);
+
+			db.run(
+				`INSERT INTO project_lessons (
+					project_id,
+					content,
+					domain,
+					extracted_at,
+					source_phase,
+					last_updated_at
+				) VALUES (?, ?, ?, ?, ?, ?)`,
+				[
+					"proj-1",
+					"Keep inspection read-only.",
+					"review",
+					"2026-01-01T00:00:00Z",
+					"RETROSPECTIVE",
+					"2026-01-01T00:00:00Z",
+				],
+			);
+
+			const lessons = listRelevantLessons("proj-1", 5, db);
+			expect(lessons).toHaveLength(1);
+			expect(lessons[0]?.content).toContain("read-only");
 		});
 	});
 

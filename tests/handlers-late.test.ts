@@ -192,11 +192,11 @@ describe("handleBuild", () => {
 		);
 		const result = await handleBuild(state, "/tmp/artifacts", "task 1 done");
 
-		// Should dispatch next task or indicate review
-		expect(["dispatch", "dispatch_multi"]).toContain(result.action);
+		expect(result.action).toBe("dispatch");
+		expect(result.taskId).toBe(2);
 	});
 
-	test("multiple tasks in same wave returns dispatch_multi with tasks marked IN_PROGRESS", async () => {
+	test("multiple tasks in same wave dispatches one task at a time", async () => {
 		const state = makeBuildState([
 			{ id: 1, title: "Task A", status: "PENDING", wave: 1 },
 			{ id: 2, title: "Task B", status: "PENDING", wave: 1 },
@@ -204,19 +204,16 @@ describe("handleBuild", () => {
 		]);
 		const result = await handleBuild(state, "/tmp/artifacts");
 
-		expect(result.action).toBe("dispatch_multi");
-		expect(result.agents).toBeDefined();
-		expect(result.agents?.length).toBe(2);
-		// dispatch_multi should set currentTask to null (results come back individually)
-		expect(result._stateUpdates?.buildProgress?.currentTask).toBeNull();
-		// dispatch_multi should mark dispatched tasks as IN_PROGRESS
+		expect(result.action).toBe("dispatch");
+		expect(result.taskId).toBe(1);
+		expect(result._stateUpdates?.buildProgress?.currentTask).toBe(1);
 		const updatedTasks = result._stateUpdates?.tasks as
 			| Array<{ id: number; status: string }>
 			| undefined;
 		expect(updatedTasks).toBeDefined();
 		if (updatedTasks) {
 			expect(updatedTasks.find((t) => t.id === 1)?.status).toBe("IN_PROGRESS");
-			expect(updatedTasks.find((t) => t.id === 2)?.status).toBe("IN_PROGRESS");
+			expect(updatedTasks.find((t) => t.id === 2)?.status).toBe("PENDING");
 			expect(updatedTasks.find((t) => t.id === 3)?.status).toBe("PENDING");
 		}
 	});
@@ -318,34 +315,35 @@ describe("handleBuild", () => {
 		// No result — this is a resume call
 		const result = await handleBuild(state, "/tmp/artifacts");
 
-		// Must NOT return complete — work is still in progress
-		expect(result.action).not.toBe("complete");
-		expect(result.action).toBe("dispatch");
-		expect(result.progress).toContain("in-progress");
+		// Must fail closed — no fake builder redispatches while waiting on typed results.
+		expect(result.action).toBe("error");
+		expect(result.code).toBe("E_BUILD_RESULT_PENDING");
+		expect(result.progress).toContain("waiting for typed result");
 	});
 
-	test("dispatch_multi result marks first IN_PROGRESS task DONE", async () => {
+	test("result marks current in-progress task DONE and dispatches next pending task", async () => {
 		const state = makeBuildState(
 			[
 				{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 },
-				{ id: 2, title: "Task B", status: "IN_PROGRESS", wave: 1 },
+				{ id: 2, title: "Task B", status: "PENDING", wave: 1 },
 			],
-			{ currentTask: null, currentWave: 1 },
+			{ currentTask: 1, currentWave: 1 },
 		);
 		const result = await handleBuild(state, "/tmp/artifacts", "task A completed");
 
-		// Should mark first IN_PROGRESS task (id:1) as DONE, dispatch next or wave complete
-		expect(["dispatch", "dispatch_multi"]).toContain(result.action);
+		expect(result.action).toBe("dispatch");
+		expect(result.taskId).toBe(2);
 		const updatedTasks = result._stateUpdates?.tasks as
 			| Array<{ id: number; status: string }>
 			| undefined;
 		expect(updatedTasks).toBeDefined();
 		if (updatedTasks) {
 			expect(updatedTasks.find((t) => t.id === 1)?.status).toBe("DONE");
+			expect(updatedTasks.find((t) => t.id === 2)?.status).toBe("IN_PROGRESS");
 		}
 	});
 
-	test("typed context requires taskId for dispatch_multi completion", async () => {
+	test("typed context requires taskId for BUILD completion when currentTask is null", async () => {
 		const state = makeBuildState(
 			[
 				{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 },
@@ -365,11 +363,33 @@ describe("handleBuild", () => {
 				taskId: null,
 				payload: { text: "done" },
 			},
-			legacy: false,
 		});
 
 		expect(result.action).toBe("error");
 		expect(result.code).toBe("E_BUILD_TASK_ID_REQUIRED");
+	});
+
+	test("review completion with more tasks remaining dispatches next task sequentially", async () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
+				{ id: 2, title: "Task B", status: "PENDING", wave: 2 },
+				{ id: 3, title: "Task C", status: "PENDING", wave: 2 },
+			],
+			{ currentTask: null, currentWave: 1, reviewPending: true },
+		);
+		const result = await handleBuild(state, "/tmp/artifacts", '{"severity":"LOW"}');
+
+		expect(result.action).toBe("dispatch");
+		expect(result.taskId).toBe(2);
+		const updatedTasks = result._stateUpdates?.tasks as
+			| Array<{ id: number; status: string }>
+			| undefined;
+		expect(updatedTasks).toBeDefined();
+		if (updatedTasks) {
+			expect(updatedTasks.find((t) => t.id === 2)?.status).toBe("IN_PROGRESS");
+			expect(updatedTasks.find((t) => t.id === 3)?.status).toBe("PENDING");
+		}
 	});
 
 	test("strike count > 3 returns error", async () => {

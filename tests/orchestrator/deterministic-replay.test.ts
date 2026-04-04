@@ -132,7 +132,7 @@ describe("deterministic replay", () => {
 		expect(result.code).toBe("E_STALE_RESULT");
 	});
 
-	test("dispatch_multi BUILD tasks are attributed by taskId regardless of completion order", async () => {
+	test("sequential BUILD result updates mark the current task done and dispatch the next one", async () => {
 		const now = new Date().toISOString();
 		const customState = {
 			schemaVersion: 2,
@@ -192,45 +192,50 @@ describe("deterministic replay", () => {
 
 		await Bun.write(join(tempDirA, "state.json"), JSON.stringify(customState, null, 2));
 		const dispatch = JSON.parse(await orchestrateCore({}, tempDirA));
-		expect(dispatch.action).toBe("dispatch_multi");
-
-		const agentForTask2 = dispatch.agents.find((a: { taskId: number }) => a.taskId === 2);
-		const agentForTask1 = dispatch.agents.find((a: { taskId: number }) => a.taskId === 1);
-
-		const resultTask2 = {
-			schemaVersion: 1,
-			resultId: "build-2",
-			runId: dispatch.runId,
-			phase: "BUILD",
-			dispatchId: agentForTask2.dispatchId,
-			agent: agentForTask2.agent,
-			kind: "task_completion",
-			taskId: 2,
-			payload: { text: "task 2 done" },
-		};
-		await orchestrateCore({ result: JSON.stringify(resultTask2) }, tempDirA);
-
-		const stateAfterFirst = JSON.parse(await readFile(join(tempDirA, "state.json"), "utf-8"));
-		expect(
-			stateAfterFirst.tasks.find((t: { id: number; status: string }) => t.id === 2).status,
-		).toBe("DONE");
+		expect(dispatch.action).toBe("dispatch");
+		expect(dispatch.taskId).toBe(1);
 
 		const resultTask1 = {
 			schemaVersion: 1,
 			resultId: "build-1",
 			runId: dispatch.runId,
 			phase: "BUILD",
-			dispatchId: agentForTask1.dispatchId,
-			agent: agentForTask1.agent,
+			dispatchId: dispatch.dispatchId,
+			agent: dispatch.agent,
 			kind: "task_completion",
 			taskId: 1,
 			payload: { text: "task 1 done" },
 		};
-		await orchestrateCore({ result: JSON.stringify(resultTask1) }, tempDirA);
+		const secondDispatch = JSON.parse(
+			await orchestrateCore({ result: JSON.stringify(resultTask1) }, tempDirA),
+		);
+		expect(secondDispatch.action).toBe("dispatch");
+		expect(secondDispatch.taskId).toBe(2);
+
+		const stateAfterFirst = JSON.parse(await readFile(join(tempDirA, "state.json"), "utf-8"));
+		expect(
+			stateAfterFirst.tasks.find((t: { id: number; status: string }) => t.id === 1).status,
+		).toBe("DONE");
+		expect(
+			stateAfterFirst.tasks.find((t: { id: number; status: string }) => t.id === 2).status,
+		).toBe("IN_PROGRESS");
+
+		const resultTask2 = {
+			schemaVersion: 1,
+			resultId: "build-2",
+			runId: secondDispatch.runId,
+			phase: "BUILD",
+			dispatchId: secondDispatch.dispatchId,
+			agent: secondDispatch.agent,
+			kind: "task_completion",
+			taskId: 2,
+			payload: { text: "task 2 done" },
+		};
+		await orchestrateCore({ result: JSON.stringify(resultTask2) }, tempDirA);
 
 		const stateAfterSecond = JSON.parse(await readFile(join(tempDirA, "state.json"), "utf-8"));
 		expect(
-			stateAfterSecond.tasks.find((t: { id: number; status: string }) => t.id === 1).status,
+			stateAfterSecond.tasks.find((t: { id: number; status: string }) => t.id === 2).status,
 		).toBe("DONE");
 	});
 });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseResultEnvelope } from "../../src/orchestrator/contracts/legacy-result-adapter";
+import { parseTypedResultEnvelope } from "../../src/orchestrator/contracts/legacy-result-adapter";
 import { planTasksArtifactSchema } from "../../src/orchestrator/contracts/phase-artifacts";
 import { resultEnvelopeSchema } from "../../src/orchestrator/contracts/result-envelope";
 
@@ -36,7 +36,7 @@ describe("resultEnvelopeSchema", () => {
 
 	test("typed malformed envelope does not silently fallback to legacy", () => {
 		expect(() =>
-			parseResultEnvelope(
+			parseTypedResultEnvelope(
 				JSON.stringify({
 					schemaVersion: 1,
 					resultId: "x",
@@ -51,6 +51,16 @@ describe("resultEnvelopeSchema", () => {
 				{ runId: "run-1", phase: "RECON", fallbackDispatchId: "d-legacy" },
 			),
 		).toThrow("E_INVALID_RESULT");
+	});
+
+	test("raw non-json payload is rejected as invalid typed envelope", () => {
+		expect(() =>
+			parseTypedResultEnvelope("plain text", {
+				runId: "run-1",
+				phase: "RECON",
+				fallbackDispatchId: "d-legacy",
+			}),
+		).toThrow("typed result envelope JSON object");
 	});
 });
 

@@ -130,6 +130,15 @@ describe("createObservabilityEventHandler", () => {
 
 	it("on session.idle, snapshots to disk but keeps session in store", async () => {
 		store.initSession("sess-1");
+		store.appendEvent("sess-1", {
+			type: "decision",
+			timestamp: "2026-04-04T10:00:00.000Z",
+			sessionId: "sess-1",
+			phase: "BUILD",
+			agent: "oc-implementer",
+			decision: "Persist pending forensic evidence",
+			rationale: "Idle flush should only write newly appended events",
+		});
 
 		await handler({
 			event: {
@@ -142,6 +151,23 @@ describe("createObservabilityEventHandler", () => {
 
 		expect(writeSessionLog).toHaveBeenCalledTimes(1);
 		// Session data should still be in store (snapshot, not flush)
+		expect(store.getSession("sess-1")).toBeDefined();
+	});
+
+	it("on session.idle, does not write when no unpersisted events exist", async () => {
+		store.initSession("sess-1");
+		store.getUnpersistedSession("sess-1");
+
+		await handler({
+			event: {
+				type: "session.idle",
+				properties: {
+					info: { sessionID: "sess-1" },
+				},
+			},
+		});
+
+		expect(writeSessionLog).not.toHaveBeenCalled();
 		expect(store.getSession("sess-1")).toBeDefined();
 	});
 

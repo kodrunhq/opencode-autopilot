@@ -5,7 +5,7 @@ import { ensurePhaseDir } from "../orchestrator/artifacts";
 import { PHASES, pipelineStateSchema } from "../orchestrator/schemas";
 import { loadState, saveState } from "../orchestrator/state";
 import { ensureGitignore } from "../utils/gitignore";
-import { getProjectArtifactDir } from "../utils/paths";
+import { getProjectArtifactDir, getProjectRootFromArtifactDir } from "../utils/paths";
 import { orchestrateCore } from "./orchestrate";
 
 /** Phases skipped in quick mode (per D-17: skip RECON, CHALLENGE, ARCHITECT, EXPLORE). */
@@ -109,7 +109,7 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 
 	// 6. Best-effort .gitignore update (same pattern as orchestrateCore)
 	try {
-		await ensureGitignore(join(artifactDir, ".."));
+		await ensureGitignore(getProjectRootFromArtifactDir(artifactDir));
 	} catch {
 		// Non-critical -- swallow gitignore errors
 	}

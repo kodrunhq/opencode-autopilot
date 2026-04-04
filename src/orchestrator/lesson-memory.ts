@@ -1,8 +1,9 @@
 /**
  * Per-project lesson memory persistence.
  *
- * Stores lessons extracted from pipeline runs at
- * {projectRoot}/.opencode-autopilot/lesson-memory.json
+ * Stores lessons extracted from pipeline runs in the project kernel,
+ * with {projectRoot}/.opencode-autopilot/lesson-memory.json kept as a
+ * compatibility mirror/export during the Phase 4 migration window.
  *
  * Memory is pruned on load to remove stale entries (>90 days)
  * and cap at 50 lessons. All writes are atomic (tmp file + rename)
@@ -12,7 +13,9 @@
 import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { loadLessonMemoryFromKernel, saveLessonMemoryToKernel } from "../kernel/repository";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
+import { getProjectArtifactDir } from "../utils/paths";
 import { lessonMemorySchema } from "./lesson-schemas";
 import type { LessonMemory } from "./lesson-types";
 
@@ -21,6 +24,7 @@ export type { LessonMemory };
 const LESSON_FILE = "lesson-memory.json";
 const MAX_LESSONS = 50;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+let legacyLessonMemoryMirrorWarned = false;
 
 /**
  * Create a valid empty lesson memory object.
@@ -41,6 +45,11 @@ export function createEmptyLessonMemory(): LessonMemory {
  * Prunes on load to remove stale entries and cap storage.
  */
 export async function loadLessonMemory(projectRoot: string): Promise<LessonMemory | null> {
+	const kernelMemory = loadLessonMemoryFromKernel(getProjectArtifactDir(projectRoot));
+	if (kernelMemory !== null) {
+		return pruneLessons(kernelMemory);
+	}
+
 	const memoryPath = join(projectRoot, ".opencode-autopilot", LESSON_FILE);
 	try {
 		const raw = await readFile(memoryPath, "utf-8");
@@ -51,7 +60,9 @@ export async function loadLessonMemory(projectRoot: string): Promise<LessonMemor
 			...parsed,
 			lessons: Array.isArray(parsed.lessons) ? parsed.lessons : [],
 		});
-		return lessonMemorySchema.parse(pruned);
+		const validated = lessonMemorySchema.parse(pruned);
+		saveLessonMemoryToKernel(getProjectArtifactDir(projectRoot), validated);
+		return validated;
 	} catch (error: unknown) {
 		if (isEnoentError(error)) {
 			return null;
@@ -74,12 +85,21 @@ export async function loadLessonMemory(projectRoot: string): Promise<LessonMemor
  */
 export async function saveLessonMemory(memory: LessonMemory, projectRoot: string): Promise<void> {
 	const validated = lessonMemorySchema.parse(memory);
-	const dir = join(projectRoot, ".opencode-autopilot");
-	await ensureDir(dir);
-	const memoryPath = join(dir, LESSON_FILE);
-	const tmpPath = `${memoryPath}.tmp.${randomBytes(8).toString("hex")}`;
-	await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
-	await rename(tmpPath, memoryPath);
+	saveLessonMemoryToKernel(getProjectArtifactDir(projectRoot), validated);
+
+	try {
+		const dir = join(projectRoot, ".opencode-autopilot");
+		await ensureDir(dir);
+		const memoryPath = join(dir, LESSON_FILE);
+		const tmpPath = `${memoryPath}.tmp.${randomBytes(8).toString("hex")}`;
+		await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
+		await rename(tmpPath, memoryPath);
+	} catch (error: unknown) {
+		if (!legacyLessonMemoryMirrorWarned) {
+			legacyLessonMemoryMirrorWarned = true;
+			console.warn("[opencode-autopilot] lesson-memory.json mirror write failed:", error);
+		}
+	}
 }
 
 /**

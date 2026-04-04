@@ -79,9 +79,10 @@ export async function logsCore(
 	options?: LogsOptions,
 	logsDir?: string,
 ): Promise<string> {
+	const logsRoot = logsDir ?? process.cwd();
 	switch (mode) {
 		case "list": {
-			const sessions = await listSessionLogs(logsDir);
+			const sessions = await listSessionLogs(logsRoot);
 
 			return JSON.stringify({
 				action: "logs_list",
@@ -92,8 +93,8 @@ export async function logsCore(
 
 		case "detail": {
 			const log = options?.sessionID
-				? await readSessionLog(options.sessionID, logsDir)
-				: await readLatestSessionLog(logsDir);
+				? await readSessionLog(options.sessionID, logsRoot)
+				: await readLatestSessionLog(logsRoot);
 
 			if (!log) {
 				const target = options?.sessionID
@@ -117,8 +118,8 @@ export async function logsCore(
 
 		case "search": {
 			const log = options?.sessionID
-				? await readSessionLog(options.sessionID, logsDir)
-				: await readLatestSessionLog(logsDir);
+				? await readSessionLog(options.sessionID, logsRoot)
+				: await readLatestSessionLog(logsRoot);
 
 			if (!log) {
 				const target = options?.sessionID

@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { getProjectRootFromArtifactDir } from "../../utils/paths";
 import { getArtifactRef, PHASE_ARTIFACTS } from "../artifacts";
 import {
 	createEmptyLessonMemory,
@@ -81,7 +82,7 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 
 		// Persist lessons to memory (best-effort: failure should not mark pipeline as FAILED)
 		try {
-			const projectRoot = join(artifactDir, "..");
+			const projectRoot = getProjectRootFromArtifactDir(artifactDir);
 			const existing = await loadLessonMemory(projectRoot);
 			const memory = existing ?? createEmptyLessonMemory();
 			const merged = [...memory.lessons, ...valid];

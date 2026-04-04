@@ -190,11 +190,13 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 				const sessionId = extractSessionId(properties);
 				if (!sessionId) return;
 
-				// Snapshot to disk (fire-and-forget per Pitfall 2) — session continues
-				const sessionData = eventStore.getSession(sessionId);
-				writeSessionLog(sessionData).catch((err) => {
-					console.error("[opencode-autopilot]", err);
-				});
+				// Persist only new events since the last flush.
+				const sessionData = eventStore.getUnpersistedSession(sessionId);
+				if (sessionData && sessionData.events.length > 0) {
+					writeSessionLog(sessionData).catch((err) => {
+						console.error("[opencode-autopilot]", err);
+					});
+				}
 				return;
 			}
 
@@ -202,11 +204,21 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 				const sessionId = extractSessionId(properties);
 				if (!sessionId) return;
 
+				eventStore.appendEvent(sessionId, {
+					type: "session_end",
+					timestamp: new Date().toISOString(),
+					sessionId,
+					durationMs: 0,
+					totalCost: 0,
+				});
+
 				// Final flush — session is done, remove from store
 				const sessionData = eventStore.flush(sessionId);
-				writeSessionLog(sessionData).catch((err) => {
-					console.error("[opencode-autopilot]", err);
-				});
+				if (sessionData && sessionData.events.length > 0) {
+					writeSessionLog(sessionData).catch((err) => {
+						console.error("[opencode-autopilot]", err);
+					});
+				}
 
 				// Clean up context monitor
 				contextMonitor.cleanup(sessionId);
@@ -219,21 +231,20 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 
 				// Append compaction decision event (not session_start)
 				const compactEvent: ObservabilityEvent = Object.freeze({
-					type: "decision" as const,
+					type: "compacted" as const,
 					timestamp: new Date().toISOString(),
 					sessionId,
-					phase: "COMPACT",
-					agent: "system",
-					decision: "Session compacted",
-					rationale: "Context window compaction triggered",
+					trigger: "context_window",
 				});
 				eventStore.appendEvent(sessionId, compactEvent);
 
 				// Snapshot to disk — session continues after compaction
-				const sessionData = eventStore.getSession(sessionId);
-				writeSessionLog(sessionData).catch((err) => {
-					console.error("[opencode-autopilot]", err);
-				});
+				const sessionData = eventStore.getUnpersistedSession(sessionId);
+				if (sessionData && sessionData.events.length > 0) {
+					writeSessionLog(sessionData).catch((err) => {
+						console.error("[opencode-autopilot]", err);
+					});
+				}
 				return;
 			}
 

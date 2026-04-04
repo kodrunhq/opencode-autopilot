@@ -1,12 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { loadLatestPipelineStateFromKernel, savePipelineStateToKernel } from "../kernel/repository";
+import { KERNEL_STATE_CONFLICT_CODE } from "../kernel/types";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
 import { assertStateInvariants } from "./contracts/invariants";
 import { PHASES, pipelineStateSchema } from "./schemas";
 import type { PipelineState } from "./types";
 
 const STATE_FILE = "state.json";
+let legacyStateMirrorWarned = false;
 
 function generateRunId(): string {
 	return `run_${randomBytes(8).toString("hex")}`;
@@ -37,12 +40,14 @@ export function createInitialState(idea: string): PipelineState {
 	});
 }
 
-export async function loadState(artifactDir: string): Promise<PipelineState | null> {
+async function loadLegacyState(artifactDir: string): Promise<PipelineState | null> {
 	const statePath = join(artifactDir, STATE_FILE);
 	try {
 		const raw = await readFile(statePath, "utf-8");
 		const parsed = JSON.parse(raw);
-		return pipelineStateSchema.parse(parsed);
+		const validated = pipelineStateSchema.parse(parsed);
+		assertStateInvariants(validated);
+		return validated;
 	} catch (error: unknown) {
 		if (isEnoentError(error)) {
 			return null;
@@ -51,28 +56,85 @@ export async function loadState(artifactDir: string): Promise<PipelineState | nu
 	}
 }
 
+async function writeLegacyStateMirror(state: PipelineState, artifactDir: string): Promise<void> {
+	await ensureDir(artifactDir);
+	const statePath = join(artifactDir, STATE_FILE);
+	const tmpPath = `${statePath}.tmp.${randomBytes(8).toString("hex")}`;
+	await writeFile(tmpPath, JSON.stringify(state, null, 2), "utf-8");
+	await rename(tmpPath, statePath);
+}
+
+async function syncLegacyStateMirror(state: PipelineState, artifactDir: string): Promise<void> {
+	try {
+		await writeLegacyStateMirror(state, artifactDir);
+	} catch (error: unknown) {
+		if (!legacyStateMirrorWarned) {
+			legacyStateMirrorWarned = true;
+			console.warn("[opencode-autopilot] state.json mirror write failed:", error);
+		}
+	}
+}
+
+export async function loadState(artifactDir: string): Promise<PipelineState | null> {
+	const kernelState = loadLatestPipelineStateFromKernel(artifactDir);
+	if (kernelState !== null) {
+		return kernelState;
+	}
+
+	const legacyState = await loadLegacyState(artifactDir);
+	if (legacyState === null) {
+		return null;
+	}
+
+	savePipelineStateToKernel(artifactDir, legacyState);
+	return legacyState;
+}
+
 export async function saveState(
 	state: PipelineState,
 	artifactDir: string,
 	expectedRevision?: number,
 ): Promise<void> {
-	if (typeof expectedRevision === "number") {
-		const current = await loadState(artifactDir);
-		const currentRevision = current?.stateRevision ?? -1;
-		if (currentRevision !== expectedRevision) {
-			throw new Error(
-				`E_STATE_CONFLICT: expected stateRevision ${expectedRevision}, found ${currentRevision}`,
-			);
-		}
-	}
-
 	const validated = pipelineStateSchema.parse(state);
 	assertStateInvariants(validated);
-	await ensureDir(artifactDir);
-	const statePath = join(artifactDir, STATE_FILE);
-	const tmpPath = `${statePath}.tmp.${randomBytes(8).toString("hex")}`;
-	await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
-	await rename(tmpPath, statePath);
+	savePipelineStateToKernel(artifactDir, validated, expectedRevision);
+	await syncLegacyStateMirror(validated, artifactDir);
+}
+
+export function isStateConflictError(error: unknown): boolean {
+	return error instanceof Error && error.message.startsWith(`${KERNEL_STATE_CONFLICT_CODE}:`);
+}
+
+export async function updatePersistedState(
+	artifactDir: string,
+	state: Readonly<PipelineState>,
+	transform: (current: Readonly<PipelineState>) => PipelineState,
+	options?: { readonly maxConflicts?: number },
+): Promise<PipelineState> {
+	const maxConflicts = options?.maxConflicts ?? 2;
+	let currentState = state;
+
+	for (let attempt = 0; ; attempt += 1) {
+		const nextState = transform(currentState);
+		if (nextState === currentState) {
+			return currentState;
+		}
+
+		try {
+			await saveState(nextState, artifactDir, currentState.stateRevision);
+			return nextState;
+		} catch (error: unknown) {
+			if (!isStateConflictError(error) || attempt >= maxConflicts) {
+				throw error;
+			}
+
+			const latestState = await loadState(artifactDir);
+			if (latestState === null) {
+				throw new Error(`${KERNEL_STATE_CONFLICT_CODE}: state disappeared during update`);
+			}
+			currentState = latestState;
+		}
+	}
 }
 
 export function patchState(

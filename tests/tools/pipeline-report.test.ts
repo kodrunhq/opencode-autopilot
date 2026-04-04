@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipelineReportCore } from "../../src/tools/pipeline-report";
+import { writeForensicSession } from "../observability/test-helpers";
 
 describe("oc_pipeline_report tool", () => {
 	let testDir: string;
@@ -17,30 +18,28 @@ describe("oc_pipeline_report tool", () => {
 		await rm(testDir, { recursive: true, force: true });
 	});
 
-	function createSessionLog(
+	async function createSessionLog(
 		sessionId: string,
 		overrides?: Partial<{
 			startedAt: string;
 			endedAt: string | null;
-			events: unknown[];
-			decisions: unknown[];
+			decisions: Parameters<typeof writeForensicSession>[0]["decisions"];
 		}>,
-	) {
-		return {
-			schemaVersion: 1,
+	): Promise<void> {
+		await writeForensicSession({
+			projectRoot: testDir,
 			sessionId,
 			startedAt: overrides?.startedAt ?? "2026-04-01T10:00:00Z",
 			endedAt: overrides?.endedAt ?? "2026-04-01T10:30:00Z",
-			events: overrides?.events ?? [],
 			decisions: overrides?.decisions ?? [],
-			errorSummary: {},
-		};
+		});
 	}
 
 	test("pipelineReportCore returns report for latest session", async () => {
-		const log = createSessionLog("session-report", {
+		await createSessionLog("session-report", {
 			decisions: [
 				{
+					timestamp: null,
 					phase: "RECON",
 					agent: "oc-researcher",
 					decision: "Research complete",
@@ -48,7 +47,6 @@ describe("oc_pipeline_report tool", () => {
 				},
 			],
 		});
-		await writeFile(join(testDir, "session-report.json"), JSON.stringify(log));
 
 		const result = JSON.parse(await pipelineReportCore(undefined, testDir));
 		expect(result.action).toBe("pipeline_report");
@@ -59,9 +57,10 @@ describe("oc_pipeline_report tool", () => {
 	});
 
 	test("pipelineReportCore returns report for specific session", async () => {
-		const log = createSessionLog("session-specific", {
+		await createSessionLog("session-specific", {
 			decisions: [
 				{
+					timestamp: null,
 					phase: "BUILD",
 					agent: "oc-implementer",
 					decision: "TDD approach",
@@ -69,7 +68,6 @@ describe("oc_pipeline_report tool", () => {
 				},
 			],
 		});
-		await writeFile(join(testDir, "session-specific.json"), JSON.stringify(log));
 
 		const result = JSON.parse(await pipelineReportCore("session-specific", testDir));
 		expect(result.action).toBe("pipeline_report");
@@ -83,21 +81,24 @@ describe("oc_pipeline_report tool", () => {
 	});
 
 	test("pipelineReportCore groups decisions by phase", async () => {
-		const log = createSessionLog("session-grouped", {
+		await createSessionLog("session-grouped", {
 			decisions: [
 				{
+					timestamp: null,
 					phase: "RECON",
 					agent: "oc-researcher",
 					decision: "Research done",
 					rationale: "Data collected",
 				},
 				{
+					timestamp: null,
 					phase: "BUILD",
 					agent: "oc-implementer",
 					decision: "Implemented feature",
 					rationale: "Tests pass",
 				},
 				{
+					timestamp: null,
 					phase: "BUILD",
 					agent: "oc-reviewer",
 					decision: "Approved code",
@@ -105,7 +106,6 @@ describe("oc_pipeline_report tool", () => {
 				},
 			],
 		});
-		await writeFile(join(testDir, "session-grouped.json"), JSON.stringify(log));
 
 		const result = JSON.parse(await pipelineReportCore("session-grouped", testDir));
 		expect(result.phases).toBeArrayOfSize(2);
@@ -117,8 +117,7 @@ describe("oc_pipeline_report tool", () => {
 	});
 
 	test("pipelineReportCore returns empty phases when no decisions exist", async () => {
-		const log = createSessionLog("session-no-decisions");
-		await writeFile(join(testDir, "session-no-decisions.json"), JSON.stringify(log));
+		await createSessionLog("session-no-decisions");
 
 		const result = JSON.parse(await pipelineReportCore("session-no-decisions", testDir));
 		expect(result.action).toBe("pipeline_report");
@@ -127,15 +126,17 @@ describe("oc_pipeline_report tool", () => {
 	});
 
 	test("displayText includes phase-by-phase breakdown", async () => {
-		const log = createSessionLog("session-display", {
+		await createSessionLog("session-display", {
 			decisions: [
 				{
+					timestamp: null,
 					phase: "RECON",
 					agent: "oc-researcher",
 					decision: "Research complete",
 					rationale: "Thorough analysis",
 				},
 				{
+					timestamp: null,
 					phase: "BUILD",
 					agent: "oc-implementer",
 					decision: "Feature built",
@@ -143,7 +144,6 @@ describe("oc_pipeline_report tool", () => {
 				},
 			],
 		});
-		await writeFile(join(testDir, "session-display.json"), JSON.stringify(log));
 
 		const result = JSON.parse(await pipelineReportCore("session-display", testDir));
 		expect(result.displayText).toContain("RECON");

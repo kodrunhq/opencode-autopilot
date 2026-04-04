@@ -30,4 +30,44 @@ describe("validateStateInvariants", () => {
 		const violations = validateStateInvariants(broken);
 		expect(violations.some((v) => v.code === "E_INVARIANT_BUILD_TASK")).toBe(true);
 	});
+
+	test("detects pending dispatch from a non-current phase", () => {
+		const state = createInitialState("pending mismatch");
+		const broken = {
+			...state,
+			pendingDispatches: [
+				{
+					dispatchId: "dispatch_plan_1",
+					phase: "PLAN" as const,
+					agent: "oc-planner",
+					issuedAt: new Date().toISOString(),
+					resultKind: "phase_output" as const,
+					taskId: null,
+				},
+			],
+		};
+		const violations = validateStateInvariants(broken);
+		expect(violations.some((v) => v.code === "E_INVARIANT_PENDING_PHASE")).toBe(true);
+	});
+
+	test("detects pending dispatches on terminal state", () => {
+		const state = createInitialState("terminal pending");
+		const broken = {
+			...state,
+			currentPhase: null,
+			status: "COMPLETED" as const,
+			pendingDispatches: [
+				{
+					dispatchId: "dispatch_done_1",
+					phase: "RECON" as const,
+					agent: "oc-researcher",
+					issuedAt: new Date().toISOString(),
+					resultKind: "phase_output" as const,
+					taskId: null,
+				},
+			],
+		};
+		const violations = validateStateInvariants(broken);
+		expect(violations.some((v) => v.code === "E_INVARIANT_PENDING_PHASE")).toBe(true);
+	});
 });

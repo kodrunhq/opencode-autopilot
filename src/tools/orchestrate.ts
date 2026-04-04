@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
-import { parseResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
-import type { ResultEnvelope } from "../orchestrator/contracts/result-envelope";
+import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
+import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
 import type { DispatchResult, PhaseHandlerContext } from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
@@ -10,11 +10,22 @@ import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
 import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
 import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
-import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
-import type { PendingDispatch, Phase, PipelineState } from "../orchestrator/types";
+import {
+	createInitialState,
+	isStateConflictError,
+	loadState,
+	patchState,
+	saveState,
+	updatePersistedState,
+} from "../orchestrator/state";
+import type { Phase, PipelineState } from "../orchestrator/types";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
-import { getGlobalConfigDir, getProjectArtifactDir } from "../utils/paths";
+import {
+	getGlobalConfigDir,
+	getProjectArtifactDir,
+	getProjectRootFromArtifactDir,
+} from "../utils/paths";
 import { reviewCore } from "./review";
 
 interface OrchestrateArgs {
@@ -28,6 +39,8 @@ const ORCHESTRATE_ERROR_CODES = Object.freeze({
 	PHASE_MISMATCH: "E_PHASE_MISMATCH",
 	UNKNOWN_DISPATCH: "E_UNKNOWN_DISPATCH",
 	DUPLICATE_RESULT: "E_DUPLICATE_RESULT",
+	PENDING_RESULT_REQUIRED: "E_PENDING_RESULT_REQUIRED",
+	RESULT_KIND_MISMATCH: "E_RESULT_KIND_MISMATCH",
 });
 
 function createDispatchId(): string {
@@ -54,6 +67,10 @@ function removePendingDispatch(state: Readonly<PipelineState>, dispatchId: strin
 	return patchState(state, {
 		pendingDispatches: state.pendingDispatches.filter((entry) => entry.dispatchId !== dispatchId),
 	});
+}
+
+function expectedResultKindForPending(pending: Readonly<PendingDispatch>): string {
+	return pending.resultKind;
 }
 
 function markResultProcessed(
@@ -172,6 +189,11 @@ function applyResultEnvelope(
 			`${ORCHESTRATE_ERROR_CODES.PHASE_MISMATCH}: result phase ${envelope.phase} != pending ${pending.phase}`,
 		);
 	}
+	if (expectedResultKindForPending(pending) !== envelope.kind) {
+		throw new Error(
+			`${ORCHESTRATE_ERROR_CODES.RESULT_KIND_MISMATCH}: result kind ${envelope.kind} != pending ${pending.resultKind}`,
+		);
+	}
 	if (pending.taskId !== null && envelope.taskId !== pending.taskId) {
 		throw new Error(
 			`${ORCHESTRATE_ERROR_CODES.PHASE_MISMATCH}: taskId ${String(envelope.taskId)} != pending ${pending.taskId}`,
@@ -207,9 +229,7 @@ async function applyStateUpdates(
 ): Promise<PipelineState> {
 	const updates = handlerResult._stateUpdates;
 	if (updates) {
-		const updated = patchState(state, updates);
-		await saveState(updated, artifactDir);
-		return updated;
+		return updatePersistedState(artifactDir, state, (current) => patchState(current, updates));
 	}
 	return state;
 }
@@ -228,7 +248,7 @@ async function maybeInlineReview(
 		handlerResult.agent === "oc-reviewer" &&
 		handlerResult.prompt
 	) {
-		const projectRoot = join(artifactDir, "..");
+		const projectRoot = getProjectRootFromArtifactDir(artifactDir);
 		const reviewResult = await reviewCore({ scope: "branch" }, projectRoot);
 		return { inlined: true, reviewResult };
 	}
@@ -245,7 +265,7 @@ async function injectLessonContext(
 	artifactDir: string,
 ): Promise<string> {
 	try {
-		const projectRoot = join(artifactDir, "..");
+		const projectRoot = getProjectRootFromArtifactDir(artifactDir);
 		const memory = await loadLessonMemory(projectRoot);
 		if (memory && memory.lessons.length > 0) {
 			const ctx = buildLessonContext(memory.lessons, phase as Phase);
@@ -332,26 +352,33 @@ async function checkCircuitBreaker(
 }> {
 	const counts = { ...(currentState.phaseDispatchCounts ?? {}) };
 	counts[phase] = (counts[phase] ?? 0) + 1;
-	const newCount = counts[phase];
+	const candidateCount = counts[phase];
 	const limit = MAX_PHASE_DISPATCHES[phase] ?? 5;
-	if (newCount > limit) {
-		const msg = `Phase ${phase} exceeded max dispatches (${newCount}/${limit}) — possible infinite loop detected. Aborting.`;
+	if (candidateCount > limit) {
+		const msg = `Phase ${phase} exceeded max dispatches (${candidateCount}/${limit}) — possible infinite loop detected. Aborting.`;
 		logOrchestrationEvent(artifactDir, {
 			timestamp: new Date().toISOString(),
 			phase,
 			action: "loop_detected",
-			attempt: newCount,
+			attempt: candidateCount,
 			message: msg,
 		});
 		return {
 			abortMsg: JSON.stringify({ action: "error", message: msg }),
-			newCount,
+			newCount: candidateCount,
 			nextState: currentState,
 		};
 	}
-	const withCounts = patchState(currentState, { phaseDispatchCounts: counts });
-	await saveState(withCounts, artifactDir);
-	return { abortMsg: null, newCount, nextState: withCounts };
+	const withCounts = await updatePersistedState(artifactDir, currentState, (current) => {
+		const nextCounts = { ...(current.phaseDispatchCounts ?? {}) };
+		nextCounts[phase] = (nextCounts[phase] ?? 0) + 1;
+		return patchState(current, { phaseDispatchCounts: nextCounts });
+	});
+	return {
+		abortMsg: null,
+		newCount: withCounts.phaseDispatchCounts[phase] ?? candidateCount,
+		nextState: withCounts,
+	};
 }
 
 /**
@@ -400,8 +427,6 @@ async function processHandlerResult(
 				resultKind: normalizedResult.expectedResultKind ?? "phase_output",
 				taskId: normalizedResult.taskId ?? null,
 			};
-			const baseRevision = currentState.stateRevision;
-			const withPendingState = withPendingDispatch(currentState, pendingEntry);
 
 			// Log the dispatch event before any inline-review or context injection
 			const progress = buildUserProgress(phase, normalizedResult.progress, attempt);
@@ -417,7 +442,7 @@ async function processHandlerResult(
 			// Check if this is a review dispatch that should be inlined
 			const { inlined, reviewResult } = await maybeInlineReview(normalizedResult, artifactDir);
 			if (inlined && reviewResult) {
-				if (withPendingState.currentPhase) {
+				if (currentState.currentPhase) {
 					let reviewPayloadText = reviewResult;
 					try {
 						const parsedReview = JSON.parse(reviewResult) as {
@@ -433,8 +458,8 @@ async function processHandlerResult(
 					const inlinedEnvelope: ResultEnvelope = {
 						schemaVersion: 1,
 						resultId: `inline-${createDispatchId()}`,
-						runId: withPendingState.runId,
-						phase: withPendingState.currentPhase,
+						runId: currentState.runId,
+						phase: currentState.currentPhase,
 						dispatchId: pendingEntry.dispatchId,
 						agent: normalizedResult.agent ?? null,
 						kind: "review_findings",
@@ -443,13 +468,16 @@ async function processHandlerResult(
 							text: reviewPayloadText,
 						},
 					};
-					const withInlineResult = applyResultEnvelope(withPendingState, inlinedEnvelope);
-					await saveState(withInlineResult, artifactDir, baseRevision);
+					const withInlineResult = await updatePersistedState(
+						artifactDir,
+						currentState,
+						(current) =>
+							applyResultEnvelope(withPendingDispatch(current, pendingEntry), inlinedEnvelope),
+					);
 
-					const handler = PHASE_HANDLERS[withPendingState.currentPhase];
+					const handler = PHASE_HANDLERS[currentState.currentPhase];
 					const nextResult = await handler(withInlineResult, artifactDir, reviewPayloadText, {
 						envelope: inlinedEnvelope,
-						legacy: false,
 					});
 					return processHandlerResult(nextResult, withInlineResult, artifactDir);
 				}
@@ -461,8 +489,9 @@ async function processHandlerResult(
 				});
 			}
 
-			await saveState(withPendingState, artifactDir, baseRevision);
-			currentState = withPendingState;
+			currentState = await updatePersistedState(artifactDir, currentState, (current) =>
+				withPendingDispatch(current, pendingEntry),
+			);
 
 			// Inject lesson + skill context into dispatch prompt (best-effort)
 			if (normalizedResult.prompt && normalizedResult.phase) {
@@ -473,7 +502,7 @@ async function processHandlerResult(
 				);
 				const withSkills = await injectSkillContext(
 					enrichedPrompt,
-					join(artifactDir, ".."),
+					getProjectRootFromArtifactDir(artifactDir),
 					normalizedResult.phase,
 				);
 				if (withSkills !== normalizedResult.prompt) {
@@ -514,11 +543,6 @@ async function processHandlerResult(
 					resultKind: entry.resultKind ?? inferExpectedResultKindForAgent(entry.agent),
 					taskId: entry.taskId ?? null,
 				})) ?? [];
-			const baseRevision = currentState.stateRevision;
-			let withPendingState = currentState;
-			for (const entry of pendingEntries) {
-				withPendingState = withPendingDispatch(withPendingState, entry);
-			}
 
 			const progress = buildUserProgress(phase, normalizedResult.progress, attempt);
 			logOrchestrationEvent(artifactDir, {
@@ -528,8 +552,13 @@ async function processHandlerResult(
 				agent: `${normalizedResult.agents?.length ?? 0} agents`,
 				attempt,
 			});
-			await saveState(withPendingState, artifactDir, baseRevision);
-			currentState = withPendingState;
+			currentState = await updatePersistedState(artifactDir, currentState, (current) => {
+				let nextState = current;
+				for (const entry of pendingEntries) {
+					nextState = withPendingDispatch(nextState, entry);
+				}
+				return nextState;
+			});
 
 			// Inject lesson + skill context into each agent's prompt (best-effort)
 			// Load lesson and skill context once and reuse for all agents in the batch
@@ -537,7 +566,7 @@ async function processHandlerResult(
 				const lessonSuffix = await injectLessonContext("", normalizedResult.phase, artifactDir);
 				const skillSuffix = await injectSkillContext(
 					"",
-					join(artifactDir, ".."),
+					getProjectRootFromArtifactDir(artifactDir),
 					normalizedResult.phase,
 				);
 				const combinedSuffix = lessonSuffix + (skillSuffix || "");
@@ -575,12 +604,11 @@ async function processHandlerResult(
 				action: "complete",
 			});
 			const nextPhase = getNextPhase(currentState.currentPhase);
-			const advanced = completePhase(currentState);
+			const advanced = await updatePersistedState(artifactDir, currentState, (current) =>
+				completePhase(current),
+			);
 
 			if (nextPhase === null) {
-				// Terminal phase completed
-				const finished = { ...advanced, status: "COMPLETED" as const };
-				await saveState(finished, artifactDir);
 				const idx = PHASE_INDEX[currentState.currentPhase] ?? TOTAL_PHASES;
 				return JSON.stringify({
 					action: "complete",
@@ -588,8 +616,6 @@ async function processHandlerResult(
 					_userProgress: `Completed ${currentState.currentPhase} (${idx}/${TOTAL_PHASES}), pipeline finished`,
 				});
 			}
-
-			await saveState(advanced, artifactDir);
 
 			// Invoke the next phase handler immediately
 			const nextHandler = PHASE_HANDLERS[nextPhase];
@@ -624,7 +650,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 
 			// Best-effort .gitignore update
 			try {
-				const projectRoot = join(artifactDir, "..");
+				const projectRoot = getProjectRootFromArtifactDir(artifactDir);
 				await ensureGitignore(projectRoot);
 			} catch {
 				// Swallow gitignore errors -- non-critical
@@ -647,6 +673,18 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 				});
 			}
 
+			if (args.result === undefined && state.pendingDispatches.length > 0) {
+				const pending = state.pendingDispatches.at(-1);
+				const msg = `Pending result required for dispatch ${pending?.dispatchId ?? "unknown"} (${pending?.agent ?? "unknown"} / ${pending?.phase ?? state.currentPhase}). Submit a typed result envelope before calling oc_orchestrate again.`;
+				logDeterministicError(
+					artifactDir,
+					pending?.phase ?? state.currentPhase,
+					ORCHESTRATE_ERROR_CODES.PENDING_RESULT_REQUIRED,
+					msg,
+				);
+				return asErrorJson(ORCHESTRATE_ERROR_CODES.PENDING_RESULT_REQUIRED, msg);
+			}
+
 			if (typeof args.result === "string") {
 				const phaseHint = detectPhaseFromPending(state);
 				if (phaseHint === null) {
@@ -661,7 +699,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 				}
 
 				try {
-					const parsed = parseResultEnvelope(args.result, {
+					const parsed = parseTypedResultEnvelope(args.result, {
 						runId: state.runId,
 						phase: phaseHint,
 						fallbackDispatchId: detectDispatchFromPending(state),
@@ -679,39 +717,13 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 						return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg);
 					}
 
-					if (parsed.legacy && state.pendingDispatches.length > 1) {
-						const msg =
-							"Legacy result payload cannot be attributed with multiple pending dispatches. Provide typed envelope with dispatchId/taskId.";
-						logDeterministicError(
-							artifactDir,
-							state.currentPhase ?? phaseHint,
-							ORCHESTRATE_ERROR_CODES.INVALID_RESULT,
-							msg,
-						);
-						return asErrorJson(ORCHESTRATE_ERROR_CODES.INVALID_RESULT, msg);
-					}
-
-					const allowMissingPending = parsed.legacy && state.pendingDispatches.length === 0;
-					const nextState = applyResultEnvelope(state, parsed.envelope, {
-						allowMissingPending,
-					});
-					await saveState(nextState, artifactDir);
+					const nextState = await updatePersistedState(artifactDir, state, (current) =>
+						applyResultEnvelope(current, parsed.envelope),
+					);
 					state = nextState;
-					if (!allowMissingPending && parsed.legacy) {
-						const legacyMsg =
-							"Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.";
-						logOrchestrationEvent(artifactDir, {
-							timestamp: new Date().toISOString(),
-							phase: state.currentPhase ?? phaseHint,
-							action: "error",
-							message: legacyMsg,
-						});
-						console.warn(`[opencode-autopilot] ${legacyMsg}`);
-					}
 
 					phaseHandlerContext = {
 						envelope: parsed.envelope,
-						legacy: parsed.legacy,
 					};
 					handlerInputResult = parsed.envelope.payload.text;
 				} catch (error: unknown) {
@@ -761,13 +773,17 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 					timestamp: new Date().toISOString(),
 					lastSuccessfulPhase: lastDone?.name ?? null,
 				};
-				const failed = patchState(currentState, {
-					status: "FAILED" as const,
-					failureContext,
-				});
-				await saveState(failed, artifactDir);
+				await updatePersistedState(artifactDir, currentState, (latest) =>
+					patchState(latest, {
+						status: "FAILED" as const,
+						failureContext,
+					}),
+				);
 			}
-		} catch {
+		} catch (persistError: unknown) {
+			if (isStateConflictError(persistError)) {
+				// Swallow conflict after retry exhaustion -- original error takes priority
+			}
 			// Swallow save errors -- original error takes priority
 		}
 

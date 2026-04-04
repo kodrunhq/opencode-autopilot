@@ -2,20 +2,15 @@
  * oc_memory_status tool — inspect memory system state.
  *
  * Shows observation counts, storage size, recent observations,
- * preferences, and per-type breakdowns. Follows the *Core + tool()
- * pattern from create-agent.ts.
+ * preferences, and per-type breakdowns through the shared inspection
+ * query layer.
  *
  * @module
  */
 
-import { Database } from "bun:sqlite";
-import { statSync } from "node:fs";
-import { join } from "node:path";
+import type { Database } from "bun:sqlite";
 import { tool } from "@opencode-ai/plugin";
-import { DB_FILE, MEMORY_DIR, OBSERVATION_TYPES } from "../memory/constants";
-import { getMemoryDb } from "../memory/database";
-import { getAllPreferences } from "../memory/repository";
-import { getGlobalConfigDir } from "../utils/paths";
+import { getMemoryOverview } from "../inspect/repository";
 
 interface MemoryStatusResult {
 	readonly stats: {
@@ -47,94 +42,22 @@ export function memoryStatusCore(
 	_args: { readonly detail?: "summary" | "full" },
 	dbOrPath?: Database | string,
 ): MemoryStatusResult {
-	let ownedDb: Database | null = null;
 	try {
-		if (typeof dbOrPath === "string") {
-			ownedDb = new Database(dbOrPath);
-		}
-		const db = dbOrPath instanceof Database ? dbOrPath : (ownedDb ?? getMemoryDb());
-
-		// Count observations
-		const obsCountRow = db.query("SELECT COUNT(*) as cnt FROM observations").get() as {
-			cnt: number;
-		};
-		const totalObservations = obsCountRow.cnt;
-
-		// Count by type
-		const typeRows = db
-			.query("SELECT type, COUNT(*) as cnt FROM observations GROUP BY type")
-			.all() as Array<{ type: string; cnt: number }>;
-
-		const observationsByType: Record<string, number> = {};
-		for (const t of OBSERVATION_TYPES) {
-			observationsByType[t] = 0;
-		}
-		for (const row of typeRows) {
-			observationsByType[row.type] = row.cnt;
-		}
-
-		// Count projects
-		const projCountRow = db.query("SELECT COUNT(*) as cnt FROM projects").get() as {
-			cnt: number;
-		};
-		const totalProjects = projCountRow.cnt;
-
-		// Count preferences
-		const prefCountRow = db.query("SELECT COUNT(*) as cnt FROM preferences").get() as {
-			cnt: number;
-		};
-		const totalPreferences = prefCountRow.cnt;
-
-		// Storage size — derive from actual DB path, not always the global default
-		let storageSizeKb = 0;
-		try {
-			const statPath =
-				typeof dbOrPath === "string" && dbOrPath !== ":memory:"
-					? dbOrPath
-					: join(getGlobalConfigDir(), MEMORY_DIR, DB_FILE);
-			const stat = statSync(statPath);
-			storageSizeKb = Math.round(stat.size / 1024);
-		} catch {
-			// DB might be in-memory or path doesn't exist
-		}
-
-		// Recent observations (last 10)
-		const recentRows = db
-			.query(
-				"SELECT type, summary, created_at, confidence FROM observations ORDER BY created_at DESC LIMIT 10",
-			)
-			.all() as Array<{
-			type: string;
-			summary: string;
-			created_at: string;
-			confidence: number;
-		}>;
-
-		const recentObservations = recentRows.map((row) => ({
-			type: row.type,
-			summary: row.summary,
-			createdAt: row.created_at,
-			confidence: row.confidence,
-		}));
-
-		// All preferences
-		const allPrefs = getAllPreferences(db);
-		const preferences = allPrefs.map((p) => ({
-			key: p.key,
-			value: p.value,
-			confidence: p.confidence,
-		}));
+		const overview = getMemoryOverview(dbOrPath);
 
 		return {
-			stats: {
-				totalObservations,
-				totalProjects,
-				totalPreferences,
-				storageSizeKb,
-				observationsByType,
-			},
-			recentObservations,
-			preferences,
+			stats: overview.stats,
+			recentObservations: overview.recentObservations.map((row) => ({
+				type: row.type,
+				summary: row.summary,
+				createdAt: row.createdAt,
+				confidence: row.confidence,
+			})),
+			preferences: overview.preferences.map((row) => ({
+				key: row.key,
+				value: row.value,
+				confidence: row.confidence,
+			})),
 		};
 	} catch (err) {
 		const detail = err instanceof Error ? err.message : String(err);
@@ -144,8 +67,6 @@ export function memoryStatusCore(
 			preferences: [],
 			error: `Memory system error: ${detail}`,
 		};
-	} finally {
-		ownedDb?.close();
 	}
 }
 

@@ -4,7 +4,12 @@ import { isFirstLoad, loadConfig } from "./config";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { installAssets } from "./installer";
-import { createMemoryCaptureHandler, createMemoryInjector, getMemoryDb } from "./memory";
+import {
+	createMemoryCaptureHandler,
+	createMemoryChatMessageHandler,
+	createMemoryInjector,
+	getMemoryDb,
+} from "./memory";
 import { ContextMonitor } from "./observability/context-monitor";
 import {
 	createObservabilityEventHandler,
@@ -12,9 +17,9 @@ import {
 	createToolExecuteBeforeHandler,
 } from "./observability/event-handlers";
 import { SessionEventStore } from "./observability/event-store";
+import { createForensicEvent } from "./observability/forensic-log";
 import { writeSessionLog } from "./observability/log-writer";
 import { pruneOldLogs } from "./observability/retention";
-import type { SessionEvent } from "./observability/types";
 import type { SdkOperations } from "./orchestrator/fallback";
 import {
 	createChatMessageHandler,
@@ -38,6 +43,7 @@ import { ocDoctor, setOpenCodeConfig as setDoctorOpenCodeConfig } from "./tools/
 import { ocForensics } from "./tools/forensics";
 import { ocHashlineEdit } from "./tools/hashline-edit";
 import { ocLogs } from "./tools/logs";
+import { ocMemoryPreferences } from "./tools/memory-preferences";
 import { ocMemoryStatus } from "./tools/memory-status";
 import { ocMockFallback } from "./tools/mock-fallback";
 import { ocOrchestrate } from "./tools/orchestrate";
@@ -148,6 +154,29 @@ const plugin: Plugin = async (input) => {
 		manager,
 		sdk: sdkOps,
 		config: fallbackConfig,
+		onFallbackEvent: (event) => {
+			if (event.type === "fallback") {
+				eventStore.appendEvent(event.sessionId, {
+					type: "fallback",
+					timestamp: new Date().toISOString(),
+					sessionId: event.sessionId,
+					failedModel: event.failedModel ?? "unknown",
+					nextModel: event.nextModel ?? "unknown",
+					reason: event.reason ?? "fallback",
+					success: event.success === true,
+				});
+				return;
+			}
+
+			eventStore.appendEvent(event.sessionId, {
+				type: "model_switch",
+				timestamp: new Date().toISOString(),
+				sessionId: event.sessionId,
+				fromModel: event.fromModel ?? "unknown",
+				toModel: event.toModel ?? "unknown",
+				trigger: event.trigger ?? "fallback",
+			});
+		},
 	});
 	const chatMessageHandler = createChatMessageHandler(manager);
 	const toolExecuteAfterHandler = createToolExecuteAfterHandler(manager);
@@ -164,6 +193,9 @@ const plugin: Plugin = async (input) => {
 
 	const memoryCaptureHandler = memoryConfig.enabled
 		? createMemoryCaptureHandler({ getDb: () => getMemoryDb(), projectRoot: process.cwd() })
+		: null;
+	const memoryChatMessageHandler = memoryConfig.enabled
+		? createMemoryChatMessageHandler({ getDb: () => getMemoryDb(), projectRoot: process.cwd() })
 		: null;
 
 	const memoryInjector = memoryConfig.enabled
@@ -183,18 +215,73 @@ const plugin: Plugin = async (input) => {
 		showToast: sdkOps.showToast,
 		writeSessionLog: async (sessionData) => {
 			if (!sessionData) return;
-			// Filter to schema-valid event types that match SessionEvent discriminated union
-			const schemaEvents: SessionEvent[] = sessionData.events.filter(
-				(e): e is SessionEvent =>
-					e.type === "fallback" ||
-					e.type === "error" ||
-					e.type === "decision" ||
-					e.type === "model_switch",
-			);
 			await writeSessionLog({
+				projectRoot: process.cwd(),
 				sessionId: sessionData.sessionId,
 				startedAt: sessionData.startedAt,
-				events: schemaEvents,
+				events: sessionData.events.map((event) =>
+					createForensicEvent({
+						projectRoot: process.cwd(),
+						domain: "session",
+						timestamp: event.timestamp,
+						sessionId: event.sessionId,
+						type: event.type,
+						message: event.type === "error" ? event.message : null,
+						code:
+							event.type === "error"
+								? event.errorType
+								: event.type === "fallback"
+									? "FALLBACK"
+									: null,
+						payload:
+							event.type === "error"
+								? {
+										model: event.model,
+										errorType: event.errorType,
+										...(event.statusCode !== undefined ? { statusCode: event.statusCode } : {}),
+									}
+								: event.type === "fallback"
+									? {
+											failedModel: event.failedModel,
+											nextModel: event.nextModel,
+											reason: event.reason,
+											success: event.success,
+										}
+									: event.type === "decision"
+										? {
+												decision: event.decision,
+												rationale: event.rationale,
+											}
+										: event.type === "model_switch"
+											? {
+													fromModel: event.fromModel,
+													toModel: event.toModel,
+													trigger: event.trigger,
+												}
+											: event.type === "context_warning"
+												? {
+														utilization: event.utilization,
+														contextLimit: event.contextLimit,
+														inputTokens: event.inputTokens,
+													}
+												: event.type === "tool_complete"
+													? {
+															tool: event.tool,
+															durationMs: event.durationMs,
+															success: event.success,
+														}
+													: event.type === "phase_transition"
+														? {
+																fromPhase: event.fromPhase,
+																toPhase: event.toPhase,
+															}
+														: event.type === "compacted"
+															? {
+																	trigger: event.trigger,
+																}
+															: {},
+					}),
+				),
 			});
 		},
 	});
@@ -224,6 +311,7 @@ const plugin: Plugin = async (input) => {
 			oc_stocktake: ocStocktake,
 			oc_update_docs: ocUpdateDocs,
 			oc_memory_status: ocMemoryStatus,
+			oc_memory_preferences: ocMemoryPreferences,
 		},
 		event: async ({ event }) => {
 			// 1. Observability: collect (pure observer, no side effects on session)
@@ -269,6 +357,10 @@ const plugin: Plugin = async (input) => {
 				parts: unknown[];
 			},
 		) => {
+			if (memoryChatMessageHandler) {
+				await memoryChatMessageHandler(hookInput, output);
+			}
+
 			if (fallbackConfig.enabled) {
 				await chatMessageHandler(hookInput, output);
 			}

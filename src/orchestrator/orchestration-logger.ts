@@ -1,5 +1,4 @@
-import { appendFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { appendForensicEventForArtifactDir } from "../observability/forensic-log";
 
 export interface OrchestrationEvent {
 	readonly timestamp: string;
@@ -9,32 +8,47 @@ export interface OrchestrationEvent {
 	readonly promptLength?: number;
 	readonly attempt?: number;
 	readonly message?: string;
+	readonly runId?: string;
+	readonly dispatchId?: string;
+	readonly taskId?: number | null;
+	readonly code?: string;
+	readonly sessionId?: string;
+	readonly payload?: Record<string, string | number | boolean | null>;
 }
-
-const LOG_FILE = "orchestration.jsonl";
-
-/** Rate-limit: warn about log failures at most once per process. */
-let logWriteWarned = false;
 
 /**
  * Append an orchestration event to the project-local JSONL log.
  * Uses synchronous append to survive crashes. Best-effort — errors are swallowed.
  */
 export function logOrchestrationEvent(artifactDir: string, event: OrchestrationEvent): void {
-	try {
-		mkdirSync(artifactDir, { recursive: true });
-		const logPath = join(artifactDir, LOG_FILE);
-		// Redact filesystem paths from message to avoid leaking sensitive directory info
-		const safe = event.message
-			? { ...event, message: event.message.replace(/[/\\][^\s"']+/g, "[PATH]") }
-			: event;
-		const line = `${JSON.stringify(safe)}\n`;
-		appendFileSync(logPath, line, "utf-8");
-	} catch (err) {
-		// Best-effort — never block the pipeline. Warn once so operators know logging is broken.
-		if (!logWriteWarned) {
-			logWriteWarned = true;
-			console.warn("[opencode-autopilot] orchestration log write failed:", err);
-		}
-	}
+	appendForensicEventForArtifactDir(artifactDir, {
+		timestamp: event.timestamp,
+		domain: event.action === "error" && event.code?.startsWith("E_") ? "contract" : "orchestrator",
+		runId: event.runId ?? null,
+		sessionId: event.sessionId ?? null,
+		phase: event.phase,
+		dispatchId: event.dispatchId ?? null,
+		taskId: event.taskId ?? null,
+		agent: event.agent ?? null,
+		type:
+			event.action === "dispatch"
+				? "dispatch"
+				: event.action === "dispatch_multi"
+					? "dispatch_multi"
+					: event.action === "complete"
+						? "complete"
+						: event.action === "loop_detected"
+							? "loop_detected"
+							: event.action === "error" && event.code?.startsWith("E_")
+								? "warning"
+								: "error",
+		code: event.code ?? null,
+		message: event.message ?? null,
+		payload: {
+			action: event.action,
+			...(event.promptLength !== undefined ? { promptLength: event.promptLength } : {}),
+			...(event.attempt !== undefined ? { attempt: event.attempt } : {}),
+			...(event.payload ?? {}),
+		},
+	});
 }
