@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.16.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.15.2...opencode-autopilot-v1.16.0) (2026-04-04)
+
+
+### Features
+
+* add shared project-aware memory and inspection surfaces ([ba44d46](https://github.com/kodrunhq/opencode-autopilot/commit/ba44d46c83e0f82ac6a8e86c082eb8bd93c7b94d))
+* add shared project-aware memory and inspection surfaces ([896e876](https://github.com/kodrunhq/opencode-autopilot/commit/896e876f623994b160f0ceba4ce61e77741b56a9))
+
+
+### Bug Fixes
+
+* harden legacy log and project resolution compatibility ([da7bf30](https://github.com/kodrunhq/opencode-autopilot/commit/da7bf30f65924c9d0907e1e0d55d4a2bd5672e2d))
+* preserve null lesson load semantics ([96fd720](https://github.com/kodrunhq/opencode-autopilot/commit/96fd720cd4c0279f6f760bc1813f0104fba2fbad))
+
 ## [1.15.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.15.1...opencode-autopilot-v1.15.2) (2026-04-04)
 
 
