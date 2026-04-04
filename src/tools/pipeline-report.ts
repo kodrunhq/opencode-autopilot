@@ -103,9 +103,10 @@ function buildDisplayText(
  * @param logsDir - Optional override for logs directory (for testing)
  */
 export async function pipelineReportCore(sessionID?: string, logsDir?: string): Promise<string> {
+	const logsRoot = logsDir ?? process.cwd();
 	const log = sessionID
-		? await readSessionLog(sessionID, logsDir)
-		: await readLatestSessionLog(logsDir);
+		? await readSessionLog(sessionID, logsRoot)
+		: await readLatestSessionLog(logsRoot);
 
 	if (!log) {
 		const target = sessionID ? `Session "${sessionID}" not found.` : "No session logs found.";

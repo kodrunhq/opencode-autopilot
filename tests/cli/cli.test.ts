@@ -1,11 +1,17 @@
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // Import the functions under test
 import { runDoctor, runInstall } from "../../bin/cli";
+import { inspectCliCore } from "../../bin/inspect";
 import type { PluginConfig } from "../../src/config";
 import { createDefaultConfig, saveConfig } from "../../src/config";
+import { runKernelMigrations } from "../../src/kernel/migrations";
+import { initMemoryDb } from "../../src/memory/database";
+import { insertObservation, upsertPreference } from "../../src/memory/repository";
+import { resolveProjectIdentitySync } from "../../src/projects/resolve";
 
 describe("CLI install", () => {
 	let tempDir: string;
@@ -255,5 +261,85 @@ describe("CLI doctor", () => {
 		expect(Object.keys(reloaded.groups)).toHaveLength(8);
 
 		// afterEach restores process.exitCode
+	});
+});
+
+describe("CLI inspect", () => {
+	let tempDir: string;
+	let dbPath: string;
+
+	beforeEach(async () => {
+		tempDir = await mkdtemp(join(tmpdir(), "cli-inspect-"));
+		dbPath = join(tempDir, "autopilot.db");
+		const db = new Database(dbPath);
+		initMemoryDb(db);
+		runKernelMigrations(db);
+
+		try {
+			const projectRoot = join(tempDir, "project-a");
+			const now = "2026-04-05T12:00:00.000Z";
+			const project = resolveProjectIdentitySync(projectRoot, {
+				db,
+				now: () => now,
+				readGitFingerprint: () => null,
+				createProjectId: () => "project-1",
+			});
+
+			insertObservation(
+				{
+					projectId: project.id,
+					sessionId: "session-1",
+					type: "decision",
+					content: "Use inspect CLI",
+					summary: "inspect CLI",
+					confidence: 0.8,
+					accessCount: 0,
+					createdAt: now,
+					lastAccessed: now,
+				},
+				db,
+			);
+
+			upsertPreference(
+				{
+					id: "pref-1",
+					key: "editor",
+					value: "vim",
+					confidence: 0.9,
+					sourceSession: "session-1",
+					createdAt: now,
+					lastUpdated: now,
+				},
+				db,
+			);
+		} finally {
+			db.close();
+		}
+	});
+
+	afterEach(async () => {
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("inspect projects returns human-readable output", async () => {
+		const result = await inspectCliCore(["projects"], { dbPath });
+		expect(result.isError).toBe(false);
+		expect(result.output).toContain("Projects");
+		expect(result.output).toContain("project-a");
+	});
+
+	test("inspect memory returns JSON output with overview", async () => {
+		const result = await inspectCliCore(["memory", "--json"], { dbPath });
+		expect(result.isError).toBe(false);
+		const parsed = JSON.parse(result.output);
+		expect(parsed.action).toBe("inspect_memory");
+		expect(parsed.overview.stats.totalObservations).toBe(1);
+		expect(parsed.overview.preferences[0].key).toBe("editor");
+	});
+
+	test("inspect project returns error for unknown project", async () => {
+		const result = await inspectCliCore(["project", "--project", "missing"], { dbPath });
+		expect(result.isError).toBe(true);
+		expect(result.output).toContain("Project not found");
 	});
 });

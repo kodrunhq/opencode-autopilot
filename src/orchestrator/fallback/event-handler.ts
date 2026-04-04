@@ -26,6 +26,17 @@ export interface EventHandlerDeps {
 	readonly manager: FallbackManager;
 	readonly sdk: SdkOperations;
 	readonly config: FallbackConfig;
+	readonly onFallbackEvent?: (event: {
+		readonly type: "fallback" | "model_switch";
+		readonly sessionId: string;
+		readonly failedModel?: string;
+		readonly nextModel?: string;
+		readonly reason?: string;
+		readonly success?: boolean;
+		readonly fromModel?: string;
+		readonly toModel?: string;
+		readonly trigger?: "fallback" | "config" | "user";
+	}) => void;
 }
 
 /**
@@ -64,7 +75,7 @@ function extractSessionID(properties: Record<string, unknown>): string | undefin
  * The returned handler routes OpenCode events to the FallbackManager.
  */
 export function createEventHandler(deps: EventHandlerDeps) {
-	const { manager, sdk, config } = deps;
+	const { manager, sdk, config, onFallbackEvent } = deps;
 
 	return async (input: {
 		readonly event: { readonly type: string; readonly [key: string]: unknown };
@@ -133,7 +144,15 @@ export function createEventHandler(deps: EventHandlerDeps) {
 				const error = properties.error;
 				const modelStr = typeof properties.model === "string" ? properties.model : undefined;
 
-				await handleFallbackError(manager, sdk, config, sessionID, error, modelStr);
+				await handleFallbackError(
+					manager,
+					sdk,
+					config,
+					sessionID,
+					error,
+					modelStr,
+					onFallbackEvent,
+				);
 				return;
 			}
 
@@ -144,7 +163,15 @@ export function createEventHandler(deps: EventHandlerDeps) {
 				if (!info?.sessionID || !info.error) return;
 
 				const modelStr = typeof info.model === "string" ? info.model : undefined;
-				await handleFallbackError(manager, sdk, config, info.sessionID, info.error, modelStr);
+				await handleFallbackError(
+					manager,
+					sdk,
+					config,
+					info.sessionID,
+					info.error,
+					modelStr,
+					onFallbackEvent,
+				);
 				return;
 			}
 
@@ -165,6 +192,7 @@ async function handleFallbackError(
 	sessionID: string,
 	error: unknown,
 	modelStr?: string,
+	onFallbackEvent?: EventHandlerDeps["onFallbackEvent"],
 ): Promise<void> {
 	// All guards (self-abort, stale, retryable, lock) are inside manager.handleError
 	const plan = manager.handleError(sessionID, error, modelStr);
@@ -219,6 +247,22 @@ async function handleFallbackError(
 						// Best-effort notification
 					});
 			}
+
+			onFallbackEvent?.({
+				type: "fallback",
+				sessionId: sessionID,
+				failedModel: plan.failedModel,
+				nextModel: plan.newModel,
+				reason: plan.reason,
+				success: true,
+			});
+			onFallbackEvent?.({
+				type: "model_switch",
+				sessionId: sessionID,
+				fromModel: plan.failedModel,
+				toModel: plan.newModel,
+				trigger: "fallback",
+			});
 
 			// Dispatch replay with fallback model
 			await sdk.promptAsync(sessionID, parsedModel, replayedParts);

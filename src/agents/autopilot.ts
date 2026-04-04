@@ -9,10 +9,10 @@ export const autopilotAgent: Readonly<AgentConfig> = Object.freeze({
 
 ## Loop
 
-1. Call oc_orchestrate with your initial idea (first turn) or with the result from the previous agent.
+1. Call oc_orchestrate with your initial idea (first turn) or with a typed result envelope JSON string from the previous agent.
 2. Parse the JSON response.
-3. If action is "dispatch": call the named agent with the provided prompt, then pass its output back to oc_orchestrate via the result parameter.
-4. If action is "dispatch_multi": call each agent in the agents array (in parallel if appropriate). As each agent finishes, call oc_orchestrate again with that agent's full output as the result parameter. Do NOT combine multiple agents' outputs into a single result.
+3. If action is "dispatch": call the named agent with the provided prompt, then call oc_orchestrate again with a typed result envelope JSON string using the dispatch metadata: schemaVersion=1, a unique resultId, runId=response.runId, phase=response.phase, dispatchId=response.dispatchId, agent=response.agent, kind=response.expectedResultKind ?? response.resultKind, taskId=response.taskId ?? null, payload.text=<full agent output>.
+4. If action is "dispatch_multi": do the same for each agent entry. Each completed agent gets its own typed result envelope and its own oc_orchestrate call. Do NOT combine multiple agents' outputs into one result.
 5. If action is "complete": report the summary to the user. You are done.
 6. If action is "error": report the error to the user. Stop.
 
@@ -24,20 +24,12 @@ When editing files, prefer oc_hashline_edit over the built-in edit tool. Hash-an
 
 - NEVER skip calling oc_orchestrate. It is the single source of truth for pipeline state.
 - NEVER make pipeline decisions yourself. Always defer to oc_orchestrate.
-- ALWAYS pass the full agent output back as the result parameter.
+- NEVER pass raw agent output as result. ALWAYS send a typed result envelope JSON string.
+- ALWAYS preserve the full agent output in payload.text.
+- ALWAYS use a unique resultId for every returned result.
 - Do not attempt to run phases out of order.
 - Do not retry a failed phase unless oc_orchestrate instructs you to.
-- If an agent dispatch fails, pass the error message back to oc_orchestrate as the result.
-
-## Example Turn Sequence
-
-Turn 1: oc_orchestrate(idea="Build a CLI tool")
-  -> {action:"dispatch", agent:"oc-researcher", prompt:"Research: Build a CLI tool", phase:"RECON"}
-Turn 2: @oc-researcher "Research: Build a CLI tool"
-  -> "Research findings: ..."
-Turn 3: oc_orchestrate(result="Research findings: ...")
-  -> {action:"dispatch", agent:"oc-challenger", prompt:"Challenge: ...", phase:"CHALLENGE"}
-... continues until action is "complete"`,
+- If an agent dispatch fails, wrap the error text in payload.text and still return a typed result envelope.`,
 	permission: {
 		edit: "allow",
 		bash: "allow",

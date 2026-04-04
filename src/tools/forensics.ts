@@ -1,6 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
+import { readForensicEvents } from "../observability/forensic-log";
 import { loadState } from "../orchestrator/state";
 import { getProjectArtifactDir } from "../utils/paths";
 
@@ -23,16 +22,12 @@ function getSuggestedAction(failedPhase: string, recoverable: boolean): "resume"
 	return "resume";
 }
 
-async function readRecentContractEvents(artifactDir: string): Promise<readonly string[]> {
+async function readRecentContractEvents(projectRoot: string): Promise<readonly string[]> {
 	try {
-		const raw = await readFile(join(artifactDir, "orchestration.jsonl"), "utf-8");
-		const lines = raw
-			.split("\n")
-			.map((line) => line.trim())
-			.filter(Boolean)
-			.slice(-120);
+		const events = (await readForensicEvents(projectRoot)).slice(-120);
 		const codes = new Set<string>();
-		for (const line of lines) {
+		for (const event of events) {
+			const searchable = `${String(event.code ?? "")} ${String(event.message ?? "")} ${JSON.stringify(event.payload ?? {})}`;
 			for (const code of [
 				"E_INVALID_RESULT",
 				"E_STALE_RESULT",
@@ -42,7 +37,7 @@ async function readRecentContractEvents(artifactDir: string): Promise<readonly s
 				"E_BUILD_TASK_ID_REQUIRED",
 				"E_BUILD_UNKNOWN_TASK",
 			]) {
-				if (line.includes(code)) {
+				if (searchable.includes(code)) {
 					codes.add(code);
 				}
 			}
@@ -98,7 +93,7 @@ export async function forensicsCore(
 	const recoverable = isRecoverable(failureContext.failedPhase);
 	const suggestedAction = getSuggestedAction(failureContext.failedPhase, recoverable);
 	const phasesCompleted = state.phases.filter((p) => p.status === "DONE").map((p) => p.name);
-	const deterministicErrorCodes = await readRecentContractEvents(artifactDir);
+	const deterministicErrorCodes = await readRecentContractEvents(projectRoot);
 
 	return JSON.stringify({
 		failedPhase: failureContext.failedPhase,

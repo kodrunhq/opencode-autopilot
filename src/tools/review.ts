@@ -17,6 +17,11 @@ import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { tool } from "@opencode-ai/plugin";
+import {
+	clearActiveReviewStateInKernel,
+	loadActiveReviewStateFromKernel,
+	saveActiveReviewStateToKernel,
+} from "../kernel/repository";
 import { REVIEW_AGENTS, SPECIALIZED_AGENTS } from "../review/agents/index";
 import {
 	createEmptyMemory,
@@ -42,6 +47,7 @@ interface ReviewArgs {
 const execFileAsync = promisify(execFile);
 
 const STATE_FILE = "current-review.json";
+let legacyReviewStateMirrorWarned = false;
 
 /**
  * Get changed file paths for the given review scope.
@@ -83,11 +89,18 @@ async function getChangedFiles(
  * Load review state from disk. Returns null if no active review.
  */
 async function loadReviewState(artifactDir: string): Promise<ReviewState | null> {
+	const kernelState = loadActiveReviewStateFromKernel(artifactDir);
+	if (kernelState !== null) {
+		return kernelState;
+	}
+
 	const statePath = join(artifactDir, STATE_FILE);
 	try {
 		const raw = await readFile(statePath, "utf-8");
 		const parsed = JSON.parse(raw);
-		return reviewStateSchema.parse(parsed) as ReviewState;
+		const validated = reviewStateSchema.parse(parsed) as ReviewState;
+		saveActiveReviewStateToKernel(artifactDir, validated);
+		return validated;
 	} catch (error: unknown) {
 		if (isEnoentError(error)) return null;
 		// Treat parse/schema errors as recoverable — delete corrupt file
@@ -103,23 +116,43 @@ async function loadReviewState(artifactDir: string): Promise<ReviewState | null>
 	}
 }
 
+async function writeLegacyReviewStateMirror(
+	state: ReviewState,
+	artifactDir: string,
+): Promise<void> {
+	await ensureDir(artifactDir);
+	const statePath = join(artifactDir, STATE_FILE);
+	const tmpPath = `${statePath}.tmp.${randomBytes(8).toString("hex")}`;
+	await writeFile(tmpPath, JSON.stringify(state, null, 2), "utf-8");
+	await rename(tmpPath, statePath);
+}
+
+async function syncLegacyReviewStateMirror(state: ReviewState, artifactDir: string): Promise<void> {
+	try {
+		await writeLegacyReviewStateMirror(state, artifactDir);
+	} catch (error: unknown) {
+		if (!legacyReviewStateMirrorWarned) {
+			legacyReviewStateMirrorWarned = true;
+			console.warn("[opencode-autopilot] current-review.json mirror write failed:", error);
+		}
+	}
+}
+
 /**
  * Save review state atomically.
  */
 async function saveReviewState(state: ReviewState, artifactDir: string): Promise<void> {
-	await ensureDir(artifactDir);
 	// Validate before writing (bidirectional validation, same as orchestrator state)
 	const validated = reviewStateSchema.parse(state);
-	const statePath = join(artifactDir, STATE_FILE);
-	const tmpPath = `${statePath}.tmp.${randomBytes(8).toString("hex")}`;
-	await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
-	await rename(tmpPath, statePath);
+	saveActiveReviewStateToKernel(artifactDir, validated);
+	await syncLegacyReviewStateMirror(validated, artifactDir);
 }
 
 /**
  * Delete review state file (pipeline complete or error cleanup).
  */
 async function clearReviewState(artifactDir: string): Promise<void> {
+	clearActiveReviewStateInKernel(artifactDir);
 	const statePath = join(artifactDir, STATE_FILE);
 	try {
 		await unlink(statePath);

@@ -39,9 +39,33 @@ async function detectContractHealth(projectRoot?: string): Promise<ContractHealt
 		const artifactDir = getProjectArtifactDir(projectRoot);
 		const logPath = join(artifactDir, "orchestration.jsonl");
 		const content = await readFile(logPath, "utf-8");
+		const entries = content
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean)
+			.map((line) => {
+				try {
+					return JSON.parse(line) as Record<string, unknown>;
+				} catch {
+					return null;
+				}
+			})
+			.filter((entry): entry is Record<string, unknown> => entry !== null);
+		const legacyTasksFallbackSeen =
+			entries.some(
+				(entry) =>
+					typeof entry.message === "string" &&
+					entry.message.includes("PLAN fallback: parsed legacy tasks.md"),
+			) || content.includes("PLAN fallback: parsed legacy tasks.md");
+		const legacyResultParserSeen =
+			entries.some(
+				(entry) =>
+					typeof entry.message === "string" &&
+					entry.message.includes("Legacy result parser path used"),
+			) || content.includes("Legacy result parser path used");
 		return {
-			legacyTasksFallbackSeen: content.includes("PLAN fallback: parsed legacy tasks.md"),
-			legacyResultParserSeen: content.includes("Legacy result parser path used"),
+			legacyTasksFallbackSeen,
+			legacyResultParserSeen,
 		};
 	} catch {
 		return {

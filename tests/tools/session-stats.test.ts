@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createForensicEvent } from "../../src/observability/forensic-log";
 import { sessionStatsCore } from "../../src/tools/session-stats";
+import { writeForensicSession } from "../observability/test-helpers";
 
 describe("oc_session_stats tool", () => {
 	let testDir: string;
@@ -17,29 +19,27 @@ describe("oc_session_stats tool", () => {
 		await rm(testDir, { recursive: true, force: true });
 	});
 
-	function createSessionLog(
+	async function createSessionLog(
 		sessionId: string,
 		overrides?: Partial<{
 			startedAt: string;
 			endedAt: string | null;
-			events: unknown[];
-			decisions: unknown[];
+			events: ReturnType<typeof createForensicEvent>[];
+			decisions: Parameters<typeof writeForensicSession>[0]["decisions"];
 		}>,
-	) {
-		return {
-			schemaVersion: 1,
+	): Promise<void> {
+		await writeForensicSession({
+			projectRoot: testDir,
 			sessionId,
 			startedAt: overrides?.startedAt ?? "2026-04-01T10:00:00Z",
 			endedAt: overrides?.endedAt ?? "2026-04-01T10:30:00Z",
 			events: overrides?.events ?? [],
 			decisions: overrides?.decisions ?? [],
-			errorSummary: {},
-		};
+		});
 	}
 
 	test("sessionStatsCore returns stats for latest session", async () => {
-		const log = createSessionLog("session-stats");
-		await writeFile(join(testDir, "session-stats.json"), JSON.stringify(log));
+		await createSessionLog("session-stats");
 
 		const result = JSON.parse(await sessionStatsCore(undefined, testDir));
 		expect(result.action).toBe("session_stats");
@@ -49,8 +49,7 @@ describe("oc_session_stats tool", () => {
 	});
 
 	test("sessionStatsCore returns stats for specific session", async () => {
-		const log = createSessionLog("session-specific");
-		await writeFile(join(testDir, "session-specific.json"), JSON.stringify(log));
+		await createSessionLog("session-specific");
 
 		const result = JSON.parse(await sessionStatsCore("session-specific", testDir));
 		expect(result.action).toBe("session_stats");
@@ -64,8 +63,7 @@ describe("oc_session_stats tool", () => {
 	});
 
 	test("displayText includes formatted token information", async () => {
-		const log = createSessionLog("session-tokens");
-		await writeFile(join(testDir, "session-tokens.json"), JSON.stringify(log));
+		await createSessionLog("session-tokens");
 
 		const result = JSON.parse(await sessionStatsCore("session-tokens", testDir));
 		expect(result.displayText).toContain("Session Stats");
@@ -75,23 +73,39 @@ describe("oc_session_stats tool", () => {
 		// Note: The session log schema's events are discriminated union of fallback/error/decision/model_switch.
 		// phase_transition events are stored in the event store but not persisted in the schema's events array.
 		// Per-phase grouping in session-stats will check for decision events grouped by phase.
-		const log = createSessionLog("session-phases", {
+		await createSessionLog("session-phases", {
 			decisions: [
 				{
+					timestamp: "2026-04-01T10:05:00Z",
 					phase: "RECON",
 					agent: "oc-researcher",
 					decision: "Research complete",
 					rationale: "Found all info",
 				},
 				{
+					timestamp: "2026-04-01T10:15:00Z",
 					phase: "BUILD",
 					agent: "oc-implementer",
 					decision: "Implementation done",
 					rationale: "Tests pass",
 				},
 			],
+			events: [
+				createForensicEvent({
+					projectRoot: testDir,
+					domain: "session",
+					timestamp: "2026-04-01T10:05:30Z",
+					sessionId: "session-phases",
+					type: "error",
+					code: "rate_limit",
+					message: "Rate limited during research",
+					payload: {
+						errorType: "rate_limit",
+						model: "claude-sonnet-4-20250514",
+					},
+				}),
+			],
 		});
-		await writeFile(join(testDir, "session-phases.json"), JSON.stringify(log));
 
 		const result = JSON.parse(await sessionStatsCore("session-phases", testDir));
 		expect(result.action).toBe("session_stats");
@@ -100,11 +114,10 @@ describe("oc_session_stats tool", () => {
 	});
 
 	test("sessionStatsCore computes duration correctly", async () => {
-		const log = createSessionLog("session-dur", {
+		await createSessionLog("session-dur", {
 			startedAt: "2026-04-01T10:00:00Z",
 			endedAt: "2026-04-01T10:45:00Z",
 		});
-		await writeFile(join(testDir, "session-dur.json"), JSON.stringify(log));
 
 		const result = JSON.parse(await sessionStatsCore("session-dur", testDir));
 		expect(result.duration).toBeDefined();

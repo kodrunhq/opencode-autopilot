@@ -1,8 +1,9 @@
 /**
  * Per-project review memory persistence.
  *
- * Stores recent findings and false positives at
- * {projectRoot}/.opencode-autopilot/review-memory.json
+ * Stores recent findings and false positives in the project kernel,
+ * with {projectRoot}/.opencode-autopilot/review-memory.json kept as a
+ * compatibility mirror/export during the Phase 4 migration window.
  *
  * Memory is pruned on load to cap storage and remove stale entries.
  * All writes are atomic (tmp file + rename) to prevent corruption.
@@ -10,7 +11,9 @@
 
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { loadReviewMemoryFromKernel, saveReviewMemoryToKernel } from "../kernel/repository";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
+import { getProjectArtifactDir } from "../utils/paths";
 import { reviewMemorySchema } from "./schemas";
 import type { ReviewMemory } from "./types";
 
@@ -20,6 +23,7 @@ const MEMORY_FILE = "review-memory.json";
 const MAX_FINDINGS = 100;
 const MAX_FALSE_POSITIVES = 50;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+let legacyReviewMemoryMirrorWarned = false;
 
 /**
  * Create a valid empty memory object.
@@ -42,12 +46,19 @@ export function createEmptyMemory(): ReviewMemory {
  * Prunes on load to cap storage.
  */
 export async function loadReviewMemory(projectRoot: string): Promise<ReviewMemory | null> {
+	const kernelMemory = loadReviewMemoryFromKernel(getProjectArtifactDir(projectRoot));
+	if (kernelMemory !== null) {
+		return pruneMemory(kernelMemory);
+	}
+
 	const memoryPath = join(projectRoot, ".opencode-autopilot", MEMORY_FILE);
 	try {
 		const raw = await readFile(memoryPath, "utf-8");
 		const parsed = JSON.parse(raw);
 		const validated = reviewMemorySchema.parse(parsed);
-		return pruneMemory(validated);
+		const pruned = pruneMemory(validated);
+		saveReviewMemoryToKernel(getProjectArtifactDir(projectRoot), pruned);
+		return pruned;
 	} catch (error: unknown) {
 		if (isEnoentError(error)) {
 			return null;
@@ -70,12 +81,21 @@ export async function loadReviewMemory(projectRoot: string): Promise<ReviewMemor
  */
 export async function saveReviewMemory(memory: ReviewMemory, projectRoot: string): Promise<void> {
 	const validated = reviewMemorySchema.parse(memory);
-	const dir = join(projectRoot, ".opencode-autopilot");
-	await ensureDir(dir);
-	const memoryPath = join(dir, MEMORY_FILE);
-	const tmpPath = `${memoryPath}.tmp.${Date.now()}`;
-	await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
-	await rename(tmpPath, memoryPath);
+	saveReviewMemoryToKernel(getProjectArtifactDir(projectRoot), validated);
+
+	try {
+		const dir = join(projectRoot, ".opencode-autopilot");
+		await ensureDir(dir);
+		const memoryPath = join(dir, MEMORY_FILE);
+		const tmpPath = `${memoryPath}.tmp.${Date.now()}`;
+		await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
+		await rename(tmpPath, memoryPath);
+	} catch (error: unknown) {
+		if (!legacyReviewMemoryMirrorWarned) {
+			legacyReviewMemoryMirrorWarned = true;
+			console.warn("[opencode-autopilot] review-memory.json mirror write failed:", error);
+		}
+	}
 }
 
 /**

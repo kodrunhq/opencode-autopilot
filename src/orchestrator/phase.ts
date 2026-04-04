@@ -1,3 +1,4 @@
+import { patchState } from "./state";
 import type { Phase, PhaseStatus, PipelineState } from "./types";
 
 /** Maps each phase to its 1-based position for user-facing progress display. */
@@ -71,12 +72,15 @@ export function completePhase(state: Readonly<PipelineState>): PipelineState {
 		return phase;
 	});
 
-	return {
-		...state,
+	return patchState(state, {
+		status: nextPhase === null ? "COMPLETED" : state.status,
 		currentPhase: nextPhase,
 		phases: updatedPhases,
-		lastUpdatedAt: new Date().toISOString(),
-	};
+		pendingDispatches:
+			nextPhase === null
+				? []
+				: state.pendingDispatches.filter((entry) => entry.phase === nextPhase),
+	});
 }
 
 /**

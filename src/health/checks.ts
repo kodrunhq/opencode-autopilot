@@ -4,11 +4,15 @@ import { join } from "node:path";
 import type { Config } from "@opencode-ai/plugin";
 import { parse } from "yaml";
 import { loadConfig } from "../config";
-import { DB_FILE, MEMORY_DIR } from "../memory/constants";
 import { AGENT_NAMES } from "../orchestrator/handlers/types";
 import { detectProjectStackTags, filterSkillsByStack } from "../skills/adaptive-injector";
 import { loadAllSkills } from "../skills/loader";
-import { getAssetsDir, getGlobalConfigDir } from "../utils/paths";
+import {
+	getAssetsDir,
+	getAutopilotDbPath,
+	getGlobalConfigDir,
+	getLegacyMemoryDbPath,
+} from "../utils/paths";
 import type { HealthResult } from "./types";
 
 /**
@@ -249,19 +253,40 @@ export async function skillHealthCheck(
  */
 export async function memoryHealthCheck(baseDir?: string): Promise<HealthResult> {
 	const resolvedBase = baseDir ?? getGlobalConfigDir();
-	const dbPath = join(resolvedBase, MEMORY_DIR, DB_FILE);
+	const dbPath = getAutopilotDbPath(resolvedBase);
+	const legacyDbPath = getLegacyMemoryDbPath(resolvedBase);
 
 	try {
 		await access(dbPath);
 	} catch (error: unknown) {
 		const code = (error as NodeJS.ErrnoException).code;
 		if (code === "ENOENT") {
+			try {
+				await access(legacyDbPath);
+			} catch (legacyError: unknown) {
+				const legacyCode = (legacyError as NodeJS.ErrnoException).code;
+				if (legacyCode === "ENOENT") {
+					return Object.freeze({
+						name: "memory-db",
+						status: "pass" as const,
+						message: `Memory DB not yet initialized -- will be created on first memory capture`,
+					});
+				}
+				const legacyMsg = legacyError instanceof Error ? legacyError.message : String(legacyError);
+				return Object.freeze({
+					name: "memory-db",
+					status: "fail" as const,
+					message: `Memory DB inaccessible: ${legacyMsg}`,
+				});
+			}
+
 			return Object.freeze({
 				name: "memory-db",
 				status: "pass" as const,
-				message: `Memory DB not yet initialized -- will be created on first memory capture`,
+				message: `Legacy memory DB found -- unified DB will be created on next write`,
 			});
 		}
+
 		const msg = error instanceof Error ? error.message : String(error);
 		return Object.freeze({
 			name: "memory-db",

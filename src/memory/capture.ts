@@ -1,34 +1,38 @@
 /**
- * Event capture handler for memory observations.
+ * Memory capture handlers.
  *
- * Subscribes to OpenCode session events and extracts memory-worthy
- * observations from decision, error, and phase_transition events.
- * Noisy events (tool_complete, context_warning, session_start/end)
- * are filtered out per Research Pitfall 4.
- *
- * Factory pattern matches createObservabilityEventHandler in
- * src/observability/event-handlers.ts.
+ * Event capture remains a supporting path for project incidents and decisions.
+ * Explicit user preference capture happens on the chat.message hook where the
+ * actual outbound user-authored text parts are available.
  *
  * @module
  */
 
 import type { Database } from "bun:sqlite";
 import { basename } from "node:path";
+import { resolveProjectIdentity } from "../projects/resolve";
 import { pruneStaleObservations } from "./decay";
-import { computeProjectKey } from "./project-key";
-import { insertObservation, upsertProject } from "./repository";
+import { insertObservation, upsertPreferenceRecord, upsertProject } from "./repository";
 import type { ObservationType } from "./types";
 
 /**
- * Dependencies for the memory capture handler.
+ * Dependencies for the memory capture handlers.
  */
 export interface MemoryCaptureDeps {
 	readonly getDb: () => Database;
 	readonly projectRoot: string;
 }
 
+interface PreferenceCandidate {
+	readonly key: string;
+	readonly value: string;
+	readonly scope: "global" | "project";
+	readonly confidence: number;
+	readonly statement: string;
+}
+
 /**
- * Events that produce memory observations.
+ * Events that produce supporting observations.
  */
 const CAPTURE_EVENT_TYPES = new Set([
 	"session.created",
@@ -37,6 +41,33 @@ const CAPTURE_EVENT_TYPES = new Set([
 	"app.decision",
 	"app.phase_transition",
 ]);
+
+const PROJECT_SCOPE_HINTS = [
+	"in this repo",
+	"for this repo",
+	"in this project",
+	"for this project",
+	"in this codebase",
+	"for this codebase",
+	"here ",
+	"this repo ",
+	"this project ",
+] as const;
+
+const EXPLICIT_PREFERENCE_PATTERNS = [
+	{
+		regex: /\b(?:please|do|always|generally)\s+(?:use|prefer|keep|run|avoid)\s+(.+?)(?:[.!?]|$)/i,
+		buildValue: (match: RegExpMatchArray) => match[1]?.trim() ?? "",
+	},
+	{
+		regex: /\b(?:i|we)\s+(?:prefer|want|need|like)\s+(.+?)(?:[.!?]|$)/i,
+		buildValue: (match: RegExpMatchArray) => match[1]?.trim() ?? "",
+	},
+	{
+		regex: /\b(?:don't|do not|never)\s+(.+?)(?:[.!?]|$)/i,
+		buildValue: (match: RegExpMatchArray) => `avoid ${match[1]?.trim() ?? ""}`,
+	},
+] as const;
 
 /**
  * Extracts a session ID from event properties.
@@ -52,6 +83,107 @@ function extractSessionId(properties: Record<string, unknown>): string | undefin
 	return undefined;
 }
 
+function normalizePreferenceKey(value: string): string {
+	const normalized = value
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, " ")
+		.trim()
+		.split(/\s+/)
+		.slice(0, 6)
+		.join(".");
+	return normalized.length > 0 ? normalized : "user.preference";
+}
+
+function normalizePreferenceValue(value: string): string {
+	return value
+		.replace(/\s+/g, " ")
+		.trim()
+		.replace(/[.!?]+$/, "");
+}
+
+function inferPreferenceScope(text: string): "global" | "project" {
+	const lowerText = text.toLowerCase();
+	return PROJECT_SCOPE_HINTS.some((hint) => lowerText.includes(hint)) ? "project" : "global";
+}
+
+function extractTextPartContent(part: unknown): string | null {
+	if (part === null || typeof part !== "object") {
+		return null;
+	}
+
+	const record = part as Record<string, unknown>;
+	if (record.type !== "text") {
+		return null;
+	}
+
+	if (typeof record.text === "string" && record.text.trim().length > 0) {
+		return record.text;
+	}
+	if (typeof record.content === "string" && record.content.trim().length > 0) {
+		return record.content;
+	}
+
+	return null;
+}
+
+function extractExplicitPreferenceCandidates(
+	parts: readonly unknown[],
+): readonly PreferenceCandidate[] {
+	const joinedText = parts
+		.map(extractTextPartContent)
+		.filter((value): value is string => value !== null)
+		.join("\n")
+		.trim();
+	if (joinedText.length === 0) {
+		return Object.freeze([]);
+	}
+
+	const candidates: PreferenceCandidate[] = [];
+	const scope = inferPreferenceScope(joinedText);
+	const lines = joinedText
+		.split(/\n+/)
+		.flatMap((line) => line.split(/(?<=[.!?])\s+/))
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0 && line.length <= 500);
+
+	for (const line of lines) {
+		for (const pattern of EXPLICIT_PREFERENCE_PATTERNS) {
+			const match = line.match(pattern.regex);
+			if (!match) {
+				continue;
+			}
+
+			const value = normalizePreferenceValue(pattern.buildValue(match));
+			if (value.length < 6) {
+				continue;
+			}
+
+			candidates.push(
+				Object.freeze({
+					key: normalizePreferenceKey(value),
+					value,
+					scope,
+					confidence: 0.9,
+					statement: line,
+				}),
+			);
+			break;
+		}
+	}
+
+	const seen = new Set<string>();
+	return Object.freeze(
+		candidates.filter((candidate) => {
+			const uniqueness = `${candidate.scope}:${candidate.key}:${candidate.value}`;
+			if (seen.has(uniqueness)) {
+				return false;
+			}
+			seen.add(uniqueness);
+			return true;
+		}),
+	);
+}
+
 /**
  * Safely truncate a string to maxLen characters.
  */
@@ -60,12 +192,7 @@ function truncate(s: string, maxLen: number): string {
 }
 
 /**
- * Creates a memory capture handler that subscribes to OpenCode events.
- *
- * Returns an async function matching the event handler signature:
- * `(input: { event: { type: string; [key: string]: unknown } }) => Promise<void>`
- *
- * Pure observer: never modifies the event or session output.
+ * Creates an event capture handler matching the plugin event hook signature.
  */
 export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 	let currentSessionId: string | null = null;
@@ -110,7 +237,6 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 				? (rawProps as Record<string, unknown>)
 				: {};
 
-		// Skip noisy events early
 		if (!CAPTURE_EVENT_TYPES.has(event.type)) return;
 
 		switch (event.type) {
@@ -121,7 +247,10 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 				if (!info.id) return;
 
 				currentSessionId = info.id;
-				currentProjectKey = computeProjectKey(deps.projectRoot);
+				const resolvedProject = await resolveProjectIdentity(deps.projectRoot, {
+					db: deps.getDb(),
+				});
+				currentProjectKey = resolvedProject.id;
 				const projectName = basename(deps.projectRoot);
 
 				try {
@@ -130,6 +259,7 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 							id: currentProjectKey,
 							path: deps.projectRoot,
 							name: projectName,
+							firstSeenAt: resolvedProject.firstSeenAt,
 							lastUpdated: now(),
 						},
 						deps.getDb(),
@@ -144,12 +274,9 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 				const projectKey = currentProjectKey;
 				const db = deps.getDb();
 
-				// Reset state
 				currentSessionId = null;
 				currentProjectKey = null;
 
-				// Defer pruning to avoid blocking the session.deleted handler.
-				// Best-effort: will not run if the process exits before this microtask drains.
 				if (projectKey) {
 					queueMicrotask(() => {
 						try {
@@ -197,9 +324,8 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 					typeof properties.fromPhase === "string" ? properties.fromPhase : "unknown";
 				const toPhase = typeof properties.toPhase === "string" ? properties.toPhase : "unknown";
 				const content = `Phase transition: ${fromPhase} -> ${toPhase}`;
-				const summary = content;
 
-				safeInsert("pattern", content, summary, 0.6);
+				safeInsert("pattern", content, content, 0.6);
 				return;
 			}
 
@@ -208,3 +334,73 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 		}
 	};
 }
+
+/**
+ * Creates a chat.message capture handler that records explicit user preferences.
+ */
+export function createMemoryChatMessageHandler(deps: MemoryCaptureDeps) {
+	return async (
+		input: { readonly sessionID: string },
+		output: { readonly parts: unknown[] },
+	): Promise<void> => {
+		try {
+			const candidates = extractExplicitPreferenceCandidates(output.parts);
+			if (candidates.length === 0) {
+				return;
+			}
+
+			const resolvedProject = await resolveProjectIdentity(deps.projectRoot, {
+				db: deps.getDb(),
+			});
+			const projectName = basename(deps.projectRoot);
+			const timestamp = new Date().toISOString();
+
+			upsertProject(
+				{
+					id: resolvedProject.id,
+					path: deps.projectRoot,
+					name: projectName,
+					firstSeenAt: resolvedProject.firstSeenAt,
+					lastUpdated: timestamp,
+				},
+				deps.getDb(),
+			);
+
+			for (const candidate of candidates) {
+				upsertPreferenceRecord(
+					{
+						key: candidate.key,
+						value: candidate.value,
+						scope: candidate.scope,
+						projectId: candidate.scope === "project" ? resolvedProject.id : null,
+						status: "confirmed",
+						confidence: candidate.confidence,
+						sourceSession: input.sessionID,
+						createdAt: timestamp,
+						lastUpdated: timestamp,
+						evidence: [
+							{
+								sessionId: input.sessionID,
+								statement: candidate.statement,
+								confidence: candidate.confidence,
+								confirmed: true,
+								createdAt: timestamp,
+							},
+						],
+					},
+					deps.getDb(),
+				);
+			}
+		} catch (err) {
+			console.warn("[opencode-autopilot] explicit preference capture failed:", err);
+		}
+	};
+}
+
+export const memoryCaptureInternals = Object.freeze({
+	extractExplicitPreferenceCandidates,
+	extractTextPartContent,
+	inferPreferenceScope,
+	normalizePreferenceKey,
+	normalizePreferenceValue,
+});

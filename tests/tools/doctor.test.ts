@@ -3,6 +3,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ToolContext } from "@opencode-ai/plugin";
+import { createForensicEvent } from "../../src/observability/forensic-log";
 import {
 	doctorCore,
 	ocDoctor,
@@ -101,10 +102,9 @@ describe("doctorCore", () => {
 		}
 
 		// Create memory DB for memoryHealthCheck
-		const memoryDir = join(tempDir, "memory");
-		await mkdir(memoryDir, { recursive: true });
+		await mkdir(tempDir, { recursive: true });
 		const { Database } = await import("bun:sqlite");
-		const db = new Database(join(memoryDir, "memory.db"));
+		const db = new Database(join(tempDir, "autopilot.db"));
 		db.run("CREATE TABLE observations (id INTEGER PRIMARY KEY, content TEXT NOT NULL)");
 		db.close();
 
@@ -255,12 +255,45 @@ describe("doctorCore", () => {
 	test("detects legacy parser usage from orchestration log", async () => {
 		const tempDir = join(tmpdir(), `doctor-contract-${Date.now()}`);
 		await mkdir(join(tempDir, ".opencode-autopilot"), { recursive: true });
+		const forensicLines = [
+			createForensicEvent({
+				projectRoot: tempDir,
+				domain: "orchestrator",
+				type: "decision",
+				message: "PLAN fallback: parsed legacy tasks.md (tasks.json missing)",
+			}),
+			createForensicEvent({
+				projectRoot: tempDir,
+				domain: "contract",
+				type: "error",
+				message:
+					"Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
+			}),
+		]
+			.map((event) => JSON.stringify(event))
+			.join("\n");
 		await writeFile(
 			join(tempDir, ".opencode-autopilot", "orchestration.jsonl"),
-			`${[
+			`${forensicLines}\n`,
+			"utf-8",
+		);
+
+		const result = JSON.parse(await doctorCore({ projectRoot: tempDir }));
+		expect(result.contractHealth.legacyTasksFallbackSeen).toBe(true);
+		expect(result.contractHealth.legacyResultParserSeen).toBe(true);
+
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("falls back to raw text search for legacy orchestration logs", async () => {
+		const tempDir = join(tmpdir(), `doctor-contract-raw-${Date.now()}`);
+		await mkdir(join(tempDir, ".opencode-autopilot"), { recursive: true });
+		await writeFile(
+			join(tempDir, ".opencode-autopilot", "orchestration.jsonl"),
+			[
 				"[opencode-autopilot] PLAN fallback: parsed legacy tasks.md (tasks.json missing)",
-				"[opencode-autopilot] Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
-			].join("\n")}\n`,
+				"Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
+			].join("\n"),
 			"utf-8",
 		);
 
@@ -306,12 +339,26 @@ describe("ocDoctor tool wrapper", () => {
 
 		const tempDir = join(tmpdir(), `doctor-wrapper-contract-${Date.now()}`);
 		await mkdir(join(tempDir, ".opencode-autopilot"), { recursive: true });
+		const forensicLines = [
+			createForensicEvent({
+				projectRoot: tempDir,
+				domain: "orchestrator",
+				type: "decision",
+				message: "PLAN fallback: parsed legacy tasks.md (tasks.json missing)",
+			}),
+			createForensicEvent({
+				projectRoot: tempDir,
+				domain: "contract",
+				type: "error",
+				message:
+					"Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
+			}),
+		]
+			.map((event) => JSON.stringify(event))
+			.join("\n");
 		await writeFile(
 			join(tempDir, ".opencode-autopilot", "orchestration.jsonl"),
-			`${[
-				"[opencode-autopilot] PLAN fallback: parsed legacy tasks.md (tasks.json missing)",
-				"[opencode-autopilot] Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
-			].join("\n")}\n`,
+			`${forensicLines}\n`,
 			"utf-8",
 		);
 

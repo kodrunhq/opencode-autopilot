@@ -70,12 +70,11 @@ Content here`,
 describe("memoryHealthCheck", () => {
 	test("returns pass when DB file exists and is readable", async () => {
 		const tempDir = join(tmpdir(), `mem-check-pass-${Date.now()}`);
-		const memoryDir = join(tempDir, "memory");
-		await mkdir(memoryDir, { recursive: true });
+		await mkdir(tempDir, { recursive: true });
 
 		// Create a minimal SQLite DB with observations table
 		const { Database } = await import("bun:sqlite");
-		const dbPath = join(memoryDir, "memory.db");
+		const dbPath = join(tempDir, "autopilot.db");
 		const db = new Database(dbPath);
 		db.run("CREATE TABLE observations (id INTEGER PRIMARY KEY, content TEXT NOT NULL)");
 		db.run("INSERT INTO observations (content) VALUES ('test observation')");
@@ -108,6 +107,23 @@ describe("memoryHealthCheck", () => {
 
 		const result = await memoryHealthCheck(tempDir);
 		expect(Object.isFrozen(result)).toBe(true);
+
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("returns pass when only legacy memory DB exists", async () => {
+		const tempDir = join(tmpdir(), `mem-check-legacy-${Date.now()}`);
+		const memoryDir = join(tempDir, "memory");
+		await mkdir(memoryDir, { recursive: true });
+
+		const { Database } = await import("bun:sqlite");
+		const db = new Database(join(memoryDir, "memory.db"));
+		db.run("CREATE TABLE observations (id INTEGER PRIMARY KEY, content TEXT NOT NULL)");
+		db.close();
+
+		const result = await memoryHealthCheck(tempDir);
+		expect(result.status).toBe("pass");
+		expect(result.message).toContain("Legacy memory DB found");
 
 		await rm(tempDir, { recursive: true, force: true });
 	});

@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { initMemoryDb } from "../../src/memory/database";
 import { createMemoryInjector } from "../../src/memory/injector";
 import { computeProjectKey } from "../../src/memory/project-key";
-import { insertObservation, upsertProject } from "../../src/memory/repository";
+import {
+	insertObservation,
+	upsertPreferenceRecord,
+	upsertProject,
+} from "../../src/memory/repository";
 
 const PROJECT_PATH = "/tmp/test-project";
 const PROJECT_KEY = computeProjectKey(PROJECT_PATH);
@@ -57,19 +61,30 @@ describe("createMemoryInjector", () => {
 		expect(output.system).toEqual(["existing"]);
 	});
 
-	test("pushes memory context to output.system when observations exist", async () => {
+	test("pushes memory context to output.system when provenance-aware memory exists", async () => {
 		const now = new Date().toISOString();
 		upsertProject(
 			{ id: PROJECT_KEY, path: PROJECT_PATH, name: "test-project", lastUpdated: now },
+			db,
+		);
+		upsertPreferenceRecord(
+			{
+				key: "editor",
+				value: "vim",
+				scope: "project",
+				projectId: PROJECT_KEY,
+				createdAt: now,
+				lastUpdated: now,
+			},
 			db,
 		);
 		insertObservation(
 			{
 				projectId: PROJECT_KEY,
 				sessionId: "sess-0",
-				type: "decision",
-				content: "Use TypeScript strict mode",
-				summary: "Strict mode enabled",
+				type: "error",
+				content: "Avoid nested transactions during project resolution",
+				summary: "Nested transaction failure",
 				confidence: 0.9,
 				accessCount: 1,
 				createdAt: now,
@@ -91,6 +106,7 @@ describe("createMemoryInjector", () => {
 		);
 		expect(output.system.length).toBe(2);
 		expect(output.system[1]).toContain("Project Memory");
+		expect(output.system[1]).toContain("editor");
 	});
 
 	test("caches context per sessionID (does not rebuild)", async () => {
@@ -99,13 +115,24 @@ describe("createMemoryInjector", () => {
 			{ id: PROJECT_KEY, path: PROJECT_PATH, name: "test-project", lastUpdated: now },
 			db,
 		);
+		upsertPreferenceRecord(
+			{
+				key: "editor",
+				value: "vim",
+				scope: "project",
+				projectId: PROJECT_KEY,
+				createdAt: now,
+				lastUpdated: now,
+			},
+			db,
+		);
 		insertObservation(
 			{
 				projectId: PROJECT_KEY,
 				sessionId: "sess-0",
-				type: "decision",
-				content: "Use TypeScript strict mode",
-				summary: "Strict mode enabled",
+				type: "error",
+				content: "Avoid nested transactions during project resolution",
+				summary: "Nested transaction failure",
 				confidence: 0.9,
 				accessCount: 1,
 				createdAt: now,
@@ -144,13 +171,24 @@ describe("createMemoryInjector", () => {
 			{ id: PROJECT_KEY, path: PROJECT_PATH, name: "test-project", lastUpdated: now },
 			db,
 		);
+		upsertPreferenceRecord(
+			{
+				key: "editor",
+				value: "vim",
+				scope: "project",
+				projectId: PROJECT_KEY,
+				createdAt: now,
+				lastUpdated: now,
+			},
+			db,
+		);
 		insertObservation(
 			{
 				projectId: PROJECT_KEY,
 				sessionId: "sess-0",
-				type: "decision",
-				content: "Use TypeScript strict mode",
-				summary: "Strict mode enabled",
+				type: "error",
+				content: "Avoid nested transactions during project resolution",
+				summary: "Nested transaction failure",
 				confidence: 0.9,
 				accessCount: 1,
 				createdAt: now,

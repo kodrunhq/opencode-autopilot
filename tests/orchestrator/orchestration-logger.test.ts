@@ -36,9 +36,10 @@ describe("logOrchestrationEvent", () => {
 		const parsed = JSON.parse(lines[0]);
 		expect(parsed.timestamp).toBe("2026-04-04T00:00:00.000Z");
 		expect(parsed.phase).toBe("RECON");
-		expect(parsed.action).toBe("dispatch");
+		expect(parsed.type).toBe("dispatch");
 		expect(parsed.agent).toBe("oc-researcher");
-		expect(parsed.promptLength).toBe(42);
+		expect(parsed.payload.promptLength).toBe(42);
+		expect(parsed.domain).toBe("orchestrator");
 	});
 
 	test("appends multiple events (does not overwrite)", async () => {
@@ -90,7 +91,7 @@ describe("logOrchestrationEvent", () => {
 		const lines = content.trim().split("\n");
 		expect(lines).toHaveLength(actions.length);
 
-		const parsedActions = lines.map((line) => JSON.parse(line).action);
+		const parsedActions = lines.map((line) => JSON.parse(line).type);
 		for (const action of actions) {
 			expect(parsedActions).toContain(action);
 		}

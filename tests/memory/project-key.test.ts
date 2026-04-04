@@ -140,6 +140,10 @@ describe("preferenceSchema", () => {
 			key: "editor.theme",
 			value: "dark",
 			confidence: 0.8,
+			scope: "global",
+			projectId: null,
+			status: "confirmed",
+			evidenceCount: 1,
 			sourceSession: "sess-1",
 			createdAt: "2026-01-01T00:00:00Z",
 			lastUpdated: "2026-01-01T00:00:00Z",
@@ -157,6 +161,10 @@ describe("preferenceSchema", () => {
 			lastUpdated: "2026-01-01T00:00:00Z",
 		});
 		expect(result.confidence).toBe(0.5);
+		expect(result.scope).toBe("global");
+		expect(result.projectId).toBeNull();
+		expect(result.status).toBe("confirmed");
+		expect(result.evidenceCount).toBe(0);
 		expect(result.sourceSession).toBeNull();
 	});
 

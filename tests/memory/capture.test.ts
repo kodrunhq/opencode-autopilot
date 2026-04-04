@@ -1,6 +1,11 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { createMemoryCaptureHandler, type MemoryCaptureDeps } from "../../src/memory/capture";
+import {
+	createMemoryCaptureHandler,
+	createMemoryChatMessageHandler,
+	type MemoryCaptureDeps,
+	memoryCaptureInternals,
+} from "../../src/memory/capture";
 import { initMemoryDb } from "../../src/memory/database";
 
 function createTestDeps(db: Database): MemoryCaptureDeps {
@@ -260,6 +265,61 @@ describe("createMemoryCaptureHandler", () => {
 			expect(obs.type).toBe("pattern");
 			expect((obs.content as string).includes("RESEARCH")).toBe(true);
 			expect((obs.content as string).includes("BUILD")).toBe(true);
+		});
+	});
+
+	describe("explicit preference capture", () => {
+		it("extracts explicit preference statements conservatively", () => {
+			const candidates = memoryCaptureInternals.extractExplicitPreferenceCandidates([
+				{
+					type: "text",
+					content:
+						"Please use small diffs in this repo. Always run tests after non-trivial changes.",
+				},
+			]);
+
+			expect(candidates).toHaveLength(2);
+			expect(candidates[0]?.scope).toBe("project");
+			expect(candidates[0]?.value).toContain("small diffs");
+			expect(candidates[1]?.value).toContain("tests after non-trivial changes");
+		});
+
+		it("ignores non-explicit text", () => {
+			const candidates = memoryCaptureInternals.extractExplicitPreferenceCandidates([
+				{ type: "text", content: "Can you help investigate this bug?" },
+			]);
+
+			expect(candidates).toEqual([]);
+		});
+
+		it("stores explicit preferences with evidence from chat.message parts", async () => {
+			const handler = createMemoryChatMessageHandler(createTestDeps(db));
+
+			await handler(
+				{ sessionID: "sess-123" },
+				{
+					parts: [
+						{ type: "text", content: "Please use small diffs in this repo." },
+						{ type: "text", content: "I prefer bun test for this project." },
+					],
+				},
+			);
+
+			const prefs = db
+				.query("SELECT key, value, scope, project_id FROM preference_records ORDER BY key ASC")
+				.all() as Array<Record<string, unknown>>;
+			expect(prefs).toHaveLength(2);
+			expect(prefs[0]?.scope).toBe("project");
+			expect(prefs[0]?.project_id).not.toBeNull();
+
+			const evidence = db
+				.query(
+					"SELECT statement, confirmed, session_id FROM preference_evidence ORDER BY statement ASC",
+				)
+				.all() as Array<Record<string, unknown>>;
+			expect(evidence).toHaveLength(2);
+			expect(evidence[0]?.confirmed).toBe(1);
+			expect(evidence[0]?.session_id).toBe("sess-123");
 		});
 	});
 });

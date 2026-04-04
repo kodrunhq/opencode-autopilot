@@ -81,6 +81,12 @@ export type ObservabilityEvent =
 			readonly fromPhase: string;
 			readonly toPhase: string;
 	  }
+	| {
+			readonly type: "compacted";
+			readonly timestamp: string;
+			readonly sessionId: string;
+			readonly trigger: string;
+	  }
 	| { readonly type: "session_start"; readonly timestamp: string; readonly sessionId: string }
 	| {
 			readonly type: "session_end";
@@ -118,6 +124,7 @@ export interface SessionEvents {
 interface MutableSessionData {
 	sessionId: string;
 	events: ObservabilityEvent[];
+	persistedEventCount: number;
 	tokens: TokenAggregate;
 	toolMetrics: Map<string, ToolMetrics>;
 	currentPhase: string | null;
@@ -138,6 +145,7 @@ export class SessionEventStore {
 		this.sessions.set(sessionId, {
 			sessionId,
 			events: [],
+			persistedEventCount: 0,
 			tokens: createEmptyTokenAggregate(),
 			toolMetrics: new Map(),
 			currentPhase: null,
@@ -214,10 +222,30 @@ export class SessionEventStore {
 	}
 
 	/**
+	 * Returns only events not yet persisted and marks them as persisted.
+	 */
+	getUnpersistedSession(sessionId: string): SessionEvents | undefined {
+		const session = this.sessions.get(sessionId);
+		if (!session) return undefined;
+
+		const events = session.events.slice(session.persistedEventCount);
+		session.persistedEventCount = session.events.length;
+
+		return {
+			sessionId: session.sessionId,
+			events,
+			tokens: session.tokens,
+			toolMetrics: new Map(session.toolMetrics),
+			currentPhase: session.currentPhase,
+			startedAt: session.startedAt,
+		};
+	}
+
+	/**
 	 * Returns session data and removes it from the store (for disk flush).
 	 */
 	flush(sessionId: string): SessionEvents | undefined {
-		const session = this.getSession(sessionId);
+		const session = this.getUnpersistedSession(sessionId);
 		if (session) {
 			this.sessions.delete(sessionId);
 		}

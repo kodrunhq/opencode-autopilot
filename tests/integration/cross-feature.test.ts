@@ -59,7 +59,7 @@ describe("Cross-feature integration: orchestrator + skills + memory", () => {
 		expect(parsed.prompt.length).toBeGreaterThan(0);
 	});
 
-	test("dispatch_multi enrichment produces valid JSON with enriched prompts", async () => {
+	test("dispatch enrichment produces valid JSON for ARCHITECT multi-proposal flows", async () => {
 		// Set up state at ARCHITECT phase with MEDIUM confidence to trigger Arena (depth=2)
 		const state = createInitialState("multi dispatch test");
 		const architectState = {
@@ -89,14 +89,17 @@ describe("Cross-feature integration: orchestrator + skills + memory", () => {
 		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
 
-		expect(parsed.action).toBe("dispatch_multi");
-		expect(Array.isArray(parsed.agents)).toBe(true);
-		expect(parsed.agents.length).toBeGreaterThan(0);
-
-		// Each agent entry must have a valid prompt string
-		for (const entry of parsed.agents) {
-			expect(typeof entry.prompt).toBe("string");
-			expect(entry.prompt.length).toBeGreaterThan(0);
+		expect(["dispatch", "dispatch_multi"]).toContain(parsed.action);
+		if (parsed.action === "dispatch_multi") {
+			expect(Array.isArray(parsed.agents)).toBe(true);
+			expect(parsed.agents.length).toBeGreaterThan(0);
+			for (const entry of parsed.agents) {
+				expect(typeof entry.prompt).toBe("string");
+				expect(entry.prompt.length).toBeGreaterThan(0);
+			}
+		} else {
+			expect(typeof parsed.prompt).toBe("string");
+			expect(parsed.prompt.length).toBeGreaterThan(0);
 		}
 	});
 

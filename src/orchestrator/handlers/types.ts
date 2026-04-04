@@ -40,7 +40,6 @@ export interface DispatchResult {
 
 export interface PhaseHandlerContext {
 	readonly envelope: ResultEnvelope;
-	readonly legacy: boolean;
 }
 
 export type PhaseHandler = (

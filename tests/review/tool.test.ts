@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadActiveReviewStateFromKernel } from "../../src/kernel/repository";
 import { reviewCore } from "../../src/tools/review";
 
 let tempDir: string;
@@ -42,6 +43,9 @@ describe("reviewCore", () => {
 		const state = JSON.parse(raw);
 		expect(state.stage).toBe(1);
 		expect(state.scope).toBe("staged");
+		expect(loadActiveReviewStateFromKernel(join(tempDir, ".opencode-autopilot"))?.scope).toBe(
+			"staged",
+		);
 	});
 
 	test("with findings and active state advances pipeline", async () => {
@@ -144,8 +148,11 @@ describe("reviewCore", () => {
 		const statePath = join(tempDir, ".opencode-autopilot", "current-review.json");
 		const raw = await readFile(statePath, "utf-8");
 		const state = JSON.parse(raw);
+		const kernelState = loadActiveReviewStateFromKernel(join(tempDir, ".opencode-autopilot"));
 		// Should include universal specialized agents
 		expect(state.selectedAgentNames).toContain("wiring-inspector");
 		expect(state.selectedAgentNames).toContain("database-auditor");
+		expect(kernelState?.selectedAgentNames).toContain("wiring-inspector");
+		expect(kernelState?.selectedAgentNames).toContain("database-auditor");
 	});
 });

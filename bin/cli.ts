@@ -11,6 +11,7 @@ import { ALL_GROUP_IDS, DIVERSITY_RULES, GROUP_DEFINITIONS } from "../src/regist
 import type { GroupId } from "../src/registry/types";
 import { fileExists } from "../src/utils/fs-helpers";
 import { runConfigure } from "./configure-tui";
+import { runInspect } from "./inspect";
 
 const execFile = promisify(execFileCb);
 
@@ -314,6 +315,7 @@ function printUsage(): void {
 	console.log("  install     Register the plugin and create starter config");
 	console.log("  configure   Interactive model assignment for each agent group");
 	console.log("  doctor      Check installation health and model assignments");
+	console.log("  inspect     Read-only inspection of projects, runs, events, and memory");
 	console.log("");
 	console.log("Options:");
 	console.log("  --help, -h  Show this help message");
@@ -335,6 +337,9 @@ if (import.meta.main) {
 			break;
 		case "doctor":
 			await runDoctor();
+			break;
+		case "inspect":
+			await runInspect(args.slice(1));
 			break;
 		case "--help":
 		case "-h":

@@ -62,6 +62,7 @@ describe("completePhase", () => {
 		const updated = completePhase(state);
 
 		expect(updated.currentPhase).toBe("CHALLENGE");
+		expect(updated.stateRevision).toBe(state.stateRevision + 1);
 
 		const reconStatus = updated.phases.find((p) => p.name === "RECON");
 		expect(reconStatus?.status).toBe("DONE");
@@ -102,6 +103,27 @@ describe("completePhase", () => {
 		const retroStatus = updated.phases.find((p) => p.name === "RETROSPECTIVE");
 		expect(retroStatus?.status).toBe("DONE");
 		expect(retroStatus?.completedAt).toBeTruthy();
+	});
+
+	test("clears pending dispatches from the completed phase", () => {
+		const state: PipelineState = {
+			...createInitialState("pending cleanup"),
+			pendingDispatches: [
+				{
+					dispatchId: "dispatch_recon_1",
+					phase: "RECON",
+					agent: "oc-researcher",
+					issuedAt: new Date().toISOString(),
+					resultKind: "phase_output",
+					taskId: null,
+				},
+			],
+		};
+
+		const updated = completePhase(state);
+
+		expect(updated.currentPhase).toBe("CHALLENGE");
+		expect(updated.pendingDispatches).toEqual([]);
 	});
 });
 

@@ -1,8 +1,8 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
-import { getGlobalConfigDir } from "../utils/paths";
-import { DB_FILE, MEMORY_DIR } from "./constants";
+import { dirname } from "node:path";
+import { runProjectRegistryMigrations } from "../projects/database";
+import { getAutopilotDbPath } from "../utils/paths";
 
 let db: Database | null = null;
 
@@ -11,12 +11,7 @@ let db: Database | null = null;
  * Idempotent via IF NOT EXISTS.
  */
 export function initMemoryDb(database: Database): void {
-	database.run(`CREATE TABLE IF NOT EXISTS projects (
-		id TEXT PRIMARY KEY,
-		path TEXT NOT NULL UNIQUE,
-		name TEXT NOT NULL,
-		last_updated TEXT NOT NULL
-	)`);
+	runProjectRegistryMigrations(database);
 
 	database.run(`CREATE TABLE IF NOT EXISTS observations (
 		id INTEGER PRIMARY KEY,
@@ -40,6 +35,73 @@ export function initMemoryDb(database: Database): void {
 		source_session TEXT,
 		created_at TEXT NOT NULL,
 		last_updated TEXT NOT NULL
+	)`);
+
+	database.run(`CREATE TABLE IF NOT EXISTS preference_records (
+		id TEXT PRIMARY KEY,
+		key TEXT NOT NULL,
+		value TEXT NOT NULL,
+		scope TEXT NOT NULL CHECK(scope IN ('global', 'project')),
+		project_id TEXT,
+		status TEXT NOT NULL CHECK(status IN ('candidate', 'confirmed', 'rejected')) DEFAULT 'confirmed',
+		confidence REAL NOT NULL DEFAULT 0.5,
+		source_session TEXT,
+		created_at TEXT NOT NULL,
+		last_updated TEXT NOT NULL,
+		FOREIGN KEY (project_id) REFERENCES projects(id),
+		UNIQUE(key, scope, project_id)
+	)`);
+
+	database.run(`CREATE INDEX IF NOT EXISTS idx_preference_records_scope_updated
+		ON preference_records(scope, last_updated DESC, key ASC)`);
+	database.run(`CREATE INDEX IF NOT EXISTS idx_preference_records_project_updated
+		ON preference_records(project_id, last_updated DESC, key ASC)`);
+
+	database.run(`CREATE TABLE IF NOT EXISTS preference_evidence (
+		id TEXT PRIMARY KEY,
+		preference_id TEXT NOT NULL,
+		session_id TEXT,
+		run_id TEXT,
+		statement TEXT NOT NULL,
+		statement_hash TEXT NOT NULL,
+		confidence REAL NOT NULL DEFAULT 0.5,
+		confirmed INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL,
+		FOREIGN KEY (preference_id) REFERENCES preference_records(id) ON DELETE CASCADE,
+		UNIQUE(preference_id, statement_hash)
+	)`);
+
+	database.run(`CREATE INDEX IF NOT EXISTS idx_preference_evidence_preference_created
+		ON preference_evidence(preference_id, created_at DESC, id DESC)`);
+
+	database.run(`INSERT INTO preference_records (
+		id,
+		key,
+		value,
+		scope,
+		project_id,
+		status,
+		confidence,
+		source_session,
+		created_at,
+		last_updated
+	)
+	SELECT
+		p.id,
+		p.key,
+		p.value,
+		'global',
+		NULL,
+		'confirmed',
+		p.confidence,
+		p.source_session,
+		p.created_at,
+		p.last_updated
+	FROM preferences p
+	WHERE NOT EXISTS (
+		SELECT 1
+		FROM preference_records pr
+		WHERE pr.id = p.id
 	)`);
 
 	database.run(`CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
@@ -79,9 +141,9 @@ export function getMemoryDb(dbPath?: string): Database {
 	const resolvedPath =
 		dbPath ??
 		(() => {
-			const memoryDir = join(getGlobalConfigDir(), MEMORY_DIR);
-			mkdirSync(memoryDir, { recursive: true });
-			return join(memoryDir, DB_FILE);
+			const runtimeDbPath = getAutopilotDbPath();
+			mkdirSync(dirname(runtimeDbPath), { recursive: true });
+			return runtimeDbPath;
 		})();
 
 	db = new Database(resolvedPath);
