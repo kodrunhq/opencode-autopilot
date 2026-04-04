@@ -4,14 +4,18 @@ import { resolveModelForAgent } from "../registry/resolver";
 import type { AgentOverride, GroupModelAssignment } from "../registry/types";
 import { autopilotAgent } from "./autopilot";
 import { coderAgent } from "./coder";
+import { dbSpecialistAgent } from "./db-specialist";
 import { debuggerAgent } from "./debugger";
+import { devopsAgent } from "./devops";
 import { documenterAgent } from "./documenter";
+import { frontendEngineerAgent } from "./frontend-engineer";
 import { metaprompterAgent } from "./metaprompter";
 import { pipelineAgents } from "./pipeline/index";
 import { plannerAgent } from "./planner";
 import { prReviewerAgent } from "./pr-reviewer";
 import { researcherAgent } from "./researcher";
 import { reviewerAgent } from "./reviewer";
+import { securityAuditorAgent } from "./security-auditor";
 
 interface AgentConfig {
 	readonly [key: string]: unknown;
@@ -21,13 +25,17 @@ interface AgentConfig {
 export const agents = {
 	autopilot: autopilotAgent,
 	coder: coderAgent,
+	"db-specialist": dbSpecialistAgent,
 	debugger: debuggerAgent,
+	devops: devopsAgent,
 	documenter: documenterAgent,
+	"frontend-engineer": frontendEngineerAgent,
 	metaprompter: metaprompterAgent,
 	planner: plannerAgent,
 	"pr-reviewer": prReviewerAgent,
 	researcher: researcherAgent,
 	reviewer: reviewerAgent,
+	"security-auditor": securityAuditorAgent,
 } as const;
 
 /**
@@ -104,10 +112,14 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 
 export { autopilotAgent } from "./autopilot";
 export { coderAgent } from "./coder";
+export { dbSpecialistAgent } from "./db-specialist";
 export { debuggerAgent } from "./debugger";
+export { devopsAgent } from "./devops";
 export { documenterAgent } from "./documenter";
+export { frontendEngineerAgent } from "./frontend-engineer";
 export { metaprompterAgent } from "./metaprompter";
 export { plannerAgent } from "./planner";
 export { prReviewerAgent } from "./pr-reviewer";
 export { researcherAgent } from "./researcher";
 export { reviewerAgent } from "./reviewer";
+export { securityAuditorAgent } from "./security-auditor";
