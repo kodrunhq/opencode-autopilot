@@ -12,8 +12,13 @@ export async function ensurePhaseDir(artifactDir: string, phase: Phase): Promise
 	return dir;
 }
 
-export function getArtifactRef(phase: Phase, filename: string): string {
-	return `phases/${phase}/${filename}`;
+/**
+ * Returns the absolute path to a phase artifact.
+ * This is the canonical path used in both handler file-existence checks
+ * AND dispatch prompts, ensuring agents write to the location handlers verify.
+ */
+export function getArtifactRef(artifactDir: string, phase: Phase, filename: string): string {
+	return join(getPhaseDir(artifactDir, phase), filename);
 }
 
 export const PHASE_ARTIFACTS: Readonly<Record<string, readonly string[]>> = Object.freeze({

@@ -82,7 +82,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 		const result = await orchestrateCore({ result: "challenge done" }, tempDir);
 		const parsed = JSON.parse(result);
 		// CHALLENGE handler with result -> complete -> advance to ARCHITECT
-		// ARCHITECT handler dispatches multi (Arena) by default
+		// ARCHITECT handler dispatches single (depth=1) with empty confidence (HIGH default)
 		expect(["dispatch", "dispatch_multi"]).toContain(parsed.action);
 		expect(parsed.phase).toBe("ARCHITECT");
 	});
@@ -235,6 +235,24 @@ describe("orchestrateCore pipeline dispatch", () => {
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed.phase).toBe("RECON");
 		expect(parsed.agent).toBe("oc-researcher");
+	});
+
+	test("circuit breaker returns error when phase exceeds max dispatches", async () => {
+		const { orchestrateCore } = await import("../src/tools/orchestrate");
+		const state = createInitialState("test idea");
+		// Pre-set dispatch count to just under the RECON limit (3)
+		const preloaded = {
+			...state,
+			phaseDispatchCounts: { RECON: 3 },
+		};
+		await saveState(preloaded, tempDir);
+
+		// Next dispatch should exceed the limit
+		const result = await orchestrateCore({}, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.message).toContain("exceeded max dispatches");
+		expect(parsed.message).toContain("RECON");
 	});
 });
 

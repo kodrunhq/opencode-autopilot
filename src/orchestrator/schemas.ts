@@ -84,4 +84,5 @@ export const pipelineStateSchema = z.object({
 		reviewPending: false,
 	}),
 	failureContext: failureContextSchema.nullable().default(null),
+	phaseDispatchCounts: z.record(z.string(), z.number()).default({}),
 });

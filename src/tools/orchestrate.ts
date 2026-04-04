@@ -110,6 +110,41 @@ async function injectSkillContext(prompt: string, projectRoot?: string): Promise
 	return prompt;
 }
 
+/** Per-phase dispatch limits. BUILD is high because of multi-task waves. */
+const MAX_PHASE_DISPATCHES: Readonly<Record<string, number>> = Object.freeze({
+	RECON: 3,
+	CHALLENGE: 3,
+	ARCHITECT: 10,
+	EXPLORE: 3,
+	PLAN: 5,
+	BUILD: 100,
+	SHIP: 5,
+	RETROSPECTIVE: 3,
+});
+
+/**
+ * Circuit breaker: increment per-phase dispatch count and abort if limit exceeded.
+ * Returns an error string if the limit is exceeded, or null to proceed.
+ */
+async function checkCircuitBreaker(
+	currentState: Readonly<import("../orchestrator/types").PipelineState>,
+	phase: string,
+	artifactDir: string,
+): Promise<string | null> {
+	const counts = { ...(currentState.phaseDispatchCounts ?? {}) };
+	counts[phase] = (counts[phase] ?? 0) + 1;
+	const limit = MAX_PHASE_DISPATCHES[phase] ?? 5;
+	if (counts[phase] > limit) {
+		return JSON.stringify({
+			action: "error",
+			message: `Phase ${phase} exceeded max dispatches (${counts[phase]}/${limit}) — possible infinite loop detected. Aborting.`,
+		});
+	}
+	const withCounts = patchState(currentState, { phaseDispatchCounts: counts });
+	await saveState(withCounts, artifactDir);
+	return null;
+}
+
 /**
  * Process a handler's DispatchResult, handling complete/dispatch/dispatch_multi/error.
  * On complete, advances the phase and invokes the next handler.
@@ -127,6 +162,11 @@ async function processHandlerResult(
 			return JSON.stringify(handlerResult);
 
 		case "dispatch": {
+			// Circuit breaker
+			const phase = handlerResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
+			const abortMsg = await checkCircuitBreaker(currentState, phase, artifactDir);
+			if (abortMsg) return abortMsg;
+
 			// Check if this is a review dispatch that should be inlined
 			const { inlined, reviewResult } = await maybeInlineReview(handlerResult, artifactDir);
 			if (inlined && reviewResult) {
@@ -154,6 +194,11 @@ async function processHandlerResult(
 		}
 
 		case "dispatch_multi": {
+			// Circuit breaker
+			const phase = handlerResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
+			const abortMsg = await checkCircuitBreaker(currentState, phase, artifactDir);
+			if (abortMsg) return abortMsg;
+
 			// Inject lesson + skill context into each agent's prompt (best-effort)
 			// Load lesson and skill context once and reuse for all agents in the batch
 			if (handlerResult.agents && handlerResult.phase) {

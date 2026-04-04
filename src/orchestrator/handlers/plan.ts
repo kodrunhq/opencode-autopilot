@@ -2,7 +2,7 @@ import { getArtifactRef } from "../artifacts";
 import type { DispatchResult, PhaseHandler } from "./types";
 import { AGENT_NAMES } from "./types";
 
-export const handlePlan: PhaseHandler = async (_state, _artifactDir, result?) => {
+export const handlePlan: PhaseHandler = async (_state, artifactDir, result?) => {
 	if (result) {
 		return Object.freeze({
 			action: "complete",
@@ -11,8 +11,9 @@ export const handlePlan: PhaseHandler = async (_state, _artifactDir, result?) =>
 		} satisfies DispatchResult);
 	}
 
-	const architectRef = getArtifactRef("ARCHITECT", "design.md");
-	const challengeRef = getArtifactRef("CHALLENGE", "brief.md");
+	const architectRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
+	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
+	const tasksPath = getArtifactRef(artifactDir, "PLAN", "tasks.md");
 
 	const prompt = [
 		"Read the architecture design at",
@@ -20,7 +21,7 @@ export const handlePlan: PhaseHandler = async (_state, _artifactDir, result?) =>
 		"and the challenge brief at",
 		challengeRef,
 		"then produce a task plan.",
-		"Write tasks to phases/PLAN/tasks.md.",
+		`Write tasks to ${tasksPath}.`,
 		"Each task should have a 300-line diff max.",
 		"Assign wave numbers for parallel execution.",
 	].join(" ");

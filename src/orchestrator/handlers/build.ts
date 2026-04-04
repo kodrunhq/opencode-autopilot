@@ -55,9 +55,9 @@ function markTasksInProgress(tasks: readonly Task[], taskIds: readonly number[])
 /**
  * Build a prompt for a single task dispatch.
  */
-function buildTaskPrompt(task: Task): string {
-	const planRef = getArtifactRef("PLAN", "tasks.md");
-	const designRef = getArtifactRef("ARCHITECT", "design.md");
+function buildTaskPrompt(task: Task, artifactDir: string): string {
+	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.md");
+	const designRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
 	return [
 		`Implement task ${task.id}: ${task.title}.`,
 		`Reference the plan at ${planRef}`,
@@ -110,7 +110,7 @@ function hasCriticalFindings(resultStr: string): boolean {
 	}
 }
 
-export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) => {
+export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => {
 	const { tasks, buildProgress } = state;
 
 	// Edge case: no tasks
@@ -177,7 +177,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			const prompt = [
 				`CRITICAL review findings detected. Fix the following issues:`,
 				safeResult,
-				`Reference ${getArtifactRef("PLAN", "tasks.md")} for context.`,
+				`Reference ${getArtifactRef(artifactDir, "PLAN", "tasks.md")} for context.`,
 			].join(" ");
 
 			return Object.freeze({
@@ -225,7 +225,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.BUILD,
-				prompt: buildTaskPrompt(task),
+				prompt: buildTaskPrompt(task, artifactDir),
 				phase: "BUILD",
 				progress: `Wave ${nextWave} — task ${task.id}`,
 				_stateUpdates: {
@@ -239,7 +239,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			action: "dispatch_multi",
 			agents: pendingTasks.map((task) => ({
 				agent: AGENT_NAMES.BUILD,
-				prompt: buildTaskPrompt(task),
+				prompt: buildTaskPrompt(task, artifactDir),
 			})),
 			phase: "BUILD",
 			progress: `Wave ${nextWave} — ${pendingTasks.length} concurrent tasks`,
@@ -285,7 +285,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.BUILD,
-				prompt: buildTaskPrompt(next),
+				prompt: buildTaskPrompt(next, artifactDir),
 				phase: "BUILD",
 				progress: `Wave ${currentWave} — task ${next.id}`,
 				_stateUpdates: {
@@ -367,7 +367,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 		return Object.freeze({
 			action: "dispatch",
 			agent: AGENT_NAMES.BUILD,
-			prompt: buildTaskPrompt(task),
+			prompt: buildTaskPrompt(task, artifactDir),
 			phase: "BUILD",
 			progress: `Wave ${currentWave} — task ${task.id}`,
 			_stateUpdates: {
@@ -386,7 +386,7 @@ export const handleBuild: PhaseHandler = async (state, _artifactDir, result?) =>
 		action: "dispatch_multi",
 		agents: pendingTasks.map((task) => ({
 			agent: AGENT_NAMES.BUILD,
-			prompt: buildTaskPrompt(task),
+			prompt: buildTaskPrompt(task, artifactDir),
 		})),
 		phase: "BUILD",
 		progress: `Wave ${currentWave} — ${pendingTasks.length} concurrent tasks`,

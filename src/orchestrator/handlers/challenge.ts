@@ -21,8 +21,8 @@ export async function handleChallenge(
 	}
 
 	await ensurePhaseDir(artifactDir, "CHALLENGE");
-	const reconRef = getArtifactRef("RECON", "report.md");
-	const outputRef = getArtifactRef("CHALLENGE", "brief.md");
+	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md");
+	const outputPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
 
 	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
 
@@ -32,7 +32,7 @@ export async function handleChallenge(
 		prompt: [
 			`Read ${reconRef} for research context.`,
 			`Original idea: ${safeIdea}`,
-			`Propose up to 3 enhancements. Write ambitious brief to ${outputRef}`,
+			`Propose up to 3 enhancements. Write ambitious brief to ${outputPath}`,
 			`For each: name, user value, complexity (LOW/MEDIUM/HIGH), accept/reject rationale.`,
 		].join("\n"),
 		phase: "CHALLENGE",

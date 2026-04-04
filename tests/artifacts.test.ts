@@ -22,12 +22,23 @@ describe("getPhaseDir", () => {
 });
 
 describe("getArtifactRef", () => {
-	test("returns relative reference for RECON report", () => {
-		expect(getArtifactRef("RECON", "report.md")).toBe("phases/RECON/report.md");
+	test("returns absolute path under artifactDir for RECON report", () => {
+		expect(getArtifactRef("/project/.opencode-autopilot", "RECON", "report.md")).toBe(
+			"/project/.opencode-autopilot/phases/RECON/report.md",
+		);
 	});
 
-	test("returns relative reference for SHIP changelog", () => {
-		expect(getArtifactRef("SHIP", "changelog.md")).toBe("phases/SHIP/changelog.md");
+	test("returns absolute path under artifactDir for SHIP changelog", () => {
+		expect(getArtifactRef("/project/.opencode-autopilot", "SHIP", "changelog.md")).toBe(
+			"/project/.opencode-autopilot/phases/SHIP/changelog.md",
+		);
+	});
+
+	test("prompt path matches handler check path (no path mismatch)", () => {
+		const artifactDir = "/project/.opencode-autopilot";
+		const ref = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
+		const checkPath = `${getPhaseDir(artifactDir, "ARCHITECT")}/design.md`;
+		expect(ref).toBe(checkPath);
 	});
 });
 

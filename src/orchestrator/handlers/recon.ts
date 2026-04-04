@@ -20,8 +20,8 @@ export async function handleRecon(
 		});
 	}
 
-	const phaseDir = await ensurePhaseDir(artifactDir, "RECON");
-	const outputRef = getArtifactRef("RECON", "report.md");
+	await ensurePhaseDir(artifactDir, "RECON");
+	const outputPath = getArtifactRef(artifactDir, "RECON", "report.md");
 
 	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
 
@@ -29,9 +29,8 @@ export async function handleRecon(
 		action: "dispatch" as const,
 		agent: AGENT_NAMES.RECON,
 		prompt: [
-			`Research the following idea and write findings to ${outputRef}`,
+			`Research the following idea and write findings to ${outputPath}`,
 			`Idea: ${safeIdea}`,
-			`Output: ${phaseDir}/report.md`,
 			`Include: Market Analysis, Technology Options, UX Considerations, Feasibility Assessment, Confidence (HIGH/MEDIUM/LOW)`,
 		].join("\n"),
 		phase: "RECON",

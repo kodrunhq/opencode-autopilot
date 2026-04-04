@@ -36,8 +36,9 @@ export function summarizeConfidence(entries: readonly ConfidenceEntry[]): {
 
 	const total = entries.length;
 
-	// Tie-break: prefer higher confidence (HIGH > MEDIUM > LOW)
-	let dominant: ConfidenceLevel = "MEDIUM"; // default for empty
+	// Default: no evidence of low confidence → assume HIGH (single-proposal fast path).
+	// This prevents empty ledgers from triggering expensive multi-proposal arena (depth=2).
+	let dominant: ConfidenceLevel = "HIGH";
 	if (total > 0) {
 		let maxCount = 0;
 		for (const level of LEVEL_PRIORITY) {
