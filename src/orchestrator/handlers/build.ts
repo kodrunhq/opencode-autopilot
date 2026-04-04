@@ -159,6 +159,8 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 		const blockedIds = nonDoneTasks.map((t) => t.id).join(", ");
 		return Object.freeze({
 			action: "error" as const,
+			phase: "BUILD",
+			message: `All remaining tasks are BLOCKED due to dependency cycles: [${blockedIds}]`,
 			progress: `All remaining tasks are BLOCKED due to dependency cycles: [${blockedIds}]`,
 			_stateUpdates: Object.freeze({
 				buildProgress: Object.freeze({

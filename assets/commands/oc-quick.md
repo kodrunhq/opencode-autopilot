@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Run a quick task (skip research/architecture, go straight to plan+build+ship)
 agent: autopilot
 ---

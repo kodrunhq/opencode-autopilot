@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: api-design
 description: REST and GraphQL API design conventions covering resource naming, HTTP methods, status codes, pagination, versioning, error format, and rate limiting
 stacks: []

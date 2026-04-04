@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: go-patterns
 description: Idiomatic Go patterns covering error handling, concurrency, interfaces, and testing conventions
 stacks:

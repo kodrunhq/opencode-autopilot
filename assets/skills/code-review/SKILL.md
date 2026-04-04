@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: code-review
 description: Structured methodology for requesting and receiving code reviews -- what to check, how to provide feedback, and how to respond to review comments
 stacks: []

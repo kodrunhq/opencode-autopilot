@@ -42,10 +42,10 @@ export const EXT_COMMENT_STYLE: Readonly<Record<string, string>> = Object.freeze
 /** Regex to extract comment text from a line given its comment prefix.
  * Matches both full-line comments and inline trailing comments.
  * Negative lookbehind (?<!:) prevents matching :// in URLs.
- * The `#` pattern excludes shebangs (`#!`) and hex colors (`#[0-9a-fA-F]{3,8}`). */
+ * Hash-line exclusions (shebangs, hex colors) are handled by isExcludedHashLine(). */
 export const COMMENT_PATTERNS: Readonly<Record<string, RegExp>> = Object.freeze({
 	"//": /(?<!:)\/\/\s*(.+)/,
-	"#": /(?<!^#![^\n]*)(?!.*#[0-9a-fA-F]{3,8}\b)#\s*(.+)/,
+	"#": /#\s*(.+)/,
 });
 
 /** Returns true if a line should be excluded from `#`-style comment scanning. */

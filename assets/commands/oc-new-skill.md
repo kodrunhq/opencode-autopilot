@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Create a new OpenCode skill from within this session
 agent: metaprompter
 ---

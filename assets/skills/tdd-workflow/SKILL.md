@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: tdd-workflow
 description: Strict RED-GREEN-REFACTOR TDD methodology with anti-pattern catalog and explicit failure modes
 stacks: []

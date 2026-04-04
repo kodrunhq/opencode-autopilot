@@ -25,17 +25,11 @@ const CONSTRAINT_FRAMINGS: readonly string[] = Object.freeze([
 export async function handleArchitect(
 	state: Readonly<PipelineState>,
 	artifactDir: string,
-	result?: string,
+	_result?: string,
 ): Promise<DispatchResult> {
-	// Complete when agent returns a result (matching RECON/CHALLENGE/PLAN/SHIP pattern)
-	if (result) {
-		return Object.freeze({
-			action: "complete" as const,
-			phase: "ARCHITECT",
-			progress: "ARCHITECT complete",
-		});
-	}
-
+	// _result is received from the orchestrator but completion is determined by
+	// artifact existence (design.md/critique.md), not by result truthiness.
+	// This preserves the three-step arena flow: proposals → critic → complete.
 	const phaseDir = getPhaseDir(artifactDir, "ARCHITECT");
 	const critiqueExists = await fileExists(join(phaseDir, "critique.md"));
 	const designExists = await fileExists(join(phaseDir, "design.md"));

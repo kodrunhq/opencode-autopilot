@@ -94,8 +94,8 @@ export function pruneStaleObservations(
 	// Optimize the FTS5 index after pruning to reclaim space and improve query speed
 	if (pruned > 0) {
 		try {
-			const d = db ?? getMemoryDb();
-			d.run("INSERT INTO observations_fts(observations_fts) VALUES('optimize')");
+			const resolvedDb = db ?? getMemoryDb();
+			resolvedDb.run("INSERT INTO observations_fts(observations_fts) VALUES('optimize')");
 		} catch {
 			// best-effort — FTS optimize failure is non-critical
 		}

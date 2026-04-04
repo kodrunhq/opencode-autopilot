@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: frontend-design
 description: State-of-the-art frontend UX/UI design patterns covering component architecture, responsive design, accessibility, and design system integration
 stacks:

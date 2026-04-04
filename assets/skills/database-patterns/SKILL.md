@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: database-patterns
 description: Database design, query optimization, migration strategies, indexing, connection pooling, transactions, and data modeling patterns
 stacks: []

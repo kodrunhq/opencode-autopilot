@@ -274,13 +274,38 @@ describe("handleArchitect", () => {
 		expect(result.prompt).toContain("/tmp/test-artifacts/phases/CHALLENGE/brief.md");
 	});
 
-	test("returns complete when result string is provided (no infinite loop)", async () => {
+	test("result with existing design.md returns complete (no infinite loop)", async () => {
 		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
 		const state = makeState({ currentPhase: "ARCHITECT", confidence: [] });
-		const result = await handleArchitect(state, "/tmp/test-artifacts", "architecture done");
 
+		// Simulate the agent having written design.md
+		const fs = await import("node:fs/promises");
+		const phaseDir = "/tmp/test-artifacts/phases/ARCHITECT";
+		await fs.mkdir(phaseDir, { recursive: true });
+		await fs.writeFile(`${phaseDir}/design.md`, "# Design\ntest content");
+
+		const result = await handleArchitect(state, "/tmp/test-artifacts", "architecture done");
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("ARCHITECT");
+
+		await fs.rm(phaseDir, { recursive: true, force: true });
+	});
+
+	test("result with existing proposals dispatches critic (arena path)", async () => {
+		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
+		const state = makeState({ currentPhase: "ARCHITECT", confidence: [] });
+
+		// Simulate proposal files from dispatch_multi
+		const fs = await import("node:fs/promises");
+		const proposalsDir = "/tmp/test-artifacts/phases/ARCHITECT/proposals";
+		await fs.mkdir(proposalsDir, { recursive: true });
+		await fs.writeFile(`${proposalsDir}/proposal-A.md`, "# Proposal A");
+
+		const result = await handleArchitect(state, "/tmp/test-artifacts", "proposals written");
+		expect(result.action).toBe("dispatch");
+		expect(result.agent).toBe("oc-critic");
+
+		await fs.rm("/tmp/test-artifacts/phases/ARCHITECT", { recursive: true, force: true });
 	});
 
 	test("each multi-dispatch proposal has distinct constraint framing", async () => {

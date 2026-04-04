@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: git-worktrees
 description: Git worktrees for isolated parallel development — work on multiple branches simultaneously without stashing
 stacks: []

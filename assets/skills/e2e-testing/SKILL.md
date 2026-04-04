@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: e2e-testing
 description: End-to-end testing patterns for critical user flows -- test the system as a user would use it
 stacks: []

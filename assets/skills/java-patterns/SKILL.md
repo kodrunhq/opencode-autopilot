@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: java-patterns
 description: Idiomatic Java patterns including records, Spring Boot conventions, JPA/Hibernate, and common pitfalls
 stacks:

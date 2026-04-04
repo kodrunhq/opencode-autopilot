@@ -13,6 +13,7 @@
 
 import type { Database } from "bun:sqlite";
 import { CHARS_PER_TOKEN, DEFAULT_INJECTION_BUDGET } from "./constants";
+import { getMemoryDb } from "./database";
 import { computeRelevanceScore } from "./decay";
 import {
 	getAllPreferences,
@@ -263,17 +264,24 @@ export function retrieveMemoryContext(
 		tokenBudget,
 	});
 
-	// Update access counts only for observations that could plausibly fit in context.
-	// buildMemoryContext uses at most MAX_PER_GROUP * sections = 30 observations.
+	// Batch-update access counts in a single transaction to avoid N+1 writes.
+	// Only observations that could plausibly fit in context are updated.
 	// Best-effort: failures are swallowed to avoid blocking retrieval.
 	const maxInContext = MAX_PER_GROUP * SECTION_ORDER.length;
-	for (const obs of scored.slice(0, maxInContext)) {
-		if (obs.id !== undefined) {
-			try {
-				updateAccessCount(obs.id, db);
-			} catch {
-				// best-effort — access count update is non-critical
+	const idsToUpdate = scored
+		.slice(0, maxInContext)
+		.map((obs) => obs.id)
+		.filter((id): id is number => id !== undefined);
+	if (idsToUpdate.length > 0) {
+		try {
+			const resolvedDb = db ?? getMemoryDb();
+			resolvedDb.run("BEGIN");
+			for (const id of idsToUpdate) {
+				updateAccessCount(id, db);
 			}
+			resolvedDb.run("COMMIT");
+		} catch {
+			// best-effort — access count update is non-critical
 		}
 	}
 

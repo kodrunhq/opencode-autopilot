@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Review a GitHub PR with structured, actionable feedback
 agent: pr-reviewer
 ---

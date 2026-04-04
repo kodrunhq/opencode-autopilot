@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: brainstorming
 description: Socratic design refinement methodology for exploring ideas through structured divergent and convergent thinking phases
 stacks: []

@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: plan-executing
 description: Batch execution methodology for implementing plans with verification checkpoints after each task
 stacks: []

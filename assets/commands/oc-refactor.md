@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Analyze and refactor code for improved design and maintainability
 agent: coder
 ---

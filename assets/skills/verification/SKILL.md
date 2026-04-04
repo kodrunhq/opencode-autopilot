@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: verification
 description: Pre-completion verification checklist methodology to catch issues before marking work as done
 stacks: []

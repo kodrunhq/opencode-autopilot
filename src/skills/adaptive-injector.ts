@@ -145,8 +145,9 @@ export function filterSkillsByStack(
  */
 export function buildSkillSummary(skill: LoadedSkill): string {
 	const { name, description } = skill.frontmatter;
-	const desc = (description ?? "").slice(0, 200);
-	return `[Skill: ${name}]\n${desc}`;
+	const safeName = sanitizeTemplateContent(name);
+	const safeDesc = sanitizeTemplateContent((description ?? "").slice(0, 200));
+	return `[Skill: ${safeName}]\n${safeDesc}`;
 }
 
 /**

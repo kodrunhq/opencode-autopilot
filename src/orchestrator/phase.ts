@@ -1,7 +1,7 @@
 import type { Phase, PhaseStatus, PipelineState } from "./types";
 
 /** Maps each phase to its 1-based position for user-facing progress display. */
-export const PHASE_INDEX: Readonly<Record<string, number>> = Object.freeze({
+export const PHASE_INDEX: Readonly<Record<Phase, number>> = Object.freeze({
 	RECON: 1,
 	CHALLENGE: 2,
 	ARCHITECT: 3,
@@ -10,7 +10,7 @@ export const PHASE_INDEX: Readonly<Record<string, number>> = Object.freeze({
 	BUILD: 6,
 	SHIP: 7,
 	RETROSPECTIVE: 8,
-});
+} satisfies Record<Phase, number>);
 
 export const TOTAL_PHASES = 8;
 

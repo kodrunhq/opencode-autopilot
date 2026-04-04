@@ -152,7 +152,11 @@ async function hasInstallerMarker(filePath: string): Promise<boolean> {
 		const head = buf.toString("utf-8", 0, bytesRead);
 		return head.includes(INSTALLER_MARKER);
 	} finally {
-		await fh?.close();
+		try {
+			await fh?.close();
+		} catch {
+			/* ignore close errors to avoid masking the primary exception */
+		}
 	}
 }
 

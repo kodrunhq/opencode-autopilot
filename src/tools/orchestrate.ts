@@ -8,7 +8,7 @@ import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
 import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
 import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
 import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
-import type { Phase } from "../orchestrator/types";
+import type { Phase, PipelineState } from "../orchestrator/types";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
 import { getGlobalConfigDir, getProjectArtifactDir } from "../utils/paths";
@@ -24,10 +24,10 @@ interface OrchestrateArgs {
  * Returns the updated state.
  */
 async function applyStateUpdates(
-	state: Readonly<import("../orchestrator/types").PipelineState>,
+	state: Readonly<PipelineState>,
 	handlerResult: DispatchResult,
 	artifactDir: string,
-): Promise<import("../orchestrator/types").PipelineState> {
+): Promise<PipelineState> {
 	const updates = handlerResult._stateUpdates;
 	if (updates) {
 		const updated = patchState(state, updates);
@@ -141,30 +141,32 @@ const MAX_PHASE_DISPATCHES: Readonly<Record<string, number>> = Object.freeze({
 
 /**
  * Circuit breaker: increment per-phase dispatch count and abort if limit exceeded.
- * Returns an error string if the limit is exceeded, or null to proceed.
+ * Returns `{ abortMsg, newCount }`. When `abortMsg` is non-null the caller must
+ * return it immediately. `newCount` is the authoritative post-increment value.
  */
 async function checkCircuitBreaker(
-	currentState: Readonly<import("../orchestrator/types").PipelineState>,
+	currentState: Readonly<PipelineState>,
 	phase: string,
 	artifactDir: string,
-): Promise<string | null> {
+): Promise<{ readonly abortMsg: string | null; readonly newCount: number }> {
 	const counts = { ...(currentState.phaseDispatchCounts ?? {}) };
 	counts[phase] = (counts[phase] ?? 0) + 1;
+	const newCount = counts[phase];
 	const limit = MAX_PHASE_DISPATCHES[phase] ?? 5;
-	if (counts[phase] > limit) {
-		const msg = `Phase ${phase} exceeded max dispatches (${counts[phase]}/${limit}) — possible infinite loop detected. Aborting.`;
+	if (newCount > limit) {
+		const msg = `Phase ${phase} exceeded max dispatches (${newCount}/${limit}) — possible infinite loop detected. Aborting.`;
 		logOrchestrationEvent(artifactDir, {
 			timestamp: new Date().toISOString(),
 			phase,
 			action: "loop_detected",
-			attempt: counts[phase],
+			attempt: newCount,
 			message: msg,
 		});
-		return JSON.stringify({ action: "error", message: msg });
+		return { abortMsg: JSON.stringify({ action: "error", message: msg }), newCount };
 	}
 	const withCounts = patchState(currentState, { phaseDispatchCounts: counts });
 	await saveState(withCounts, artifactDir);
-	return null;
+	return { abortMsg: null, newCount };
 }
 
 /**
@@ -173,7 +175,7 @@ async function checkCircuitBreaker(
  */
 async function processHandlerResult(
 	handlerResult: DispatchResult,
-	state: Readonly<import("../orchestrator/types").PipelineState>,
+	state: Readonly<PipelineState>,
 	artifactDir: string,
 ): Promise<string> {
 	// Apply state updates from handler if present
@@ -192,23 +194,14 @@ async function processHandlerResult(
 		case "dispatch": {
 			// Circuit breaker
 			const phase = handlerResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
-			const abortMsg = await checkCircuitBreaker(currentState, phase, artifactDir);
+			const { abortMsg, newCount: attempt } = await checkCircuitBreaker(
+				currentState,
+				phase,
+				artifactDir,
+			);
 			if (abortMsg) return abortMsg;
 
-			// Check if this is a review dispatch that should be inlined
-			const { inlined, reviewResult } = await maybeInlineReview(handlerResult, artifactDir);
-			if (inlined && reviewResult) {
-				// Feed the review result back into the current phase handler
-				const reloadedState = await loadState(artifactDir);
-				if (reloadedState?.currentPhase) {
-					const handler = PHASE_HANDLERS[reloadedState.currentPhase];
-					const nextResult = await handler(reloadedState, artifactDir, reviewResult);
-					return processHandlerResult(nextResult, reloadedState, artifactDir);
-				}
-			}
-			// Log and inject lesson + skill context into dispatch prompt (best-effort)
-			// +1 because checkCircuitBreaker already incremented the saved count
-			const attempt = (currentState.phaseDispatchCounts?.[phase] ?? 0) + 1;
+			// Log the dispatch event before any inline-review or context injection
 			const progress = buildUserProgress(phase, handlerResult.progress, attempt);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
@@ -218,6 +211,24 @@ async function processHandlerResult(
 				promptLength: handlerResult.prompt?.length,
 				attempt,
 			});
+
+			// Check if this is a review dispatch that should be inlined
+			const { inlined, reviewResult } = await maybeInlineReview(handlerResult, artifactDir);
+			if (inlined && reviewResult) {
+				const reloadedState = await loadState(artifactDir);
+				if (reloadedState?.currentPhase) {
+					const handler = PHASE_HANDLERS[reloadedState.currentPhase];
+					const nextResult = await handler(reloadedState, artifactDir, reviewResult);
+					return processHandlerResult(nextResult, reloadedState, artifactDir);
+				}
+				// State unavailable or pipeline completed after inline review — return complete
+				return JSON.stringify({
+					action: "complete",
+					summary: "Inline review completed; no active phase.",
+					_userProgress: progress,
+				});
+			}
+			// Inject lesson + skill context into dispatch prompt (best-effort)
 			if (handlerResult.prompt && handlerResult.phase) {
 				const enrichedPrompt = await injectLessonContext(
 					handlerResult.prompt,
@@ -239,31 +250,30 @@ async function processHandlerResult(
 		case "dispatch_multi": {
 			// Circuit breaker
 			const phase = handlerResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
-			const abortMsg = await checkCircuitBreaker(currentState, phase, artifactDir);
+			const { abortMsg, newCount: attempt } = await checkCircuitBreaker(
+				currentState,
+				phase,
+				artifactDir,
+			);
 			if (abortMsg) return abortMsg;
 
-			const multiAttempt = (currentState.phaseDispatchCounts?.[phase] ?? 0) + 1;
-			const multiProgress = buildUserProgress(phase, handlerResult.progress, multiAttempt);
+			const progress = buildUserProgress(phase, handlerResult.progress, attempt);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
 				phase,
 				action: "dispatch_multi",
 				agent: `${handlerResult.agents?.length ?? 0} agents`,
-				attempt: multiAttempt,
+				attempt,
 			});
 
 			// Inject lesson + skill context into each agent's prompt (best-effort)
 			// Load lesson and skill context once and reuse for all agents in the batch
 			if (handlerResult.agents && handlerResult.phase) {
-				const lessonSuffix = await injectLessonContext(
-					"",
-					handlerResult.phase as string,
-					artifactDir,
-				);
+				const lessonSuffix = await injectLessonContext("", handlerResult.phase, artifactDir);
 				const skillSuffix = await injectSkillContext(
 					"",
 					join(artifactDir, ".."),
-					handlerResult.phase as string,
+					handlerResult.phase,
 				);
 				const combinedSuffix = lessonSuffix + (skillSuffix || "");
 				if (combinedSuffix) {
@@ -274,7 +284,7 @@ async function processHandlerResult(
 					return JSON.stringify({
 						...handlerResult,
 						agents: enrichedAgents,
-						_userProgress: multiProgress,
+						_userProgress: progress,
 					});
 				}
 			}
@@ -305,7 +315,7 @@ async function processHandlerResult(
 				const idx = PHASE_INDEX[currentState.currentPhase] ?? TOTAL_PHASES;
 				return JSON.stringify({
 					action: "complete",
-					summary: `Pipeline completed all 8 phases. Idea: ${currentState.idea}`,
+					summary: `Pipeline completed all ${TOTAL_PHASES} phases. Idea: ${currentState.idea}`,
 					_userProgress: `Completed ${currentState.currentPhase} (${idx}/${TOTAL_PHASES}), pipeline finished`,
 				});
 			}

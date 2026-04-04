@@ -130,6 +130,15 @@ export function createAntiSlopHandler(options: {
 		const lastScan = scanTimestamps.get(resolved);
 		if (lastScan !== undefined && now - lastScan < SCAN_DEBOUNCE_MS) return;
 
+		// Claim the slot before yielding the event loop to prevent TOCTOU races
+		scanTimestamps.set(resolved, now);
+		if (scanTimestamps.size > 10_000) {
+			const cutoff = now - SCAN_DEBOUNCE_MS;
+			for (const [path, ts] of scanTimestamps) {
+				if (ts < cutoff) scanTimestamps.delete(path);
+			}
+		}
+
 		const ext = extname(resolved).toLowerCase();
 
 		// Read the actual file content — output.output is the tool's result message, not file content
@@ -137,16 +146,8 @@ export function createAntiSlopHandler(options: {
 		try {
 			fileContent = await readFile(resolved, "utf-8");
 		} catch {
-			return; // file unreadable — best-effort, skip
-		}
-
-		// Record scan timestamp after successful read; prune stale entries to prevent memory growth
-		scanTimestamps.set(resolved, Date.now());
-		if (scanTimestamps.size > 10_000) {
-			const cutoff = Date.now() - SCAN_DEBOUNCE_MS;
-			for (const [path, ts] of scanTimestamps) {
-				if (ts < cutoff) scanTimestamps.delete(path);
-			}
+			scanTimestamps.delete(resolved); // clear slot so next attempt is not blocked
+			return;
 		}
 
 		const findings = scanForSlopComments(fileContent, ext);

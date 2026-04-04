@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 name: systematic-debugging
 description: 4-phase root cause analysis methodology for systematic bug diagnosis and resolution
 stacks: []

@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Start a brainstorming session with Socratic design refinement
 agent: researcher
 ---

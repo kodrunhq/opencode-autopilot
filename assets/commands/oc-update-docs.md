@@ -1,4 +1,5 @@
 ---
+# opencode-autopilot
 description: Detect documentation affected by recent code changes and suggest updates
 agent: documenter
 ---

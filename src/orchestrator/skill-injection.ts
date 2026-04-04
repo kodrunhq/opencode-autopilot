@@ -87,9 +87,9 @@ export async function loadAdaptiveSkillContext(
 
 		const matchingSkills = filterSkillsByStack(allSkills, projectTags);
 		return buildAdaptiveSkillContext(matchingSkills, options);
-	} catch {
-		// Best-effort: all errors return empty string. Caller (injectSkillContext)
-		// logs the error — no need to re-throw since the call site is also best-effort.
+	} catch (err) {
+		// Best-effort: all errors return empty string.
+		console.warn("[opencode-autopilot] adaptive skill load failed:", err);
 		return "";
 	}
 }
