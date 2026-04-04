@@ -19,6 +19,24 @@ const DEFAULT_TOKEN_BUDGET = 8000;
 const CHARS_PER_TOKEN = 4;
 
 /**
+ * Maps pipeline phases to the skill names relevant for that phase.
+ * Skills not in the list for the current phase are excluded from injection,
+ * preventing the full 13-19KB per-skill content from bloating every dispatch.
+ */
+export const PHASE_SKILL_MAP: Readonly<Record<string, readonly string[]>> = Object.freeze({
+	RECON: ["plan-writing"],
+	CHALLENGE: ["plan-writing"],
+	ARCHITECT: ["plan-writing"],
+	PLAN: ["plan-writing", "plan-executing"],
+	BUILD: ["coding-standards", "tdd-workflow"],
+	SHIP: ["plan-executing"],
+	RETROSPECTIVE: [],
+	EXPLORE: [],
+});
+
+export type SkillMode = "summary" | "full";
+
+/**
  * Manifest files that indicate project stack.
  * Checks project root for these files to detect the stack.
  */
@@ -122,13 +140,38 @@ export function filterSkillsByStack(
 }
 
 /**
+ * Build a compact summary for a single skill: frontmatter name + description
+ * (max 200 chars). Used in summary mode to avoid injecting full skill content.
+ */
+export function buildSkillSummary(skill: LoadedSkill): string {
+	const { name, description } = skill.frontmatter;
+	const desc = (description ?? "").slice(0, 200);
+	return `[Skill: ${name}]\n${desc}`;
+}
+
+/**
+ * In full mode, truncate skill content at the first `## ` heading boundary
+ * that exceeds the per-skill character budget. Preserves structure instead
+ * of collapsing all newlines.
+ */
+function truncateAtSectionBoundary(content: string, maxChars: number): string {
+	if (content.length <= maxChars) return content;
+	const cutPoint = content.lastIndexOf("\n## ", maxChars);
+	if (cutPoint > 0) return content.slice(0, cutPoint);
+	return content.slice(0, maxChars);
+}
+
+/**
  * Build multi-skill context string with dependency ordering and token budget.
  * Skills are ordered by dependency (prerequisites first), then concatenated
  * until the token budget is exhausted.
+ *
+ * @param mode - "summary" emits only name + description (compact); "full" preserves structure
  */
 export function buildMultiSkillContext(
 	skills: ReadonlyMap<string, LoadedSkill>,
 	tokenBudget: number = DEFAULT_TOKEN_BUDGET,
+	mode: SkillMode = "summary",
 ): string {
 	if (skills.size === 0) return "";
 
@@ -151,17 +194,64 @@ export function buildMultiSkillContext(
 		const skill = skills.get(name);
 		if (!skill) continue;
 
-		const collapsed = skill.content.replace(/[\r\n]+/g, " ");
-		const header = `[Skill: ${name}]\n`;
+		let section: string;
+		if (mode === "summary") {
+			section = buildSkillSummary(skill);
+		} else {
+			// Full mode: preserve structure, truncate at section boundaries
+			const header = `[Skill: ${name}]\n`;
+			const perSkillBudget = Math.max(charBudget - totalChars - header.length, 0);
+			const truncated = truncateAtSectionBoundary(skill.content, perSkillBudget);
+			const sanitized = sanitizeTemplateContent(truncated);
+			section = `${header}${sanitized}`;
+		}
+
 		const separator = sections.length > 0 ? 2 : 0; // "\n\n"
-		const sectionCost = collapsed.length + header.length + separator;
+		const sectionCost = section.length + separator;
 		if (totalChars + sectionCost > charBudget) break;
 
-		const sanitized = sanitizeTemplateContent(collapsed);
-		sections.push(`${header}${sanitized}`);
+		sections.push(section);
 		totalChars += sectionCost;
 	}
 
 	if (sections.length === 0) return "";
 	return `\n\nSkills context (follow these conventions and methodologies):\n${sections.join("\n\n")}`;
+}
+
+/**
+ * Build adaptive skill context with optional phase filtering.
+ *
+ * When `phase` is provided, only skills listed in PHASE_SKILL_MAP for that
+ * phase are included (pipeline dispatch path). When omitted, all stack-filtered
+ * skills are included (direct chat injection path).
+ */
+export function buildAdaptiveSkillContext(
+	skills: ReadonlyMap<string, LoadedSkill>,
+	options?: {
+		readonly phase?: string;
+		readonly budget?: number;
+		readonly mode?: SkillMode;
+	},
+): string {
+	const phase = options?.phase;
+	const budget = options?.budget ?? DEFAULT_TOKEN_BUDGET;
+	const mode = options?.mode ?? "summary";
+
+	if (phase !== undefined) {
+		const allowedNames = PHASE_SKILL_MAP[phase] ?? [];
+		if (allowedNames.length === 0) return "";
+
+		const allowedSet = new Set(allowedNames);
+		const filtered = new Map<string, LoadedSkill>();
+		for (const [name, skill] of skills) {
+			if (allowedSet.has(name)) {
+				filtered.set(name, skill);
+			}
+		}
+
+		return buildMultiSkillContext(filtered, budget, mode);
+	}
+
+	// No phase -- include all provided skills (caller already stack-filtered)
+	return buildMultiSkillContext(skills, budget, mode);
 }

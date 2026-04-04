@@ -4,7 +4,8 @@ import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
 import type { DispatchResult } from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
-import { completePhase, getNextPhase } from "../orchestrator/phase";
+import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
+import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
 import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
 import { createInitialState, loadState, patchState, saveState } from "../orchestrator/state";
 import type { Phase } from "../orchestrator/types";
@@ -99,15 +100,31 @@ async function injectLessonContext(
  * Attempt to inject stack-filtered adaptive skill context into a dispatch prompt.
  * Best-effort: failures are silently swallowed to avoid breaking dispatch.
  */
-async function injectSkillContext(prompt: string, projectRoot?: string): Promise<string> {
+async function injectSkillContext(
+	prompt: string,
+	projectRoot?: string,
+	phase?: string,
+): Promise<string> {
 	try {
 		const baseDir = getGlobalConfigDir();
-		const ctx = await loadAdaptiveSkillContext(baseDir, projectRoot ?? process.cwd());
+		const ctx = await loadAdaptiveSkillContext(baseDir, projectRoot ?? process.cwd(), {
+			phase,
+			budget: 1500,
+			mode: "summary",
+		});
 		if (ctx) return prompt + ctx;
 	} catch (err) {
 		console.warn("[opencode-autopilot] skill injection failed:", err);
 	}
 	return prompt;
+}
+
+/** Build a human-readable progress string for user-facing display. */
+function buildUserProgress(phase: string, label?: string, attempt?: number): string {
+	const idx = PHASE_INDEX[phase] ?? 0;
+	const desc = label ?? "dispatching";
+	const att = attempt != null ? ` (attempt ${attempt})` : "";
+	return `Phase ${idx}/${TOTAL_PHASES}: ${phase} — ${desc}${att}`;
 }
 
 /** Per-phase dispatch limits. BUILD is high because of multi-task waves. */
@@ -135,10 +152,15 @@ async function checkCircuitBreaker(
 	counts[phase] = (counts[phase] ?? 0) + 1;
 	const limit = MAX_PHASE_DISPATCHES[phase] ?? 5;
 	if (counts[phase] > limit) {
-		return JSON.stringify({
-			action: "error",
-			message: `Phase ${phase} exceeded max dispatches (${counts[phase]}/${limit}) — possible infinite loop detected. Aborting.`,
+		const msg = `Phase ${phase} exceeded max dispatches (${counts[phase]}/${limit}) — possible infinite loop detected. Aborting.`;
+		logOrchestrationEvent(artifactDir, {
+			timestamp: new Date().toISOString(),
+			phase,
+			action: "loop_detected",
+			attempt: counts[phase],
+			message: msg,
 		});
+		return JSON.stringify({ action: "error", message: msg });
 	}
 	const withCounts = patchState(currentState, { phaseDispatchCounts: counts });
 	await saveState(withCounts, artifactDir);
@@ -159,6 +181,12 @@ async function processHandlerResult(
 
 	switch (handlerResult.action) {
 		case "error":
+			logOrchestrationEvent(artifactDir, {
+				timestamp: new Date().toISOString(),
+				phase: handlerResult.phase ?? currentState.currentPhase ?? "UNKNOWN",
+				action: "error",
+				message: handlerResult.message?.slice(0, 500),
+			});
 			return JSON.stringify(handlerResult);
 
 		case "dispatch": {
@@ -178,19 +206,33 @@ async function processHandlerResult(
 					return processHandlerResult(nextResult, reloadedState, artifactDir);
 				}
 			}
-			// Inject lesson + skill context into dispatch prompt (best-effort)
+			// Log and inject lesson + skill context into dispatch prompt (best-effort)
+			const attempt = currentState.phaseDispatchCounts?.[phase] ?? 1;
+			const progress = buildUserProgress(phase, handlerResult.progress, attempt);
+			logOrchestrationEvent(artifactDir, {
+				timestamp: new Date().toISOString(),
+				phase,
+				action: "dispatch",
+				agent: handlerResult.agent,
+				promptLength: handlerResult.prompt?.length,
+				attempt,
+			});
 			if (handlerResult.prompt && handlerResult.phase) {
 				const enrichedPrompt = await injectLessonContext(
 					handlerResult.prompt,
 					handlerResult.phase,
 					artifactDir,
 				);
-				const withSkills = await injectSkillContext(enrichedPrompt, join(artifactDir, ".."));
+				const withSkills = await injectSkillContext(
+					enrichedPrompt,
+					join(artifactDir, ".."),
+					handlerResult.phase,
+				);
 				if (withSkills !== handlerResult.prompt) {
-					return JSON.stringify({ ...handlerResult, prompt: withSkills });
+					return JSON.stringify({ ...handlerResult, prompt: withSkills, _userProgress: progress });
 				}
 			}
-			return JSON.stringify(handlerResult);
+			return JSON.stringify({ ...handlerResult, _userProgress: progress });
 		}
 
 		case "dispatch_multi": {
@@ -198,6 +240,16 @@ async function processHandlerResult(
 			const phase = handlerResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
 			const abortMsg = await checkCircuitBreaker(currentState, phase, artifactDir);
 			if (abortMsg) return abortMsg;
+
+			const multiAttempt = currentState.phaseDispatchCounts?.[phase] ?? 1;
+			const multiProgress = buildUserProgress(phase, handlerResult.progress, multiAttempt);
+			logOrchestrationEvent(artifactDir, {
+				timestamp: new Date().toISOString(),
+				phase,
+				action: "dispatch_multi",
+				agent: `${handlerResult.agents?.length ?? 0} agents`,
+				attempt: multiAttempt,
+			});
 
 			// Inject lesson + skill context into each agent's prompt (best-effort)
 			// Load lesson and skill context once and reuse for all agents in the batch
@@ -207,17 +259,25 @@ async function processHandlerResult(
 					handlerResult.phase as string,
 					artifactDir,
 				);
-				const skillSuffix = await injectSkillContext("", join(artifactDir, ".."));
+				const skillSuffix = await injectSkillContext(
+					"",
+					join(artifactDir, ".."),
+					handlerResult.phase as string,
+				);
 				const combinedSuffix = lessonSuffix + (skillSuffix || "");
 				if (combinedSuffix) {
 					const enrichedAgents = handlerResult.agents.map((entry) => ({
 						...entry,
 						prompt: entry.prompt + combinedSuffix,
 					}));
-					return JSON.stringify({ ...handlerResult, agents: enrichedAgents });
+					return JSON.stringify({
+						...handlerResult,
+						agents: enrichedAgents,
+						_userProgress: multiProgress,
+					});
 				}
 			}
-			return JSON.stringify(handlerResult);
+			return JSON.stringify({ ...handlerResult, _userProgress: multiProgress });
 		}
 
 		case "complete": {
@@ -228,6 +288,11 @@ async function processHandlerResult(
 				});
 			}
 
+			logOrchestrationEvent(artifactDir, {
+				timestamp: new Date().toISOString(),
+				phase: currentState.currentPhase,
+				action: "complete",
+			});
 			const nextPhase = getNextPhase(currentState.currentPhase);
 			const advanced = completePhase(currentState);
 			await saveState(advanced, artifactDir);
@@ -236,9 +301,11 @@ async function processHandlerResult(
 				// Terminal phase completed
 				const finished = { ...advanced, status: "COMPLETED" as const };
 				await saveState(finished, artifactDir);
+				const idx = PHASE_INDEX[currentState.currentPhase] ?? TOTAL_PHASES;
 				return JSON.stringify({
 					action: "complete",
 					summary: `Pipeline completed all 8 phases. Idea: ${currentState.idea}`,
+					_userProgress: `Completed ${currentState.currentPhase} (${idx}/${TOTAL_PHASES}), pipeline finished`,
 				});
 			}
 
