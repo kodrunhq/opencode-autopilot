@@ -414,6 +414,10 @@ export function loadLessonMemoryFromKernel(artifactDir: string): LessonMemory | 
 			}
 		}
 
+		if (!tableExists(db, "project_lesson_memory")) {
+			return parseLessonRows([]);
+		}
+
 		const row = db
 			.query("SELECT * FROM project_lesson_memory WHERE project_id = ?")
 			.get(projectId) as ProjectLessonMemoryRow | null;

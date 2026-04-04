@@ -51,17 +51,21 @@ async function detectContractHealth(projectRoot?: string): Promise<ContractHealt
 				}
 			})
 			.filter((entry): entry is Record<string, unknown> => entry !== null);
-		return {
-			legacyTasksFallbackSeen: entries.some(
+		const legacyTasksFallbackSeen =
+			entries.some(
 				(entry) =>
 					typeof entry.message === "string" &&
 					entry.message.includes("PLAN fallback: parsed legacy tasks.md"),
-			),
-			legacyResultParserSeen: entries.some(
+			) || content.includes("PLAN fallback: parsed legacy tasks.md");
+		const legacyResultParserSeen =
+			entries.some(
 				(entry) =>
 					typeof entry.message === "string" &&
 					entry.message.includes("Legacy result parser path used"),
-			),
+			) || content.includes("Legacy result parser path used");
+		return {
+			legacyTasksFallbackSeen,
+			legacyResultParserSeen,
 		};
 	} catch {
 		return {

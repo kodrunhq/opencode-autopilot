@@ -5,7 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initMemoryDb } from "../../src/memory/database";
 import { upsertProjectGitFingerprint, upsertProjectRecord } from "../../src/projects/repository";
-import { resolveProjectIdentity, resolveProjectIdentitySync } from "../../src/projects/resolve";
+import {
+	normalizeGitRemoteUrl,
+	resolveProjectIdentity,
+	resolveProjectIdentitySync,
+} from "../../src/projects/resolve";
 
 describe("resolveProjectIdentity", () => {
 	let db: Database;
@@ -168,5 +172,14 @@ describe("resolveProjectIdentity", () => {
 			readonlyDb.close();
 			await rm(dbPath, { force: true });
 		}
+	});
+
+	test("normalizes URL and SCP remotes to the same fingerprint", () => {
+		expect(normalizeGitRemoteUrl("git@github.com:Example/Repo.git")).toBe(
+			"github.com/Example/Repo",
+		);
+		expect(normalizeGitRemoteUrl("https://github.com/Example/Repo.git")).toBe(
+			"github.com/Example/Repo",
+		);
 	});
 });

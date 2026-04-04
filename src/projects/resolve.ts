@@ -31,9 +31,9 @@ export function normalizeGitRemoteUrl(remoteUrl: string): string | null {
 
 	const scpMatch = trimmed.match(/^([^@\s]+)@([^:\s]+):(.+)$/);
 	if (scpMatch) {
-		const [, user, host, path] = scpMatch;
+		const [, _user, host, path] = scpMatch;
 		const normalizedPath = path.replace(/\.git$/i, "").replace(/^\/+/, "");
-		return `${user.toLowerCase()}@${host.toLowerCase()}/${normalizedPath}`;
+		return `${host.toLowerCase()}/${normalizedPath}`;
 	}
 
 	try {
@@ -42,9 +42,10 @@ export function normalizeGitRemoteUrl(remoteUrl: string): string | null {
 		if (normalizedPath.length === 0) {
 			return null;
 		}
-		return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}/${normalizedPath}`;
+		return `${parsed.host.toLowerCase()}/${normalizedPath}`;
 	} catch {
-		return trimmed.replace(/\.git$/i, "");
+		const normalized = trimmed.replace(/\.git$/i, "").replace(/^\/+/, "");
+		return normalized.length > 0 ? normalized : null;
 	}
 }
 
