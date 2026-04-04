@@ -254,6 +254,137 @@ describe("orchestrateCore pipeline dispatch", () => {
 		expect(parsed.message).toContain("exceeded max dispatches");
 		expect(parsed.message).toContain("RECON");
 	});
+
+	test("_userProgress contains phase number and name for RECON dispatch", async () => {
+		const { orchestrateCore } = await import("../src/tools/orchestrate");
+		const result = await orchestrateCore({ idea: "build a chat app" }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed._userProgress).toBeDefined();
+		expect(parsed._userProgress).toContain("Phase 1/8");
+		expect(parsed._userProgress).toContain("RECON");
+	});
+
+	test("_userProgress contains Completed and 8/8 for terminal phase", async () => {
+		const { orchestrateCore } = await import("../src/tools/orchestrate");
+		const state = createInitialState("test idea");
+		const retroState = {
+			...state,
+			currentPhase: "RETROSPECTIVE" as Phase,
+			phases: state.phases.map((p) =>
+				p.name === "RETROSPECTIVE"
+					? { ...p, status: "IN_PROGRESS" as const }
+					: { ...p, status: "DONE" as const },
+			),
+		};
+		await saveState(retroState, tempDir);
+
+		const result = await orchestrateCore({ result: "retro done" }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed._userProgress).toBeDefined();
+		expect(parsed._userProgress).toContain("Completed");
+		expect(parsed._userProgress).toContain("8/8");
+	});
+
+	test("_userProgress contains Phase and phase name for dispatch_multi", async () => {
+		const { orchestrateCore } = await import("../src/tools/orchestrate");
+		const state = createInitialState("test idea");
+		const buildState = {
+			...state,
+			currentPhase: "BUILD" as Phase,
+			tasks: [
+				{
+					id: 1,
+					title: "Task A",
+					status: "PENDING" as const,
+					wave: 1,
+					depends_on: [],
+					attempt: 0,
+					strike: 0,
+				},
+				{
+					id: 2,
+					title: "Task B",
+					status: "PENDING" as const,
+					wave: 1,
+					depends_on: [],
+					attempt: 0,
+					strike: 0,
+				},
+			],
+			buildProgress: {
+				currentTask: null,
+				currentWave: null,
+				attemptCount: 0,
+				strikeCount: 0,
+				reviewPending: false,
+			},
+			phases: state.phases.map((p) =>
+				["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN"].includes(p.name)
+					? { ...p, status: "DONE" as const }
+					: p.name === "BUILD"
+						? { ...p, status: "IN_PROGRESS" as const }
+						: p,
+			),
+		};
+		await saveState(buildState, tempDir);
+
+		const result = await orchestrateCore({}, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed._userProgress).toBeDefined();
+		expect(parsed._userProgress).toContain("Phase");
+		expect(parsed._userProgress).toContain("BUILD");
+	});
+
+	test("JSONL logging side-effect: orchestration.jsonl contains dispatch event", async () => {
+		const { orchestrateCore } = await import("../src/tools/orchestrate");
+		await orchestrateCore({ idea: "build a chat app" }, tempDir);
+
+		const logPath = join(tempDir, "orchestration.jsonl");
+		const content = await readFile(logPath, "utf-8");
+		const lines = content.trim().split("\n").filter(Boolean);
+		expect(lines.length).toBeGreaterThanOrEqual(1);
+
+		const hasDispatch = lines.some((line) => {
+			const entry = JSON.parse(line);
+			return entry.action === "dispatch" && entry.phase === "RECON";
+		});
+		expect(hasDispatch).toBe(true);
+	});
+
+	test("circuit breaker dispatch_multi path returns error at limit", async () => {
+		const { orchestrateCore } = await import("../src/tools/orchestrate");
+		const state = createInitialState("test idea");
+		// ARCHITECT with MEDIUM confidence triggers dispatch_multi (depth=2).
+		// Pre-set dispatch count to the ARCHITECT limit (10) so next dispatch is blocked.
+		const archState = {
+			...state,
+			currentPhase: "ARCHITECT" as Phase,
+			confidence: [
+				{
+					timestamp: new Date().toISOString(),
+					phase: "RECON",
+					agent: "oc-researcher",
+					area: "feasibility",
+					level: "MEDIUM" as const,
+					rationale: "some uncertainty",
+				},
+			],
+			phaseDispatchCounts: { ARCHITECT: 10 },
+			phases: state.phases.map((p) =>
+				["RECON", "CHALLENGE"].includes(p.name)
+					? { ...p, status: "DONE" as const }
+					: p.name === "ARCHITECT"
+						? { ...p, status: "IN_PROGRESS" as const }
+						: p,
+			),
+		};
+		await saveState(archState, tempDir);
+
+		const result = await orchestrateCore({}, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.message).toContain("exceeded max dispatches");
+	});
 });
 
 // ---- configHook pipeline agent registration tests ----

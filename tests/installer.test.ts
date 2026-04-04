@@ -183,4 +183,31 @@ describe("installAssets", () => {
 		// Restore permissions for cleanup
 		await chmod(agentPath, 0o644);
 	});
+
+	test("hasInstallerMarker deletes deprecated asset when marker is within 200 bytes", async () => {
+		// "opencode-autopilot" is 18 bytes. Place it starting at byte 180 so it
+		// ends at byte 198, well within the 200-byte read window.
+		await mkdir(join(targetDir, "commands"), { recursive: true });
+		const padding = " ".repeat(180);
+		const content = padding + "opencode-autopilot\nold content after marker";
+		await writeFile(join(targetDir, "commands", "brainstorm.md"), content);
+
+		await installAssets(sourceDir, targetDir);
+
+		expect(await fileExists(join(targetDir, "commands", "brainstorm.md"))).toBe(false);
+	});
+
+	test("hasInstallerMarker preserves deprecated asset when marker is beyond 200 bytes", async () => {
+		// Pad with 201 bytes of spaces so "opencode-autopilot" starts at byte 201,
+		// outside the 200-byte read window. The marker should NOT be detected.
+		await mkdir(join(targetDir, "commands"), { recursive: true });
+		const padding = " ".repeat(201);
+		const content = padding + "opencode-autopilot\nold content after marker";
+		await writeFile(join(targetDir, "commands", "brainstorm.md"), content);
+
+		await installAssets(sourceDir, targetDir);
+
+		// File should still exist because the marker was not found in the first 200 bytes
+		expect(await fileExists(join(targetDir, "commands", "brainstorm.md"))).toBe(true);
+	});
 });

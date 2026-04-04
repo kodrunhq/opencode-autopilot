@@ -200,4 +200,37 @@ describe("createAntiSlopHandler", () => {
 
 		expect(showToast).not.toHaveBeenCalled();
 	});
+
+	it("debounces: second call within window does not fire toast again", async () => {
+		const showToast = mock((_t: string, _m: string, _v: "info" | "warning" | "error") =>
+			Promise.resolve(),
+		);
+		const handler = createAntiSlopHandler({ showToast });
+		const tsPath = join(tempDir, "debounce.ts");
+		await writeFile(
+			tsPath,
+			"// This function handles the logic\n// This elegantly solves it\nconst x = 1;",
+		);
+
+		const hookInput = {
+			tool: "write_file" as const,
+			sessionID: "s1",
+			callID: "c1",
+			args: { file_path: tsPath },
+		};
+		const hookOutput = { title: "", output: "done", metadata: {} };
+
+		// First call should fire
+		await handler(hookInput, hookOutput);
+		expect(showToast).toHaveBeenCalledTimes(1);
+
+		// Second call within debounce window should be skipped
+		await handler(hookInput, hookOutput);
+		expect(showToast).toHaveBeenCalledTimes(1);
+
+		// After clearing timestamps, the next call should fire again
+		clearScanTimestamps();
+		await handler(hookInput, hookOutput);
+		expect(showToast).toHaveBeenCalledTimes(2);
+	});
 });

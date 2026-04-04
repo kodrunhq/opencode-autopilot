@@ -1,7 +1,11 @@
-import { describe, expect, it } from "bun:test";
+import { Database } from "bun:sqlite";
+import { afterEach, describe, expect, it } from "bun:test";
 import { CHARS_PER_TOKEN } from "../../src/memory/constants";
+import { initMemoryDb } from "../../src/memory/database";
+import { insertObservation, upsertProject } from "../../src/memory/repository";
 import {
 	buildMemoryContext,
+	retrieveMemoryContext,
 	type ScoredObservation,
 	scoreAndRankObservations,
 } from "../../src/memory/retrieval";
@@ -236,5 +240,53 @@ describe("ScoredObservation type", () => {
 		expect(scored.content).toBeDefined();
 		expect(scored.summary).toBeDefined();
 		expect(scored.relevanceScore).toBeDefined();
+	});
+});
+
+describe("retrieveMemoryContext access-count integration", () => {
+	let db: Database;
+
+	afterEach(() => {
+		try {
+			db.close();
+		} catch {
+			// already closed
+		}
+	});
+
+	it("increments access_count for retrieved observations", () => {
+		db = new Database(":memory:");
+		initMemoryDb(db);
+
+		const testPath = "/tmp/test-project-access-count";
+		const projectId = "proj-access-test";
+		const now = new Date().toISOString();
+
+		upsertProject({ id: projectId, path: testPath, name: "access-test", lastUpdated: now }, db);
+
+		insertObservation(
+			{
+				projectId,
+				sessionId: "sess-1",
+				type: "decision",
+				content: "Use repository pattern",
+				summary: "Repository pattern adopted",
+				confidence: 0.8,
+				accessCount: 0,
+				createdAt: now,
+				lastAccessed: now,
+			},
+			db,
+		);
+
+		// Retrieve context — this should increment access_count
+		const ctx = retrieveMemoryContext(testPath, 2000, db);
+		expect(ctx).toContain("Repository pattern adopted");
+
+		// Verify access_count was incremented
+		const row = db
+			.query("SELECT access_count FROM observations WHERE project_id = ?")
+			.get(projectId) as { access_count: number };
+		expect(row.access_count).toBeGreaterThanOrEqual(1);
 	});
 });
