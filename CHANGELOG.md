@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.15.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.14.1...opencode-autopilot-v1.15.0) (2026-04-04)
+
+
+### Features
+
+* harden pipeline with deterministic dispatch contracts ([cce6ed8](https://github.com/kodrunhq/opencode-autopilot/commit/cce6ed8dfb9b404e180009a46705ba2136379c15))
+
+
+### Bug Fixes
+
+* address copilot review on deterministic logging and plan fallback ([0e35a53](https://github.com/kodrunhq/opencode-autopilot/commit/0e35a535f766c31b9a1d098d93b2288f8f78b6e9))
+
 ## [1.14.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.14.0...opencode-autopilot-v1.14.1) (2026-04-04)
 
 
