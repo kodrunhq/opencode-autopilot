@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { commandHealthCheck, memoryHealthCheck, skillHealthCheck } from "../../src/health/checks";
+import {
+	commandHealthCheck,
+	memoryHealthCheck,
+	nativeAgentSuppressionHealthCheck,
+	skillHealthCheck,
+} from "../../src/health/checks";
 
 // ---------------------------------------------------------------------------
 // skillHealthCheck
@@ -180,5 +185,74 @@ Content`,
 		expect(Object.isFrozen(result)).toBe(true);
 
 		await rm(tempDir, { recursive: true, force: true });
+	});
+});
+
+// ---------------------------------------------------------------------------
+// nativeAgentSuppressionHealthCheck
+// ---------------------------------------------------------------------------
+describe("nativeAgentSuppressionHealthCheck", () => {
+	test("returns fail when OpenCode config is missing", async () => {
+		const result = await nativeAgentSuppressionHealthCheck(null);
+		expect(result.status).toBe("fail");
+		expect(result.name).toBe("native-agent-suppression");
+		expect(result.message).toContain("No OpenCode config");
+	});
+
+	test("returns fail when native plan/build suppression is missing", async () => {
+		const result = await nativeAgentSuppressionHealthCheck({
+			agent: {
+				plan: { mode: "all" },
+				build: { mode: "all" },
+			},
+		} as unknown as import("@opencode-ai/plugin").Config);
+
+		expect(result.status).toBe("fail");
+		expect(result.name).toBe("native-agent-suppression");
+		expect(result.details).toBeDefined();
+		expect(result.details?.length).toBeGreaterThan(0);
+	});
+
+	test("returns pass when plan/build are disabled and hidden as subagents", async () => {
+		const result = await nativeAgentSuppressionHealthCheck({
+			agent: {
+				plan: { disable: true, mode: "subagent", hidden: true },
+				build: { disable: true, mode: "subagent", hidden: true },
+			},
+		} as unknown as import("@opencode-ai/plugin").Config);
+
+		expect(result.status).toBe("pass");
+		expect(result.name).toBe("native-agent-suppression");
+		expect(result.message).toContain("suppressed");
+	});
+
+	test("returns fail when optional uppercase variants exist but are not suppressed", async () => {
+		const result = await nativeAgentSuppressionHealthCheck({
+			agent: {
+				plan: { disable: true, mode: "subagent", hidden: true },
+				build: { disable: true, mode: "subagent", hidden: true },
+				Plan: { mode: "all" },
+				Build: { mode: "all" },
+				Planner: { mode: "all" },
+				Builder: { mode: "all" },
+			},
+		} as unknown as import("@opencode-ai/plugin").Config);
+
+		expect(result.status).toBe("fail");
+		expect(result.details).toBeDefined();
+		expect(result.details).toContain("Plan: disable must be true");
+		expect(result.details).toContain("Build: disable must be true");
+		expect(result.details).toContain("Planner: disable must be true");
+		expect(result.details).toContain("Builder: disable must be true");
+	});
+
+	test("returns frozen result", async () => {
+		const result = await nativeAgentSuppressionHealthCheck({
+			agent: {
+				plan: { disable: true, mode: "subagent", hidden: true },
+				build: { disable: true, mode: "subagent", hidden: true },
+			},
+		} as unknown as import("@opencode-ai/plugin").Config);
+		expect(Object.isFrozen(result)).toBe(true);
 	});
 });

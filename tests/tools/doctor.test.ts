@@ -2,7 +2,25 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { doctorCore } from "../../src/tools/doctor";
+import type { ToolContext } from "@opencode-ai/plugin";
+import {
+	doctorCore,
+	ocDoctor,
+	setOpenCodeConfig as setDoctorOpenCodeConfig,
+} from "../../src/tools/doctor";
+
+function createToolContext(directory: string): ToolContext {
+	return {
+		sessionID: "ses-test",
+		messageID: "msg-test",
+		agent: "tester",
+		directory,
+		worktree: directory,
+		abort: new AbortController().signal,
+		metadata(_input: Parameters<ToolContext["metadata"]>[0]) {},
+		ask: async (_input: Parameters<ToolContext["ask"]>[0]) => {},
+	};
+}
 
 describe("doctorCore", () => {
 	test("returns allPassed true when plugin is healthy", async () => {
@@ -36,6 +54,8 @@ describe("doctorCore", () => {
 		// Simulate all 15 agents injected
 		const agentMap: Record<string, unknown> = {};
 		for (const name of [
+			"plan",
+			"build",
 			"researcher",
 			"metaprompter",
 			"documenter",
@@ -54,6 +74,8 @@ describe("doctorCore", () => {
 		]) {
 			agentMap[name] = { systemPrompt: "test" };
 		}
+		agentMap.plan = { disable: true, mode: "subagent", hidden: true };
+		agentMap.build = { disable: true, mode: "subagent", hidden: true };
 
 		// Create expected command files for commandHealthCheck
 		const commandsDir = join(tempDir, "commands");
@@ -103,8 +125,33 @@ describe("doctorCore", () => {
 		for (const check of result.checks) {
 			expect(check.status).toBe("pass");
 		}
+		const suppressionCheck = result.checks.find(
+			(c: { name: string }) => c.name === "native-agent-suppression",
+		);
+		expect(suppressionCheck).toBeDefined();
+		expect(suppressionCheck.status).toBe("pass");
 
 		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("reports native-agent-suppression failure with fix suggestion", async () => {
+		const result = JSON.parse(
+			await doctorCore({
+				configPath: "/nonexistent/path/config.json",
+				openCodeConfig: {
+					agent: { plan: { mode: "all" }, build: { mode: "all" } },
+				} as unknown as import("@opencode-ai/plugin").Config,
+				targetDir: "/nonexistent/target",
+			}),
+		);
+
+		const suppressionCheck = result.checks.find(
+			(c: { name: string }) => c.name === "native-agent-suppression",
+		);
+		expect(suppressionCheck).toBeDefined();
+		expect(suppressionCheck.status).toBe("fail");
+		expect(typeof suppressionCheck.fixSuggestion).toBe("string");
+		expect(suppressionCheck.fixSuggestion).toContain("Restart OpenCode");
 	});
 
 	test("returns allPassed false when config check fails", async () => {
@@ -149,6 +196,29 @@ describe("doctorCore", () => {
 		}
 	});
 
+	test("includes exactly 8 checks with expected names", async () => {
+		const result = JSON.parse(
+			await doctorCore({
+				configPath: "/nonexistent/path/config.json",
+				openCodeConfig: null,
+				targetDir: "/nonexistent/target",
+			}),
+		);
+
+		const checkNames = result.checks.map((c: { name: string }) => c.name);
+		expect(result.checks.length).toBe(8);
+		expect(checkNames).toEqual([
+			"config-validity",
+			"agent-injection",
+			"native-agent-suppression",
+			"asset-directories",
+			"skill-loading",
+			"memory-db",
+			"command-accessibility",
+			"hook-registration",
+		]);
+	});
+
 	test("includes hook-registration check that verifies plugin is loaded", async () => {
 		const result = JSON.parse(
 			await doctorCore({
@@ -187,10 +257,10 @@ describe("doctorCore", () => {
 		await mkdir(join(tempDir, ".opencode-autopilot"), { recursive: true });
 		await writeFile(
 			join(tempDir, ".opencode-autopilot", "orchestration.jsonl"),
-			[
+			`${[
 				"[opencode-autopilot] PLAN fallback: parsed legacy tasks.md (tasks.json missing)",
 				"[opencode-autopilot] Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 			"utf-8",
 		);
 
@@ -198,6 +268,58 @@ describe("doctorCore", () => {
 		expect(result.contractHealth.legacyTasksFallbackSeen).toBe(true);
 		expect(result.contractHealth.legacyResultParserSeen).toBe(true);
 
+		await rm(tempDir, { recursive: true, force: true });
+	});
+});
+
+describe("ocDoctor tool wrapper", () => {
+	test("uses injected OpenCode config for native-agent-suppression check", async () => {
+		setDoctorOpenCodeConfig({
+			agent: {
+				plan: { disable: true, mode: "subagent", hidden: true },
+				build: { disable: true, mode: "subagent", hidden: true },
+			},
+		} as unknown as import("@opencode-ai/plugin").Config);
+
+		const tempDir = join(tmpdir(), `doctor-wrapper-config-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+
+		const result = JSON.parse(await ocDoctor.execute({}, createToolContext(tempDir)));
+		const suppressionCheck = result.checks.find(
+			(c: { name: string }) => c.name === "native-agent-suppression",
+		);
+
+		expect(suppressionCheck).toBeDefined();
+		expect(suppressionCheck.status).toBe("pass");
+
+		setDoctorOpenCodeConfig(null);
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("uses tool context directory as projectRoot for contract health detection", async () => {
+		setDoctorOpenCodeConfig({
+			agent: {
+				plan: { disable: true, mode: "subagent", hidden: true },
+				build: { disable: true, mode: "subagent", hidden: true },
+			},
+		} as unknown as import("@opencode-ai/plugin").Config);
+
+		const tempDir = join(tmpdir(), `doctor-wrapper-contract-${Date.now()}`);
+		await mkdir(join(tempDir, ".opencode-autopilot"), { recursive: true });
+		await writeFile(
+			join(tempDir, ".opencode-autopilot", "orchestration.jsonl"),
+			`${[
+				"[opencode-autopilot] PLAN fallback: parsed legacy tasks.md (tasks.json missing)",
+				"[opencode-autopilot] Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
+			].join("\n")}\n`,
+			"utf-8",
+		);
+
+		const result = JSON.parse(await ocDoctor.execute({}, createToolContext(tempDir)));
+		expect(result.contractHealth.legacyTasksFallbackSeen).toBe(true);
+		expect(result.contractHealth.legacyResultParserSeen).toBe(true);
+
+		setDoctorOpenCodeConfig(null);
 		await rm(tempDir, { recursive: true, force: true });
 	});
 });

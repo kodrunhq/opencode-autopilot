@@ -62,6 +62,20 @@ npm install -g @kodrunhq/opencode-autopilot
 
 Launch OpenCode. The plugin auto-installs agents, skills, and commands on first load and shows a welcome toast.
 
+### Agent visibility defaults
+
+Primary Tab-cycle agents provided by this plugin are:
+
+- `autopilot`
+- `coder`
+- `debugger`
+- `planner`
+- `researcher`
+- `reviewer`
+
+OpenCode native `plan` and `build` are suppressed by the plugin config hook to avoid
+duplicate planning/building entries in the primary Tab menu.
+
 ### Verify your setup
 
 ```bash

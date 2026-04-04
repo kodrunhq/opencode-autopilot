@@ -34,7 +34,7 @@ import {
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
-import { ocDoctor } from "./tools/doctor";
+import { ocDoctor, setOpenCodeConfig as setDoctorOpenCodeConfig } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
 import { ocHashlineEdit } from "./tools/hashline-edit";
 import { ocLogs } from "./tools/logs";
@@ -255,6 +255,7 @@ const plugin: Plugin = async (input) => {
 		config: async (cfg: Config) => {
 			openCodeConfig = cfg;
 			setOpenCodeConfig(cfg);
+			setDoctorOpenCodeConfig(cfg);
 			await configHook(cfg);
 		},
 		"chat.message": async (

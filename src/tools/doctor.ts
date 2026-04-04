@@ -6,6 +6,12 @@ import { runHealthChecks } from "../health/runner";
 import type { HealthResult } from "../health/types";
 import { getProjectArtifactDir } from "../utils/paths";
 
+let openCodeConfig: Config | null = null;
+
+export function setOpenCodeConfig(config: Config | null): void {
+	openCodeConfig = config;
+}
+
 /**
  * A single check in the doctor report, with an optional fix suggestion.
  */
@@ -63,6 +69,8 @@ const FIX_SUGGESTIONS: Readonly<Record<string, string>> = Object.freeze({
 	"config-validity":
 		"Run `bunx @kodrunhq/opencode-autopilot configure` to reconfigure, or delete ~/.config/opencode/opencode-autopilot.json to reset",
 	"agent-injection": "Restart OpenCode to trigger agent re-injection via config hook",
+	"native-agent-suppression":
+		"Restart OpenCode and verify plugin config hook runs. If issue persists, check for conflicting OpenCode config or another plugin overriding agent entries",
 	"asset-directories": "Restart OpenCode to trigger asset reinstallation",
 	"skill-loading": "Ensure skills directory exists in ~/.config/opencode/skills/",
 	"memory-db":
@@ -143,9 +151,12 @@ export async function doctorCore(options?: DoctorOptions): Promise<string> {
 export const ocDoctor = tool({
 	description:
 		"Run plugin health diagnostics. Reports pass/fail status for config, agents, " +
-		"assets, and hooks. Like `brew doctor` for opencode-autopilot.",
+		"native suppression, assets, and hooks. Like `brew doctor` for opencode-autopilot.",
 	args: {},
-	async execute() {
-		return doctorCore();
+	async execute(_args, context) {
+		return doctorCore({
+			openCodeConfig,
+			projectRoot: context.directory,
+		});
 	},
 });

@@ -497,8 +497,18 @@ describe("configHook pipeline agents", () => {
 		expect(agents["frontend-engineer"]).toBeDefined();
 		expect(agents["security-auditor"]).toBeDefined();
 
-		// Total: 13 standard + 10 pipeline = 23
-		expect(Object.keys(agents).length).toBe(23);
+		// deterministic suppression entries for OpenCode native built-ins
+		expect(agents.plan).toBeDefined();
+		expect(agents.build).toBeDefined();
+		expect((agents.plan as Record<string, unknown>).disable).toBe(true);
+		expect((agents.plan as Record<string, unknown>).mode).toBe("subagent");
+		expect((agents.plan as Record<string, unknown>).hidden).toBe(true);
+		expect((agents.build as Record<string, unknown>).disable).toBe(true);
+		expect((agents.build as Record<string, unknown>).mode).toBe("subagent");
+		expect((agents.build as Record<string, unknown>).hidden).toBe(true);
+
+		// Total: 13 standard + 10 pipeline + 2 suppressed native = 25
+		expect(Object.keys(agents).length).toBe(25);
 	});
 
 	test("pipeline agents have mode subagent", async () => {
