@@ -144,7 +144,7 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 				currentSessionId = null;
 				currentProjectKey = null;
 
-				// Defer pruning to avoid blocking the event loop
+				// Defer pruning via microtask to guarantee execution before process exit
 				if (projectKey) {
 					queueMicrotask(() => {
 						try {

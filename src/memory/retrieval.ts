@@ -255,9 +255,19 @@ export function retrieveMemoryContext(
 	const scored = scoreAndRankObservations(observations, halfLifeDays);
 	const preferences = getAllPreferences(db);
 
-	// Update access counts for observations that make it into context.
+	const context = buildMemoryContext({
+		projectName: project.name,
+		lastSessionDate: project.lastUpdated,
+		observations: scored,
+		preferences,
+		tokenBudget,
+	});
+
+	// Update access counts only for observations that could plausibly fit in context.
+	// buildMemoryContext uses at most MAX_PER_GROUP * sections = 30 observations.
 	// Best-effort: failures are swallowed to avoid blocking retrieval.
-	for (const obs of scored) {
+	const maxInContext = MAX_PER_GROUP * SECTION_ORDER.length;
+	for (const obs of scored.slice(0, maxInContext)) {
 		if (obs.id !== undefined) {
 			try {
 				updateAccessCount(obs.id, db);
@@ -267,11 +277,5 @@ export function retrieveMemoryContext(
 		}
 	}
 
-	return buildMemoryContext({
-		projectName: project.name,
-		lastSessionDate: project.lastUpdated,
-		observations: scored,
-		preferences,
-		tokenBudget,
-	});
+	return context;
 }

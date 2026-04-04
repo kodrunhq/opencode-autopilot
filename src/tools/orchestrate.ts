@@ -207,7 +207,8 @@ async function processHandlerResult(
 				}
 			}
 			// Log and inject lesson + skill context into dispatch prompt (best-effort)
-			const attempt = currentState.phaseDispatchCounts?.[phase] ?? 1;
+			// +1 because checkCircuitBreaker already incremented the saved count
+			const attempt = (currentState.phaseDispatchCounts?.[phase] ?? 0) + 1;
 			const progress = buildUserProgress(phase, handlerResult.progress, attempt);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
@@ -241,7 +242,7 @@ async function processHandlerResult(
 			const abortMsg = await checkCircuitBreaker(currentState, phase, artifactDir);
 			if (abortMsg) return abortMsg;
 
-			const multiAttempt = currentState.phaseDispatchCounts?.[phase] ?? 1;
+			const multiAttempt = (currentState.phaseDispatchCounts?.[phase] ?? 0) + 1;
 			const multiProgress = buildUserProgress(phase, handlerResult.progress, multiAttempt);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
