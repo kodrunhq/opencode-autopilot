@@ -140,8 +140,14 @@ export function createAntiSlopHandler(options: {
 			return; // file unreadable — best-effort, skip
 		}
 
-		// Record scan timestamp after successful read
+		// Record scan timestamp after successful read; prune stale entries to prevent memory growth
 		scanTimestamps.set(resolved, Date.now());
+		if (scanTimestamps.size > 10_000) {
+			const cutoff = Date.now() - SCAN_DEBOUNCE_MS;
+			for (const [path, ts] of scanTimestamps) {
+				if (ts < cutoff) scanTimestamps.delete(path);
+			}
+		}
 
 		const findings = scanForSlopComments(fileContent, ext);
 		if (findings.length === 0) return;

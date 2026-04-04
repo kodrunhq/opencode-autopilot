@@ -21,7 +21,11 @@ export function logOrchestrationEvent(artifactDir: string, event: OrchestrationE
 	try {
 		mkdirSync(artifactDir, { recursive: true });
 		const logPath = join(artifactDir, LOG_FILE);
-		const line = `${JSON.stringify(event)}\n`;
+		// Redact filesystem paths from message to avoid leaking sensitive directory info
+		const safe = event.message
+			? { ...event, message: event.message.replace(/[/\\][^\s"']+/g, "[PATH]") }
+			: event;
+		const line = `${JSON.stringify(safe)}\n`;
 		appendFileSync(logPath, line, "utf-8");
 	} catch {
 		// Best-effort — never block the pipeline

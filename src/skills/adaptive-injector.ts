@@ -196,7 +196,7 @@ export function buildMultiSkillContext(
 
 		let section: string;
 		if (mode === "summary") {
-			section = buildSkillSummary(skill);
+			section = sanitizeTemplateContent(buildSkillSummary(skill));
 		} else {
 			// Full mode: preserve structure, truncate at section boundaries
 			const header = `[Skill: ${name}]\n`;
