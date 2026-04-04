@@ -121,7 +121,7 @@ async function injectSkillContext(
 
 /** Build a human-readable progress string for user-facing display. */
 function buildUserProgress(phase: string, label?: string, attempt?: number): string {
-	const idx = PHASE_INDEX[phase] ?? 0;
+	const idx = PHASE_INDEX[phase as Phase] ?? 0;
 	const desc = label ?? "dispatching";
 	const att = attempt != null ? ` (attempt ${attempt})` : "";
 	return `Phase ${idx}/${TOTAL_PHASES}: ${phase} — ${desc}${att}`;
@@ -288,7 +288,7 @@ async function processHandlerResult(
 					});
 				}
 			}
-			return JSON.stringify({ ...handlerResult, _userProgress: multiProgress });
+			return JSON.stringify({ ...handlerResult, _userProgress: progress });
 		}
 
 		case "complete": {
