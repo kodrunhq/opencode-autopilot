@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { doctorCore } from "../../src/tools/doctor";
@@ -97,6 +97,9 @@ describe("doctorCore", () => {
 
 		expect(result.action).toBe("doctor");
 		expect(result.allPassed).toBe(true);
+		expect(result.contractHealth).toBeDefined();
+		expect(result.contractHealth.legacyTasksFallbackSeen).toBe(false);
+		expect(result.contractHealth.legacyResultParserSeen).toBe(false);
 		for (const check of result.checks) {
 			expect(check.status).toBe("pass");
 		}
@@ -115,6 +118,7 @@ describe("doctorCore", () => {
 
 		expect(result.action).toBe("doctor");
 		expect(result.allPassed).toBe(false);
+		expect(result.contractHealth).toBeDefined();
 
 		const failedChecks = result.checks.filter((c: { status: string }) => c.status === "fail");
 		expect(failedChecks.length).toBeGreaterThan(0);
@@ -176,5 +180,24 @@ describe("doctorCore", () => {
 		expect(result.displayText).toContain("Completed in");
 		// Fix suggestions appear for failed checks
 		expect(result.displayText).toContain("Fix:");
+	});
+
+	test("detects legacy parser usage from orchestration log", async () => {
+		const tempDir = join(tmpdir(), `doctor-contract-${Date.now()}`);
+		await mkdir(join(tempDir, ".opencode-autopilot"), { recursive: true });
+		await writeFile(
+			join(tempDir, ".opencode-autopilot", "orchestration.jsonl"),
+			[
+				"[opencode-autopilot] PLAN fallback: parsed legacy tasks.md (tasks.json missing)",
+				"[opencode-autopilot] Legacy result parser path used. Submit typed envelopes for deterministic replay guarantees.",
+			].join("\n") + "\n",
+			"utf-8",
+		);
+
+		const result = JSON.parse(await doctorCore({ projectRoot: tempDir }));
+		expect(result.contractHealth.legacyTasksFallbackSeen).toBe(true);
+		expect(result.contractHealth.legacyResultParserSeen).toBe(true);
+
+		await rm(tempDir, { recursive: true, force: true });
 	});
 });

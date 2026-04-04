@@ -58,6 +58,16 @@ describe("reviewCore", () => {
 		}
 	});
 
+	test("returns typed findingsEnvelope on completion", async () => {
+		await reviewCore({ scope: "all" }, tempDir);
+		await reviewCore({ findings: '{"findings": []}' }, tempDir);
+		await reviewCore({ findings: '{"findings": []}' }, tempDir);
+		const result = await reviewCore({ findings: '{"findings": []}' }, tempDir);
+		const parsed = parseResult(result);
+		expect(parsed.action).toBe("complete");
+		expect((parsed.findingsEnvelope as { kind?: string }).kind).toBe("review_findings");
+	});
+
 	test("returns status when state exists but no findings provided", async () => {
 		// Start a review first
 		await reviewCore({ scope: "all" }, tempDir);

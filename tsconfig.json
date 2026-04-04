@@ -10,5 +10,5 @@
 		"rootDir": ".",
 		"types": ["bun-types"]
 	},
-	"include": ["src/**/*.ts", "tests/**/*.ts"]
+	"include": ["src/**/*.ts", "src/**/*.d.ts", "tests/**/*.ts"]
 }

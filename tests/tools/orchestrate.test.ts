@@ -40,11 +40,49 @@ describe("orchestrateCore", () => {
 	test("with state at RECON and result returns dispatch for next phase", async () => {
 		const state = createInitialState("build a chat");
 		await saveState(state, tempDir);
-		const result = await orchestrateCore({ result: "research done" }, tempDir);
+		const first = JSON.parse(await orchestrateCore({}, tempDir));
+		const envelope = {
+			schemaVersion: 1,
+			resultId: "test-recon-1",
+			runId: first.runId,
+			phase: "RECON",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "research done" },
+		};
+		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed.agent).toBe("oc-challenger");
 		expect(parsed.phase).toBe("CHALLENGE");
+	});
+
+	test("returns stale error for mismatched runId", async () => {
+		await orchestrateCore({ idea: "build a chat" }, tempDir);
+		const result = await orchestrateCore(
+			{
+				result: JSON.stringify({
+					schemaVersion: 1,
+					resultId: "bad-run",
+					runId: "other-run",
+					phase: "RECON",
+					dispatchId: "dispatch_x",
+					agent: "oc-researcher",
+					kind: "phase_output",
+					taskId: null,
+					payload: { text: "x" },
+				}),
+			},
+			tempDir,
+		);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.code).toBe("E_STALE_RESULT");
+
+		const logRaw = await readFile(join(tempDir, "orchestration.jsonl"), "utf-8");
+		expect(logRaw).toContain("E_STALE_RESULT");
 	});
 
 	test("at final phase returns complete", async () => {
@@ -54,7 +92,9 @@ describe("orchestrateCore", () => {
 			...state,
 			currentPhase: "RETROSPECTIVE" as const,
 			phases: state.phases.map((p) =>
-				p.name === "RETROSPECTIVE" ? { ...p, status: "IN_PROGRESS" as const } : p,
+				p.name === "RETROSPECTIVE"
+					? { ...p, status: "IN_PROGRESS" as const }
+					: { ...p, status: "DONE" as const },
 			),
 		};
 		await saveState(terminalState, tempDir);

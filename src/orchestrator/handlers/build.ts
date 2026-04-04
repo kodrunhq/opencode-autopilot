@@ -1,9 +1,10 @@
 import { sanitizeTemplateContent } from "../../review/sanitize";
+import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
 import type { BuildProgress, Task } from "../types";
 import { assignWaves } from "../wave-assigner";
-import type { DispatchResult, PhaseHandler } from "./types";
+import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
 
 const MAX_STRIKES = 3;
@@ -55,12 +56,14 @@ function markTasksInProgress(tasks: readonly Task[], taskIds: readonly number[])
 /**
  * Build a prompt for a single task dispatch.
  */
-function buildTaskPrompt(task: Task, artifactDir: string): string {
-	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.md");
+async function buildTaskPrompt(task: Task, artifactDir: string): Promise<string> {
+	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.json");
+	const planFallbackRef = getArtifactRef(artifactDir, "PLAN", "tasks.md");
 	const designRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
+	const planPath = (await fileExists(planRef)) ? planRef : planFallbackRef;
 	return [
 		`Implement task ${task.id}: ${task.title}.`,
-		`Reference the plan at ${planRef}`,
+		`Reference the plan at ${planPath}`,
 		`and architecture at ${designRef}.`,
 		`If a CLAUDE.md file exists in the project root, read it for project-specific conventions.`,
 		`Check ~/.config/opencode/skills/coding-standards/SKILL.md for coding standards.`,
@@ -110,8 +113,14 @@ function hasCriticalFindings(resultStr: string): boolean {
 	}
 }
 
-export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => {
+export const handleBuild: PhaseHandler = async (
+	state,
+	artifactDir,
+	result?,
+	context?: PhaseHandlerContext,
+) => {
 	const { tasks, buildProgress } = state;
+	const resultText = context?.envelope.payload.text ?? result;
 
 	// Edge case: no tasks
 	if (tasks.length === 0) {
@@ -123,9 +132,10 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 	}
 
 	// Edge case: strike count exceeded
-	if (buildProgress.strikeCount > MAX_STRIKES && buildProgress.reviewPending && result) {
+	if (buildProgress.strikeCount > MAX_STRIKES && buildProgress.reviewPending && resultText) {
 		return Object.freeze({
 			action: "error",
+			code: "E_BUILD_MAX_STRIKES",
 			phase: "BUILD",
 			message: "Max retries exceeded — too many CRITICAL review findings",
 		} satisfies DispatchResult);
@@ -171,15 +181,26 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 		});
 	}
 
+	if (buildProgress.reviewPending && !resultText) {
+		return Object.freeze({
+			action: "dispatch",
+			agent: AGENT_NAMES.REVIEW,
+			prompt: "Review completed wave. Scope: branch. Report any CRITICAL findings.",
+			phase: "BUILD",
+			resultKind: "review_findings",
+			progress: "Review pending — dispatching reviewer",
+		} satisfies DispatchResult);
+	}
+
 	// Case 1: Review pending + result provided -> process review outcome
-	if (buildProgress.reviewPending && result) {
-		if (hasCriticalFindings(result)) {
+	if (buildProgress.reviewPending && resultText) {
+		if (hasCriticalFindings(resultText)) {
 			// Re-dispatch implementer with fix instructions
-			const safeResult = sanitizeTemplateContent(result).slice(0, 4000);
+			const safeResult = sanitizeTemplateContent(resultText).slice(0, 4000);
 			const prompt = [
 				`CRITICAL review findings detected. Fix the following issues:`,
 				safeResult,
-				`Reference ${getArtifactRef(artifactDir, "PLAN", "tasks.md")} for context.`,
+				`Reference ${getArtifactRef(artifactDir, "PLAN", "tasks.json")} for context.`,
 			].join(" ");
 
 			return Object.freeze({
@@ -187,6 +208,8 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 				agent: AGENT_NAMES.BUILD,
 				prompt,
 				phase: "BUILD",
+				resultKind: "task_completion",
+				taskId: buildProgress.currentTask,
 				progress: "Fix dispatch — CRITICAL findings",
 				_stateUpdates: {
 					buildProgress: {
@@ -224,11 +247,14 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 
 		if (pendingTasks.length === 1) {
 			const task = pendingTasks[0];
+			const prompt = await buildTaskPrompt(task, artifactDir);
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.BUILD,
-				prompt: buildTaskPrompt(task, artifactDir),
+				prompt,
 				phase: "BUILD",
+				resultKind: "task_completion",
+				taskId: task.id,
 				progress: `Wave ${nextWave} — task ${task.id}`,
 				_stateUpdates: {
 					buildProgress: { ...updatedProgress, currentTask: task.id },
@@ -237,11 +263,19 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 		}
 
 		const dispatchedIds = pendingTasks.map((t) => t.id);
+		const promptsByTaskId = new Map<number, string>();
+		await Promise.all(
+			pendingTasks.map(async (task) => {
+				promptsByTaskId.set(task.id, await buildTaskPrompt(task, artifactDir));
+			}),
+		);
 		return Object.freeze({
 			action: "dispatch_multi",
 			agents: pendingTasks.map((task) => ({
 				agent: AGENT_NAMES.BUILD,
-				prompt: buildTaskPrompt(task, artifactDir),
+				prompt: promptsByTaskId.get(task.id) ?? "",
+				taskId: task.id,
+				resultKind: "task_completion" as const,
 			})),
 			phase: "BUILD",
 			progress: `Wave ${nextWave} — ${pendingTasks.length} concurrent tasks`,
@@ -254,9 +288,50 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 
 	// Case 2: Result provided + not review pending -> mark task done
 	// For dispatch_multi, currentTask may be null — find the first IN_PROGRESS task instead
-	const taskToComplete =
-		buildProgress.currentTask ?? effectiveTasks.find((t) => t.status === "IN_PROGRESS")?.id ?? null;
-	if (result && !buildProgress.reviewPending && taskToComplete !== null) {
+	const hasTypedContext = context !== undefined && !context.legacy;
+	const isTaskCompletion = hasTypedContext && context.envelope.kind === "task_completion";
+	const isLegacyContext = context !== undefined && context.legacy;
+	const taskToComplete = isTaskCompletion
+		? context.envelope.taskId
+		: hasTypedContext
+			? buildProgress.currentTask
+			: (buildProgress.currentTask ??
+				effectiveTasks.find((t) => t.status === "IN_PROGRESS")?.id ??
+				null);
+
+	if (
+		resultText &&
+		!buildProgress.reviewPending &&
+		isLegacyContext &&
+		buildProgress.currentTask === null
+	) {
+		return Object.freeze({
+			action: "error",
+			code: "E_BUILD_TASK_ID_REQUIRED",
+			phase: "BUILD",
+			message:
+				"Legacy BUILD result cannot be attributed when currentTask is null. Submit typed envelope with taskId.",
+		} satisfies DispatchResult);
+	}
+	if (resultText && !buildProgress.reviewPending && taskToComplete === null) {
+		return Object.freeze({
+			action: "error",
+			code: "E_BUILD_TASK_ID_REQUIRED",
+			phase: "BUILD",
+			message: "Cannot attribute BUILD result to a task. Provide taskId in result envelope.",
+		} satisfies DispatchResult);
+	}
+
+	if (resultText && !buildProgress.reviewPending && taskToComplete !== null) {
+		if (!effectiveTasks.some((t) => t.id === taskToComplete)) {
+			return Object.freeze({
+				action: "error",
+				code: "E_BUILD_UNKNOWN_TASK",
+				phase: "BUILD",
+				message: `Unknown taskId in BUILD result: ${taskToComplete}`,
+			} satisfies DispatchResult);
+		}
+
 		const updatedTasks = markTaskDone(effectiveTasks, taskToComplete);
 		const waveMap = groupByWave(updatedTasks);
 		const currentWave = buildProgress.currentWave ?? 1;
@@ -268,6 +343,7 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 				agent: AGENT_NAMES.REVIEW,
 				prompt: "Review completed wave. Scope: branch. Report any CRITICAL findings.",
 				phase: "BUILD",
+				resultKind: "review_findings",
 				progress: `Wave ${currentWave} complete — review pending`,
 				_stateUpdates: {
 					tasks: [...updatedTasks],
@@ -284,11 +360,14 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 		const pendingInWave = findPendingTasks(waveMap, currentWave);
 		if (pendingInWave.length > 0) {
 			const next = pendingInWave[0];
+			const prompt = await buildTaskPrompt(next, artifactDir);
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.BUILD,
-				prompt: buildTaskPrompt(next, artifactDir),
+				prompt,
 				phase: "BUILD",
+				resultKind: "task_completion",
+				taskId: next.id,
 				progress: `Wave ${currentWave} — task ${next.id}`,
 				_stateUpdates: {
 					tasks: [...updatedTasks],
@@ -308,6 +387,7 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 				agent: AGENT_NAMES.BUILD,
 				prompt: `Wave ${currentWave} has ${inProgressInWave.length} task(s) still in progress. Continue working on remaining tasks.`,
 				phase: "BUILD",
+				resultKind: "phase_output",
 				progress: `Wave ${currentWave} — waiting for ${inProgressInWave.length} in-progress task(s)`,
 				_stateUpdates: {
 					tasks: [...updatedTasks],
@@ -344,6 +424,7 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 			agent: AGENT_NAMES.BUILD,
 			prompt: `Resume: wave ${currentWave} has ${inProgressTasks.length} task(s) still in progress. Wait for agent results and pass them back.`,
 			phase: "BUILD",
+			resultKind: "phase_output",
 			progress: `Wave ${currentWave} — waiting for ${inProgressTasks.length} in-progress task(s)`,
 			_stateUpdates: {
 				buildProgress: {
@@ -366,11 +447,14 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 
 	if (pendingTasks.length === 1) {
 		const task = pendingTasks[0];
+		const prompt = await buildTaskPrompt(task, artifactDir);
 		return Object.freeze({
 			action: "dispatch",
 			agent: AGENT_NAMES.BUILD,
-			prompt: buildTaskPrompt(task, artifactDir),
+			prompt,
 			phase: "BUILD",
+			resultKind: "task_completion",
+			taskId: task.id,
 			progress: `Wave ${currentWave} — task ${task.id}`,
 			_stateUpdates: {
 				buildProgress: {
@@ -384,11 +468,19 @@ export const handleBuild: PhaseHandler = async (state, artifactDir, result?) => 
 
 	// Multiple pending tasks in wave -> dispatch_multi
 	const dispatchedIds = pendingTasks.map((t) => t.id);
+	const promptsByTaskId = new Map<number, string>();
+	await Promise.all(
+		pendingTasks.map(async (task) => {
+			promptsByTaskId.set(task.id, await buildTaskPrompt(task, artifactDir));
+		}),
+	);
 	return Object.freeze({
 		action: "dispatch_multi",
 		agents: pendingTasks.map((task) => ({
 			agent: AGENT_NAMES.BUILD,
-			prompt: buildTaskPrompt(task, artifactDir),
+			prompt: promptsByTaskId.get(task.id) ?? "",
+			taskId: task.id,
+			resultKind: "task_completion" as const,
 		})),
 		phase: "BUILD",
 		progress: `Wave ${currentWave} — ${pendingTasks.length} concurrent tasks`,

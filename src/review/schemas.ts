@@ -65,6 +65,12 @@ export const reviewStateSchema = z.object({
 	startedAt: z.string().max(128),
 });
 
+export const reviewFindingsEnvelopeSchema = z.object({
+	schemaVersion: z.literal(1).default(1),
+	kind: z.literal("review_findings"),
+	findings: z.array(reviewFindingSchema).max(500).default([]),
+});
+
 export const reviewConfigSchema = z.object({
 	parallel: z.boolean().default(true),
 	maxFixAttempts: z.number().int().min(0).max(10).default(3),

@@ -26,7 +26,7 @@ import {
 } from "../review/memory";
 import type { ReviewState } from "../review/pipeline";
 import { advancePipeline } from "../review/pipeline";
-import { reviewStateSchema } from "../review/schemas";
+import { reviewFindingsEnvelopeSchema, reviewStateSchema } from "../review/schemas";
 import { selectAgents } from "../review/selection";
 import { detectStackTags } from "../review/stack-gate";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
@@ -219,7 +219,29 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 
 		// Case 3: State exists, findings provided -> advance pipeline
 		if (currentState !== null && args.findings) {
-			const result = advancePipeline(args.findings, currentState);
+			let findingsPayload = args.findings;
+			try {
+				const parsed = JSON.parse(args.findings);
+				if (
+					parsed &&
+					typeof parsed === "object" &&
+					"report" in parsed &&
+					typeof parsed.report === "object" &&
+					parsed.report !== null &&
+					Array.isArray((parsed.report as { findings?: unknown }).findings)
+				) {
+					findingsPayload = JSON.stringify(
+						reviewFindingsEnvelopeSchema.parse({
+							schemaVersion: 1,
+							kind: "review_findings",
+							findings: (parsed.report as { findings: unknown[] }).findings,
+						}),
+					);
+				}
+			} catch {
+				// keep legacy payload for parser fallback
+			}
+			const result = advancePipeline(findingsPayload, currentState);
 
 			if (result.action === "dispatch" && result.state) {
 				await saveReviewState(result.state, artifactDir);
@@ -228,6 +250,7 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 					stage: result.stage,
 					agents: result.agents,
 					message: result.message,
+					parseMode: result.parseMode,
 				});
 			}
 
@@ -247,6 +270,8 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 				return JSON.stringify({
 					action: "complete",
 					report: result.report,
+					findingsEnvelope: result.findingsEnvelope,
+					parseMode: result.parseMode,
 				});
 			}
 

@@ -53,8 +53,20 @@ describe("orchestrateCore pipeline dispatch", () => {
 		const { orchestrateCore } = await import("../src/tools/orchestrate");
 		const state = createInitialState("test idea");
 		await saveState(state, tempDir);
+		const first = JSON.parse(await orchestrateCore({}, tempDir));
+		const envelope = {
+			schemaVersion: 1,
+			resultId: "pipe-recon-1",
+			runId: first.runId,
+			phase: "RECON",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "recon findings complete" },
+		};
 
-		const result = await orchestrateCore({ result: "recon findings complete" }, tempDir);
+		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		// RECON handler with result returns complete, then orchestrateCore should advance
 		// After RECON complete, it should dispatch CHALLENGE
@@ -79,7 +91,19 @@ describe("orchestrateCore pipeline dispatch", () => {
 		};
 		await saveState(challengeState, tempDir);
 
-		const result = await orchestrateCore({ result: "challenge done" }, tempDir);
+		const first = JSON.parse(await orchestrateCore({}, tempDir));
+		const envelope = {
+			schemaVersion: 1,
+			resultId: "pipe-challenge-1",
+			runId: first.runId,
+			phase: "CHALLENGE",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "challenge done" },
+		};
+		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		// CHALLENGE handler with result -> complete -> advance to ARCHITECT
 		// ARCHITECT handler dispatches single (depth=1) with empty confidence (HIGH default)
@@ -197,12 +221,9 @@ describe("orchestrateCore pipeline dispatch", () => {
 		};
 		await saveState(buildState, tempDir);
 
-		// When BUILD handler dispatches "oc-review", orchestrateCore should call reviewCore
-		// For the purpose of this test, the handler's result with reviewPending=true
-		// and a non-critical result should advance (complete BUILD)
-		const result = await orchestrateCore({ result: '{"findings":[]}' }, tempDir);
+		// reviewCore is inlined, so a single orchestrate call should advance past BUILD
+		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
-		// After review passes (no critical), BUILD should complete and advance to SHIP
 		expect(["dispatch", "complete"]).toContain(parsed.action);
 	});
 
@@ -220,7 +241,19 @@ describe("orchestrateCore pipeline dispatch", () => {
 		};
 		await saveState(retroState, tempDir);
 
-		const result = await orchestrateCore({ result: "retro findings" }, tempDir);
+		const first = JSON.parse(await orchestrateCore({}, tempDir));
+		const envelope = {
+			schemaVersion: 1,
+			resultId: "pipe-retro-1",
+			runId: first.runId,
+			phase: "RETROSPECTIVE",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "retro findings" },
+		};
+		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("complete");
 	});
@@ -278,7 +311,19 @@ describe("orchestrateCore pipeline dispatch", () => {
 		};
 		await saveState(retroState, tempDir);
 
-		const result = await orchestrateCore({ result: "retro done" }, tempDir);
+		const first = JSON.parse(await orchestrateCore({}, tempDir));
+		const envelope = {
+			schemaVersion: 1,
+			resultId: "pipe-retro-2",
+			runId: first.runId,
+			phase: "RETROSPECTIVE",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "retro done" },
+		};
+		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed._userProgress).toBeDefined();
 		expect(parsed._userProgress).toContain("Completed");
@@ -384,6 +429,27 @@ describe("orchestrateCore pipeline dispatch", () => {
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("error");
 		expect(parsed.message).toContain("exceeded max dispatches");
+	});
+
+	test("returns duplicate error when replaying same result envelope", async () => {
+		const { orchestrateCore } = await import("../src/tools/orchestrate");
+		const first = JSON.parse(await orchestrateCore({ idea: "dup test" }, tempDir));
+		const envelope = JSON.stringify({
+			schemaVersion: 1,
+			resultId: "dup-1",
+			runId: first.runId,
+			phase: "RECON",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "done" },
+		});
+
+		await orchestrateCore({ result: envelope }, tempDir);
+		const second = JSON.parse(await orchestrateCore({ result: envelope }, tempDir));
+		expect(second.action).toBe("error");
+		expect(second.code).toBe("E_DUPLICATE_RESULT");
 	});
 });
 

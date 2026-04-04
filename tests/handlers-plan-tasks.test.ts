@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { handlePlan } from "../src/orchestrator/handlers/plan";
@@ -81,6 +81,59 @@ describe("handlePlan task loading", () => {
 			wave: 2,
 			status: "PENDING",
 		});
+
+		const jsonRaw = await readFile(join(tempDir, "phases", "PLAN", "tasks.json"), "utf-8");
+		const parsed = JSON.parse(jsonRaw) as {
+			schemaVersion: number;
+			tasks: Array<{ taskId: string; title: string; wave: number; depends_on: string[] }>;
+		};
+		expect(parsed.schemaVersion).toBe(1);
+		expect(parsed.tasks).toHaveLength(3);
+		expect(parsed.tasks[0]).toMatchObject({
+			taskId: "W1-T01",
+			title: "Add v1 API schemas",
+			wave: 1,
+			depends_on: [],
+		});
+		expect(parsed.tasks[2]).toMatchObject({
+			taskId: "W2-T01",
+			title: "Build repositories",
+			wave: 2,
+			depends_on: [],
+		});
+	});
+
+	test("loads tasks from tasks.json and writes derived tasks.md", async () => {
+		const tasksJson = {
+			schemaVersion: 1,
+			tasks: [
+				{ taskId: "W1-T01", title: "Seed DB schema", wave: 1, depends_on: [] },
+				{ taskId: "W2-T01", title: "Add repositories", wave: 2, depends_on: ["W1-T01"] },
+			],
+		};
+
+		await writeFile(join(tempDir, "phases", "ARCHITECT", "design.md"), "# Architecture");
+		await writeFile(join(tempDir, "phases", "CHALLENGE", "brief.md"), "# Challenge");
+		await writeFile(
+			join(tempDir, "phases", "PLAN", "tasks.json"),
+			JSON.stringify(tasksJson, null, 2),
+			"utf-8",
+		);
+
+		const state = makeState({ currentPhase: "PLAN" });
+		const result = await handlePlan(state, tempDir, "tasks written");
+
+		expect(result.action).toBe("complete");
+		expect(result._stateUpdates?.tasks?.length).toBe(2);
+		expect(result._stateUpdates?.tasks?.[1]).toMatchObject({
+			id: 2,
+			title: "Add repositories",
+			depends_on: [1],
+		});
+
+		const markdown = await readFile(join(tempDir, "phases", "PLAN", "tasks.md"), "utf-8");
+		expect(markdown).toContain("| W1-T01 | Seed DB schema");
+		expect(markdown).toContain("| W2-T01 | Add repositories");
 	});
 
 	test("accepts markdown table rows without trailing boundary pipe", async () => {

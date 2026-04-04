@@ -55,6 +55,21 @@ export const buildProgressSchema = z.object({
 	reviewPending: z.boolean().default(false),
 });
 
+export const dispatchResultKindSchema = z.enum([
+	"phase_output",
+	"task_completion",
+	"review_findings",
+]);
+
+export const pendingDispatchSchema = z.object({
+	dispatchId: z.string().min(1).max(128),
+	phase: phaseSchema,
+	agent: z.string().min(1).max(128),
+	issuedAt: z.string().max(128),
+	resultKind: dispatchResultKindSchema.default("phase_output"),
+	taskId: z.number().int().positive().nullable().default(null),
+});
+
 export const failureContextSchema = z.object({
 	failedPhase: phaseSchema,
 	failedAgent: z.string().max(128).nullable(),
@@ -66,6 +81,8 @@ export const failureContextSchema = z.object({
 export const pipelineStateSchema = z.object({
 	schemaVersion: z.literal(2),
 	status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"]),
+	runId: z.string().max(128).default("legacy-run"),
+	stateRevision: z.number().int().min(0).default(0),
 	idea: z.string().max(4096),
 	currentPhase: phaseSchema.nullable(),
 	startedAt: z.string().max(128),
@@ -83,6 +100,8 @@ export const pipelineStateSchema = z.object({
 		strikeCount: 0,
 		reviewPending: false,
 	}),
+	pendingDispatches: z.array(pendingDispatchSchema).max(2000).default([]),
+	processedResultIds: z.array(z.string().max(128)).max(10_000).default([]),
 	failureContext: failureContextSchema.nullable().default(null),
 	phaseDispatchCounts: z.record(z.string().max(32), z.number().int().min(0).max(1000)).default({}),
 });
