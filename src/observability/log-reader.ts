@@ -39,9 +39,13 @@ export interface EventSearchFilters {
 	readonly after?: string;
 	readonly before?: string;
 	readonly domain?: string;
+	readonly subsystem?: string;
+	/** Matches against event.type for semantic severity (e.g. "error", "warning"),
+	 *  or against event.payload.severity / event.payload.level for explicit severity fields. */
+	readonly severity?: string;
 }
 
-function isSessionForProject(event: Readonly<ForensicEvent>, sessionId: string): boolean {
+function _isSessionForProject(event: Readonly<ForensicEvent>, sessionId: string): boolean {
 	return event.domain === "session" && event.sessionId === sessionId;
 }
 
@@ -164,6 +168,21 @@ export function searchEvents(
 		if (filters.domain && event.domain !== filters.domain) return false;
 		if (filters.after && event.timestamp <= filters.after) return false;
 		if (filters.before && event.timestamp >= filters.before) return false;
+		if (filters.subsystem) {
+			const subsystem = event.payload.subsystem;
+			if (typeof subsystem !== "string" || subsystem !== filters.subsystem) return false;
+		}
+		if (filters.severity) {
+			const payloadSeverity =
+				typeof event.payload.severity === "string"
+					? event.payload.severity
+					: typeof event.payload.level === "string"
+						? event.payload.level
+						: null;
+			const matchesSemantic = event.type === filters.severity;
+			const matchesPayload = payloadSeverity === filters.severity;
+			if (!matchesSemantic && !matchesPayload) return false;
+		}
 		return true;
 	});
 }

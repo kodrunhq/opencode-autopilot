@@ -116,7 +116,7 @@ describe("diagnose", () => {
 			(w) => w.groups.includes("architects") && w.groups.includes("challengers"),
 		);
 		expect(architectsChallengersWarning).toBeDefined();
-		expect(architectsChallengersWarning!.sharedFamily).toBe("anthropic");
+		expect(architectsChallengersWarning?.sharedFamily).toBe("anthropic");
 	});
 
 	test("return value is frozen", () => {

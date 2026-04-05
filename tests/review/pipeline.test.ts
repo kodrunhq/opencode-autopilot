@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { advancePipeline, parseAgentFindings } from "../../src/review/pipeline";
+import { parseAgentFindings } from "../../src/review/parse-findings";
+import { advancePipeline } from "../../src/review/pipeline";
 import type { ReviewState } from "../../src/review/types";
 
 describe("parseAgentFindings", () => {
@@ -28,7 +29,9 @@ describe("parseAgentFindings", () => {
 	test("rejects invalid findings and keeps valid ones", () => {
 		const raw = `{"findings": [
 			{"severity": "CRITICAL", "domain": "logic", "title": "Valid", "file": "a.ts", "line": 1, "agent": "x", "source": "phase1", "evidence": "e", "problem": "p", "fix": "f"},
-			{"severity": "INVALID_SEVERITY", "domain": "logic", "title": "Bad", "file": "a.ts"}
+			null,
+			"this is just a string, not an object",
+			{"problem": {"not": "a string"}}
 		]}`;
 		const result = parseAgentFindings(raw, "logic-auditor");
 		expect(result.length).toBe(1);

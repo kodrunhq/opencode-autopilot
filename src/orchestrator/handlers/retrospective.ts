@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { getProjectRootFromArtifactDir } from "../../utils/paths";
 import { getArtifactRef, PHASE_ARTIFACTS } from "../artifacts";
 import {

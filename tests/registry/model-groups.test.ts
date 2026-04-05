@@ -24,7 +24,7 @@ describe("AGENT_REGISTRY", () => {
 	});
 
 	test("every agent maps to a valid GroupId", () => {
-		for (const [name, entry] of Object.entries(AGENT_REGISTRY)) {
+		for (const [_name, entry] of Object.entries(AGENT_REGISTRY)) {
 			expect(ALL_GROUP_IDS).toContain(entry.group);
 		}
 	});
@@ -129,7 +129,7 @@ describe("DIVERSITY_RULES", () => {
 			(r) => r.groups.includes("architects") && r.groups.includes("challengers"),
 		);
 		expect(rule).toBeDefined();
-		expect(rule!.severity).toBe("strong");
+		expect(rule?.severity).toBe("strong");
 	});
 
 	test("builders-reviewers rule is strong", () => {
@@ -137,13 +137,13 @@ describe("DIVERSITY_RULES", () => {
 			(r) => r.groups.includes("builders") && r.groups.includes("reviewers"),
 		);
 		expect(rule).toBeDefined();
-		expect(rule!.severity).toBe("strong");
+		expect(rule?.severity).toBe("strong");
 	});
 
 	test("red-team multi-group rule is soft", () => {
 		const rule = DIVERSITY_RULES.find((r) => r.groups.includes("red-team"));
 		expect(rule).toBeDefined();
-		expect(rule!.severity).toBe("soft");
-		expect(rule!.groups).toHaveLength(3);
+		expect(rule?.severity).toBe("soft");
+		expect(rule?.groups).toHaveLength(3);
 	});
 });

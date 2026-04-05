@@ -11,7 +11,10 @@
  */
 
 import type { Database } from "bun:sqlite";
+import { getLogger } from "../logging/domains";
 import { retrieveMemoryContext } from "./retrieval";
+
+const logger = getLogger("memory", "injector");
 
 /**
  * Configuration for creating a memory injector.
@@ -79,7 +82,7 @@ export function createMemoryInjector(config: MemoryInjectorConfig) {
 				output.system.push(context);
 			}
 		} catch (err) {
-			console.warn("[opencode-autopilot] memory injection failed:", err);
+			logger.warn("memory injection failed", { error: String(err) });
 		}
 	};
 }

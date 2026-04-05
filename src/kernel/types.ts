@@ -1,7 +1,6 @@
 import type { ForensicEvent } from "../observability/forensic-types";
-import type { LessonMemory } from "../orchestrator/lesson-types";
 import type { PipelineState } from "../orchestrator/types";
-import type { ReviewMemory, ReviewState } from "../review/types";
+import type { ReviewState } from "../review/types";
 
 export const KERNEL_STATE_CONFLICT_CODE = "E_STATE_CONFLICT";
 

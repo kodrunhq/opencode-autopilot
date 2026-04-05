@@ -13,6 +13,7 @@
  */
 
 import type { Database } from "bun:sqlite";
+import { getLogger } from "../logging/domains";
 import { CHARS_PER_TOKEN, DEFAULT_INJECTION_BUDGET } from "./constants";
 import { getMemoryDb } from "./database";
 import { computeRelevanceScore } from "./decay";
@@ -24,6 +25,8 @@ import {
 	updateAccessCount,
 } from "./repository";
 import type { Observation, Preference } from "./types";
+
+const logger = getLogger("memory", "retrieval");
 
 /**
  * An observation with its computed relevance score.
@@ -194,8 +197,9 @@ export function retrieveMemoryContext(
 				updateAccessCount(id, db);
 			}
 			resolvedDb.run("COMMIT");
-		} catch {
+		} catch (err) {
 			// best-effort — access count update is non-critical
+			logger.warn("access count update failed", { error: String(err) });
 		}
 	}
 

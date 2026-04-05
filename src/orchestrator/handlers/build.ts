@@ -1,141 +1,21 @@
 import { sanitizeTemplateContent } from "../../review/sanitize";
-import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
-import type { BuildProgress, Task } from "../types";
 import { assignWaves } from "../wave-assigner";
+import {
+	buildPendingResultError,
+	buildTaskPrompt,
+	findCurrentWave,
+	findInProgressTasks,
+	findPendingTasks,
+	hasCriticalFindings,
+	isWaveComplete,
+	MAX_STRIKES,
+	markTaskDone,
+	markTasksInProgress,
+} from "./build-utils";
 import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
-
-const MAX_STRIKES = 3;
-
-/**
- * Find the first wave number that has PENDING tasks.
- */
-function findCurrentWave(waveMap: ReadonlyMap<number, readonly Task[]>): number | null {
-	const sortedWaves = [...waveMap.keys()].sort((a, b) => a - b);
-	for (const wave of sortedWaves) {
-		const tasks = waveMap.get(wave) ?? [];
-		if (tasks.some((t) => t.status === "PENDING" || t.status === "IN_PROGRESS")) {
-			return wave;
-		}
-	}
-	return null;
-}
-
-/**
- * Get pending tasks for a specific wave.
- */
-function findPendingTasks(
-	waveMap: ReadonlyMap<number, readonly Task[]>,
-	wave: number,
-): readonly Task[] {
-	const tasks = waveMap.get(wave) ?? [];
-	return tasks.filter((t) => t.status === "PENDING");
-}
-
-/**
- * Get in-progress tasks for a specific wave.
- */
-function findInProgressTasks(
-	waveMap: ReadonlyMap<number, readonly Task[]>,
-	wave: number,
-): readonly Task[] {
-	const tasks = waveMap.get(wave) ?? [];
-	return tasks.filter((t) => t.status === "IN_PROGRESS");
-}
-
-function buildPendingResultError(
-	wave: number,
-	inProgressTasks: readonly Task[],
-	buildProgress: Readonly<BuildProgress>,
-	updatedTasks?: readonly Task[],
-): DispatchResult {
-	const taskIds = inProgressTasks.map((task) => task.id);
-	return Object.freeze({
-		action: "error",
-		code: "E_BUILD_RESULT_PENDING",
-		phase: "BUILD",
-		message: `Wave ${wave} still has in-progress task result(s) pending for taskIds [${taskIds.join(", ")}]. Wait for the typed result envelope and pass it back to oc_orchestrate.`,
-		progress: `Wave ${wave} — waiting for typed result(s) for taskIds [${taskIds.join(", ")}]`,
-		_stateUpdates: {
-			...(updatedTasks ? { tasks: [...updatedTasks] } : {}),
-			buildProgress: {
-				...buildProgress,
-				currentWave: wave,
-				currentTask: buildProgress.currentTask ?? inProgressTasks[0]?.id ?? null,
-			},
-		},
-	} satisfies DispatchResult);
-}
-
-/**
- * Mark multiple tasks as IN_PROGRESS immutably.
- */
-function markTasksInProgress(tasks: readonly Task[], taskIds: readonly number[]): readonly Task[] {
-	const idSet = new Set(taskIds);
-	return tasks.map((t) => (idSet.has(t.id) ? { ...t, status: "IN_PROGRESS" as const } : t));
-}
-
-/**
- * Build a prompt for a single task dispatch.
- */
-async function buildTaskPrompt(task: Task, artifactDir: string): Promise<string> {
-	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.json");
-	const planFallbackRef = getArtifactRef(artifactDir, "PLAN", "tasks.md");
-	const designRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
-	const planPath = (await fileExists(planRef)) ? planRef : planFallbackRef;
-	return [
-		`Implement task ${task.id}: ${task.title}.`,
-		`Reference the plan at ${planPath}`,
-		`and architecture at ${designRef}.`,
-		`If a CLAUDE.md file exists in the project root, read it for project-specific conventions.`,
-		`Check ~/.config/opencode/skills/coding-standards/SKILL.md for coding standards.`,
-		`Report completion when done.`,
-	].join(" ");
-}
-
-/**
- * Mark a task as DONE immutably and return the updated tasks array.
- */
-function markTaskDone(tasks: readonly Task[], taskId: number): readonly Task[] {
-	return tasks.map((t) => (t.id === taskId ? { ...t, status: "DONE" as const } : t));
-}
-
-/**
- * Check whether all tasks in a given wave are DONE.
- */
-function isWaveComplete(waveMap: ReadonlyMap<number, readonly Task[]>, wave: number): boolean {
-	const tasks = waveMap.get(wave) ?? [];
-	return tasks.every((t) => t.status === "DONE");
-}
-
-/**
- * Parse review result to check for CRITICAL findings.
- */
-function hasCriticalFindings(resultStr: string): boolean {
-	try {
-		const parsed = JSON.parse(resultStr);
-		if (parsed.severity === "CRITICAL") return true;
-		const hasCritical = (arr: unknown[]): boolean =>
-			arr.some(
-				(f: unknown) =>
-					typeof f === "object" &&
-					f !== null &&
-					"severity" in f &&
-					(f as { severity: string }).severity === "CRITICAL",
-			);
-		if (Array.isArray(parsed.findings)) {
-			return hasCritical(parsed.findings);
-		}
-		if (parsed.report?.findings && Array.isArray(parsed.report.findings)) {
-			return hasCritical(parsed.report.findings);
-		}
-		return false;
-	} catch {
-		return false;
-	}
-}
 
 export const handleBuild: PhaseHandler = async (
 	state,
@@ -146,7 +26,6 @@ export const handleBuild: PhaseHandler = async (
 	const { tasks, buildProgress } = state;
 	const resultText = context?.envelope.payload.text ?? result;
 
-	// Edge case: no tasks
 	if (tasks.length === 0) {
 		return Object.freeze({
 			action: "error",
@@ -155,7 +34,6 @@ export const handleBuild: PhaseHandler = async (
 		} satisfies DispatchResult);
 	}
 
-	// Edge case: strike count exceeded
 	if (buildProgress.strikeCount > MAX_STRIKES && buildProgress.reviewPending && resultText) {
 		return Object.freeze({
 			action: "error",
@@ -165,7 +43,6 @@ export const handleBuild: PhaseHandler = async (
 		} satisfies DispatchResult);
 	}
 
-	// Auto-assign waves from depends_on declarations (D-15)
 	let effectiveTasks = tasks;
 	const hasDependencies = tasks.some((t) => t.depends_on && t.depends_on.length > 0);
 	if (hasDependencies) {
@@ -187,7 +64,6 @@ export const handleBuild: PhaseHandler = async (
 		}
 	}
 
-	// Check if all remaining tasks are BLOCKED (cycles or MAX_TASKS cap)
 	const nonDoneTasks = effectiveTasks.filter((t) => t.status !== "DONE" && t.status !== "SKIPPED");
 	if (nonDoneTasks.length > 0 && nonDoneTasks.every((t) => t.status === "BLOCKED")) {
 		const blockedIds = nonDoneTasks.map((t) => t.id).join(", ");
@@ -216,10 +92,8 @@ export const handleBuild: PhaseHandler = async (
 		} satisfies DispatchResult);
 	}
 
-	// Case 1: Review pending + result provided -> process review outcome
 	if (buildProgress.reviewPending && resultText) {
 		if (hasCriticalFindings(resultText)) {
-			// Re-dispatch implementer with fix instructions
 			const safeResult = sanitizeTemplateContent(resultText).slice(0, 4000);
 			const prompt = [
 				`CRITICAL review findings detected. Fix the following issues:`,
@@ -245,7 +119,6 @@ export const handleBuild: PhaseHandler = async (
 			} satisfies DispatchResult);
 		}
 
-		// No critical -> advance to next wave
 		const waveMap = groupByWave(effectiveTasks);
 		const nextWave = findCurrentWave(waveMap);
 
@@ -266,7 +139,7 @@ export const handleBuild: PhaseHandler = async (
 
 		const pendingTasks = findPendingTasks(waveMap, nextWave);
 		const inProgressTasks = findInProgressTasks(waveMap, nextWave);
-		const updatedProgress: BuildProgress = {
+		const updatedProgress = {
 			...buildProgress,
 			reviewPending: false,
 			currentWave: nextWave,
@@ -302,7 +175,6 @@ export const handleBuild: PhaseHandler = async (
 		} satisfies DispatchResult);
 	}
 
-	// Case 2: Result provided + not review pending -> mark task done
 	const hasTypedContext = context !== undefined;
 	const isTaskCompletion = hasTypedContext && context.envelope.kind === "task_completion";
 	const taskToComplete = isTaskCompletion ? context.envelope.taskId : buildProgress.currentTask;
@@ -331,7 +203,6 @@ export const handleBuild: PhaseHandler = async (
 		const currentWave = buildProgress.currentWave ?? 1;
 
 		if (isWaveComplete(waveMap, currentWave)) {
-			// Wave complete -> trigger review (same for final wave or intermediate)
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.REVIEW,
@@ -350,7 +221,6 @@ export const handleBuild: PhaseHandler = async (
 			} satisfies DispatchResult);
 		}
 
-		// Wave not complete -> dispatch next pending task or wait for in-progress
 		const pendingInWave = findPendingTasks(waveMap, currentWave);
 		if (pendingInWave.length > 0) {
 			const next = pendingInWave[0];
@@ -373,19 +243,16 @@ export const handleBuild: PhaseHandler = async (
 			} satisfies DispatchResult);
 		}
 
-		// No pending tasks but wave not complete — other tasks are still IN_PROGRESS
 		const inProgressInWave = findInProgressTasks(waveMap, currentWave);
 		if (inProgressInWave.length > 0) {
 			return buildPendingResultError(currentWave, inProgressInWave, buildProgress, updatedTasks);
 		}
 	}
 
-	// Case 3: No result (first call or resume) -> find first pending wave
 	const waveMap = groupByWave(effectiveTasks);
 	const currentWave = findCurrentWave(waveMap);
 
 	if (currentWave === null) {
-		// All tasks already DONE
 		return Object.freeze({
 			action: "complete",
 			phase: "BUILD",
@@ -401,7 +268,6 @@ export const handleBuild: PhaseHandler = async (
 	}
 
 	if (pendingTasks.length === 0) {
-		// All tasks in all waves DONE (findCurrentWave already checked PENDING + IN_PROGRESS)
 		return Object.freeze({
 			action: "complete",
 			phase: "BUILD",
@@ -431,7 +297,6 @@ export const handleBuild: PhaseHandler = async (
 		} satisfies DispatchResult);
 	}
 
-	// Multiple pending tasks in wave -> dispatch only the next task sequentially.
 	const task = pendingTasks[0];
 	const prompt = await buildTaskPrompt(task, artifactDir);
 	return Object.freeze({

@@ -12,6 +12,7 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadReviewMemoryFromKernel, saveReviewMemoryToKernel } from "../kernel/repository";
+import { getLogger } from "../logging/domains";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
 import { getProjectArtifactDir } from "../utils/paths";
 import { reviewMemorySchema } from "./schemas";
@@ -93,7 +94,9 @@ export async function saveReviewMemory(memory: ReviewMemory, projectRoot: string
 	} catch (error: unknown) {
 		if (!legacyReviewMemoryMirrorWarned) {
 			legacyReviewMemoryMirrorWarned = true;
-			console.warn("[opencode-autopilot] review-memory.json mirror write failed:", error);
+			getLogger("review", "memory").warn("review-memory.json mirror write failed", {
+				error: String(error),
+			});
 		}
 	}
 }
@@ -106,8 +109,13 @@ export async function saveReviewMemory(memory: ReviewMemory, projectRoot: string
  * - falsePositives: cap at 50 (keep newest by markedAt date)
  * - falsePositives: remove entries older than 30 days
  */
-export function pruneMemory(memory: ReviewMemory): ReviewMemory {
-	const now = Date.now();
+import { systemTimeProvider, type TimeProvider } from "../scoring/time-provider";
+
+export function pruneMemory(
+	memory: ReviewMemory,
+	timeProvider: TimeProvider = systemTimeProvider,
+): ReviewMemory {
+	const now = timeProvider.now();
 
 	// Prune false positives older than 30 days first, then cap
 	const freshFalsePositives = memory.falsePositives.filter(

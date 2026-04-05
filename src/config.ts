@@ -53,8 +53,8 @@ export const confidenceConfigSchema = z.object({
 });
 
 // Pre-compute full defaults for nested schema defaults
-const orchestratorDefaults = orchestratorConfigSchema.parse({});
-const confidenceDefaults = confidenceConfigSchema.parse({});
+export const orchestratorDefaults = orchestratorConfigSchema.parse({});
+export const confidenceDefaults = confidenceConfigSchema.parse({});
 
 // --- V2 schema (internal, for migration) ---
 
@@ -90,7 +90,7 @@ export const memoryConfigSchema = z.object({
 	decayHalfLifeDays: z.number().min(7).max(365).default(90),
 });
 
-const memoryDefaults = memoryConfigSchema.parse({});
+export const memoryDefaults = memoryConfigSchema.parse({});
 
 // --- V4 sub-schemas ---
 

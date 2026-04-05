@@ -1,14 +1,16 @@
 import { randomBytes } from "node:crypto";
-import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
+import { getLogger } from "../logging/domains";
 import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
+import { enrichErrorMessage } from "../orchestrator/error-context";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
 import type { DispatchResult, PhaseHandlerContext } from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
 import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
+import { getPhaseProgressString } from "../orchestrator/progress";
 import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
 import {
 	createInitialState,
@@ -311,17 +313,16 @@ async function injectSkillContext(
 		});
 		if (ctx) return prompt + ctx;
 	} catch (err) {
-		console.warn("[opencode-autopilot] skill injection failed:", err);
+		getLogger("tool", "orchestrate").warn("skill injection failed", { err });
 	}
 	return prompt;
 }
 
 /** Build a human-readable progress string for user-facing display. */
-function buildUserProgress(phase: string, label?: string, attempt?: number): string {
-	const idx = PHASE_INDEX[phase as Phase] ?? 0;
-	const desc = label ?? "dispatching";
+function buildUserProgress(state: PipelineState, label?: string, attempt?: number): string {
+	const baseProgress = getPhaseProgressString(state);
 	const att = attempt != null ? ` (attempt ${attempt})` : "";
-	return `Phase ${idx}/${TOTAL_PHASES}: ${phase} — ${desc}${att}`;
+	return `${baseProgress}${label ? ` — ${label}` : ""}${att}`;
 }
 
 /** Per-phase dispatch limits. BUILD is high because of multi-task waves. */
@@ -429,7 +430,7 @@ async function processHandlerResult(
 			};
 
 			// Log the dispatch event before any inline-review or context injection
-			const progress = buildUserProgress(phase, normalizedResult.progress, attempt);
+			const progress = buildUserProgress(currentState, normalizedResult.progress, attempt);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
 				phase,
@@ -544,7 +545,7 @@ async function processHandlerResult(
 					taskId: entry.taskId ?? null,
 				})) ?? [];
 
-			const progress = buildUserProgress(phase, normalizedResult.progress, attempt);
+			const progress = buildUserProgress(currentState, normalizedResult.progress, attempt);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
 				phase,
@@ -759,12 +760,13 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
 		const parsedErr = parseErrorCode(error);
-		const safeMessage = message.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 4096);
+		let safeMessage = message.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 4096);
 
 		// Persist failure metadata for forensics (best-effort)
 		try {
 			const currentState = await loadState(artifactDir);
 			if (currentState?.currentPhase) {
+				safeMessage = enrichErrorMessage(safeMessage, currentState);
 				const lastDone = currentState.phases.filter((p) => p.status === "DONE").pop();
 				const failureContext = {
 					failedPhase: currentState.currentPhase,

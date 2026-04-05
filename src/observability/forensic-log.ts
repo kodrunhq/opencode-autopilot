@@ -40,10 +40,18 @@ function toProjectRootFromArtifactDir(artifactDir: string): string {
 }
 
 function appendValidatedForensicEvent(artifactDir: string, event: ForensicEvent): void {
-	appendForensicEventsToKernel(artifactDir, [event]);
+	mkdirSync(artifactDir, { recursive: true });
 
 	try {
-		mkdirSync(artifactDir, { recursive: true });
+		appendForensicEventsToKernel(artifactDir, [event]);
+	} catch (kernelError) {
+		if (!forensicWriteWarned) {
+			forensicWriteWarned = true;
+			console.warn("[opencode-autopilot] forensic log write failed:", kernelError);
+		}
+	}
+
+	try {
 		const logPath = join(artifactDir, FORENSIC_LOG_FILE);
 		appendFileSync(logPath, `${JSON.stringify(event)}\n`, "utf-8");
 	} catch (mirrorError) {

@@ -192,7 +192,7 @@ describe("loadLessonMemory", () => {
 
 		const loaded = await loadLessonMemory(tmpDir);
 		expect(loaded).not.toBeNull();
-		expect(loaded!.lessons).toHaveLength(1);
+		expect(loaded?.lessons).toHaveLength(1);
 	});
 
 	test("caps at 50 lessons (keeps newest by extractedAt)", async () => {
@@ -219,7 +219,7 @@ describe("loadLessonMemory", () => {
 		// Files with >50 lessons are recovered (pruned+validated), not rejected.
 		const loaded = await loadLessonMemory(tmpDir);
 		expect(loaded).not.toBeNull();
-		expect(loaded!.lessons.length).toBeLessThanOrEqual(50);
+		expect(loaded?.lessons.length).toBeLessThanOrEqual(50);
 	});
 
 	test("loads valid memory and returns frozen object", async () => {
@@ -231,8 +231,8 @@ describe("loadLessonMemory", () => {
 
 		const loaded = await loadLessonMemory(tmpDir);
 		expect(loaded).not.toBeNull();
-		expect(loaded!.schemaVersion).toBe(1);
-		expect(loaded!.lessons).toHaveLength(1);
+		expect(loaded?.schemaVersion).toBe(1);
+		expect(loaded?.lessons).toHaveLength(1);
 	});
 });
 

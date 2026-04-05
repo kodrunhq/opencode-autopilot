@@ -22,14 +22,14 @@ import {
 } from "../observability/log-reader";
 import { generateSessionSummary } from "../observability/summary-generator";
 
-/**
- * Options for logsCore search/detail modes.
- */
 interface LogsOptions {
 	readonly sessionID?: string;
 	readonly eventType?: string;
 	readonly after?: string;
 	readonly before?: string;
+	readonly domain?: string;
+	readonly subsystem?: string;
+	readonly severity?: string;
 }
 
 /**
@@ -135,6 +135,9 @@ export async function logsCore(
 				type: options?.eventType,
 				after: options?.after,
 				before: options?.before,
+				domain: options?.domain,
+				subsystem: options?.subsystem,
+				severity: options?.severity,
 			});
 
 			const displayLines = [
@@ -146,6 +149,15 @@ export async function logsCore(
 			return JSON.stringify({
 				action: "logs_search",
 				sessionId: log.sessionId,
+				filters: {
+					eventType: options?.eventType,
+					after: options?.after,
+					before: options?.before,
+					domain: options?.domain,
+					subsystem: options?.subsystem,
+					severity: options?.severity,
+				},
+				matchCount: filtered.length,
 				events: filtered,
 				displayText: displayLines.join("\n"),
 			});
@@ -158,7 +170,7 @@ export async function logsCore(
 export const ocLogs = tool({
 	description:
 		"View session logs. Modes: 'list' shows all sessions, 'detail' shows full log with " +
-		"summary, 'search' filters events by type/time. Use to inspect session history and errors.",
+		"summary, 'search' filters events by type/time/domain/subsystem/severity. Use to inspect session history and errors.",
 	args: {
 		mode: z.enum(["list", "detail", "search"]).describe("View mode: list, detail, or search"),
 		sessionID: z
@@ -172,8 +184,22 @@ export const ocLogs = tool({
 			.string()
 			.optional()
 			.describe("Only events before this ISO timestamp (for search mode)"),
+		domain: z
+			.string()
+			.optional()
+			.describe("Filter events by domain (e.g. 'session', 'orchestrator') (for search mode)"),
+		subsystem: z
+			.string()
+			.optional()
+			.describe("Filter events by payload.subsystem field (for search mode)"),
+		severity: z
+			.string()
+			.optional()
+			.describe(
+				"Filter by severity: matches event.type (e.g. 'error', 'warning') or payload.severity/payload.level (for search mode)",
+			),
 	},
-	async execute({ mode, sessionID, eventType, after, before }) {
-		return logsCore(mode, { sessionID, eventType, after, before });
+	async execute({ mode, sessionID, eventType, after, before, domain, subsystem, severity }) {
+		return logsCore(mode, { sessionID, eventType, after, before, domain, subsystem, severity });
 	},
 });

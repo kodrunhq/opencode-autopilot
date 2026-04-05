@@ -82,7 +82,7 @@ describe("configure-tui model grouping", () => {
 
 	test("preserves model order within groups", () => {
 		const grouped = groupByProvider(models);
-		const anthropic = grouped.get("anthropic")!;
+		const anthropic = grouped.get("anthropic") ?? [];
 		expect(anthropic[0].id).toBe("anthropic/claude-opus-4-6");
 		expect(anthropic[1].id).toBe("anthropic/claude-sonnet-4-6");
 	});

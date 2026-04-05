@@ -19,9 +19,17 @@ export const forensicEventTypeSchema = z.enum([
 	"context_warning",
 	"tool_complete",
 	"compacted",
+	"info",
+	"debug",
 ]);
 
-export const forensicEventDomainSchema = z.enum(["session", "orchestrator", "contract"]);
+export const forensicEventDomainSchema = z.enum([
+	"session",
+	"orchestrator",
+	"contract",
+	"system",
+	"review",
+]);
 
 export type JsonValue =
 	| null

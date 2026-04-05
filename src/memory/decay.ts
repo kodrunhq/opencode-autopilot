@@ -10,6 +10,7 @@
  */
 
 import type { Database } from "bun:sqlite";
+import { systemTimeProvider, type TimeProvider } from "../scoring/time-provider";
 import {
 	DEFAULT_HALF_LIFE_DAYS,
 	MAX_OBSERVATIONS_PER_PROJECT,
@@ -35,8 +36,9 @@ export function computeRelevanceScore(
 	accessCount: number,
 	type: ObservationType,
 	halfLifeDays: number = DEFAULT_HALF_LIFE_DAYS,
+	timeProvider: TimeProvider = systemTimeProvider,
 ): number {
-	const ageMs = Date.now() - new Date(lastAccessed).getTime();
+	const ageMs = timeProvider.now() - new Date(lastAccessed).getTime();
 	const ageDays = ageMs / MS_PER_DAY;
 	const timeDecay = Math.exp(-ageDays / halfLifeDays);
 	const frequencyWeight = Math.max(Math.log2(accessCount + 1), 1);
@@ -55,6 +57,7 @@ export function computeRelevanceScore(
 export function pruneStaleObservations(
 	projectId: string | null,
 	db?: Database,
+	timeProvider: TimeProvider = systemTimeProvider,
 ): { readonly pruned: number } {
 	const fetchLimit = MAX_OBSERVATIONS_PER_PROJECT + 1000;
 	const observations = getObservationsByProject(projectId, fetchLimit, db);
@@ -64,7 +67,13 @@ export function pruneStaleObservations(
 		.filter((obs): obs is typeof obs & { id: number } => obs.id !== undefined)
 		.map((obs) => ({
 			id: obs.id,
-			score: computeRelevanceScore(obs.lastAccessed, obs.accessCount, obs.type),
+			score: computeRelevanceScore(
+				obs.lastAccessed,
+				obs.accessCount,
+				obs.type,
+				DEFAULT_HALF_LIFE_DAYS,
+				timeProvider,
+			),
 		}));
 
 	let pruned = 0;
