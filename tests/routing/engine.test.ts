@@ -16,7 +16,7 @@ describe("makeRoutingDecision", () => {
 			categories: {
 				writing: {
 					enabled: true,
-					agentId: "documenter",
+					agentId: "coder",
 					modelGroup: "utilities",
 					timeoutSeconds: 90,
 					skills: ["coding-standards", "custom-docs"],
@@ -27,7 +27,7 @@ describe("makeRoutingDecision", () => {
 
 		const result = makeRoutingDecision("write API documentation", config);
 		expect(result.category).toBe("writing");
-		expect(result.agentId).toBe("documenter");
+		expect(result.agentId).toBe("coder");
 		expect(result.appliedConfig?.modelGroup).toBe("utilities");
 		expect(result.appliedConfig?.timeoutSeconds).toBe(90);
 		expect(result.appliedConfig?.skills).toEqual(["coding-standards", "custom-docs"]);

@@ -1,5 +1,8 @@
+import type { Database } from "bun:sqlite";
 import { getLogger } from "../logging/domains";
+import type { RecoveryAction } from "../types/recovery";
 import type { RecoveryOrchestrator } from "./orchestrator";
+import { clearRecoveryState } from "./persistence";
 
 const logger = getLogger("recovery", "event-handler");
 
@@ -65,7 +68,35 @@ function extractError(properties: Record<string, unknown>): Error | string | nul
 	return null;
 }
 
-export function createRecoveryEventHandler(orchestrator: RecoveryOrchestrator) {
+function executeRecoveryAction(action: RecoveryAction, sessionId: string): void {
+	logger.info("Executing recovery action", {
+		sessionId,
+		strategy: action.strategy,
+		errorCategory: action.errorCategory,
+		backoffMs: action.backoffMs,
+		maxAttempts: action.maxAttempts,
+	});
+
+	if (action.backoffMs > 0) {
+		logger.info("Backoff scheduled", { sessionId, delayMs: action.backoffMs });
+	}
+}
+
+interface RecoveryEventHandlerOptions {
+	readonly orchestrator: RecoveryOrchestrator;
+	readonly db?: Database;
+}
+
+export function createRecoveryEventHandler(
+	orchestratorOrOptions: RecoveryOrchestrator | RecoveryEventHandlerOptions,
+) {
+	const options: RecoveryEventHandlerOptions =
+		orchestratorOrOptions instanceof Object && "orchestrator" in orchestratorOrOptions
+			? orchestratorOrOptions
+			: { orchestrator: orchestratorOrOptions };
+
+	const { orchestrator, db } = options;
+
 	return async (input: { event: { type: string; [key: string]: unknown } }): Promise<void> => {
 		try {
 			const { event } = input;
@@ -81,12 +112,7 @@ export function createRecoveryEventHandler(orchestrator: RecoveryOrchestrator) {
 
 					const action = orchestrator.handleError(sessionId, error, properties);
 					if (action) {
-						logger.info("Recovery action scheduled", {
-							sessionId,
-							strategy: action.strategy,
-							errorCategory: action.errorCategory,
-							backoffMs: action.backoffMs,
-						});
+						executeRecoveryAction(action, sessionId);
 					}
 					return;
 				}
@@ -98,6 +124,16 @@ export function createRecoveryEventHandler(orchestrator: RecoveryOrchestrator) {
 					}
 
 					orchestrator.reset(sessionId);
+					if (db) {
+						try {
+							clearRecoveryState(db, sessionId);
+						} catch (error: unknown) {
+							logger.warn("Failed to clear persisted recovery state on session delete", {
+								sessionId,
+								error: error instanceof Error ? error.message : String(error),
+							});
+						}
+					}
 					logger.info("Recovery state cleared", { sessionId });
 					return;
 				}

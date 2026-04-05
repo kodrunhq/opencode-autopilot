@@ -1,6 +1,7 @@
 // tests/registry/resolver.test.ts
 import { describe, expect, test } from "bun:test";
 import {
+	DEPRECATED_AGENT_REMAP,
 	extractFamily,
 	resolveModelForAgent,
 	resolveModelForGroup,
@@ -112,5 +113,64 @@ describe("resolveModelForGroup", () => {
 	test("returns null for missing group", () => {
 		const result = resolveModelForGroup("architects", groups);
 		expect(result).toBeNull();
+	});
+});
+
+describe("DEPRECATED_AGENT_REMAP", () => {
+	const groups: Record<string, GroupModelAssignment> = {
+		builders: { primary: "anthropic/claude-opus-4-6", fallbacks: ["openai/gpt-5.4"] },
+		researchers: { primary: "google/gemini-3.1-pro", fallbacks: [] },
+		communicators: { primary: "anthropic/claude-haiku-4-5", fallbacks: [] },
+	};
+
+	test("maps deprecated agent names to their replacements", () => {
+		expect(DEPRECATED_AGENT_REMAP.documenter).toBe("coder");
+		expect(DEPRECATED_AGENT_REMAP.devops).toBe("coder");
+		expect(DEPRECATED_AGENT_REMAP["frontend-engineer"]).toBe("coder");
+		expect(DEPRECATED_AGENT_REMAP["db-specialist"]).toBe("coder");
+		expect(DEPRECATED_AGENT_REMAP["oc-explorer"]).toBe("oc-researcher");
+		expect(DEPRECATED_AGENT_REMAP["oc-retrospector"]).toBe("oc-shipper");
+	});
+
+	test("deprecated agents resolve via remap to new agent's group", () => {
+		const result = resolveModelForAgent("documenter", groups, {});
+		expect(result).not.toBeNull();
+		expect(result?.primary).toBe("anthropic/claude-opus-4-6");
+		expect(result?.source).toBe("group");
+	});
+
+	test("deprecated agent override on new name takes precedence over group", () => {
+		const overrides: Record<string, AgentOverride> = {
+			coder: { primary: "xai/grok-3", fallbacks: [] },
+		};
+		const result = resolveModelForAgent("documenter", groups, overrides);
+		expect(result).not.toBeNull();
+		expect(result?.primary).toBe("xai/grok-3");
+		expect(result?.source).toBe("override");
+	});
+
+	test("deprecated agent direct override takes precedence over remap", () => {
+		const overrides: Record<string, AgentOverride> = {
+			documenter: { primary: "openai/gpt-5.4", fallbacks: [] },
+			coder: { primary: "xai/grok-3", fallbacks: [] },
+		};
+		const result = resolveModelForAgent("documenter", groups, overrides);
+		expect(result).not.toBeNull();
+		expect(result?.primary).toBe("openai/gpt-5.4");
+		expect(result?.source).toBe("override");
+	});
+
+	test("oc-explorer resolves via remap to oc-researcher group", () => {
+		const result = resolveModelForAgent("oc-explorer", groups, {});
+		expect(result).not.toBeNull();
+		expect(result?.primary).toBe("google/gemini-3.1-pro");
+		expect(result?.source).toBe("group");
+	});
+
+	test("oc-retrospector resolves via remap to oc-shipper group", () => {
+		const result = resolveModelForAgent("oc-retrospector", groups, {});
+		expect(result).not.toBeNull();
+		expect(result?.primary).toBe("anthropic/claude-haiku-4-5");
+		expect(result?.source).toBe("group");
 	});
 });

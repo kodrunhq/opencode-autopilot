@@ -3,11 +3,11 @@ import type { LoopController } from "./controller";
 const LOOP_CONTEXT_CHAR_BUDGET = 500;
 
 interface LoopInjectorInput {
-	readonly sessionID: string;
+	readonly sessionID?: string;
 }
 
 interface LoopInjectorOutput {
-	system: string;
+	system: string[];
 }
 
 function truncate(value: string, maxLength: number): string {
@@ -40,7 +40,7 @@ export function createLoopInjector(controller: LoopController) {
 		}
 
 		const loopContext = buildLoopContext(controller);
-		output.system = output.system.length > 0 ? `${output.system}\n\n${loopContext}` : loopContext;
+		output.system.push(loopContext);
 	};
 }
 

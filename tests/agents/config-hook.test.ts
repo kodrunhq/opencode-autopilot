@@ -14,18 +14,19 @@ function expectSuppressedNativeAgent(agent: unknown): void {
 }
 
 describe("configHook", () => {
-	test("adds all 8 standard agents to an empty config object", async () => {
+	test("adds all 9 standard agents to an empty config object", async () => {
 		const config = { agent: {} } as Config;
 		await configHook(config);
 
 		expect(config.agent?.researcher).toBeDefined();
 		expect(config.agent?.metaprompter).toBeDefined();
-		expect(config.agent?.documenter).toBeDefined();
 		expect(config.agent?.["pr-reviewer"]).toBeDefined();
 		expect(config.agent?.autopilot).toBeDefined();
+		expect(config.agent?.coder).toBeDefined();
 		expect(config.agent?.debugger).toBeDefined();
 		expect(config.agent?.planner).toBeDefined();
 		expect(config.agent?.reviewer).toBeDefined();
+		expect(config.agent?.["security-auditor"]).toBeDefined();
 	});
 
 	test("initializes config.agent if it is undefined", async () => {
@@ -35,12 +36,13 @@ describe("configHook", () => {
 		expect(config.agent).toBeDefined();
 		expect(config.agent?.researcher).toBeDefined();
 		expect(config.agent?.metaprompter).toBeDefined();
-		expect(config.agent?.documenter).toBeDefined();
 		expect(config.agent?.["pr-reviewer"]).toBeDefined();
 		expect(config.agent?.autopilot).toBeDefined();
+		expect(config.agent?.coder).toBeDefined();
 		expect(config.agent?.debugger).toBeDefined();
 		expect(config.agent?.planner).toBeDefined();
 		expect(config.agent?.reviewer).toBeDefined();
+		expect(config.agent?.["security-auditor"]).toBeDefined();
 	});
 
 	test("does NOT overwrite an existing agent key", async () => {

@@ -1,13 +1,16 @@
+import type { Database } from "bun:sqlite";
 import { getLogger } from "../logging/domains";
 import type { Logger } from "../logging/types";
 import type { RecoveryAction } from "../types/recovery";
 import { classifyError } from "./classifier";
+import { clearRecoveryState, loadRecoveryState, saveRecoveryState } from "./persistence";
 import { getStrategy } from "./strategies";
 import type { RecoveryAttempt, RecoveryState } from "./types";
 
 interface RecoveryOrchestratorOptions {
 	readonly maxAttempts?: number;
 	readonly logger?: Logger;
+	readonly db?: Database;
 }
 
 function getErrorMessage(error: Error | string): string {
@@ -24,11 +27,13 @@ function cloneState(state: RecoveryState): RecoveryState {
 export class RecoveryOrchestrator {
 	private readonly maxAttempts: number;
 	private readonly logger: Logger;
+	private readonly db: Database | null;
 	private readonly states = new Map<string, RecoveryState>();
 
 	constructor(options: RecoveryOrchestratorOptions = {}) {
 		this.maxAttempts = options.maxAttempts ?? 3;
 		this.logger = options.logger ?? getLogger("recovery", "subsystem");
+		this.db = options.db ?? null;
 	}
 
 	handleError(
@@ -45,14 +50,15 @@ export class RecoveryOrchestrator {
 			return null;
 		}
 
-		const previousState = this.states.get(sessionId) ?? {
-			sessionId,
-			attempts: Object.freeze([]),
-			currentStrategy: null,
-			maxAttempts: this.maxAttempts,
-			isRecovering: false,
-			lastError: null,
-		};
+		const previousState = this.states.get(sessionId) ??
+			this.loadFromDb(sessionId) ?? {
+				sessionId,
+				attempts: Object.freeze([]),
+				currentStrategy: null,
+				maxAttempts: this.maxAttempts,
+				isRecovering: false,
+				lastError: null,
+			};
 
 		if (previousState.attempts.length >= previousState.maxAttempts) {
 			this.logger.warn("Recovery attempt limit reached", {
@@ -83,6 +89,7 @@ export class RecoveryOrchestrator {
 		});
 
 		this.states.set(sessionId, nextState);
+		this.persistToDb(nextState);
 		return action;
 	}
 
@@ -93,6 +100,7 @@ export class RecoveryOrchestrator {
 
 	reset(sessionId: string): void {
 		this.states.delete(sessionId);
+		this.clearFromDb(sessionId);
 	}
 
 	getHistory(sessionId: string): readonly RecoveryAttempt[] {
@@ -111,16 +119,48 @@ export class RecoveryOrchestrator {
 			success,
 		});
 		const attempts = Object.freeze([...state.attempts.slice(0, -1), updatedAttempt]);
-		this.states.set(
-			sessionId,
-			cloneState({
-				...state,
-				attempts,
-				currentStrategy: success ? null : state.currentStrategy,
-				isRecovering: false,
-				lastError: success ? null : state.lastError,
-			}),
-		);
+		const nextState = cloneState({
+			...state,
+			attempts,
+			currentStrategy: success ? null : state.currentStrategy,
+			isRecovering: false,
+			lastError: success ? null : state.lastError,
+		});
+		this.states.set(sessionId, nextState);
+		this.persistToDb(nextState);
+	}
+
+	private loadFromDb(sessionId: string): RecoveryState | null {
+		if (!this.db) return null;
+		try {
+			return loadRecoveryState(this.db, sessionId);
+		} catch {
+			return null;
+		}
+	}
+
+	private persistToDb(state: RecoveryState): void {
+		if (!this.db) return;
+		try {
+			saveRecoveryState(this.db, state);
+		} catch (error) {
+			this.logger.warn("Failed to persist recovery state", {
+				sessionId: state.sessionId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
+	private clearFromDb(sessionId: string): void {
+		if (!this.db) return;
+		try {
+			clearRecoveryState(this.db, sessionId);
+		} catch (error) {
+			this.logger.warn("Failed to clear recovery state", {
+				sessionId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
 	}
 }
 
@@ -133,4 +173,8 @@ export function getDefaultRecoveryOrchestrator(): RecoveryOrchestrator {
 
 	defaultRecoveryOrchestrator = new RecoveryOrchestrator();
 	return defaultRecoveryOrchestrator;
+}
+
+export function createRecoveryOrchestratorWithDb(db: Database): RecoveryOrchestrator {
+	return new RecoveryOrchestrator({ db });
 }

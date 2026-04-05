@@ -4,9 +4,9 @@ import { pipelineAgents } from "../src/agents/pipeline/index";
 
 describe("Agent visibility invariants", () => {
 	describe("Pipeline agents", () => {
-		it("all 10 pipeline agents have mode 'subagent' and hidden true", () => {
+		it("all 8 pipeline agents have mode 'subagent' and hidden true", () => {
 			const entries = Object.entries(pipelineAgents);
-			expect(entries.length).toBe(10);
+			expect(entries.length).toBe(8);
 
 			for (const [_name, agent] of entries) {
 				expect(agent.mode).toBe("subagent");
@@ -40,12 +40,12 @@ describe("Agent visibility invariants", () => {
 			expect(agents.metaprompter.mode).toBe("subagent");
 		});
 
-		it("documenter has mode 'subagent'", () => {
-			expect(agents.documenter.mode).toBe("subagent");
-		});
-
 		it("pr-reviewer has mode 'subagent'", () => {
 			expect(agents["pr-reviewer"].mode).toBe("subagent");
+		});
+
+		it("security-auditor has mode 'subagent'", () => {
+			expect(agents["security-auditor"].mode).toBe("subagent");
 		});
 
 		it("exactly 6 agents have mode 'all': autopilot, coder, debugger, planner, researcher, reviewer", () => {
@@ -64,12 +64,12 @@ describe("Agent visibility invariants", () => {
 	});
 
 	describe("Agent count", () => {
-		it("total agent count is 23 (13 standard + 10 pipeline)", () => {
+		it("total agent count is 17 (9 standard + 8 pipeline)", () => {
 			const standardCount = Object.keys(agents).length;
 			const pipelineCount = Object.keys(pipelineAgents).length;
-			expect(standardCount).toBe(13);
-			expect(pipelineCount).toBe(10);
-			expect(standardCount + pipelineCount).toBe(23);
+			expect(standardCount).toBe(9);
+			expect(pipelineCount).toBe(8);
+			expect(standardCount + pipelineCount).toBe(17);
 		});
 
 		it("primary agent names sort alphabetically in desired Tab-cycle order", () => {

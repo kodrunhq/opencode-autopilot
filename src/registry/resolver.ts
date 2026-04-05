@@ -1,6 +1,15 @@
 import { AGENT_REGISTRY } from "./model-groups";
 import type { AgentOverride, GroupId, GroupModelAssignment, ResolvedModel } from "./types";
 
+const DEPRECATED_AGENT_REMAP: Readonly<Record<string, string>> = Object.freeze({
+	documenter: "coder",
+	devops: "coder",
+	"frontend-engineer": "coder",
+	"db-specialist": "coder",
+	"oc-explorer": "oc-researcher",
+	"oc-retrospector": "oc-shipper",
+});
+
 /**
  * Extract model family (provider) from a model string.
  * "anthropic/claude-opus-4-6" → "anthropic"
@@ -17,15 +26,15 @@ export function extractFamily(model: string): string {
  *
  * Resolution order:
  * 1. Per-agent override in overrides[agentName]
- * 2. Agent's group in AGENT_REGISTRY → groups[groupId]
- * 3. null (agent uses OpenCode's default model)
+ * 2. Deprecated agent remap → resolve via new agent name
+ * 3. Agent's group in AGENT_REGISTRY → groups[groupId]
+ * 4. null (agent uses OpenCode's default model)
  */
 export function resolveModelForAgent(
 	agentName: string,
 	groups: Readonly<Record<string, GroupModelAssignment>>,
 	overrides: Readonly<Record<string, AgentOverride>>,
 ): ResolvedModel | null {
-	// Tier 1: per-agent override
 	const override = overrides[agentName];
 	if (override) {
 		return {
@@ -35,7 +44,30 @@ export function resolveModelForAgent(
 		};
 	}
 
-	// Tier 2: group assignment
+	const remappedName = DEPRECATED_AGENT_REMAP[agentName];
+	if (remappedName) {
+		const remappedOverride = overrides[remappedName];
+		if (remappedOverride) {
+			return {
+				primary: remappedOverride.primary,
+				fallbacks: remappedOverride.fallbacks ?? [],
+				source: "override",
+			};
+		}
+
+		const remappedEntry = AGENT_REGISTRY[remappedName];
+		if (remappedEntry) {
+			const remappedGroup = groups[remappedEntry.group];
+			if (remappedGroup) {
+				return {
+					primary: remappedGroup.primary,
+					fallbacks: remappedGroup.fallbacks,
+					source: "group",
+				};
+			}
+		}
+	}
+
 	const entry = AGENT_REGISTRY[agentName];
 	if (entry) {
 		const group = groups[entry.group];
@@ -48,17 +80,12 @@ export function resolveModelForAgent(
 		}
 	}
 
-	// Tier 3: no assignment
 	return null;
 }
 
 /**
  * Resolve model for a group directly (used by review pipeline for
  * internal ReviewAgent objects that are not in AGENT_REGISTRY).
- *
- * Used by:
- * - Review pipeline for the 19 universal+specialized agents → "reviewers"
- * - Review pipeline for red-team + product-thinker → "red-team"
  */
 export function resolveModelForGroup(
 	groupId: GroupId,
@@ -72,3 +99,5 @@ export function resolveModelForGroup(
 		source: "group",
 	};
 }
+
+export { DEPRECATED_AGENT_REMAP };

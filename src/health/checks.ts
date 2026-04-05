@@ -217,9 +217,13 @@ export async function configV7FieldsCheck(configPath?: string): Promise<HealthRe
 const STANDARD_AGENT_NAMES: readonly string[] = Object.freeze([
 	"researcher",
 	"metaprompter",
-	"documenter",
 	"pr-reviewer",
 	"autopilot",
+	"coder",
+	"debugger",
+	"planner",
+	"reviewer",
+	"security-auditor",
 ]);
 
 /** Pipeline agent names, derived from AGENT_NAMES in the orchestrator. */

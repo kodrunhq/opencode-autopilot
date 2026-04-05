@@ -1,11 +1,15 @@
 import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
+import { getLoopController } from "./autonomy";
+import { createLoopInjector } from "./autonomy/injector";
 import { isFirstLoad, loadConfig } from "./config";
 import { createCompactionHandler, createContextInjector } from "./context";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { installAssets } from "./installer";
+import { openKernelDb } from "./kernel/database";
 import { getLogger, initLoggers } from "./logging/domains";
+import { McpLifecycleManager } from "./mcp";
 import {
 	createMemoryCaptureHandler,
 	createMemoryChatMessageHandler,
@@ -31,7 +35,11 @@ import {
 } from "./orchestrator/fallback";
 import { fallbackDefaults } from "./orchestrator/fallback/fallback-config";
 import { resolveChain } from "./orchestrator/fallback/resolve-chain";
-import { createRecoveryEventHandler, getDefaultRecoveryOrchestrator } from "./recovery/index";
+import {
+	createRecoveryEventHandler,
+	createRecoveryOrchestratorWithDb,
+	getDefaultRecoveryOrchestrator,
+} from "./recovery/index";
 import { ocBackground } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
 import {
@@ -208,7 +216,15 @@ const plugin: Plugin = async (input) => {
 	});
 	const chatMessageHandler = createChatMessageHandler(manager);
 	const toolExecuteAfterHandler = createToolExecuteAfterHandler(manager);
-	const recoveryEventHandler = createRecoveryEventHandler(getDefaultRecoveryOrchestrator());
+	const recoveryEventHandler = (() => {
+		try {
+			const kernelDb = openKernelDb();
+			const orchestrator = createRecoveryOrchestratorWithDb(kernelDb);
+			return createRecoveryEventHandler({ orchestrator, db: kernelDb });
+		} catch {
+			return createRecoveryEventHandler(getDefaultRecoveryOrchestrator());
+		}
+	})();
 
 	// --- Anti-slop hook initialization ---
 	const antiSlopHandler = createAntiSlopHandler({ showToast: sdkOps.showToast });
@@ -240,6 +256,10 @@ const plugin: Plugin = async (input) => {
 		totalBudget: 4000,
 	});
 	const compactionHandler = createCompactionHandler(contextInjector);
+	const loopInjector = createLoopInjector(getLoopController());
+
+	// --- MCP lifecycle manager (lazy — servers start when skills with mcp: config activate) ---
+	const mcpManager = new McpLifecycleManager();
 
 	// --- Observability handlers ---
 	const toolStartTimes = new Map<string, number>();
@@ -381,6 +401,10 @@ const plugin: Plugin = async (input) => {
 
 			await recoveryEventHandler({ event });
 			await compactionHandler({ event });
+
+			if (event.type === "session.deleted") {
+				mcpManager.stopAll().catch(() => {});
+			}
 		},
 		config: async (cfg: Config) => {
 			openCodeConfig = cfg;
@@ -442,6 +466,7 @@ const plugin: Plugin = async (input) => {
 				await memoryInjector(input, output);
 			}
 			await contextInjector(input, output);
+			await loopInjector(input, output);
 		},
 	};
 };
