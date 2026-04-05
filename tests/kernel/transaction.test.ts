@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { unlinkSync } from "node:fs";
+import { mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { withTransaction } from "../../src/kernel/transaction";
 
@@ -11,7 +11,11 @@ describe("withTransaction", () => {
 	let db: Database;
 
 	beforeEach(() => {
-		testDbPath = join(process.cwd(), ".opencode", "test-transaction.db");
+		const opencodeDir = join(process.cwd(), ".opencode");
+		try {
+			mkdirSync(opencodeDir, { recursive: true });
+		} catch (_e) {}
+		testDbPath = join(opencodeDir, "test-transaction.db");
 		try {
 			unlinkSync(testDbPath);
 		} catch (_e) {}
