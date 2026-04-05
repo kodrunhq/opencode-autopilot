@@ -87,9 +87,10 @@ describe("plugin entry point", () => {
 			"oc_memory_status",
 			"oc_memory_preferences",
 			"oc_hashline_edit",
+			"oc_summary",
 		];
 		expect(toolNames).toEqual([...expected].sort());
-		expect(toolNames).toHaveLength(22);
+		expect(toolNames).toHaveLength(23);
 	});
 
 	test("every registered tool has a valid execute function", async () => {

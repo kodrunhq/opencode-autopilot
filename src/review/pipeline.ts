@@ -19,8 +19,9 @@ const STAGE3_NAMES: ReadonlySet<string> = new Set(STAGE3_AGENTS.map((a) => a.nam
 
 import { buildFixInstructions, determineFixableFindings } from "./fix-cycle";
 import { buildReport } from "./report";
-import { reviewFindingSchema, reviewFindingsEnvelopeSchema } from "./schemas";
+import { reviewFindingsEnvelopeSchema } from "./schemas";
 import type { ReviewFinding, ReviewFindingsEnvelope, ReviewReport, ReviewState } from "./types";
+import { parseTypedFindingsEnvelope, parseAgentFindings } from "./parse-findings";
 
 export type { ReviewState };
 
@@ -36,112 +37,6 @@ export interface ReviewStageResult {
 	readonly message?: string;
 	readonly state?: ReviewState;
 	readonly parseMode?: "typed" | "legacy";
-}
-
-function parseTypedFindingsEnvelope(raw: string): ReviewFindingsEnvelope | null {
-	try {
-		const parsed = JSON.parse(raw);
-		return reviewFindingsEnvelopeSchema.parse(parsed);
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Parse findings from raw LLM output (which may contain markdown, prose, code blocks).
- *
- * Handles:
- * - {"findings": [...]} wrapper
- * - Raw array [{...}, ...]
- * - JSON embedded in markdown code blocks
- * - Prose with embedded JSON
- *
- * Sets agent field to agentName if missing from individual findings.
- * Validates each finding through reviewFindingSchema, discards invalid ones.
- */
-export function parseAgentFindings(raw: string, agentName: string): readonly ReviewFinding[] {
-	const findings: ReviewFinding[] = [];
-
-	// Try to extract JSON from the raw text
-	const jsonStr = extractJson(raw);
-	if (jsonStr === null) return Object.freeze(findings);
-
-	try {
-		const parsed = JSON.parse(jsonStr);
-		const items = Array.isArray(parsed) ? parsed : parsed?.findings;
-
-		if (!Array.isArray(items)) return Object.freeze(findings);
-
-		for (const item of items) {
-			// Set agent field if missing
-			const withAgent = item.agent ? item : { ...item, agent: agentName };
-			const result = reviewFindingSchema.safeParse(withAgent);
-			if (result.success) {
-				findings.push(result.data);
-			}
-		}
-	} catch {
-		// JSON parse failed -- return empty
-	}
-
-	return Object.freeze(findings);
-}
-
-/**
- * Extract the first JSON object or array from raw text.
- * Looks for:
- * 1. JSON inside markdown code blocks
- * 2. {"findings": ...} pattern
- * 3. Raw array [{...}]
- */
-function extractJson(raw: string): string | null {
-	// Try markdown code block extraction first
-	const codeBlockMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-	if (codeBlockMatch) {
-		return codeBlockMatch[1].trim();
-	}
-
-	// Try to find {"findings": ...} or [{...}]
-	const objectStart = raw.indexOf("{");
-	const arrayStart = raw.indexOf("[");
-
-	if (objectStart === -1 && arrayStart === -1) return null;
-
-	// Pick whichever comes first
-	const start =
-		objectStart === -1
-			? arrayStart
-			: arrayStart === -1
-				? objectStart
-				: Math.min(objectStart, arrayStart);
-
-	// Find matching close bracket (string-literal-aware depth tracking)
-	let depth = 0;
-	let inString = false;
-	let escaped = false;
-	for (let i = start; i < raw.length; i++) {
-		const ch = raw[i];
-		if (escaped) {
-			escaped = false;
-			continue;
-		}
-		if (ch === "\\" && inString) {
-			escaped = true;
-			continue;
-		}
-		if (ch === '"') {
-			inString = !inString;
-			continue;
-		}
-		if (inString) continue;
-		if (ch === "{" || ch === "[") depth++;
-		if (ch === "}" || ch === "]") depth--;
-		if (depth === 0) {
-			return raw.slice(start, i + 1);
-		}
-	}
-
-	return null;
 }
 
 /**

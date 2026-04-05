@@ -110,8 +110,13 @@ export async function saveLessonMemory(memory: LessonMemory, projectRoot: string
  * - Sort remaining by extractedAt descending (newest first)
  * - Cap at 50 lessons
  */
-export function pruneLessons(memory: LessonMemory): LessonMemory {
-	const now = Date.now();
+import { systemTimeProvider, type TimeProvider } from "../scoring/time-provider";
+
+export function pruneLessons(
+	memory: LessonMemory,
+	timeProvider: TimeProvider = systemTimeProvider,
+): LessonMemory {
+	const now = timeProvider.now();
 
 	// Filter out stale lessons (>90 days)
 	const fresh = memory.lessons.filter(

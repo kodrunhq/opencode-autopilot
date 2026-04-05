@@ -35,7 +35,9 @@ import { reviewFindingsEnvelopeSchema, reviewStateSchema } from "../review/schem
 import { selectAgents } from "../review/selection";
 import { detectStackTags } from "../review/stack-gate";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
+import { getLogger } from "../logging/domains";
 import { getProjectArtifactDir } from "../utils/paths";
+import { loadState as loadPipelineState } from "../orchestrator/state";
 
 interface ReviewArgs {
 	readonly scope?: string;
@@ -133,7 +135,7 @@ async function syncLegacyReviewStateMirror(state: ReviewState, artifactDir: stri
 	} catch (error: unknown) {
 		if (!legacyReviewStateMirrorWarned) {
 			legacyReviewStateMirrorWarned = true;
-			console.warn("[opencode-autopilot] current-review.json mirror write failed:", error);
+			getLogger("tool", "review").warn("current-review.json mirror write failed", { error });
 		}
 	}
 }
@@ -190,7 +192,11 @@ async function startNewReview(
 
 	// Select agents from all candidates (universal + specialized)
 	const allCandidates = [...REVIEW_AGENTS, ...SPECIALIZED_AGENTS];
-	const selection = selectAgents(detectedStacks, diffAnalysis, allCandidates);
+	const artifactDir = getProjectArtifactDir(projectRoot);
+	const pipelineState = await loadPipelineState(artifactDir);
+	const seed = pipelineState ? `${pipelineState.runId}-review-1` : undefined;
+
+	const selection = selectAgents(detectedStacks, diffAnalysis, allCandidates, { seed });
 
 	const selectedNames = selection.selected.map((a) => a.name);
 

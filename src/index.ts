@@ -1,6 +1,7 @@
 import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
+import { getLogger, initLoggers } from "./logging/domains";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { installAssets } from "./installer";
@@ -55,17 +56,36 @@ import { ocReview } from "./tools/review";
 import { ocSessionStats } from "./tools/session-stats";
 import { ocState } from "./tools/state";
 import { ocStocktake } from "./tools/stocktake";
+import { ocSummary } from "./tools/summary";
 import { ocUpdateDocs } from "./tools/update-docs";
 
 let openCodeConfig: Config | null = null;
 
+let processHandlersRegistered = false;
+function registerProcessHandlers() {
+	if (processHandlersRegistered) return;
+	processHandlersRegistered = true;
+	process.on("uncaughtException", (error) => {
+		getLogger("system").error("Uncaught exception", {
+			error: error instanceof Error ? error.stack : String(error),
+		});
+	});
+	process.on("unhandledRejection", (reason) => {
+		getLogger("system").error("Unhandled rejection", {
+			reason: reason instanceof Error ? reason.stack : String(reason),
+		});
+	});
+}
+
 const plugin: Plugin = async (input) => {
 	const client = input.client;
+	initLoggers(process.cwd());
+	registerProcessHandlers();
 
 	// Self-healing asset installation on every load
 	const installResult = await installAssets();
 	if (installResult.errors.length > 0) {
-		console.error("[opencode-autopilot] Asset installation errors:", installResult.errors);
+		getLogger("system").warn("Asset installation errors", { errors: installResult.errors });
 	}
 
 	// Discover available providers/models in the background (non-blocking).
@@ -102,7 +122,9 @@ const plugin: Plugin = async (input) => {
 
 	// Retention pruning on load (non-blocking per D-14)
 	pruneOldLogs().catch((err) => {
-		console.error("[opencode-autopilot]", err);
+		getLogger("system").error("Log retention pruning failed", {
+			error: err instanceof Error ? err.stack : String(err),
+		});
 	});
 
 	// --- Fallback subsystem initialization ---
@@ -307,6 +329,7 @@ const plugin: Plugin = async (input) => {
 			oc_logs: ocLogs,
 			oc_session_stats: ocSessionStats,
 			oc_pipeline_report: ocPipelineReport,
+			oc_summary: ocSummary,
 			oc_mock_fallback: ocMockFallback,
 			oc_stocktake: ocStocktake,
 			oc_update_docs: ocUpdateDocs,

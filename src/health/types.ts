@@ -4,7 +4,7 @@
  */
 export interface HealthResult {
 	readonly name: string;
-	readonly status: "pass" | "fail";
+	readonly status: "pass" | "warn" | "fail";
 	readonly message: string;
 	readonly details?: readonly string[];
 }

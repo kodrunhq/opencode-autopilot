@@ -26,7 +26,12 @@ import {
 	getProjectArtifactDir,
 	getProjectRootFromArtifactDir,
 } from "../utils/paths";
+import { getLogger } from "../logging/domains";
 import { reviewCore } from "./review";
+
+import { getPhaseProgressString } from "../orchestrator/progress";
+
+import { enrichErrorMessage } from "../orchestrator/error-context";
 
 interface OrchestrateArgs {
 	readonly idea?: string;
@@ -311,17 +316,16 @@ async function injectSkillContext(
 		});
 		if (ctx) return prompt + ctx;
 	} catch (err) {
-		console.warn("[opencode-autopilot] skill injection failed:", err);
+		getLogger("tool", "orchestrate").warn("skill injection failed", { err });
 	}
 	return prompt;
 }
 
 /** Build a human-readable progress string for user-facing display. */
-function buildUserProgress(phase: string, label?: string, attempt?: number): string {
-	const idx = PHASE_INDEX[phase as Phase] ?? 0;
-	const desc = label ?? "dispatching";
+function buildUserProgress(state: PipelineState, label?: string, attempt?: number): string {
+	const baseProgress = getPhaseProgressString(state);
 	const att = attempt != null ? ` (attempt ${attempt})` : "";
-	return `Phase ${idx}/${TOTAL_PHASES}: ${phase} — ${desc}${att}`;
+	return `${baseProgress}${label ? ` — ${label}` : ""}${att}`;
 }
 
 /** Per-phase dispatch limits. BUILD is high because of multi-task waves. */
@@ -429,7 +433,7 @@ async function processHandlerResult(
 			};
 
 			// Log the dispatch event before any inline-review or context injection
-			const progress = buildUserProgress(phase, normalizedResult.progress, attempt);
+			const progress = buildUserProgress(currentState, normalizedResult.progress, attempt);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
 				phase,
@@ -544,7 +548,7 @@ async function processHandlerResult(
 					taskId: entry.taskId ?? null,
 				})) ?? [];
 
-			const progress = buildUserProgress(phase, normalizedResult.progress, attempt);
+			const progress = buildUserProgress(currentState, normalizedResult.progress, attempt);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
 				phase,
@@ -759,12 +763,13 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
 		const parsedErr = parseErrorCode(error);
-		const safeMessage = message.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 4096);
+		let safeMessage = message.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 4096);
 
 		// Persist failure metadata for forensics (best-effort)
 		try {
 			const currentState = await loadState(artifactDir);
 			if (currentState?.currentPhase) {
+				safeMessage = enrichErrorMessage(safeMessage, currentState);
 				const lastDone = currentState.phases.filter((p) => p.status === "DONE").pop();
 				const failureContext = {
 					failedPhase: currentState.currentPhase,

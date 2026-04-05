@@ -137,4 +137,179 @@ describe("oc_logs tool", () => {
 		expect(result.action).toBe("error");
 		expect(result.message).toContain("not found");
 	});
+
+	describe("search mode - new filters", () => {
+		const sessionId = "session-filters";
+
+		beforeEach(async () => {
+			await createSessionLog(sessionId, {
+				events: [
+					createForensicEvent({
+						projectRoot: testDir,
+						domain: "session",
+						timestamp: "2026-04-01T10:05:00Z",
+						sessionId,
+						type: "error",
+						message: "Rate limited",
+						payload: { errorType: "rate_limit" },
+					}),
+					createForensicEvent({
+						projectRoot: testDir,
+						domain: "orchestrator",
+						timestamp: "2026-04-01T10:10:00Z",
+						sessionId,
+						type: "warning",
+						message: "Slow response",
+						payload: { subsystem: "model-caller", severity: "warning" },
+					}),
+					createForensicEvent({
+						projectRoot: testDir,
+						domain: "orchestrator",
+						timestamp: "2026-04-01T10:15:00Z",
+						sessionId,
+						type: "info",
+						message: "Phase started",
+						payload: { subsystem: "planner", level: "info" },
+					}),
+					createForensicEvent({
+						projectRoot: testDir,
+						domain: "review",
+						timestamp: "2026-04-01T10:20:00Z",
+						sessionId,
+						type: "info",
+						message: "Review complete",
+						payload: { subsystem: "reviewer" },
+					}),
+				],
+			});
+		});
+
+		test("filters by domain", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, domain: "orchestrator" }, testDir),
+			);
+			expect(result.action).toBe("logs_search");
+			expect(result.events.every((e: { domain: string }) => e.domain === "orchestrator")).toBe(
+				true,
+			);
+			expect(result.events.length).toBeGreaterThanOrEqual(2);
+		});
+
+		test("filters by subsystem via payload.subsystem", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, subsystem: "planner" }, testDir),
+			);
+			expect(result.action).toBe("logs_search");
+			expect(result.events).toBeArrayOfSize(1);
+			expect(result.events[0].payload.subsystem).toBe("planner");
+		});
+
+		test("filters by severity matching event.type", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, severity: "warning" }, testDir),
+			);
+			expect(result.action).toBe("logs_search");
+			expect(result.events.length).toBeGreaterThanOrEqual(1);
+			expect(
+				result.events.every(
+					(e: { type: string; payload: { severity?: string; level?: string } }) =>
+						e.type === "warning" ||
+						e.payload.severity === "warning" ||
+						e.payload.level === "warning",
+				),
+			).toBe(true);
+		});
+
+		test("filters by severity matching payload.severity", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, severity: "warning" }, testDir),
+			);
+			expect(
+				result.events.some(
+					(e: { payload: { severity?: string } }) => e.payload.severity === "warning",
+				),
+			).toBe(true);
+		});
+
+		test("filters by severity matching payload.level", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, severity: "info" }, testDir),
+			);
+			expect(result.action).toBe("logs_search");
+			expect(result.events.length).toBeGreaterThanOrEqual(1);
+			expect(
+				result.events.every(
+					(e: { type: string; payload: { severity?: string; level?: string } }) =>
+						e.type === "info" || e.payload.severity === "info" || e.payload.level === "info",
+				),
+			).toBe(true);
+		});
+
+		test("filters by time range - after", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, after: "2026-04-01T10:12:00Z" }, testDir),
+			);
+			expect(result.action).toBe("logs_search");
+			expect(
+				result.events.every((e: { timestamp: string }) => e.timestamp > "2026-04-01T10:12:00Z"),
+			).toBe(true);
+		});
+
+		test("filters by time range - before", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, before: "2026-04-01T10:12:00Z" }, testDir),
+			);
+			expect(result.action).toBe("logs_search");
+			expect(
+				result.events.every((e: { timestamp: string }) => e.timestamp < "2026-04-01T10:12:00Z"),
+			).toBe(true);
+		});
+
+		test("combines domain and severity filters", async () => {
+			const result = JSON.parse(
+				await logsCore(
+					"search",
+					{ sessionID: sessionId, domain: "orchestrator", severity: "warning" },
+					testDir,
+				),
+			);
+			expect(result.action).toBe("logs_search");
+			expect(
+				result.events.every(
+					(e: { domain: string; type: string; payload: { severity?: string; level?: string } }) =>
+						e.domain === "orchestrator" &&
+						(e.type === "warning" ||
+							e.payload.severity === "warning" ||
+							e.payload.level === "warning"),
+				),
+			).toBe(true);
+		});
+
+		test("search result includes matchCount and filters fields", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, domain: "review" }, testDir),
+			);
+			expect(result.matchCount).toBeDefined();
+			expect(result.filters).toBeDefined();
+			expect(result.filters.domain).toBe("review");
+			expect(result.matchCount).toBe(result.events.length);
+		});
+
+		test("search result includes displayText with event count", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, domain: "review" }, testDir),
+			);
+			expect(result.displayText).toContain("Search Results");
+			expect(result.displayText).toContain(`${result.matchCount} event`);
+		});
+
+		test("no matching events returns empty events array", async () => {
+			const result = JSON.parse(
+				await logsCore("search", { sessionID: sessionId, subsystem: "nonexistent" }, testDir),
+			);
+			expect(result.action).toBe("logs_search");
+			expect(result.events).toBeArrayOfSize(0);
+			expect(result.matchCount).toBe(0);
+		});
+	});
 });

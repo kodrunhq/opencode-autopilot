@@ -12,11 +12,16 @@
  * @module
  */
 
+import { getLogger } from "../logging/domains";
 import { classifyErrorType, getErrorMessage } from "../orchestrator/fallback/error-classifier";
+import { generateSessionSummary } from "../ux/session-summary";
+import { getContextUtilizationString } from "./context-display";
 import type { ContextMonitor } from "./context-monitor";
 import { emitErrorEvent, emitToolCompleteEvent } from "./event-emitter";
 import type { ObservabilityEvent, SessionEventStore, SessionEvents } from "./event-store";
 import { accumulateTokensFromMessage, createEmptyTokenAggregate } from "./token-tracker";
+
+const logger = getLogger("session", "event-handlers");
 
 /**
  * Dependencies for the observability event handler.
@@ -161,7 +166,6 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 					// Check context utilization
 					const utilResult = contextMonitor.processMessage(sessionId, info.tokens.input);
 					if (utilResult.shouldWarn) {
-						const pct = Math.round(utilResult.utilization * 100);
 						// Append context_warning event
 						const warningEvent: ObservabilityEvent = Object.freeze({
 							type: "context_warning" as const,
@@ -176,10 +180,14 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 						// Fire toast (per D-35)
 						showToast(
 							"Context Warning",
-							`Context at ${pct}% -- consider compacting`,
+							getContextUtilizationString(info.tokens.input, 200000),
 							"warning",
 						).catch((err) => {
-							console.error("[opencode-autopilot]", err);
+							logger.error("showToast failed for context warning", {
+								operation: "context_warning",
+								sessionId,
+								error: String(err),
+							});
 						});
 					}
 				}
@@ -194,7 +202,11 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 				const sessionData = eventStore.getUnpersistedSession(sessionId);
 				if (sessionData && sessionData.events.length > 0) {
 					writeSessionLog(sessionData).catch((err) => {
-						console.error("[opencode-autopilot]", err);
+						logger.error("writeSessionLog failed on session.idle", {
+							operation: "session_end",
+							sessionId,
+							error: String(err),
+						});
 					});
 				}
 				return;
@@ -212,11 +224,33 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 					totalCost: 0,
 				});
 
+				const summary = generateSessionSummary(eventStore.getSession(sessionId), null);
+				logger.info(`Session ended summary:\n${summary}`, {
+					operation: "session_end",
+					sessionId,
+				});
+
+				void showToast(
+					"Session ended",
+					"Run /oc_summary to view the session summary.",
+					"info",
+				).catch((err) => {
+					logger.error("showToast failed for session end", {
+						operation: "session_end",
+						sessionId,
+						error: String(err),
+					});
+				});
+
 				// Final flush — session is done, remove from store
 				const sessionData = eventStore.flush(sessionId);
 				if (sessionData && sessionData.events.length > 0) {
 					writeSessionLog(sessionData).catch((err) => {
-						console.error("[opencode-autopilot]", err);
+						logger.error("writeSessionLog failed on session.deleted", {
+							operation: "session_end",
+							sessionId,
+							error: String(err),
+						});
 					});
 				}
 
@@ -242,7 +276,11 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 				const sessionData = eventStore.getUnpersistedSession(sessionId);
 				if (sessionData && sessionData.events.length > 0) {
 					writeSessionLog(sessionData).catch((err) => {
-						console.error("[opencode-autopilot]", err);
+						logger.error("writeSessionLog failed on session.compacted", {
+							operation: "compacted",
+							sessionId,
+							error: String(err),
+						});
 					});
 				}
 				return;

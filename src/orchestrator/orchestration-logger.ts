@@ -1,4 +1,6 @@
-import { appendForensicEventForArtifactDir } from "../observability/forensic-log";
+import { createForensicSinkForArtifactDir } from "../logging/forensic-writer";
+import { getLogger } from "../logging/domains";
+import type { LogLevel } from "../logging/types";
 
 export interface OrchestrationEvent {
 	readonly timestamp: string;
@@ -16,39 +18,52 @@ export interface OrchestrationEvent {
 	readonly payload?: Record<string, string | number | boolean | null>;
 }
 
-/**
- * Append an orchestration event to the project-local JSONL log.
- * Uses synchronous append to survive crashes. Best-effort — errors are swallowed.
- */
+function resolveOperation(event: OrchestrationEvent): string {
+	if (event.action === "dispatch") return "dispatch";
+	if (event.action === "dispatch_multi") return "dispatch_multi";
+	if (event.action === "complete") return "complete";
+	if (event.action === "loop_detected") return "loop_detected";
+	if (event.action === "error" && event.code?.startsWith("E_")) return "warning";
+	return "error";
+}
+
 export function logOrchestrationEvent(artifactDir: string, event: OrchestrationEvent): void {
-	appendForensicEventForArtifactDir(artifactDir, {
-		timestamp: event.timestamp,
-		domain: event.action === "error" && event.code?.startsWith("E_") ? "contract" : "orchestrator",
-		runId: event.runId ?? null,
-		sessionId: event.sessionId ?? null,
-		phase: event.phase,
-		dispatchId: event.dispatchId ?? null,
-		taskId: event.taskId ?? null,
-		agent: event.agent ?? null,
-		type:
-			event.action === "dispatch"
-				? "dispatch"
-				: event.action === "dispatch_multi"
-					? "dispatch_multi"
-					: event.action === "complete"
-						? "complete"
-						: event.action === "loop_detected"
-							? "loop_detected"
-							: event.action === "error" && event.code?.startsWith("E_")
-								? "warning"
-								: "error",
-		code: event.code ?? null,
-		message: event.message ?? null,
-		payload: {
+	try {
+		const domain =
+			event.action === "error" && event.code?.startsWith("E_") ? "contract" : "orchestrator";
+		const operation = resolveOperation(event);
+		const level: LogLevel = event.action === "error" ? "ERROR" : "INFO";
+
+		const metadata = {
+			domain,
+			operation,
+			runId: event.runId ?? null,
+			sessionId: event.sessionId ?? null,
+			phase: event.phase,
+			dispatchId: event.dispatchId ?? null,
+			taskId: event.taskId ?? null,
+			agent: event.agent ?? null,
+			code: event.code ?? null,
 			action: event.action,
 			...(event.promptLength !== undefined ? { promptLength: event.promptLength } : {}),
 			...(event.attempt !== undefined ? { attempt: event.attempt } : {}),
 			...(event.payload ?? {}),
-		},
-	});
+		};
+
+		createForensicSinkForArtifactDir(artifactDir).write(
+			Object.freeze({
+				timestamp: event.timestamp,
+				level,
+				message: event.message ?? event.action,
+				metadata,
+			}),
+		);
+
+		const globalLogger = getLogger(domain);
+		if (event.action === "error") {
+			globalLogger.error(event.message ?? event.action, { operation, phase: event.phase });
+		} else {
+			globalLogger.info(event.message ?? event.action, { operation, phase: event.phase });
+		}
+	} catch {}
 }

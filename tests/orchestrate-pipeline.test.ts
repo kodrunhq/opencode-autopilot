@@ -293,8 +293,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 		const result = await orchestrateCore({ idea: "build a chat app" }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed._userProgress).toBeDefined();
-		expect(parsed._userProgress).toContain("Phase 1/8");
-		expect(parsed._userProgress).toContain("RECON");
+		expect(parsed._userProgress).toContain("[1/8]");
 	});
 
 	test("_userProgress contains Completed and 8/8 for terminal phase", async () => {
@@ -377,8 +376,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed._userProgress).toBeDefined();
-		expect(parsed._userProgress).toContain("Phase");
-		expect(parsed._userProgress).toContain("BUILD");
+		expect(parsed._userProgress).toContain("[6/8]");
 	});
 
 	test("orchestrateCore fails closed when BUILD has pending dispatch but no result is provided", async () => {

@@ -17,7 +17,7 @@ export function setOpenCodeConfig(config: Config | null): void {
  */
 interface DoctorCheck {
 	readonly name: string;
-	readonly status: "pass" | "fail";
+	readonly status: "pass" | "warn" | "fail";
 	readonly message: string;
 	readonly fixSuggestion: string | null;
 }
@@ -120,7 +120,7 @@ function formatCheck(result: HealthResult): DoctorCheck {
  */
 function buildDisplayText(checks: readonly DoctorCheck[], duration: number): string {
 	const lines = checks.map((c) => {
-		const icon = c.status === "pass" ? "OK" : "FAIL";
+		const icon = c.status === "pass" ? "OK" : c.status === "warn" ? "WARN" : "FAIL";
 		const line = `[${icon}] ${c.name}: ${c.message}`;
 		return c.fixSuggestion ? `${line}\n     Fix: ${c.fixSuggestion}` : line;
 	});

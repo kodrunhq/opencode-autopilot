@@ -44,6 +44,103 @@ export async function configHealthCheck(configPath?: string): Promise<HealthResu
 	}
 }
 
+const LATEST_CONFIG_VERSION = 6;
+
+export async function configVersionCheck(configPath?: string): Promise<HealthResult> {
+	try {
+		const config = await loadConfig(configPath);
+		if (config === null) {
+			return Object.freeze({
+				name: "config-version",
+				status: "fail" as const,
+				message: "Config file not found",
+			});
+		}
+		if (config.version < LATEST_CONFIG_VERSION) {
+			return Object.freeze({
+				name: "config-version",
+				status: "warn" as const,
+				message: `Config v${config.version} is outdated (latest: v${LATEST_CONFIG_VERSION}). Auto-migration will upgrade on next load.`,
+			});
+		}
+		return Object.freeze({
+			name: "config-version",
+			status: "pass" as const,
+			message: `Config is on latest version (v${config.version})`,
+		});
+	} catch (error: unknown) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "config-version",
+			status: "fail" as const,
+			message: `Config version check failed: ${msg}`,
+		});
+	}
+}
+
+const REQUIRED_GROUPS: readonly string[] = Object.freeze([
+	"architects",
+	"challengers",
+	"builders",
+	"reviewers",
+	"red-team",
+	"researchers",
+	"communicators",
+	"utilities",
+]);
+
+export async function configGroupsCheck(configPath?: string): Promise<HealthResult> {
+	try {
+		const config = await loadConfig(configPath);
+		if (config === null) {
+			return Object.freeze({
+				name: "config-groups",
+				status: "fail" as const,
+				message: "Config file not found",
+			});
+		}
+
+		const assignedGroups = Object.keys(config.groups);
+		const missingGroups = REQUIRED_GROUPS.filter((g) => !assignedGroups.includes(g));
+
+		if (missingGroups.length > 0) {
+			return Object.freeze({
+				name: "config-groups",
+				status: "warn" as const,
+				message: `Missing model assignments for groups: ${missingGroups.join(", ")}`,
+				details: Object.freeze(missingGroups),
+			});
+		}
+
+		const groupsWithoutPrimary = assignedGroups.filter((g) => {
+			const group = config.groups[g];
+			return !group || !group.primary;
+		});
+
+		if (groupsWithoutPrimary.length > 0) {
+			return Object.freeze({
+				name: "config-groups",
+				status: "warn" as const,
+				message: `Groups without primary model: ${groupsWithoutPrimary.join(", ")}`,
+				details: Object.freeze(groupsWithoutPrimary),
+			});
+		}
+
+		return Object.freeze({
+			name: "config-groups",
+			status: "pass" as const,
+			message: `All ${REQUIRED_GROUPS.length} required groups have primary models assigned`,
+		});
+	} catch (error: unknown) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "config-groups",
+			status: "fail" as const,
+			message: `Config groups check failed: ${msg}`,
+		});
+	}
+}
+
 /** Standard agent names, derived from the agents barrel export. */
 const STANDARD_AGENT_NAMES: readonly string[] = Object.freeze([
 	"researcher",
