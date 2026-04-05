@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { tool } from "@opencode-ai/plugin";
 import { BackgroundManager } from "../background/manager";
+import { type BackgroundSdkOperations, createSdkRunner } from "../background/sdk-runner";
 import { loadConfig } from "../config";
 import { openKernelDb } from "../kernel/database";
 import { makeRoutingDecision } from "../routing";
@@ -94,6 +95,11 @@ function resolveRoutingDecision(
 }
 
 let defaultDelegateManager: BackgroundManager | null = null;
+let delegateSdkOps: BackgroundSdkOperations | null = null;
+
+export function setDelegateSdkOperations(ops: BackgroundSdkOperations): void {
+	delegateSdkOps = ops;
+}
 
 function getDelegateManager(db?: Database): BackgroundManager {
 	if (db) {
@@ -102,7 +108,8 @@ function getDelegateManager(db?: Database): BackgroundManager {
 	if (defaultDelegateManager) {
 		return defaultDelegateManager;
 	}
-	defaultDelegateManager = new BackgroundManager({ db: openKernelDb() });
+	const runTask = delegateSdkOps ? createSdkRunner(delegateSdkOps) : undefined;
+	defaultDelegateManager = new BackgroundManager({ db: openKernelDb(), runTask });
 	return defaultDelegateManager;
 }
 

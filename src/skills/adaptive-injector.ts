@@ -22,7 +22,9 @@ const CHARS_PER_TOKEN = 4;
 
 const mcpLogger = getLogger("mcp", "skill-activation");
 
-function activateMcpForSkills(skills: ReadonlyMap<string, LoadedSkill>): void {
+function activateMcpForSkills(skills: ReadonlyMap<string, LoadedSkill>, mcpEnabled: boolean): void {
+	if (!mcpEnabled) return;
+
 	const manager = getGlobalMcpManager();
 	if (!manager) return;
 
@@ -197,10 +199,11 @@ export function buildMultiSkillContext(
 	skills: ReadonlyMap<string, LoadedSkill>,
 	tokenBudget: number = DEFAULT_TOKEN_BUDGET,
 	mode: SkillMode = "summary",
+	mcpEnabled = true,
 ): string {
 	if (skills.size === 0) return "";
 
-	activateMcpForSkills(skills);
+	activateMcpForSkills(skills, mcpEnabled);
 
 	// Resolve dependency order
 	const depMap = new Map(
@@ -258,11 +261,13 @@ export function buildAdaptiveSkillContext(
 		readonly phase?: string;
 		readonly budget?: number;
 		readonly mode?: SkillMode;
+		readonly mcpEnabled?: boolean;
 	},
 ): string {
 	const phase = options?.phase;
 	const budget = options?.budget ?? DEFAULT_TOKEN_BUDGET;
 	const mode = options?.mode ?? "summary";
+	const mcpEnabled = options?.mcpEnabled ?? true;
 
 	if (phase !== undefined) {
 		const allowedNames = PHASE_SKILL_MAP[phase] ?? [];
@@ -276,9 +281,9 @@ export function buildAdaptiveSkillContext(
 			}
 		}
 
-		return buildMultiSkillContext(filtered, budget, mode);
+		return buildMultiSkillContext(filtered, budget, mode, mcpEnabled);
 	}
 
 	// No phase -- include all provided skills (caller already stack-filtered)
-	return buildMultiSkillContext(skills, budget, mode);
+	return buildMultiSkillContext(skills, budget, mode, mcpEnabled);
 }

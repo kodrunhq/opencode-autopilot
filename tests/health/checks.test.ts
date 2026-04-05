@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +11,7 @@ import {
 	routingHealthCheck,
 	skillHealthCheck,
 } from "../../src/health/checks";
+import { resetGlobalMcpManager } from "../../src/mcp";
 
 // ---------------------------------------------------------------------------
 // skillHealthCheck
@@ -506,6 +507,10 @@ describe("routingHealthCheck", () => {
 });
 
 describe("mcpHealthCheck", () => {
+	beforeEach(() => {
+		resetGlobalMcpManager();
+	});
+
 	test("returns pass when mcp is disabled", async () => {
 		const tempDir = join(tmpdir(), `mcp-health-disabled-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });

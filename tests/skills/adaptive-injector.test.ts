@@ -1,7 +1,8 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { McpLifecycleManager, resetGlobalMcpManager, setGlobalMcpManager } from "../../src/mcp";
 import {
 	buildAdaptiveSkillContext,
 	buildMultiSkillContext,
@@ -396,5 +397,77 @@ describe("buildAdaptiveSkillContext", () => {
 			expect(PHASE_SKILL_MAP[phase]).toBeDefined();
 			expect(Array.isArray(PHASE_SKILL_MAP[phase])).toBe(true);
 		}
+	});
+});
+
+describe("MCP config gating", () => {
+	afterEach(() => {
+		resetGlobalMcpManager();
+	});
+
+	function makeSkillWithMcp(name: string): LoadedSkill {
+		return {
+			frontmatter: {
+				name,
+				description: `${name} skill`,
+				stacks: [],
+				requires: [],
+				mcp: {
+					serverName: `${name}-server`,
+					command: "npx",
+					args: [],
+					env: {},
+					transport: "stdio",
+					scope: ["read"],
+					healthCheckTimeoutMs: 5000,
+				},
+			},
+			content: `# ${name}`,
+			path: `/fake/${name}/SKILL.md`,
+		};
+	}
+
+	it("does not start MCP servers when mcpEnabled is false", () => {
+		const manager = new McpLifecycleManager();
+		setGlobalMcpManager(manager);
+
+		const skills = new Map<string, LoadedSkill>([["docs", makeSkillWithMcp("docs")]]);
+
+		buildMultiSkillContext(skills, 8000, "summary", false);
+
+		const servers = manager.listServers();
+		expect(servers).toHaveLength(0);
+	});
+
+	it("starts MCP servers when mcpEnabled is true", () => {
+		const manager = new McpLifecycleManager();
+		setGlobalMcpManager(manager);
+
+		const skills = new Map<string, LoadedSkill>([["docs", makeSkillWithMcp("docs")]]);
+
+		buildMultiSkillContext(skills, 8000, "summary", true);
+
+		const servers = manager.listServers();
+		expect(servers).toHaveLength(1);
+		expect(servers[0]?.skillName).toBe("docs");
+	});
+
+	it("does not start MCP servers when no global manager is set", () => {
+		const skills = new Map<string, LoadedSkill>([["docs", makeSkillWithMcp("docs")]]);
+
+		const result = buildMultiSkillContext(skills, 8000, "summary", true);
+		expect(result).toContain("[Skill: docs]");
+	});
+
+	it("propagates mcpEnabled=false through buildAdaptiveSkillContext", () => {
+		const manager = new McpLifecycleManager();
+		setGlobalMcpManager(manager);
+
+		const skills = new Map<string, LoadedSkill>([["docs", makeSkillWithMcp("docs")]]);
+
+		buildAdaptiveSkillContext(skills, { mcpEnabled: false });
+
+		const servers = manager.listServers();
+		expect(servers).toHaveLength(0);
 	});
 });

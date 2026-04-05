@@ -76,6 +76,7 @@ export async function loadAdaptiveSkillContext(
 		readonly phase?: string;
 		readonly budget?: number;
 		readonly mode?: SkillMode;
+		readonly mcpEnabled?: boolean;
 	},
 ): Promise<string> {
 	try {

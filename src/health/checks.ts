@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import type { Config } from "@opencode-ai/plugin";
 import { parse } from "yaml";
 import { loadConfig } from "../config";
+import { getGlobalMcpManager } from "../mcp";
 import { AGENT_NAMES } from "../orchestrator/handlers/types";
 import { ALL_GROUP_IDS } from "../registry/model-groups";
 import { getAllCategories } from "../routing";
@@ -437,6 +438,43 @@ export async function mcpHealthCheck(configPath?: string): Promise<HealthResult>
 			});
 		}
 
+		const manager = getGlobalMcpManager();
+		if (manager) {
+			const healthResults = await manager.healthCheckAll();
+			if (healthResults.length === 0) {
+				return Object.freeze({
+					name: "mcp-health",
+					status: "pass" as const,
+					message: "MCP enabled, no servers running",
+				});
+			}
+
+			const unhealthy = healthResults.filter((result) => result.state !== "healthy");
+			const details = Object.freeze(
+				healthResults.map((result) => {
+					const status = result.state === "healthy" ? "ok" : result.state;
+					const errorSuffix = result.error ? ` - ${result.error}` : "";
+					return `${result.serverName} (${result.skillName}): ${status}${errorSuffix}`;
+				}),
+			);
+
+			if (unhealthy.length > 0) {
+				return Object.freeze({
+					name: "mcp-health",
+					status: "warn" as const,
+					message: `MCP enabled: ${healthResults.length} server(s), ${unhealthy.length} unhealthy`,
+					details,
+				});
+			}
+
+			return Object.freeze({
+				name: "mcp-health",
+				status: "pass" as const,
+				message: `MCP enabled: ${healthResults.length} server(s) healthy`,
+				details,
+			});
+		}
+
 		const skillsDir = join(configPath ? dirname(configPath) : getGlobalConfigDir(), "skills");
 		const skills = await loadAllSkills(skillsDir);
 		const mcpSkills = [...skills.values()].filter((skill) => skill.frontmatter.mcp !== null);
@@ -450,7 +488,7 @@ export async function mcpHealthCheck(configPath?: string): Promise<HealthResult>
 		return Object.freeze({
 			name: "mcp-health",
 			status: "pass" as const,
-			message: `MCP enabled with ${mcpSkills.length} MCP-capable skill${mcpSkills.length === 1 ? "" : "s"}`,
+			message: `MCP enabled with ${mcpSkills.length} MCP-capable skill${mcpSkills.length === 1 ? "" : "s"} (manager not initialized)`,
 			details,
 		});
 	} catch (error: unknown) {

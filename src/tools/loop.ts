@@ -2,7 +2,7 @@ import { tool } from "@opencode-ai/plugin";
 import { z } from "zod";
 import { getLoopController, type LoopController } from "../autonomy";
 
-type LoopAction = "status" | "abort";
+type LoopAction = "status" | "abort" | "start" | "pause" | "resume" | "iterate";
 
 function buildDisplayText(action: LoopAction, controller: LoopController): string {
 	const context = controller.getStatus();
@@ -20,10 +20,45 @@ function buildDisplayText(action: LoopAction, controller: LoopController): strin
 
 export async function loopCore(
 	action: LoopAction,
+	options?: {
+		readonly taskDescription?: string;
+		readonly maxIterations?: number;
+		readonly iterationResult?: string;
+	},
 	controller: LoopController = getLoopController(),
 ): Promise<string> {
-	if (action === "abort") {
-		controller.abort();
+	switch (action) {
+		case "start": {
+			const description = options?.taskDescription ?? "Untitled task";
+			controller.start(description, {
+				maxIterations: options?.maxIterations,
+			});
+			break;
+		}
+
+		case "iterate": {
+			const result = options?.iterationResult ?? "";
+			await controller.iterate(result);
+			break;
+		}
+
+		case "pause": {
+			controller.pause();
+			break;
+		}
+
+		case "resume": {
+			controller.resume();
+			break;
+		}
+
+		case "abort": {
+			controller.abort();
+			break;
+		}
+
+		case "status":
+			break;
 	}
 
 	return JSON.stringify({
@@ -34,11 +69,26 @@ export async function loopCore(
 }
 
 export const ocLoop = tool({
-	description: "Inspect or abort the current autonomy loop.",
+	description:
+		"Manage the autonomy loop. Actions: start (begin new loop), iterate (advance with result), pause, resume, abort, status.",
 	args: {
-		action: z.enum(["status", "abort"]).describe("Loop action to perform"),
+		action: z
+			.enum(["status", "abort", "start", "pause", "resume", "iterate"])
+			.describe("Loop action to perform"),
+		taskDescription: z.string().min(1).optional().describe("Task description for the start action"),
+		maxIterations: z
+			.number()
+			.int()
+			.min(1)
+			.max(100)
+			.optional()
+			.describe("Max iterations for the start action"),
+		iterationResult: z
+			.string()
+			.optional()
+			.describe("Result of the current iteration for the iterate action"),
 	},
-	async execute({ action }) {
-		return loopCore(action);
+	async execute({ action, taskDescription, maxIterations, iterationResult }) {
+		return loopCore(action, { taskDescription, maxIterations, iterationResult });
 	},
 });

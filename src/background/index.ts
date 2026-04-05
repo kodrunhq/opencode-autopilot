@@ -3,5 +3,6 @@ export * from "./executor";
 export * from "./manager";
 export * from "./repository";
 export * from "./schema";
+export * from "./sdk-runner";
 export * from "./slot-manager";
 export * from "./state-machine";

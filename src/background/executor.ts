@@ -42,6 +42,18 @@ function isAbortError(error: unknown): boolean {
 	return error instanceof Error && error.name === "AbortError";
 }
 
+function getDefaultRunner(
+	wait: (durationMs: number, signal: AbortSignal) => Promise<void>,
+	delayMs: number,
+): (task: BackgroundTaskRecord, signal: AbortSignal) => Promise<string> {
+	return async (task, signal) => {
+		await wait(delayMs, signal);
+		const agentSuffix = task.agent ? ` [agent=${task.agent}]` : "";
+		const modelSuffix = task.model ? ` [model=${task.model}]` : "";
+		return `Completed background task: ${task.description}${agentSuffix}${modelSuffix}`;
+	};
+}
+
 async function defaultWait(durationMs: number, signal: AbortSignal): Promise<void> {
 	await new Promise<void>((resolve, reject) => {
 		if (signal.aborted) {
@@ -95,12 +107,7 @@ export async function executeTask(
 	const timeoutMs = deps.timeoutMs ?? 1_000;
 	const executionDelayMs = deps.executionDelayMs ?? 10;
 	const wait = deps.wait ?? defaultWait;
-	const run =
-		deps.run ??
-		(async (currentTask: BackgroundTaskRecord, signal: AbortSignal) => {
-			await wait(executionDelayMs, signal);
-			return `Completed background task: ${currentTask.description}`;
-		});
+	const run = deps.run ?? getDefaultRunner(wait, executionDelayMs);
 
 	let timedOut = false;
 	const timeoutId = setTimeout(() => {

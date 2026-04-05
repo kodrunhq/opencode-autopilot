@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { tool } from "@opencode-ai/plugin";
 import { z } from "zod";
 import { BackgroundManager } from "../background/manager";
+import { type BackgroundSdkOperations, createSdkRunner } from "../background/sdk-runner";
 import { openKernelDb } from "../kernel/database";
 import type { TaskStatus } from "../types/background";
 
@@ -18,13 +19,19 @@ interface BackgroundToolOptions {
 }
 
 let defaultManager: BackgroundManager | null = null;
+let backgroundSdkOps: BackgroundSdkOperations | null = null;
+
+export function setBackgroundSdkOperations(ops: BackgroundSdkOperations): void {
+	backgroundSdkOps = ops;
+}
 
 function getDefaultManager(): BackgroundManager {
 	if (defaultManager) {
 		return defaultManager;
 	}
 
-	defaultManager = new BackgroundManager({ db: openKernelDb() });
+	const runTask = backgroundSdkOps ? createSdkRunner(backgroundSdkOps) : undefined;
+	defaultManager = new BackgroundManager({ db: openKernelDb(), runTask });
 	return defaultManager;
 }
 

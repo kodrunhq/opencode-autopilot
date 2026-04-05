@@ -40,7 +40,7 @@ import {
 	createRecoveryOrchestratorWithDb,
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
-import { ocBackground } from "./tools/background";
+import { ocBackground, setBackgroundSdkOperations } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
 import {
 	ocConfigure,
@@ -51,7 +51,7 @@ import {
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
-import { ocDelegate } from "./tools/delegate";
+import { ocDelegate, setDelegateSdkOperations } from "./tools/delegate";
 import { ocDoctor, setOpenCodeConfig as setDoctorOpenCodeConfig } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
 import { ocHashlineEdit } from "./tools/hashline-edit";
@@ -72,7 +72,10 @@ import { ocState } from "./tools/state";
 import { ocStocktake } from "./tools/stocktake";
 import { ocSummary } from "./tools/summary";
 import { ocUpdateDocs } from "./tools/update-docs";
+import { ContextWarningMonitor } from "./ux/context-warnings";
+import { getRemediationHint } from "./ux/error-hints";
 import { NotificationManager } from "./ux/notifications";
+import { ProgressTracker } from "./ux/progress";
 
 let openCodeConfig: Config | null = null;
 
@@ -152,6 +155,10 @@ const plugin: Plugin = async (input) => {
 		},
 	});
 
+	// --- UX surfaces: context warnings, progress tracking, error hints ---
+	const contextWarningMonitor = new ContextWarningMonitor({ notificationManager });
+	const _progressTracker = new ProgressTracker({ notificationManager });
+
 	// --- Fallback subsystem initialization ---
 	const sdkOps: SdkOperations = {
 		abortSession: async (sessionID) => {
@@ -184,6 +191,24 @@ const plugin: Plugin = async (input) => {
 			});
 		},
 	};
+
+	// --- Background task SDK wiring (enables real dispatch via promptAsync) ---
+	const backgroundSdkOps = {
+		promptAsync: async (
+			sessionId: string,
+			model: string | undefined,
+			parts: ReadonlyArray<{ type: "text"; text: string }>,
+		) => {
+			const modelSpec = model ? { providerID: "", modelID: model } : undefined;
+			await sdkOps.promptAsync(
+				sessionId,
+				modelSpec as { readonly providerID: string; readonly modelID: string },
+				parts as readonly import("./orchestrator/fallback").MessagePart[],
+			);
+		},
+	};
+	setBackgroundSdkOperations(backgroundSdkOps);
+	setDelegateSdkOperations(backgroundSdkOps);
 
 	const manager = new FallbackManager({
 		config: fallbackConfig,
@@ -416,7 +441,20 @@ const plugin: Plugin = async (input) => {
 					props && typeof props === "object" && "error" in props
 						? String((props as Record<string, unknown>).error)
 						: "Unknown error";
-				await notificationManager.error("Session Error", errorMsg);
+				const hint = getRemediationHint(errorMsg);
+				const displayMsg = hint ? `${errorMsg}\n${hint}` : errorMsg;
+				await notificationManager.error("Session Error", displayMsg);
+			}
+
+			if (event.type === "message.updated") {
+				const props = (event.properties ?? {}) as Record<string, unknown>;
+				const info = props.info as Record<string, unknown> | undefined;
+				if (info) {
+					const tokens = info.tokens as { input?: number } | undefined;
+					if (tokens && typeof tokens.input === "number") {
+						contextWarningMonitor.checkUtilization(tokens.input, 200_000);
+					}
+				}
 			}
 
 			if (fallbackConfig.enabled) {

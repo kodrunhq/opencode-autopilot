@@ -28,3 +28,7 @@ export function getGlobalMcpManager(): InstanceType<
 > | null {
 	return globalMcpManager;
 }
+
+export function resetGlobalMcpManager(): void {
+	globalMcpManager = null;
+}
