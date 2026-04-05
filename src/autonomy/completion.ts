@@ -9,7 +9,7 @@ export interface CompletionDetectionResult {
 }
 
 function countMatches(content: string, phrases: readonly string[]): readonly string[] {
-	return phrases.filter((phrase) => content.includes(phrase));
+	return phrases.filter((phrase) => new RegExp(`\\b${phrase}\\b`, "i").test(content));
 }
 
 function clampConfidence(value: number): number {

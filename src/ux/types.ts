@@ -8,7 +8,12 @@ export interface ToastOptions {
 }
 
 export interface NotificationSink {
-	showToast(title: string, message: string, variant: string, duration?: number): Promise<void>;
+	showToast(
+		title: string,
+		message: string,
+		variant: ToastVariant,
+		duration?: number,
+	): Promise<void>;
 }
 
 export interface ProgressUpdate {

@@ -176,7 +176,7 @@ describe("Integration: full pipeline v7 — all subsystems active", () => {
 
 	test("routing decision respects disabled category fallback", () => {
 		const decision = makeRoutingDecision("update the CSS styles", {
-			enabled: false,
+			enabled: true,
 			categories: {
 				"visual-engineering": { enabled: false, skills: [], metadata: {} },
 			},

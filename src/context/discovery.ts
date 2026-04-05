@@ -78,7 +78,11 @@ export async function discoverContextFiles(
 					priority: definition.priority + (maxDepth - depth + 1) * PRIORITY_DEPTH_BONUS,
 					tokenEstimate: estimateTokens(content),
 				});
-			} catch {}
+			} catch (error: unknown) {
+				if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) {
+					throw error;
+				}
+			}
 		}
 	}
 

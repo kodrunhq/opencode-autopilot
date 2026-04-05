@@ -14,8 +14,6 @@ export {
 export { getStrategy, type RecoveryStrategyResolver } from "./strategies";
 export type {
 	ClassificationResult,
-	ExtendedErrorCategory,
-	ExtendedRecoveryStrategy,
 	RecoveryActionEnvelope,
 	RecoveryAttempt,
 	RecoveryState,

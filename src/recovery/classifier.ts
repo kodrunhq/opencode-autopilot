@@ -1,8 +1,9 @@
+import type { ErrorCategory } from "../types/recovery";
 import { ErrorCategorySchema } from "../types/recovery";
-import type { ClassificationResult, ExtendedErrorCategory } from "./types";
+import type { ClassificationResult } from "./types";
 
 const CLASSIFICATION_RULES: readonly {
-	readonly category: ExtendedErrorCategory;
+	readonly category: ErrorCategory;
 	readonly patterns: readonly RegExp[];
 	readonly confidence: number;
 	readonly reasoning: string;
@@ -87,16 +88,13 @@ const CLASSIFICATION_RULES: readonly {
 	},
 ]);
 
-const NON_RECOVERABLE_CATEGORIES = new Set<ExtendedErrorCategory>([
-	"auth_failure",
-	"session_corruption",
-]);
+const NON_RECOVERABLE_CATEGORIES = new Set<ErrorCategory>(["auth_failure", "session_corruption"]);
 
 function getErrorMessage(error: Error | string): string {
 	return typeof error === "string" ? error : error.message;
 }
 
-function isKnownBaseCategory(category: string): category is ExtendedErrorCategory {
+function isKnownBaseCategory(category: string): category is ErrorCategory {
 	return ErrorCategorySchema.safeParse(category).success;
 }
 
@@ -119,7 +117,7 @@ export function classifyError(
 		}
 	}
 
-	const category: ExtendedErrorCategory = isKnownBaseCategory("unknown") ? "unknown" : "validation";
+	const category: ErrorCategory = isKnownBaseCategory("unknown") ? "unknown" : "validation";
 	return Object.freeze({
 		category,
 		confidence: 0.35,

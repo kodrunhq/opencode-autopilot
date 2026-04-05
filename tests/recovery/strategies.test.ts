@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { getStrategy } from "../../src/recovery/strategies";
-import type { ExtendedErrorCategory, RecoveryState } from "../../src/recovery/types";
+import type { RecoveryState } from "../../src/recovery/types";
+import type { ErrorCategory } from "../../src/types/recovery";
 
 function createState(overrides: Partial<RecoveryState> = {}): RecoveryState {
 	return {
@@ -72,7 +73,7 @@ describe("getStrategy", () => {
 	});
 
 	test("all required categories produce valid actions", () => {
-		const categories: readonly ExtendedErrorCategory[] = [
+		const categories: readonly ErrorCategory[] = [
 			"rate_limit",
 			"timeout",
 			"network",

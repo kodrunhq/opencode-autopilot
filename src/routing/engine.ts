@@ -56,6 +56,21 @@ export function makeRoutingDecision(
 	config?: RoutingConfig,
 	changedFiles: readonly string[] = [],
 ): RoutingDecision {
+	if (config?.enabled === false) {
+		const fallbackCategory: Category = "unspecified-low";
+		const appliedConfig = buildAppliedConfig(
+			fallbackCategory,
+			config?.categories[fallbackCategory],
+		);
+		return Object.freeze({
+			category: fallbackCategory,
+			confidence: 0,
+			agentId: appliedConfig.agentId,
+			reasoning: "Routing is disabled globally.",
+			appliedConfig,
+		});
+	}
+
 	const classification = classifyTask(description, changedFiles);
 	const resolved = resolveCategory(classification.category, config);
 	const appliedConfig = buildAppliedConfig(

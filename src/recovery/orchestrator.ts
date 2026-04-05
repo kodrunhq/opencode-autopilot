@@ -32,7 +32,7 @@ export class RecoveryOrchestrator {
 
 	constructor(options: RecoveryOrchestratorOptions = {}) {
 		this.maxAttempts = options.maxAttempts ?? 3;
-		this.logger = options.logger ?? getLogger("recovery", "subsystem");
+		this.logger = options.logger ?? getLogger("recovery", "orchestrator");
 		this.db = options.db ?? null;
 	}
 

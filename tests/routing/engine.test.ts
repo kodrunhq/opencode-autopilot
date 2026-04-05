@@ -50,4 +50,16 @@ describe("makeRoutingDecision", () => {
 		expect(result.reasoning).toContain("fell back to unspecified-low");
 		expect(result.appliedConfig?.modelGroup).toBe("utilities");
 	});
+
+	test("returns unspecified-low with zero confidence when routing is globally disabled", () => {
+		const config: RoutingConfig = {
+			enabled: false,
+			categories: {},
+		};
+
+		const result = makeRoutingDecision("build a complex React dashboard", config);
+		expect(result.category).toBe("unspecified-low");
+		expect(result.confidence).toBe(0);
+		expect(result.reasoning).toBe("Routing is disabled globally.");
+	});
 });

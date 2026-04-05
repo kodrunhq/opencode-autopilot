@@ -59,7 +59,7 @@ function resolveRoutingDecision(
 		}
 
 		const explicitDefinition = getCategoryDefinition(parsedCategory.data);
-		const override = config?.routing.categories[parsedCategory.data];
+		const override = config?.routing?.categories?.[parsedCategory.data];
 		const appliedConfig = CategoryConfigSchema.parse({
 			enabled: override?.enabled ?? true,
 			agentId: override?.agentId,
