@@ -9,7 +9,7 @@ import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { installAssets } from "./installer";
 import { openKernelDb } from "./kernel/database";
 import { getLogger, initLoggers } from "./logging/domains";
-import { McpLifecycleManager } from "./mcp";
+import { McpLifecycleManager, setGlobalMcpManager } from "./mcp";
 import {
 	createMemoryCaptureHandler,
 	createMemoryChatMessageHandler,
@@ -72,6 +72,7 @@ import { ocState } from "./tools/state";
 import { ocStocktake } from "./tools/stocktake";
 import { ocSummary } from "./tools/summary";
 import { ocUpdateDocs } from "./tools/update-docs";
+import { NotificationManager } from "./ux/notifications";
 
 let openCodeConfig: Config | null = null;
 
@@ -139,6 +140,16 @@ const plugin: Plugin = async (input) => {
 		getLogger("system").error("Log retention pruning failed", {
 			error: err instanceof Error ? err.stack : String(err),
 		});
+	});
+
+	// --- UX notification manager (rate-limited, best-effort) ---
+	const notificationManager = new NotificationManager({
+		sink: {
+			showToast: async (title, message, variant, duration) => {
+				await sdkOps.showToast(title, message, variant as "info" | "warning" | "error");
+				void duration;
+			},
+		},
 	});
 
 	// --- Fallback subsystem initialization ---
@@ -220,7 +231,15 @@ const plugin: Plugin = async (input) => {
 		try {
 			const kernelDb = openKernelDb();
 			const orchestrator = createRecoveryOrchestratorWithDb(kernelDb);
-			return createRecoveryEventHandler({ orchestrator, db: kernelDb });
+			return createRecoveryEventHandler({
+				orchestrator,
+				db: kernelDb,
+				sdk: {
+					abortSession: sdkOps.abortSession,
+					showToast: (title, message, variant) =>
+						sdkOps.showToast(title, message, variant as "info" | "warning" | "error"),
+				},
+			});
 		} catch {
 			return createRecoveryEventHandler(getDefaultRecoveryOrchestrator());
 		}
@@ -260,6 +279,7 @@ const plugin: Plugin = async (input) => {
 
 	// --- MCP lifecycle manager (lazy — servers start when skills with mcp: config activate) ---
 	const mcpManager = new McpLifecycleManager();
+	setGlobalMcpManager(mcpManager);
 
 	// --- Observability handlers ---
 	const toolStartTimes = new Map<string, number>();
@@ -373,10 +393,8 @@ const plugin: Plugin = async (input) => {
 			oc_memory_preferences: ocMemoryPreferences,
 		},
 		event: async ({ event }) => {
-			// 1. Observability: collect (pure observer, no side effects on session)
 			await observabilityEventHandler({ event });
 
-			// 2. Memory capture (pure observer, best-effort)
 			if (memoryCaptureHandler) {
 				try {
 					await memoryCaptureHandler({ event });
@@ -385,16 +403,22 @@ const plugin: Plugin = async (input) => {
 				}
 			}
 
-			// 3. First-load toast
 			if (event.type === "session.created" && isFirstLoad(config)) {
-				await sdkOps.showToast(
+				await notificationManager.info(
 					"Welcome to OpenCode Autopilot!",
 					"Plugin loaded. Run oc_doctor to verify your setup.",
-					"info",
 				);
 			}
 
-			// 4. Fallback event handling
+			if (event.type === "session.error") {
+				const props = event.properties;
+				const errorMsg =
+					props && typeof props === "object" && "error" in props
+						? String((props as Record<string, unknown>).error)
+						: "Unknown error";
+				await notificationManager.error("Session Error", errorMsg);
+			}
+
 			if (fallbackConfig.enabled) {
 				await fallbackEventHandler({ event });
 			}

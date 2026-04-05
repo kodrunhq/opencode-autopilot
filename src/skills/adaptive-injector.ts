@@ -9,6 +9,8 @@
 
 import { access, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { getLogger } from "../logging/domains";
+import { getGlobalMcpManager } from "../mcp";
 import { sanitizeTemplateContent } from "../review/sanitize";
 import { isEnoentError } from "../utils/fs-helpers";
 import { resolveDependencyOrder } from "./dependency-resolver";
@@ -17,6 +19,24 @@ import type { LoadedSkill } from "./loader";
 const DEFAULT_TOKEN_BUDGET = 8000;
 /** Rough estimate: 1 token ~ 4 chars */
 const CHARS_PER_TOKEN = 4;
+
+const mcpLogger = getLogger("mcp", "skill-activation");
+
+function activateMcpForSkills(skills: ReadonlyMap<string, LoadedSkill>): void {
+	const manager = getGlobalMcpManager();
+	if (!manager) return;
+
+	for (const [name, skill] of skills) {
+		if (skill.frontmatter.mcp) {
+			manager.startServer(name, skill.frontmatter.mcp).catch((error: unknown) => {
+				mcpLogger.warn("Failed to start MCP server for skill", {
+					skill: name,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			});
+		}
+	}
+}
 
 /**
  * Maps pipeline phases to the skill names relevant for that phase.
@@ -179,6 +199,8 @@ export function buildMultiSkillContext(
 	mode: SkillMode = "summary",
 ): string {
 	if (skills.size === 0) return "";
+
+	activateMcpForSkills(skills);
 
 	// Resolve dependency order
 	const depMap = new Map(

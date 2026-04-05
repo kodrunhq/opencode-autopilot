@@ -37,17 +37,20 @@ interface DelegateCoreOptions {
 	readonly spawn?: boolean;
 }
 
+interface ResolvedRouting {
+	readonly category: Category;
+	readonly confidence: number;
+	readonly reasoning: string;
+	readonly modelGroup: string;
+	readonly agentId: string | undefined;
+	readonly skills: readonly string[];
+}
+
 function resolveRoutingDecision(
 	task: string,
 	category: string | undefined,
 	config: Awaited<ReturnType<typeof loadConfig>>,
-): {
-	category: Category;
-	confidence: number;
-	reasoning: string;
-	modelGroup: string;
-	skills: readonly string[];
-} | null {
+): ResolvedRouting | null {
 	if (category !== undefined) {
 		const parsedCategory = CategorySchema.safeParse(category);
 		if (!parsedCategory.success) {
@@ -73,6 +76,7 @@ function resolveRoutingDecision(
 			confidence: 1,
 			reasoning: `Category explicitly provided as '${parsedCategory.data}'.`,
 			modelGroup: appliedConfig?.modelGroup ?? explicitDefinition.modelGroup,
+			agentId: appliedConfig?.agentId,
 			skills: appliedConfig?.skills ?? explicitDefinition.skills,
 		};
 	}
@@ -84,6 +88,7 @@ function resolveRoutingDecision(
 		confidence: decision.confidence,
 		reasoning: decision.reasoning ?? "No routing reasoning available.",
 		modelGroup: decision.appliedConfig?.modelGroup ?? definition.modelGroup,
+		agentId: decision.agentId,
 		skills: decision.appliedConfig?.skills ?? definition.skills,
 	};
 }
@@ -142,8 +147,8 @@ export async function delegateCore(
 		const sessionId = options?.sessionId ?? "delegate-session";
 		taskId = manager.spawn(sessionId, task, {
 			category: routing.category,
-			agent: undefined,
-			model: undefined,
+			agent: routing.agentId,
+			model: routing.modelGroup,
 		});
 
 		if (db) {

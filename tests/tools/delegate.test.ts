@@ -86,10 +86,26 @@ describe("delegateCore with background spawn", () => {
 			id: string;
 			category: string;
 			session_id: string;
+			model: string | null;
 		} | null;
 		expect(taskRow).not.toBeNull();
 		expect(taskRow?.category).toBe("quick");
 		expect(taskRow?.session_id).toBe("test-session");
+	});
+
+	test("spawned task passes model group from routing decision", async () => {
+		const result = JSON.parse(
+			await delegateCore("design UI", "visual-engineering", db, {
+				sessionId: "test-session",
+				spawn: true,
+			}),
+		);
+		const taskRow = db.query("SELECT * FROM background_tasks WHERE id = ?").get(result.taskId) as {
+			id: string;
+			model: string | null;
+		} | null;
+		expect(taskRow).not.toBeNull();
+		expect(taskRow?.model).toBe("builders");
 	});
 
 	test("displayText includes task ID when spawned", async () => {

@@ -14,3 +14,17 @@ export {
 	mcpTransportSchema,
 	skillMcpConfigSchema,
 } from "./types";
+
+let globalMcpManager: InstanceType<typeof import("./manager").McpLifecycleManager> | null = null;
+
+export function setGlobalMcpManager(
+	manager: InstanceType<typeof import("./manager").McpLifecycleManager>,
+): void {
+	globalMcpManager = manager;
+}
+
+export function getGlobalMcpManager(): InstanceType<
+	typeof import("./manager").McpLifecycleManager
+> | null {
+	return globalMcpManager;
+}
