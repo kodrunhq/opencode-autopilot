@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, unlinkSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { openKernelDb } from "../../src/kernel/database";
 
 describe("SQLite busy_timeout configuration", () => {
 	let testDir: string;
-	let testDbPath: string;
+	let _testDbPath: string;
 
 	beforeEach(() => {
 		testDir = join(tmpdir(), `opencode-tests-busy-${Date.now()}`);
 		mkdirSync(testDir, { recursive: true });
-		testDbPath = join(testDir, "kernel.db");
+		_testDbPath = join(testDir, "kernel.db");
 	});
 
 	afterEach(() => {
