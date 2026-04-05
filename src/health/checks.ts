@@ -44,7 +44,7 @@ export async function configHealthCheck(configPath?: string): Promise<HealthResu
 	}
 }
 
-const LATEST_CONFIG_VERSION = 6;
+const LATEST_CONFIG_VERSION = 7;
 
 export async function configVersionCheck(configPath?: string): Promise<HealthResult> {
 	try {
@@ -137,6 +137,74 @@ export async function configGroupsCheck(configPath?: string): Promise<HealthResu
 			name: "config-groups",
 			status: "fail" as const,
 			message: `Config groups check failed: ${msg}`,
+		});
+	}
+}
+
+/** v7 config fields that must be present on a v7 config. */
+const V7_REQUIRED_FIELDS: readonly string[] = Object.freeze([
+	"background",
+	"routing",
+	"recovery",
+	"mcp",
+]);
+
+/**
+ * Check that v7 configs contain all four new top-level fields introduced in v7:
+ * background, routing, recovery, and mcp.
+ * Inspects the raw on-disk JSON so that Zod default-filling does not mask
+ * actually-missing fields. Pre-v7 configs receive a pass with a migration notice.
+ */
+export async function configV7FieldsCheck(configPath?: string): Promise<HealthResult> {
+	const resolvedPath = configPath ?? join(getGlobalConfigDir(), "opencode-autopilot.json");
+	try {
+		let raw: Record<string, unknown>;
+		try {
+			const content = await readFile(resolvedPath, "utf-8");
+			raw = JSON.parse(content) as Record<string, unknown>;
+		} catch (error: unknown) {
+			if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+				return Object.freeze({
+					name: "config-v7-fields",
+					status: "fail" as const,
+					message: "Config file not found",
+				});
+			}
+			throw error;
+		}
+
+		const version = typeof raw.version === "number" ? raw.version : 0;
+
+		if (version < 7) {
+			return Object.freeze({
+				name: "config-v7-fields",
+				status: "pass" as const,
+				message: `Config v${version} will gain v7 fields (background, routing, recovery, mcp) on next load`,
+			});
+		}
+
+		const missingFields = V7_REQUIRED_FIELDS.filter((field) => !(field in raw));
+
+		if (missingFields.length > 0) {
+			return Object.freeze({
+				name: "config-v7-fields",
+				status: "fail" as const,
+				message: `Config v7 is missing required fields: ${missingFields.join(", ")}`,
+				details: Object.freeze(missingFields),
+			});
+		}
+
+		return Object.freeze({
+			name: "config-v7-fields",
+			status: "pass" as const,
+			message: `Config v7 fields present: ${V7_REQUIRED_FIELDS.join(", ")}`,
+		});
+	} catch (error: unknown) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "config-v7-fields",
+			status: "fail" as const,
+			message: `Config v7 fields check failed: ${msg}`,
 		});
 	}
 }
