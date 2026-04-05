@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 import plugin from "../src/index";
 
 describe("plugin entry point", () => {
+	type PluginInput = Parameters<typeof plugin>[0];
+	type PluginResult = Awaited<ReturnType<typeof plugin>>;
+
 	// Mock client with the session/tui stubs the fallback subsystem needs
 	const mockClient = {
 		session: {
@@ -26,40 +29,41 @@ describe("plugin entry point", () => {
 		directory: "/tmp",
 		worktree: "/tmp",
 		serverUrl: new URL("http://localhost:3000"),
-		$: {} as any,
-	};
+		$: {} as PluginInput["$"],
+	} satisfies PluginInput;
 
 	test("default export is a function", () => {
 		expect(typeof plugin).toBe("function");
 	});
 
 	test("returns hooks object with tool property", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		expect(result.tool).toBeDefined();
 	});
 
 	test("tool property contains oc_configure", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		expect(result.tool?.oc_configure).toBeDefined();
 		expect(typeof result.tool?.oc_configure.execute).toBe("function");
 	});
 
 	test("returns event handler function", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		expect(result.event).toBeDefined();
 		expect(typeof result.event).toBe("function");
 	});
 
 	test("event handler handles session.created gracefully", async () => {
 		const result = await plugin(mockInput);
-		const eventResult = await (result as any).event?.({
-			event: { type: "session.created", properties: {} },
-		} as any);
+		const eventInput = {
+			event: { type: "session.created", properties: { info: {} } },
+		} as unknown as Parameters<NonNullable<PluginResult["event"]>>[0];
+		const eventResult = await result.event?.(eventInput);
 		expect(eventResult).toBeUndefined();
 	});
 
 	test("registers all expected tools (22 total)", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		expect(result.tool).toBeDefined();
 		const toolNames = [...Object.keys(result.tool ?? {})].sort();
 		const expected = [
@@ -92,30 +96,30 @@ describe("plugin entry point", () => {
 	});
 
 	test("every registered tool has a valid execute function", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		expect(result.tool).toBeDefined();
-		for (const [_name, tool] of Object.entries(result.tool ?? ({} as any)) as any) {
+		for (const tool of Object.values(result.tool ?? {})) {
 			expect(typeof tool.execute).toBe("function");
 			expect(tool.description).toBeDefined();
 		}
 	});
 
 	test("returns chat.message hook", async () => {
-		const result = await plugin(mockInput as any);
-		const chatMessage = (result as any)["chat.message"];
+		const result = await plugin(mockInput);
+		const chatMessage = (result as unknown as Record<string, unknown>)["chat.message"];
 		expect(chatMessage).toBeDefined();
 		expect(typeof chatMessage).toBe("function");
 	});
 
 	test("returns tool.execute.after hook", async () => {
-		const result = await plugin(mockInput as any);
-		const toolExecAfter = (result as any)["tool.execute.after"];
+		const result = await plugin(mockInput);
+		const toolExecAfter = (result as unknown as Record<string, unknown>)["tool.execute.after"];
 		expect(toolExecAfter).toBeDefined();
 		expect(typeof toolExecAfter).toBe("function");
 	});
 
 	test("plugin return object has all 6 hook keys", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		const keys = Object.keys(result);
 		expect(keys).toContain("tool");
 		expect(keys).toContain("event");
@@ -126,32 +130,32 @@ describe("plugin entry point", () => {
 	});
 
 	test("returns tool.execute.before hook", async () => {
-		const result = await plugin(mockInput as any);
-		const toolExecBefore = (result as any)["tool.execute.before"];
+		const result = await plugin(mockInput);
+		const toolExecBefore = (result as unknown as Record<string, unknown>)["tool.execute.before"];
 		expect(toolExecBefore).toBeDefined();
 		expect(typeof toolExecBefore).toBe("function");
 	});
 
 	test("oc_logs tool is registered", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		expect(result.tool?.oc_logs).toBeDefined();
 		expect(typeof result.tool?.oc_logs.execute).toBe("function");
 	});
 
 	test("oc_session_stats tool is registered", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		expect(result.tool?.oc_session_stats).toBeDefined();
 		expect(typeof result.tool?.oc_session_stats.execute).toBe("function");
 	});
 
 	test("oc_pipeline_report tool is registered", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		expect(result.tool?.oc_pipeline_report).toBeDefined();
 		expect(typeof result.tool?.oc_pipeline_report.execute).toBe("function");
 	});
 
 	test("oc_mock_fallback tool is registered", async () => {
-		const result = await plugin(mockInput as any);
+		const result = await plugin(mockInput);
 		expect(result.tool?.oc_mock_fallback).toBeDefined();
 		expect(typeof result.tool?.oc_mock_fallback.execute).toBe("function");
 	});

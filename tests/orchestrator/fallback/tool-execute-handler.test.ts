@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import type { FallbackManager } from "../../../src/orchestrator/fallback/fallback-manager";
 
 // Minimal mock for FallbackManager
 function createMockManager() {
@@ -12,8 +13,11 @@ function createMockManager() {
 }
 
 describe("createToolExecuteAfterHandler", () => {
-	let createToolExecuteAfterHandler: any;
-	let mockManager: any;
+	type MockManager = Pick<FallbackManager, "getParentID"> & {
+		parentIDs: Map<string, string | null>;
+	};
+	let createToolExecuteAfterHandler: typeof import("../../../src/orchestrator/fallback/tool-execute-handler").createToolExecuteAfterHandler;
+	let mockManager: MockManager;
 
 	beforeEach(async () => {
 		const mod = await import("../../../src/orchestrator/fallback/tool-execute-handler");
@@ -22,14 +26,14 @@ describe("createToolExecuteAfterHandler", () => {
 	});
 
 	test("non-task tool returns without touching output", async () => {
-		const handler = createToolExecuteAfterHandler(mockManager);
+		const handler = createToolExecuteAfterHandler(mockManager as unknown as FallbackManager);
 		const output = { title: "read", output: "file content", metadata: {} };
 		await handler({ tool: "read", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect(output.metadata).toEqual({});
 	});
 
 	test("task tool with non-empty output returns without touching output", async () => {
-		const handler = createToolExecuteAfterHandler(mockManager);
+		const handler = createToolExecuteAfterHandler(mockManager as unknown as FallbackManager);
 		const output = { title: "task", output: "result data", metadata: {} };
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect(output.metadata).toEqual({});
@@ -37,14 +41,14 @@ describe("createToolExecuteAfterHandler", () => {
 
 	test("task tool with empty output and parentID sets fallbackPending", async () => {
 		mockManager.parentIDs.set("sess-1", "parent-1");
-		const handler = createToolExecuteAfterHandler(mockManager);
-		const output = { title: "task", output: "", metadata: {} as any };
+		const handler = createToolExecuteAfterHandler(mockManager as unknown as FallbackManager);
+		const output = { title: "task", output: "", metadata: {} as Record<string, unknown> };
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect((output.metadata as Record<string, unknown>).fallbackPending).toBe(true);
 	});
 
 	test("task tool with empty output and no parentID does NOT set flag", async () => {
-		const handler = createToolExecuteAfterHandler(mockManager);
+		const handler = createToolExecuteAfterHandler(mockManager as unknown as FallbackManager);
 		const output = { title: "task", output: "", metadata: {} };
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect(output.metadata).toEqual({});
@@ -52,7 +56,7 @@ describe("createToolExecuteAfterHandler", () => {
 
 	test("task tool with empty output and null parentID does NOT set flag", async () => {
 		mockManager.parentIDs.set("sess-1", null);
-		const handler = createToolExecuteAfterHandler(mockManager);
+		const handler = createToolExecuteAfterHandler(mockManager as unknown as FallbackManager);
 		const output = { title: "task", output: "", metadata: {} };
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect(output.metadata).toEqual({});
@@ -60,11 +64,11 @@ describe("createToolExecuteAfterHandler", () => {
 
 	test("task_result sentinel string is treated as empty", async () => {
 		mockManager.parentIDs.set("sess-1", "parent-1");
-		const handler = createToolExecuteAfterHandler(mockManager);
+		const handler = createToolExecuteAfterHandler(mockManager as unknown as FallbackManager);
 		const output = {
 			title: "task",
 			output: "<task_result></task_result>",
-			metadata: {} as any,
+			metadata: {} as Record<string, unknown>,
 		};
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect((output.metadata as Record<string, unknown>).fallbackPending).toBe(true);
@@ -72,11 +76,11 @@ describe("createToolExecuteAfterHandler", () => {
 
 	test("empty output with existing metadata merges correctly", async () => {
 		mockManager.parentIDs.set("sess-1", "parent-1");
-		const handler = createToolExecuteAfterHandler(mockManager);
+		const handler = createToolExecuteAfterHandler(mockManager as unknown as FallbackManager);
 		const output = {
 			title: "task",
 			output: "",
-			metadata: { existing: "value" } as any,
+			metadata: { existing: "value" } as Record<string, unknown>,
 		};
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		const meta = output.metadata as Record<string, unknown>;
@@ -86,8 +90,8 @@ describe("createToolExecuteAfterHandler", () => {
 
 	test("whitespace-only output is treated as empty", async () => {
 		mockManager.parentIDs.set("sess-1", "parent-1");
-		const handler = createToolExecuteAfterHandler(mockManager);
-		const output = { title: "task", output: "   \n\t  ", metadata: {} as any };
+		const handler = createToolExecuteAfterHandler(mockManager as unknown as FallbackManager);
+		const output = { title: "task", output: "   \n\t  ", metadata: {} as Record<string, unknown> };
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect((output.metadata as Record<string, unknown>).fallbackPending).toBe(true);
 	});

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import type { FallbackConfig } from "../../../src/orchestrator/fallback/fallback-config";
+import type { FallbackManager } from "../../../src/orchestrator/fallback/fallback-manager";
 import type { FallbackPlan, FallbackState } from "../../../src/orchestrator/fallback/types";
 
 // Minimal mock for FallbackManager
@@ -115,7 +116,7 @@ const defaultConfig: FallbackConfig = {
 describe("createEventHandler", () => {
 	let mockManager: ReturnType<typeof createMockManager>;
 	let mockSdk: ReturnType<typeof createMockSdk>;
-	let createEventHandler: any;
+	let createEventHandler: typeof import("../../../src/orchestrator/fallback/event-handler").createEventHandler;
 
 	beforeEach(async () => {
 		mockManager = createMockManager();
@@ -126,7 +127,7 @@ describe("createEventHandler", () => {
 
 	test("session.created calls manager.initSession with session model", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as any,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -148,7 +149,7 @@ describe("createEventHandler", () => {
 
 	test("session.created with parentID records parent-child mapping", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as any,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -169,7 +170,7 @@ describe("createEventHandler", () => {
 
 	test("session.created with agent forwards agentName to initSession", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -195,7 +196,7 @@ describe("createEventHandler", () => {
 
 	test("session.created without agent passes undefined agentName", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -216,7 +217,7 @@ describe("createEventHandler", () => {
 
 	test("session.deleted calls manager.cleanupSession", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -235,7 +236,7 @@ describe("createEventHandler", () => {
 
 	test("session.error with retryable error calls handleError", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -263,7 +264,7 @@ describe("createEventHandler", () => {
 			return null; // self-abort suppression happens inside handleError
 		};
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -288,7 +289,7 @@ describe("createEventHandler", () => {
 
 	test("session.compacted calls manager.clearCompactionInFlight", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -307,7 +308,7 @@ describe("createEventHandler", () => {
 
 	test("message.part.delta calls manager.recordFirstToken", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -326,7 +327,7 @@ describe("createEventHandler", () => {
 
 	test("message.updated with error calls handleError", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -371,7 +372,7 @@ describe("createEventHandler", () => {
 		};
 
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -402,7 +403,7 @@ describe("createEventHandler", () => {
 
 	test("session.created with model and timeout > 0 starts TTFT timeout", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -423,7 +424,7 @@ describe("createEventHandler", () => {
 
 	test("session.diff calls manager.recordFirstToken", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -442,7 +443,7 @@ describe("createEventHandler", () => {
 	test("session.error non-retryable does not trigger fallback dispatch", async () => {
 		// handleError returns null for non-retryable
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -463,7 +464,7 @@ describe("createEventHandler", () => {
 
 	test("session.created without model does not start TTFT timeout", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -504,7 +505,7 @@ describe("createEventHandler", () => {
 		};
 
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: { ...defaultConfig, notifyOnFallback: true },
 		});
@@ -526,7 +527,7 @@ describe("createEventHandler", () => {
 });
 
 describe("parseModelString", () => {
-	let parseModelString: any;
+	let parseModelString: typeof import("../../../src/orchestrator/fallback/event-handler").parseModelString;
 
 	beforeEach(async () => {
 		const mod = await import("../../../src/orchestrator/fallback/event-handler");
@@ -555,7 +556,7 @@ describe("parseModelString", () => {
 });
 
 describe("handleFallbackError additional coverage", () => {
-	let createEventHandler: any;
+	let createEventHandler: typeof import("../../../src/orchestrator/fallback/event-handler").createEventHandler;
 	let mockManager: ReturnType<typeof createMockManagerForAdditional>;
 	let mockSdk: ReturnType<typeof createMockSdkForAdditional>;
 
@@ -694,7 +695,7 @@ describe("handleFallbackError additional coverage", () => {
 		};
 
 		const handler = createEventHandler({
-			manager: mockManager,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -736,7 +737,7 @@ describe("handleFallbackError additional coverage", () => {
 		};
 
 		const handler = createEventHandler({
-			manager: mockManager,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: { ...defaultConfig, notifyOnFallback: false },
 		});
@@ -775,7 +776,7 @@ describe("handleFallbackError additional coverage", () => {
 		};
 
 		const handler = createEventHandler({
-			manager: mockManager,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -821,7 +822,7 @@ describe("handleFallbackError additional coverage", () => {
 		};
 
 		const handler = createEventHandler({
-			manager: mockManager,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -847,7 +848,7 @@ describe("handleFallbackError additional coverage", () => {
 
 	test("message.updated without error field does not trigger handleError", async () => {
 		const handler = createEventHandler({
-			manager: mockManager,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -869,7 +870,7 @@ describe("handleFallbackError additional coverage", () => {
 
 	test("session.error without sessionID does not trigger handleError", async () => {
 		const handler = createEventHandler({
-			manager: mockManager,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -909,7 +910,7 @@ describe("handleFallbackError additional coverage", () => {
 		};
 
 		const handler = createEventHandler({
-			manager: mockManager,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -929,7 +930,7 @@ describe("handleFallbackError additional coverage", () => {
 
 	test("clearAwaitingResult called on first token", async () => {
 		const handler = createEventHandler({
-			manager: mockManager,
+			manager: mockManager as unknown as FallbackManager,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});

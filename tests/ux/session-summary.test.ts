@@ -11,7 +11,7 @@ describe("generateSessionSummary", () => {
 	});
 
 	it("summarizes a successful completed session", () => {
-		const pipelineState: PipelineState = {
+		const pipelineState = {
 			status: "COMPLETED",
 			currentPhase: "RETROSPECTIVE",
 			phases: [
@@ -29,9 +29,9 @@ describe("generateSessionSummary", () => {
 					confidence: "HIGH",
 				},
 			],
-		} as any;
+		} as unknown as PipelineState;
 
-		const sessionData: SessionEvents = {
+		const sessionData = {
 			tokens: {
 				inputTokens: 1000,
 				outputTokens: 500,
@@ -51,7 +51,7 @@ describe("generateSessionSummary", () => {
 				},
 			],
 			startedAt: "2024-01-01T00:00:00Z",
-		} as any;
+		} as unknown as SessionEvents;
 
 		const summary = generateSessionSummary(sessionData, pipelineState);
 		expect(summary).toContain("**Pipeline Status**: COMPLETED (Current Phase: RETROSPECTIVE)");
@@ -63,7 +63,7 @@ describe("generateSessionSummary", () => {
 	});
 
 	it("includes errors in the summary", () => {
-		const sessionData: SessionEvents = {
+		const sessionData = {
 			events: [
 				{
 					type: "error",
@@ -75,7 +75,7 @@ describe("generateSessionSummary", () => {
 				},
 			],
 			startedAt: "2024-01-01T00:00:00Z",
-		} as any;
+		} as unknown as SessionEvents;
 
 		const summary = generateSessionSummary(sessionData, null);
 		expect(summary).toContain("**Errors Encountered**:");
@@ -86,10 +86,10 @@ describe("generateSessionSummary", () => {
 		const now = new Date("2024-01-01T00:00:05Z");
 		setSystemTime(now);
 		const startedAt = new Date("2024-01-01T00:00:00Z").toISOString();
-		const sessionData: SessionEvents = {
+		const sessionData = {
 			events: [],
 			startedAt,
-		} as any;
+		} as unknown as SessionEvents;
 
 		const summary = generateSessionSummary(sessionData, null);
 		expect(summary).toContain("**Duration (active)**: 5.0s");
@@ -97,11 +97,11 @@ describe("generateSessionSummary", () => {
 	});
 
 	it("handles empty phases list", () => {
-		const pipelineState: PipelineState = {
+		const pipelineState = {
 			status: "IN_PROGRESS",
 			currentPhase: "RECON",
 			phases: [],
-		} as any;
+		} as unknown as PipelineState;
 
 		const summary = generateSessionSummary(undefined, pipelineState);
 		expect(summary).toContain("**Pipeline Status**: IN_PROGRESS (Current Phase: RECON)");

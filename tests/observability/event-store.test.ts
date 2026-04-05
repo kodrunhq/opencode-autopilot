@@ -30,7 +30,14 @@ describe("Event Store Concurrency", () => {
 		expect(session).toBeDefined();
 		expect(session?.events.length).toBe(100);
 
-		const tools = new Set(session?.events.map((e: any) => e.tool));
+		const tools = new Set(
+			session?.events
+				.filter(
+					(event): event is Extract<ObservabilityEvent, { type: "tool_complete" }> =>
+						event.type === "tool_complete",
+				)
+				.map((event) => event.tool),
+		);
 		expect(tools.size).toBe(100);
 	});
 });

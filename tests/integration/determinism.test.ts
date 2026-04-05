@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parseAgentFindings } from "../../src/review/parse-findings";
 import { advancePipeline } from "../../src/review/pipeline";
 import { selectAgents } from "../../src/review/selection";
+import type { ReviewState } from "../../src/review/types";
 
 describe("Determinism Integration Test (Task 8)", () => {
 	test("Running exactly the same setup produces exactly the same outcomes 3 times", () => {
@@ -49,7 +50,7 @@ describe("Determinism Integration Test (Task 8)", () => {
 				startedAt: "2026-01-01T00:00:00.000Z",
 			};
 
-			const stage2Result = advancePipeline(JSON.stringify(findings), initialState as any);
+			const stage2Result = advancePipeline(JSON.stringify(findings), initialState as ReviewState);
 
 			return {
 				selectionNames: selection.selected.map((a) => a.name),

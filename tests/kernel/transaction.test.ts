@@ -4,6 +4,8 @@ import { unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { withTransaction } from "../../src/kernel/transaction";
 
+type RunArgs = Parameters<Database["run"]>;
+
 describe("withTransaction", () => {
 	let testDbPath: string;
 	let db: Database;
@@ -57,15 +59,15 @@ describe("withTransaction", () => {
 
 		let calls = 0;
 		const originalRun = db.run;
-		db.run = function (this: unknown, ...args: any[]) {
+		db.run = function (this: unknown, ...args: RunArgs) {
 			if (args[0] === "BEGIN IMMEDIATE") {
 				calls++;
 				if (calls < 3) {
 					throw new Error("database is locked");
 				}
 			}
-			return Reflect.apply(originalRun, db, args as any);
-		} as any;
+			return Reflect.apply(originalRun, db, args);
+		};
 
 		const result = withTransaction(
 			db,
@@ -86,13 +88,13 @@ describe("withTransaction", () => {
 	it("should fail after max retries", () => {
 		let calls = 0;
 		const originalRun = db.run;
-		db.run = function (this: unknown, ...args: any[]) {
+		db.run = function (this: unknown, ...args: RunArgs) {
 			if (args[0] === "BEGIN IMMEDIATE") {
 				calls++;
 				throw new Error("database is locked");
 			}
-			return Reflect.apply(originalRun, db, args as any);
-		} as any;
+			return Reflect.apply(originalRun, db, args);
+		};
 
 		expect(() => {
 			withTransaction(

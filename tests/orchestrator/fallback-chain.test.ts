@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { resolveChain } from "../../src/orchestrator/fallback/resolve-chain";
 
+type AgentConfig = Record<string, unknown> & { fallback_models?: string | readonly unknown[] };
+
+function makeAgentConfig(fallback_models: string | readonly unknown[] | number | boolean | null) {
+	return { fallback_models } as AgentConfig;
+}
+
 describe("resolveChain", () => {
 	test("returns per-agent fallback_models array when set", () => {
 		const result = resolveChain(
@@ -80,26 +86,24 @@ describe("resolveChain", () => {
 	test("filters non-string elements from per-agent array", () => {
 		const result = resolveChain(
 			"agent-a",
-			{ "agent-a": { fallback_models: [42, null, "valid-model", "", true] as any } },
+			{ "agent-a": makeAgentConfig([42, null, "valid-model", "", true]) },
 			undefined,
 		);
 		expect(result).toEqual(["valid-model"]);
 	});
 
 	test("filters non-string elements from global array", () => {
-		const result = resolveChain("agent-a", undefined, [42, null, "global-model"] as any);
+		const result = resolveChain("agent-a", undefined, [42, null, "global-model"]);
 		expect(result).toEqual(["global-model"]);
 	});
 
 	test("falls through to global when per-agent fallback_models is a number", () => {
-		const result = resolveChain("agent-a", { "agent-a": { fallback_models: 42 } as any }, [
-			"global-fallback",
-		]);
+		const result = resolveChain("agent-a", { "agent-a": makeAgentConfig(42) }, ["global-fallback"]);
 		expect(result).toEqual(["global-fallback"]);
 	});
 
 	test("falls through to global when per-agent fallback_models is boolean true", () => {
-		const result = resolveChain("agent-a", { "agent-a": { fallback_models: true } as any }, [
+		const result = resolveChain("agent-a", { "agent-a": makeAgentConfig(true) }, [
 			"global-fallback",
 		]);
 		expect(result).toEqual(["global-fallback"]);

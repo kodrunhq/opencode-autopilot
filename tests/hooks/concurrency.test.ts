@@ -5,7 +5,7 @@ import {
 	createToolExecuteAfterHandler,
 	createToolExecuteBeforeHandler,
 } from "../../src/observability/event-handlers";
-import { SessionEventStore } from "../../src/observability/event-store";
+import { type ObservabilityEvent, SessionEventStore } from "../../src/observability/event-store";
 
 describe("Hook Concurrency", () => {
 	it("should handle 10 concurrent tool executions safely", async () => {
@@ -48,7 +48,12 @@ describe("Hook Concurrency", () => {
 
 		const session = eventStore.getSession("test-session");
 		expect(session?.events.length).toBe(10);
-		expect(session?.events.every((e: any) => e.type === "tool_complete")).toBe(true);
+		expect(
+			session?.events.every(
+				(event): event is Extract<ObservabilityEvent, { type: "tool_complete" }> =>
+					event.type === "tool_complete",
+			),
+		).toBe(true);
 
 		expect(startTimes.size).toBe(0);
 	});

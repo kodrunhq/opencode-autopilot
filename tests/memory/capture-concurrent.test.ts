@@ -56,9 +56,9 @@ describe("Memory Capture Concurrency", () => {
 
 		const observations = db
 			.query("SELECT * FROM observations WHERE session_id = ?")
-			.all(sessionId) as Array<unknown>;
+			.all(sessionId) as Array<{ type: string }>;
 
 		expect(observations.length).toBe(10);
-		expect(observations.every((o: any) => o.type === "error")).toBe(true);
+		expect(observations.every((observation) => observation.type === "error")).toBe(true);
 	});
 });

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import type { FallbackManager } from "../../../src/orchestrator/fallback/fallback-manager";
 import type { FallbackState } from "../../../src/orchestrator/fallback/types";
 
 // Minimal mock for FallbackManager
@@ -54,7 +55,7 @@ function createFallbackState(overrides: Partial<FallbackState> = {}): FallbackSt
 
 describe("createChatMessageHandler", () => {
 	let mockManager: ReturnType<typeof createMockManager>;
-	let createChatMessageHandler: any;
+	let createChatMessageHandler: typeof import("../../../src/orchestrator/fallback/chat-message-handler").createChatMessageHandler;
 
 	beforeEach(async () => {
 		mockManager = createMockManager();
@@ -63,7 +64,7 @@ describe("createChatMessageHandler", () => {
 	});
 
 	test("when no fallback state exists, does not modify output", async () => {
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown as FallbackManager);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -77,7 +78,7 @@ describe("createChatMessageHandler", () => {
 
 	test("when currentModel equals originalModel, does not modify output", async () => {
 		mockManager.states.set("sess-1", createFallbackState());
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown as FallbackManager);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -98,7 +99,7 @@ describe("createChatMessageHandler", () => {
 				attemptCount: 1,
 			}),
 		);
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown as FallbackManager);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -119,7 +120,7 @@ describe("createChatMessageHandler", () => {
 			}),
 		);
 		mockManager.setDispatchInFlight(true);
-		const handler = createChatMessageHandler(mockManager as unknown);
+		const handler = createChatMessageHandler(mockManager as unknown as FallbackManager);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -141,7 +142,7 @@ describe("createChatMessageHandler", () => {
 			}),
 		);
 		mockManager.setCompactionInFlight(true);
-		const handler = createChatMessageHandler(mockManager as unknown);
+		const handler = createChatMessageHandler(mockManager as unknown as FallbackManager);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -162,7 +163,7 @@ describe("createChatMessageHandler", () => {
 				attemptCount: 1,
 			}),
 		);
-		const handler = createChatMessageHandler(mockManager as unknown);
+		const handler = createChatMessageHandler(mockManager as unknown as FallbackManager);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -176,7 +177,7 @@ describe("createChatMessageHandler", () => {
 
 	test("calls tryRecoverToOriginal to check for cooldown expiry", async () => {
 		mockManager.states.set("sess-1", createFallbackState());
-		const handler = createChatMessageHandler(mockManager as unknown);
+		const handler = createChatMessageHandler(mockManager as unknown as FallbackManager);
 
 		await handler({ sessionID: "sess-1" }, { message: { model: undefined }, parts: [] });
 
