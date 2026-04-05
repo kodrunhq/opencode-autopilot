@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	commandHealthCheck,
+	configV7FieldsCheck,
 	memoryHealthCheck,
 	nativeAgentSuppressionHealthCheck,
 	skillHealthCheck,
@@ -270,5 +271,227 @@ describe("nativeAgentSuppressionHealthCheck", () => {
 			},
 		} as unknown as import("@opencode-ai/plugin").Config);
 		expect(Object.isFrozen(result)).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// configV7FieldsCheck
+// ---------------------------------------------------------------------------
+describe("configV7FieldsCheck", () => {
+	async function writeTempConfig(dir: string, payload: unknown): Promise<string> {
+		const configPath = join(dir, "opencode-autopilot.json");
+		await writeFile(configPath, JSON.stringify(payload));
+		return configPath;
+	}
+
+	test("returns pass when all v7 fields are present", async () => {
+		const tempDir = join(tmpdir(), `v7-check-pass-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+
+		const configPath = await writeTempConfig(tempDir, {
+			version: 7,
+			configured: true,
+			groups: {},
+			overrides: {},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				notifyOnFallback: true,
+				cooldownMinutes: 10,
+				maxFallbacksPerSession: 5,
+				testMode: { forceError: false, forcedErrorType: null },
+			},
+			memory: { enabled: true, injectionBudget: 2000, decayHalfLifeDays: 90 },
+			background: {},
+			routing: {},
+			recovery: {},
+			mcp: {},
+		});
+
+		const result = await configV7FieldsCheck(configPath);
+		expect(result.status).toBe("pass");
+		expect(result.name).toBe("config-v7-fields");
+		expect(result.message).toContain("background");
+		expect(result.message).toContain("routing");
+		expect(result.message).toContain("recovery");
+		expect(result.message).toContain("mcp");
+
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("returns fail when config file is missing", async () => {
+		const tempDir = join(tmpdir(), `v7-check-missing-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+
+		const result = await configV7FieldsCheck(join(tempDir, "nonexistent.json"));
+		expect(result.status).toBe("fail");
+		expect(result.name).toBe("config-v7-fields");
+		expect(result.message).toContain("not found");
+
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("returns fail when v7 fields are missing from a v7 config", async () => {
+		const tempDir = join(tmpdir(), `v7-check-incomplete-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+
+		const configPath = await writeTempConfig(tempDir, {
+			version: 7,
+			configured: true,
+			groups: {},
+			overrides: {},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				notifyOnFallback: true,
+				cooldownMinutes: 10,
+				maxFallbacksPerSession: 5,
+				testMode: { forceError: false, forcedErrorType: null },
+			},
+			memory: { enabled: true, injectionBudget: 2000, decayHalfLifeDays: 90 },
+		});
+
+		const result = await configV7FieldsCheck(configPath);
+		expect(result.status).toBe("fail");
+		expect(result.name).toBe("config-v7-fields");
+		expect(result.message).toContain("missing required fields");
+		expect(result.details).toBeDefined();
+		expect(result.details).toContain("background");
+		expect(result.details).toContain("routing");
+		expect(result.details).toContain("recovery");
+		expect(result.details).toContain("mcp");
+
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("returns pass with migration message for a pre-v7 config", async () => {
+		const tempDir = join(tmpdir(), `v7-check-prев7-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+
+		const configPath = await writeTempConfig(tempDir, {
+			version: 6,
+			configured: true,
+			groups: {},
+			overrides: {},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				notifyOnFallback: true,
+				cooldownMinutes: 10,
+				maxFallbacksPerSession: 5,
+				testMode: { forceError: false, forcedErrorType: null },
+			},
+			memory: { enabled: true, injectionBudget: 2000, decayHalfLifeDays: 90 },
+		});
+
+		const result = await configV7FieldsCheck(configPath);
+		expect(result.status).toBe("pass");
+		expect(result.name).toBe("config-v7-fields");
+		expect(result.message).toContain("background");
+		expect(result.message).toContain("routing");
+		expect(result.message).toContain("recovery");
+		expect(result.message).toContain("mcp");
+
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("returns fail when only some v7 fields are missing", async () => {
+		const tempDir = join(tmpdir(), `v7-check-partial-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+
+		const configPath = await writeTempConfig(tempDir, {
+			version: 7,
+			configured: true,
+			groups: {},
+			overrides: {},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				notifyOnFallback: true,
+				cooldownMinutes: 10,
+				maxFallbacksPerSession: 5,
+				testMode: { forceError: false, forcedErrorType: null },
+			},
+			memory: { enabled: true, injectionBudget: 2000, decayHalfLifeDays: 90 },
+			background: {},
+			routing: {},
+		});
+
+		const result = await configV7FieldsCheck(configPath);
+		expect(result.status).toBe("fail");
+		expect(result.name).toBe("config-v7-fields");
+		expect(result.details).toBeDefined();
+		expect(result.details).toContain("recovery");
+		expect(result.details).toContain("mcp");
+		expect(result.details).not.toContain("background");
+		expect(result.details).not.toContain("routing");
+
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("returns frozen result", async () => {
+		const tempDir = join(tmpdir(), `v7-check-frozen-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+
+		const result = await configV7FieldsCheck(join(tempDir, "nonexistent.json"));
+		expect(Object.isFrozen(result)).toBe(true);
+
+		await rm(tempDir, { recursive: true, force: true });
 	});
 });

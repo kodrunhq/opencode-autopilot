@@ -23,7 +23,7 @@ describe("Config migration chain integration: v1 through v6", () => {
 		const result = await loadConfig(configPath);
 
 		expect(result).not.toBeNull();
-		expect(result?.version).toBe(6);
+		expect(result?.version).toBe(7);
 		expect(result?.configured).toBe(true);
 
 		// Orchestrator defaults
@@ -78,7 +78,7 @@ describe("Config migration chain integration: v1 through v6", () => {
 
 		const result = await loadConfig(configPath);
 
-		expect(result?.version).toBe(6);
+		expect(result?.version).toBe(7);
 		// Preserved from v2
 		expect(result?.orchestrator.autonomy).toBe("supervised");
 		expect(result?.orchestrator.strictness).toBe("strict");
@@ -127,7 +127,7 @@ describe("Config migration chain integration: v1 through v6", () => {
 
 		const result = await loadConfig(configPath);
 
-		expect(result?.version).toBe(6);
+		expect(result?.version).toBe(7);
 		// Preserved from v3
 		expect(result?.fallback.enabled).toBe(false);
 		expect(result?.fallback.retryOnErrors).toEqual([429, 500]);
@@ -180,7 +180,7 @@ describe("Config migration chain integration: v1 through v6", () => {
 
 		const result = await loadConfig(configPath);
 
-		expect(result?.version).toBe(6);
+		expect(result?.version).toBe(7);
 		// Preserved from v4
 		expect(result?.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
 		expect(result?.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
@@ -237,7 +237,7 @@ describe("Config migration chain integration: v1 through v6", () => {
 
 		const result = await loadConfig(configPath);
 
-		expect(result?.version).toBe(6);
+		expect(result?.version).toBe(7);
 		// Custom memory settings preserved (not overwritten with defaults)
 		expect(result?.memory.enabled).toBe(false);
 		expect(result?.memory.injectionBudget).toBe(3000);
@@ -256,7 +256,7 @@ describe("Config migration chain integration: v1 through v6", () => {
 
 		// File on disk should now be v6
 		const raw = JSON.parse(await readFile(configPath, "utf-8"));
-		expect(raw.version).toBe(6);
+		expect(raw.version).toBe(7);
 		expect(raw.orchestrator).toBeDefined();
 		expect(raw.confidence).toBeDefined();
 		expect(raw.fallback).toBeDefined();
@@ -268,5 +268,96 @@ describe("Config migration chain integration: v1 through v6", () => {
 		expect(raw.memory.enabled).toBe(true);
 		expect(raw.memory.injectionBudget).toBe(2000);
 		expect(raw.memory.decayHalfLifeDays).toBe(90);
+		expect(raw.background).toBeDefined();
+		expect(raw.background.enabled).toBe(false);
+		expect(raw.routing).toBeDefined();
+		expect(raw.routing.enabled).toBe(false);
+		expect(raw.recovery).toBeDefined();
+		expect(raw.recovery.enabled).toBe(true);
+		expect(raw.mcp).toBeDefined();
+		expect(raw.mcp.enabled).toBe(false);
+	});
+});
+
+describe("Config migration chain integration: v6 to v7", () => {
+	let tempDir: string;
+
+	beforeEach(async () => {
+		tempDir = await mkdtemp(join(tmpdir(), "config-migration-v6v7-"));
+	});
+
+	afterEach(async () => {
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("v6 config migrates to v7 with background/routing/recovery/mcp defaults", async () => {
+		const configPath = join(tempDir, "v6-config.json");
+		const v6Config = {
+			version: 6,
+			configured: true,
+			groups: { architects: { primary: "anthropic/claude-opus-4-6", fallbacks: [] } },
+			overrides: {},
+			orchestrator: {
+				autonomy: "full",
+				strictness: "normal",
+				phases: {
+					recon: true,
+					challenge: true,
+					architect: true,
+					explore: true,
+					plan: true,
+					build: true,
+					ship: true,
+					retrospective: true,
+				},
+			},
+			confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+			fallback: {
+				enabled: true,
+				retryOnErrors: [429],
+				retryableErrorPatterns: [],
+				maxFallbackAttempts: 10,
+				cooldownSeconds: 60,
+				timeoutSeconds: 30,
+				notifyOnFallback: true,
+				testMode: { enabled: false, sequence: [] },
+			},
+			memory: { enabled: false, injectionBudget: 3000, decayHalfLifeDays: 60 },
+		};
+		await writeFile(configPath, JSON.stringify(v6Config), "utf-8");
+
+		const result = await loadConfig(configPath);
+
+		expect(result).not.toBeNull();
+		expect(result?.version).toBe(7);
+
+		expect(result?.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
+		expect(result?.memory.enabled).toBe(false);
+		expect(result?.memory.injectionBudget).toBe(3000);
+
+		expect(result?.background.enabled).toBe(false);
+		expect(result?.background.maxConcurrent).toBe(5);
+		expect(result?.background.persistence).toBe(true);
+		expect(result?.routing.enabled).toBe(false);
+		expect(result?.routing.categories).toEqual({});
+		expect(result?.recovery.enabled).toBe(true);
+		expect(result?.recovery.maxRetries).toBe(3);
+		expect(result?.mcp.enabled).toBe(false);
+		expect(result?.mcp.skills).toEqual({});
+	});
+
+	test("v7 config round-trips without re-migration", async () => {
+		const configPath = join(tempDir, "v7-config.json");
+		const { loadConfig: lc, saveConfig: sc } = await import("../../src/config");
+		const { createDefaultConfig: cdc } = await import("../../src/config");
+		const defaultCfg = cdc();
+		await sc(defaultCfg, configPath);
+
+		const loaded = await lc(configPath);
+		expect(loaded?.version).toBe(7);
+		expect(loaded?.background.enabled).toBe(false);
+		expect(loaded?.routing.enabled).toBe(false);
+		expect(loaded?.recovery.enabled).toBe(true);
+		expect(loaded?.mcp.enabled).toBe(false);
 	});
 });

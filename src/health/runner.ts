@@ -4,6 +4,7 @@ import {
 	assetHealthCheck,
 	commandHealthCheck,
 	configHealthCheck,
+	configV7FieldsCheck,
 	memoryHealthCheck,
 	nativeAgentSuppressionHealthCheck,
 	skillHealthCheck,
@@ -51,6 +52,7 @@ export async function runHealthChecks(options?: {
 		skillHealthCheck(options?.projectRoot ?? process.cwd()),
 		memoryHealthCheck(options?.targetDir),
 		commandHealthCheck(options?.targetDir),
+		configV7FieldsCheck(options?.configPath),
 	]);
 
 	const fallbackNames = [
@@ -61,6 +63,7 @@ export async function runHealthChecks(options?: {
 		"skill-loading",
 		"memory-db",
 		"command-accessibility",
+		"config-v7-fields",
 	];
 	const results: readonly HealthResult[] = Object.freeze(
 		settled.map((outcome, i) => settledToResult(outcome, fallbackNames[i])),

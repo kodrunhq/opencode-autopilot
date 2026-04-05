@@ -35,7 +35,7 @@ describe("Config Health Checks", () => {
 
 			const result = await configHealthCheck(configPath);
 			expect(result.status).toBe("pass");
-			expect(result.message).toContain("v6");
+			expect(result.message).toContain("v7");
 		} finally {
 			await rm(tmpDir, { recursive: true });
 		}
