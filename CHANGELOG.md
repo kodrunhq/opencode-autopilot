@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.19.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.18.0...opencode-autopilot-v1.19.0) (2026-04-05)
+
+
+### Features
+
+* Phase 43 — integration polish, v7 documentation, and version bump ([1785e41](https://github.com/kodrunhq/opencode-autopilot/commit/1785e412ee0da27bf1d4a4c682ed20bb2d035df7))
+* v7.0 — Phases 33-43 (Background, Autonomy, Routing, Recovery, Context, UX, Agent Consolidation, MCP) ([5d5e1c6](https://github.com/kodrunhq/opencode-autopilot/commit/5d5e1c6e289344f0a7a2f03cd429d6588a9781f7))
+
+
+### Bug Fixes
+
+* address Copilot PR review findings (7 valid issues) ([be1d6c8](https://github.com/kodrunhq/opencode-autopilot/commit/be1d6c84ae24245078047178467d98bc7875b42a))
+* address Oracle V2 blocking issues (MCP wiring, deprecated files, delegate routing, recovery execution, UX notifications) ([da82488](https://github.com/kodrunhq/opencode-autopilot/commit/da8248870e62d926ab43fe32992ca1006a02dada))
+* address Oracle V3 blocking issues (SDK wiring, loop actions, MCP gating, UX surfaces, docs) ([c65d2cd](https://github.com/kodrunhq/opencode-autopilot/commit/c65d2cdc8ca7bf8a3e734e5c18c7d304ef9b9e4d))
+* resolve Oracle blocking issues — delegate, recovery, agents, MCP, loop injector ([c850ed1](https://github.com/kodrunhq/opencode-autopilot/commit/c850ed1593f380c9ebef35a122fb74b6a1b3af42))
+
 ## [7.0.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.18.0...opencode-autopilot-v7.0.0) (2026-04-05)
 
 v7.0 is a major release adding 11 new subsystems (Phases 33-43) that transform the plugin from a pipeline orchestrator into a fully autonomous development platform with background task management, self-healing recovery, context-aware injection, and MCP integration.
