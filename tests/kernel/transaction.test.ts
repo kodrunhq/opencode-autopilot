@@ -64,7 +64,7 @@ describe("withTransaction", () => {
 					throw new Error("database is locked");
 				}
 			}
-			return (originalRun as any)(...args);
+			return originalRun.apply(db, args as any);
 		} as any;
 
 		const result = withTransaction(
@@ -91,7 +91,7 @@ describe("withTransaction", () => {
 				calls++;
 				throw new Error("database is locked");
 			}
-			return (originalRun as any)(...args);
+			return originalRun.apply(db, args as any);
 		} as any;
 
 		expect(() => {
