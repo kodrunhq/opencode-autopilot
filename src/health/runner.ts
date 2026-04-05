@@ -7,6 +7,7 @@ import {
 	configV7FieldsCheck,
 	memoryHealthCheck,
 	nativeAgentSuppressionHealthCheck,
+	routingHealthCheck,
 	skillHealthCheck,
 } from "./checks";
 import type { HealthReport, HealthResult } from "./types";
@@ -54,6 +55,7 @@ export async function runHealthChecks(options?: {
 		memoryHealthCheck(options?.targetDir),
 		commandHealthCheck(options?.targetDir),
 		configV7FieldsCheck(options?.configPath),
+		routingHealthCheck(options?.configPath),
 	]);
 
 	const allSettled = [...configOutcome, ...settled];
@@ -67,6 +69,7 @@ export async function runHealthChecks(options?: {
 		"memory-db",
 		"command-accessibility",
 		"config-v7-fields",
+		"routing-health",
 	];
 	const results: readonly HealthResult[] = Object.freeze(
 		allSettled.map((outcome, i) => settledToResult(outcome, fallbackNames[i])),

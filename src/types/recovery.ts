@@ -8,6 +8,12 @@ export const ErrorCategorySchema = z.enum([
 	"timeout",
 	"network",
 	"validation",
+	"empty_content",
+	"thinking_block_error",
+	"tool_result_overflow",
+	"context_window_exceeded",
+	"session_corruption",
+	"agent_loop_stuck",
 	"unknown",
 ]);
 export type ErrorCategory = z.infer<typeof ErrorCategorySchema>;
@@ -18,6 +24,10 @@ export const RecoveryStrategySchema = z.enum([
 	"skip",
 	"abort",
 	"user_prompt",
+	"compact_and_retry",
+	"restart_session",
+	"reduce_context",
+	"skip_and_continue",
 ]);
 export type RecoveryStrategy = z.infer<typeof RecoveryStrategySchema>;
 

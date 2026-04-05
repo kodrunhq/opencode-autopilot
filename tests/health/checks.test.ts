@@ -7,6 +7,7 @@ import {
 	configV7FieldsCheck,
 	memoryHealthCheck,
 	nativeAgentSuppressionHealthCheck,
+	routingHealthCheck,
 	skillHealthCheck,
 } from "../../src/health/checks";
 
@@ -493,5 +494,12 @@ describe("configV7FieldsCheck", () => {
 		expect(Object.isFrozen(result)).toBe(true);
 
 		await rm(tempDir, { recursive: true, force: true });
+	});
+});
+
+describe("routingHealthCheck", () => {
+	test("returns frozen result", async () => {
+		const result = await routingHealthCheck("/nonexistent/path/config.json");
+		expect(Object.isFrozen(result)).toBe(true);
 	});
 });

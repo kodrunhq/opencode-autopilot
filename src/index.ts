@@ -30,6 +30,7 @@ import {
 } from "./orchestrator/fallback";
 import { fallbackDefaults } from "./orchestrator/fallback/fallback-config";
 import { resolveChain } from "./orchestrator/fallback/resolve-chain";
+import { createRecoveryEventHandler, getDefaultRecoveryOrchestrator } from "./recovery/index";
 import { ocBackground } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
 import {
@@ -41,6 +42,7 @@ import {
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
+import { ocDelegate } from "./tools/delegate";
 import { ocDoctor, setOpenCodeConfig as setDoctorOpenCodeConfig } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
 import { ocHashlineEdit } from "./tools/hashline-edit";
@@ -54,6 +56,7 @@ import { ocPhase } from "./tools/phase";
 import { ocPipelineReport } from "./tools/pipeline-report";
 import { ocPlan } from "./tools/plan";
 import { ocQuick } from "./tools/quick";
+import { ocRecover } from "./tools/recover";
 import { ocReview } from "./tools/review";
 import { ocSessionStats } from "./tools/session-stats";
 import { ocState } from "./tools/state";
@@ -204,6 +207,7 @@ const plugin: Plugin = async (input) => {
 	});
 	const chatMessageHandler = createChatMessageHandler(manager);
 	const toolExecuteAfterHandler = createToolExecuteAfterHandler(manager);
+	const recoveryEventHandler = createRecoveryEventHandler(getDefaultRecoveryOrchestrator());
 
 	// --- Anti-slop hook initialization ---
 	const antiSlopHandler = createAntiSlopHandler({ showToast: sdkOps.showToast });
@@ -316,6 +320,7 @@ const plugin: Plugin = async (input) => {
 		tool: {
 			oc_background: ocBackground,
 			oc_configure: ocConfigure,
+			oc_delegate: ocDelegate,
 			oc_create_agent: ocCreateAgent,
 			oc_create_skill: ocCreateSkill,
 			oc_create_command: ocCreateCommand,
@@ -326,6 +331,7 @@ const plugin: Plugin = async (input) => {
 			oc_orchestrate: ocOrchestrate,
 			oc_doctor: ocDoctor,
 			oc_quick: ocQuick,
+			oc_recover: ocRecover,
 			oc_forensics: ocForensics,
 			oc_hashline_edit: ocHashlineEdit,
 			oc_review: ocReview,
@@ -366,6 +372,8 @@ const plugin: Plugin = async (input) => {
 			if (fallbackConfig.enabled) {
 				await fallbackEventHandler({ event });
 			}
+
+			await recoveryEventHandler({ event });
 		},
 		config: async (cfg: Config) => {
 			openCodeConfig = cfg;
