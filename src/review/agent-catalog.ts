@@ -1,16 +1,6 @@
 import type { AgentCategory, AgentDefinition } from "./types";
 
-/**
- * NOTE: This catalog is reference data and is NOT yet wired into the review pipeline.
- * The pipeline uses the agent definitions from src/review/agents/*.ts directly.
- * This file may be integrated in a future milestone to drive dynamic agent selection.
- *
- * Complete registry of review agents ported from the ace review engine.
- * Core squad always runs. Parallel specialists run based on stack gate.
- * Sequenced specialists run after all prior findings are collected.
- */
 export const AGENT_CATALOG: readonly AgentDefinition[] = Object.freeze([
-	// --- Core Squad (always runs) ---
 	Object.freeze({
 		name: "logic-auditor",
 		category: "core" as const,
@@ -57,171 +47,143 @@ export const AGENT_CATALOG: readonly AgentDefinition[] = Object.freeze([
 		hardGatesSummary:
 			"Reads both sides of every API boundary, compares shapes/methods/URLs/error codes",
 	}),
-
-	// --- Parallel Specialists ---
 	Object.freeze({
-		name: "wiring-inspector",
+		name: "security-auditor",
 		category: "parallel" as const,
-		domain: "End-to-end connectivity (UI -> API -> DB -> response -> UI)",
+		domain: "Systematic OWASP auditing, auth/authz correctness, secrets, injection, crypto",
 		catches: Object.freeze([
-			"Disconnected flows",
-			"Wrong endpoint URLs",
-			"Mismatched request/response shapes",
-			"Missing error propagation across layers",
-			"Orphaned handlers",
+			"Hardcoded secrets",
+			"SQL/NoSQL/command injection",
+			"XSS",
+			"CSRF gaps",
+			"Broken route protection",
+			"Privilege escalation",
+			"Token validation gaps",
+			"Insecure crypto",
+			"SSRF",
+			"Sensitive data in logs",
 		]),
 		triggerSignals: Object.freeze([
-			"Changes span 2+ architectural layers",
-			"New API endpoints",
-			"New UI components that fetch data",
+			"User input handling",
+			"API endpoint changes",
+			"Auth middleware or session code",
+			"Database query construction",
+			"Crypto usage",
 		]),
 		stackAffinity: Object.freeze(["universal"]),
 		hardGatesSummary:
-			"Traces every feature path from UI event to DB write and back, documents each verified link",
+			"Checks OWASP Top 10 categories systematically and verifies auth guard, token, and password-handling flows end-to-end",
 	}),
 	Object.freeze({
-		name: "dead-code-scanner",
+		name: "code-hygiene-auditor",
 		category: "parallel" as const,
-		domain: "Unused code, imports, unreachable branches",
+		domain: "Unused code, unreachable branches, debug artifacts, and silent failure patterns",
 		catches: Object.freeze([
 			"Unused imports",
 			"Orphaned functions",
-			"TODO/FIXME",
+			"Unreachable branches",
+			"Empty catch blocks",
+			"Silent fallbacks that hide failures",
 			"Console.log/debugger",
-			"Hardcoded secrets",
 			"Commented-out code",
 		]),
 		triggerSignals: Object.freeze([
 			"Refactors",
 			"Feature removals",
 			"Large diffs",
-			"File deletions with remaining references",
+			"New error handling or fallback logic",
 		]),
 		stackAffinity: Object.freeze(["universal"]),
 		hardGatesSummary:
-			"Checks all changed files for unused imports, orphaned functions, debug artifacts, hardcoded secrets",
+			"Checks all changed files for dead code, production leftovers, and error paths that fail silently instead of surfacing problems",
 	}),
 	Object.freeze({
-		name: "spec-checker",
+		name: "architecture-verifier",
 		category: "parallel" as const,
-		domain: "Requirements alignment with issue/spec context",
+		domain: "End-to-end connectivity, scope and intent alignment, and requirement compliance",
 		catches: Object.freeze([
-			"Missing requirements",
+			"Disconnected flows",
+			"Broken cross-layer shape alignment",
+			"Missing error propagation across layers",
 			"Partial implementations",
-			"Ungoverned changes",
-			"Extra features not in spec",
+			"Scope creep and unguided architectural surface area",
 		]),
 		triggerSignals: Object.freeze([
-			"Linked GitHub issue exists",
-			"PR description references requirements",
-			"Changes touch feature code",
-		]),
-		stackAffinity: Object.freeze(["universal"]),
-		hardGatesSummary: "Maps each requirement to implementation status (done/partial/missing/extra)",
-	}),
-	Object.freeze({
-		name: "database-auditor",
-		category: "parallel" as const,
-		domain: "Migrations, query performance, schema design, connection management",
-		catches: Object.freeze([
-			"Destructive migrations without rollback",
-			"Missing indexes on FKs",
-			"N+1 queries",
-			"Raw SQL injection",
-			"Wrong column types",
-		]),
-		triggerSignals: Object.freeze([
-			"Migration files in diff",
-			"Schema changes",
-			"ORM model changes without corresponding migrations",
+			"Changes span 2+ architectural layers",
+			"New API endpoints",
+			"Requirements-driven feature work",
+			"New dependencies or architectural changes",
 		]),
 		stackAffinity: Object.freeze(["universal"]),
 		hardGatesSummary:
-			"Verifies rollback path, checks index coverage, detects N+1 patterns, checks for SQL injection",
+			"Traces feature paths end-to-end, maps each change to the requested scope, and flags missing or extra architectural work",
 	}),
 	Object.freeze({
-		name: "auth-flow-verifier",
+		name: "correctness-auditor",
 		category: "parallel" as const,
-		domain: "Auth/authz correctness, middleware guards, token handling",
-		catches: Object.freeze([
-			"Unprotected routes",
-			"Privilege escalation",
-			"Token validation gaps",
-			"Session fixation",
-			"Plaintext password storage",
-		]),
-		triggerSignals: Object.freeze([
-			"Changes to auth middleware",
-			"Login/logout handlers",
-			"Role/permission checks",
-			"JWT/session code",
-		]),
-		stackAffinity: Object.freeze(["universal"]),
-		hardGatesSummary:
-			"Traces every protected route to verify guard, checks token validation flow end-to-end",
-	}),
-	Object.freeze({
-		name: "type-soundness",
-		category: "parallel" as const,
-		domain: "Type correctness, invariant design, encapsulation, generics",
+		domain: "Type correctness, invariant design, async safety, concurrency safety",
 		catches: Object.freeze([
 			"Unsafe any usage",
 			"Incorrect type narrowing",
-			"Meaningless generic constraints",
 			"Unsafe type assertions",
-			"Violated invariants",
+			"Race conditions",
+			"Missing await or dropped promises",
+			"Missing cancellation or cleanup",
 		]),
 		triggerSignals: Object.freeze([
 			"New type definitions",
-			"Complex generics",
+			"Complex async or concurrency code",
 			"Type assertion usage",
-			"any in diff",
-		]),
-		stackAffinity: Object.freeze(["typescript", "kotlin", "rust", "go"]),
-		hardGatesSummary:
-			"Flags every any usage, verifies type narrowing correctness, evaluates invariant enforcement",
-	}),
-	Object.freeze({
-		name: "state-mgmt-auditor",
-		category: "parallel" as const,
-		domain: "UI state consistency, reactivity bugs, stale state, race conditions in UI",
-		catches: Object.freeze([
-			"Stale closures",
-			"Infinite re-render loops",
-			"Derived state stored instead of computed",
-			"Missing optimistic update rollback",
-		]),
-		triggerSignals: Object.freeze([
-			"React useState/useReducer",
-			"Redux/Zustand/Pinia store changes",
-			"Vue reactive state",
-			"Svelte stores",
-		]),
-		stackAffinity: Object.freeze(["react", "vue", "svelte", "angular"]),
-		hardGatesSummary:
-			"Traces state flow from update to render, verifies no stale closures in hooks",
-	}),
-	Object.freeze({
-		name: "concurrency-checker",
-		category: "parallel" as const,
-		domain: "Thread/async/goroutine safety, deadlocks, resource leaks",
-		catches: Object.freeze([
-			"Goroutine leaks",
-			"Mutex misuse",
-			"Race conditions",
-			"Missing context cancellation",
-			"Missing await",
-		]),
-		triggerSignals: Object.freeze([
-			"Goroutine creation",
-			"Mutex/lock usage",
-			"Async/await patterns",
-			"Worker threads",
-			"Promise.all usage",
+			"Shared mutable state",
 		]),
 		stackAffinity: Object.freeze(["universal"]),
 		hardGatesSummary:
-			"Verifies every goroutine/thread has a termination path, checks lock/unlock pairs",
+			"Flags type escape hatches, traces async and concurrent execution paths, and verifies cleanup on every code path",
+	}),
+	Object.freeze({
+		name: "frontend-auditor",
+		category: "parallel" as const,
+		domain: "Frontend framework rules, hooks/reactivity, state management, stale closures",
+		catches: Object.freeze([
+			"Hooks or lifecycle rule violations",
+			"Stale closures",
+			"Infinite re-render or reactive loops",
+			"Derived state anti-patterns",
+			"Hydration or server/client boundary mismatches",
+			"Missing optimistic update rollback",
+		]),
+		triggerSignals: Object.freeze([
+			"React/Next.js component changes",
+			"Vue/Svelte/Angular reactive state changes",
+			"Hooks, watchers, or store updates",
+		]),
+		stackAffinity: Object.freeze(["react", "nextjs", "vue", "svelte", "angular"]),
+		hardGatesSummary:
+			"Traces state from update to render, verifies framework rule compliance, and catches stale closures and hydration risks",
+	}),
+	Object.freeze({
+		name: "language-idioms-auditor",
+		category: "parallel" as const,
+		domain: "Go idioms, Python or Django or FastAPI patterns, and Rust safety conventions",
+		catches: Object.freeze([
+			"defer-in-loop and goroutine leaks",
+			"Nil interface or context misuse",
+			"N+1 queries in templates or handlers",
+			"Mutable default arguments",
+			"Missing CSRF on cookie-based auth flows",
+			"Unsafe Rust blocks without justification",
+			"unwrap/expect in non-test Rust code",
+			"Send/Sync or resource lifecycle misuse",
+		]),
+		triggerSignals: Object.freeze([
+			"Go files in diff",
+			"Django/FastAPI files in diff",
+			"Rust files in diff",
+			"Language-specific framework or runtime primitives",
+		]),
+		stackAffinity: Object.freeze(["go", "django", "fastapi", "rust"]),
+		hardGatesSummary:
+			"Applies stack-specific correctness checks for Go, Python web frameworks, and Rust that generic reviewers often miss",
 	}),
 	Object.freeze({
 		name: "code-quality-auditor",
@@ -245,149 +207,25 @@ export const AGENT_CATALOG: readonly AgentDefinition[] = Object.freeze([
 			"Measures function length, file length, nesting depth; checks naming conventions",
 	}),
 	Object.freeze({
-		name: "security-auditor",
+		name: "database-auditor",
 		category: "parallel" as const,
-		domain: "Systematic OWASP auditing, secrets, injection, crypto",
+		domain: "Migrations, query performance, schema design, connection management",
 		catches: Object.freeze([
-			"Hardcoded secrets",
-			"SQL/NoSQL/command injection",
-			"XSS",
-			"CSRF gaps",
-			"Insecure crypto",
-			"SSRF",
-			"Sensitive data in logs",
+			"Destructive migrations without rollback",
+			"Missing indexes on FKs",
+			"N+1 queries",
+			"Raw SQL injection",
+			"Wrong column types",
 		]),
 		triggerSignals: Object.freeze([
-			"User input handling",
-			"API endpoint changes",
-			"Database query construction",
-			"Crypto usage",
-		]),
-		stackAffinity: Object.freeze(["universal"]),
-		hardGatesSummary: "Checks OWASP Top 10 categories systematically, scans for hardcoded secrets",
-	}),
-	Object.freeze({
-		name: "scope-intent-verifier",
-		category: "parallel" as const,
-		domain: "Scope creep, project alignment, feature coherence",
-		catches: Object.freeze([
-			"Features not in any spec/issue",
-			"Changes conflicting with project philosophy",
-			"Unnecessary dependencies",
-		]),
-		triggerSignals: Object.freeze([
-			"New capabilities added",
-			"New dependencies",
-			"Changes to core architecture",
+			"Migration files in diff",
+			"Schema changes",
+			"ORM model changes without corresponding migrations",
 		]),
 		stackAffinity: Object.freeze(["universal"]),
 		hardGatesSummary:
-			"Reads project docs to understand purpose, maps each change to a user need or spec requirement",
+			"Verifies rollback path, checks index coverage, detects N+1 patterns, checks for SQL injection",
 	}),
-	Object.freeze({
-		name: "silent-failure-hunter",
-		category: "parallel" as const,
-		domain: "Error handling quality, swallowed errors, empty catches, silent fallbacks",
-		catches: Object.freeze([
-			"Empty catch blocks",
-			"Generic error swallowing",
-			"Console.log-only error handling",
-			"Optional chaining masking nulls",
-			"Fallbacks hiding failures",
-		]),
-		triggerSignals: Object.freeze([
-			"New/modified try-catch blocks",
-			"Error callbacks",
-			"Fallback logic",
-			"Default values on failure paths",
-		]),
-		stackAffinity: Object.freeze(["universal"]),
-		hardGatesSummary: "Every catch block must log with context and surface actionable feedback",
-	}),
-	Object.freeze({
-		name: "react-patterns-auditor",
-		category: "parallel" as const,
-		domain: "React/Next.js specific bug classes",
-		catches: Object.freeze([
-			"Hooks rules violations",
-			"Stale closures",
-			"Missing useEffect deps",
-			"Server/client boundary violations",
-			"Hydration mismatches",
-		]),
-		triggerSignals: Object.freeze([
-			"React component files in diff",
-			"Hooks usage",
-			"Next.js page/layout files",
-		]),
-		stackAffinity: Object.freeze(["react", "nextjs"]),
-		hardGatesSummary:
-			"Checks every hook call for rules compliance, verifies every useEffect deps array",
-	}),
-	Object.freeze({
-		name: "go-idioms-auditor",
-		category: "parallel" as const,
-		domain: "Go-specific bug classes",
-		catches: Object.freeze([
-			"defer-in-loop",
-			"Goroutine leaks",
-			"Nil interface traps",
-			"Error shadowing with :=",
-			"Context misuse",
-		]),
-		triggerSignals: Object.freeze([
-			"Go files in diff",
-			"Goroutine creation",
-			"Defer statements",
-			"Context.Context usage",
-		]),
-		stackAffinity: Object.freeze(["go"]),
-		hardGatesSummary:
-			"Checks every defer for loop placement, every goroutine for cancellation path",
-	}),
-	Object.freeze({
-		name: "python-django-auditor",
-		category: "parallel" as const,
-		domain: "Python/Django-specific bug classes",
-		catches: Object.freeze([
-			"N+1 in templates",
-			"Unvalidated ModelForms",
-			"Missing CSRF",
-			"Lazy eval traps",
-			"Mutable default args",
-		]),
-		triggerSignals: Object.freeze([
-			"Django view/model/form/template files",
-			"Python files with ORM queries",
-			"settings.py changes",
-		]),
-		stackAffinity: Object.freeze(["django", "fastapi"]),
-		hardGatesSummary:
-			"Checks every queryset for select_related/prefetch_related, every ModelForm for explicit fields",
-	}),
-	Object.freeze({
-		name: "rust-safety-auditor",
-		category: "parallel" as const,
-		domain: "Rust-specific bug classes",
-		catches: Object.freeze([
-			"Unjustified unsafe blocks",
-			".unwrap() in non-test code",
-			"Lifetime correctness issues",
-			"Send/Sync violations",
-			"mem::forget misuse",
-		]),
-		triggerSignals: Object.freeze([
-			"Rust files in diff",
-			"Unsafe blocks",
-			".unwrap()/.expect() calls",
-			"Lifetime annotations",
-		]),
-		stackAffinity: Object.freeze(["rust"]),
-		hardGatesSummary:
-			"Every unsafe block must have a SAFETY comment, every .unwrap() in non-test code is flagged",
-	}),
-
-	// --- Sequenced Specialists (run after all prior findings) ---
 	Object.freeze({
 		name: "product-thinker",
 		category: "sequenced" as const,
@@ -424,16 +262,10 @@ export const AGENT_CATALOG: readonly AgentDefinition[] = Object.freeze([
 	}),
 ]);
 
-/**
- * The three core squad agents that always run regardless of stack or scoring.
- */
 export const CORE_SQUAD: readonly AgentDefinition[] = Object.freeze(
 	AGENT_CATALOG.filter((a) => a.category === "core"),
 );
 
-/**
- * Filter agents by category.
- */
 export function getAgentsByCategory(category: AgentCategory): readonly AgentDefinition[] {
 	return AGENT_CATALOG.filter((a) => a.category === category);
 }

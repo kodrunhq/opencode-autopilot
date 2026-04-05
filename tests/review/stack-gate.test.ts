@@ -4,9 +4,8 @@ import { applyStackGate, detectStackTags, STACK_GATE_RULES } from "../../src/rev
 
 describe("STACK_GATE_RULES", () => {
 	test("maps agent names to required tags", () => {
-		expect(STACK_GATE_RULES["react-patterns-auditor"]).toBeDefined();
-		expect(STACK_GATE_RULES["go-idioms-auditor"]).toBeDefined();
-		expect(STACK_GATE_RULES["type-soundness"]).toBeDefined();
+		expect(STACK_GATE_RULES["frontend-auditor"]).toBeDefined();
+		expect(STACK_GATE_RULES["language-idioms-auditor"]).toBeDefined();
 	});
 
 	test("is frozen", () => {
@@ -20,32 +19,36 @@ describe("STACK_GATE_RULES", () => {
 });
 
 describe("applyStackGate", () => {
-	test("keeps type-soundness with typescript tags", () => {
+	test("excludes frontend-auditor with typescript-only tags", () => {
 		const result = applyStackGate(AGENT_CATALOG, ["typescript"]);
-		expect(result.some((a) => a.name === "type-soundness")).toBe(true);
+		expect(result.some((a) => a.name === "frontend-auditor")).toBe(false);
 	});
 
-	test("excludes go-idioms-auditor with typescript tags", () => {
+	test("excludes language-idioms-auditor with typescript tags", () => {
 		const result = applyStackGate(AGENT_CATALOG, ["typescript"]);
-		expect(result.some((a) => a.name === "go-idioms-auditor")).toBe(false);
+		expect(result.some((a) => a.name === "language-idioms-auditor")).toBe(false);
 	});
 
-	test("keeps react-patterns-auditor and state-mgmt-auditor with react tags", () => {
+	test("keeps frontend-auditor with react tags", () => {
 		const result = applyStackGate(AGENT_CATALOG, ["react"]);
-		expect(result.some((a) => a.name === "react-patterns-auditor")).toBe(true);
-		expect(result.some((a) => a.name === "state-mgmt-auditor")).toBe(true);
+		expect(result.some((a) => a.name === "frontend-auditor")).toBe(true);
 	});
 
-	test("excludes react-patterns-auditor with python tags", () => {
+	test("keeps language-idioms-auditor with rust tags", () => {
+		const result = applyStackGate(AGENT_CATALOG, ["rust"]);
+		expect(result.some((a) => a.name === "language-idioms-auditor")).toBe(true);
+	});
+
+	test("excludes frontend-auditor with python tags", () => {
 		const result = applyStackGate(AGENT_CATALOG, ["python"]);
-		expect(result.some((a) => a.name === "react-patterns-auditor")).toBe(false);
+		expect(result.some((a) => a.name === "frontend-auditor")).toBe(false);
 	});
 
 	test("keeps ungated agents regardless of tags", () => {
 		const result = applyStackGate(AGENT_CATALOG, ["python"]);
 		expect(result.some((a) => a.name === "logic-auditor")).toBe(true);
 		expect(result.some((a) => a.name === "security-auditor")).toBe(true);
-		expect(result.some((a) => a.name === "wiring-inspector")).toBe(true);
+		expect(result.some((a) => a.name === "architecture-verifier")).toBe(true);
 	});
 
 	test("keeps ungated agents even with empty tags", () => {
@@ -53,8 +56,8 @@ describe("applyStackGate", () => {
 		expect(result.some((a) => a.name === "logic-auditor")).toBe(true);
 		expect(result.some((a) => a.name === "security-auditor")).toBe(true);
 		// Gated agents should be excluded with empty tags
-		expect(result.some((a) => a.name === "react-patterns-auditor")).toBe(false);
-		expect(result.some((a) => a.name === "go-idioms-auditor")).toBe(false);
+		expect(result.some((a) => a.name === "frontend-auditor")).toBe(false);
+		expect(result.some((a) => a.name === "language-idioms-auditor")).toBe(false);
 	});
 });
 

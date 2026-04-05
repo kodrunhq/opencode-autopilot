@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { access, readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Config } from "@opencode-ai/plugin";
 import { parse } from "yaml";
 import { loadConfig } from "../config";
@@ -410,6 +410,51 @@ export async function skillHealthCheck(
 			name: "skill-loading",
 			status: "fail" as const,
 			message: `Skill check failed: ${msg}`,
+		});
+	}
+}
+
+export async function mcpHealthCheck(configPath?: string): Promise<HealthResult> {
+	try {
+		const config = await loadConfig(configPath);
+		if (config === null) {
+			return Object.freeze({
+				name: "mcp-health",
+				status: "fail" as const,
+				message: "Plugin config file not found",
+			});
+		}
+
+		if (!config.mcp.enabled) {
+			return Object.freeze({
+				name: "mcp-health",
+				status: "pass" as const,
+				message: "MCP disabled in config",
+			});
+		}
+
+		const skillsDir = join(configPath ? dirname(configPath) : getGlobalConfigDir(), "skills");
+		const skills = await loadAllSkills(skillsDir);
+		const mcpSkills = [...skills.values()].filter((skill) => skill.frontmatter.mcp !== null);
+		const details = Object.freeze(
+			mcpSkills.map((skill) => {
+				const mcp = skill.frontmatter.mcp;
+				return `${skill.frontmatter.name}: ${mcp?.serverName} (${mcp?.transport})`;
+			}),
+		);
+
+		return Object.freeze({
+			name: "mcp-health",
+			status: "pass" as const,
+			message: `MCP enabled with ${mcpSkills.length} MCP-capable skill${mcpSkills.length === 1 ? "" : "s"}`,
+			details,
+		});
+	} catch (error: unknown) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "mcp-health",
+			status: "fail" as const,
+			message: `MCP health check failed: ${msg}`,
 		});
 	}
 }

@@ -9,6 +9,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse } from "yaml";
+import { skillMcpConfigSchema } from "../mcp/types";
 import { isEnoentError } from "../utils/fs-helpers";
 
 export interface SkillFrontmatter {
@@ -16,6 +17,7 @@ export interface SkillFrontmatter {
 	readonly description: string;
 	readonly stacks: readonly string[];
 	readonly requires: readonly string[];
+	readonly mcp: import("../mcp/types").SkillMcpConfig | null;
 }
 
 export interface LoadedSkill {
@@ -36,6 +38,7 @@ export function parseSkillFrontmatter(content: string): SkillFrontmatter | null 
 		const parsed = parse(match[1]);
 		if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
 		const fm = parsed as Record<string, unknown>;
+		const parsedMcp = fm.mcp === undefined ? null : skillMcpConfigSchema.safeParse(fm.mcp);
 		return {
 			name: typeof fm.name === "string" ? fm.name : "",
 			description: typeof fm.description === "string" ? fm.description : "",
@@ -45,6 +48,7 @@ export function parseSkillFrontmatter(content: string): SkillFrontmatter | null 
 			requires: Array.isArray(fm.requires)
 				? fm.requires.filter((s): s is string => typeof s === "string")
 				: [],
+			mcp: parsedMcp?.success === true ? parsedMcp.data : null,
 		};
 	} catch {
 		return null;

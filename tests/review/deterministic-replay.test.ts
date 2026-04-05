@@ -8,7 +8,7 @@ describe("Deterministic Replay (Task 3)", () => {
 	const createInitialState = (): ReviewState => ({
 		stage: 1,
 		scope: initialScope,
-		selectedAgentNames: ["security-auditor", "auth-flow-verifier"],
+		selectedAgentNames: ["security-auditor", "architecture-verifier"],
 		accumulatedFindings: [],
 		startedAt: "2026-01-01T00:00:00.000Z",
 	});
@@ -34,7 +34,7 @@ describe("Deterministic Replay (Task 3)", () => {
 		`
 		[
 			{
-				"agent": "auth-flow-verifier",
+				"agent": "architecture-verifier",
 				"file": "auth.ts",
 				"line": 1,
 				"severity": "CRITICAL",

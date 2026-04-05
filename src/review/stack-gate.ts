@@ -7,12 +7,8 @@ import type { AgentDefinition } from "./types";
  * If listed, at least ONE of the required tags must be present in the project.
  */
 export const STACK_GATE_RULES: Readonly<Record<string, readonly string[]>> = Object.freeze({
-	"react-patterns-auditor": Object.freeze(["react", "nextjs"]),
-	"go-idioms-auditor": Object.freeze(["go"]),
-	"python-django-auditor": Object.freeze(["django", "fastapi"]),
-	"rust-safety-auditor": Object.freeze(["rust"]),
-	"state-mgmt-auditor": Object.freeze(["react", "vue", "svelte", "angular"]),
-	"type-soundness": Object.freeze(["typescript", "kotlin", "rust", "go"]),
+	"frontend-auditor": Object.freeze(["react", "nextjs", "vue", "svelte", "angular"]),
+	"language-idioms-auditor": Object.freeze(["go", "django", "fastapi", "rust"]),
 });
 
 /**

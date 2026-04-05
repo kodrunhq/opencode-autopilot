@@ -29,10 +29,6 @@ export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = deepFreeze({
 
 	// ── Reviewers ──────────────────────────────────────────────
 	// Code analysis, adversarial to Builders
-	// NOTE: The 21 internal ReviewAgent objects (logic-auditor, security-auditor,
-	// etc.) are NOT in this registry. They use the ReviewAgent type from
-	// src/review/types.ts, not AgentConfig. The review pipeline resolves their
-	// model via resolveModelForGroup("reviewers") directly.
 	"oc-reviewer": { group: "reviewers" },
 	reviewer: { group: "reviewers" },
 

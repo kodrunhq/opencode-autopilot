@@ -138,9 +138,9 @@ describe("reviewCore", () => {
 		expect(agentNames).toContain("logic-auditor");
 		expect(agentNames).toContain("security-auditor");
 		// Universal specialized agents should also be present
-		expect(agentNames).toContain("wiring-inspector");
-		expect(agentNames).toContain("dead-code-scanner");
-		expect(agentNames).toContain("concurrency-checker");
+		expect(agentNames).toContain("architecture-verifier");
+		expect(agentNames).toContain("code-hygiene-auditor");
+		expect(agentNames).toContain("correctness-auditor");
 	});
 
 	test("state file contains selectedAgentNames with specialized agents", async () => {
@@ -150,9 +150,9 @@ describe("reviewCore", () => {
 		const state = JSON.parse(raw);
 		const kernelState = loadActiveReviewStateFromKernel(join(tempDir, ".opencode-autopilot"));
 		// Should include universal specialized agents
-		expect(state.selectedAgentNames).toContain("wiring-inspector");
+		expect(state.selectedAgentNames).toContain("architecture-verifier");
 		expect(state.selectedAgentNames).toContain("database-auditor");
-		expect(kernelState?.selectedAgentNames).toContain("wiring-inspector");
+		expect(kernelState?.selectedAgentNames).toContain("architecture-verifier");
 		expect(kernelState?.selectedAgentNames).toContain("database-auditor");
 	});
 });

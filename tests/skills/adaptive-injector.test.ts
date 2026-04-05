@@ -19,7 +19,7 @@ function makeSkill(
 	description = "",
 ): LoadedSkill {
 	return {
-		frontmatter: { name, description, stacks, requires },
+		frontmatter: { name, description, stacks, requires, mcp: null },
 		content: `---\nname: ${name}\n---\n# ${name} content`,
 		path: `/fake/${name}/SKILL.md`,
 	};
@@ -178,7 +178,13 @@ describe("buildMultiSkillContext", () => {
 
 	it("respects token budget by excluding skills that exceed it", () => {
 		const bigSkill: LoadedSkill = {
-			frontmatter: { name: "big", description: "x".repeat(300), stacks: [], requires: [] },
+			frontmatter: {
+				name: "big",
+				description: "x".repeat(300),
+				stacks: [],
+				requires: [],
+				mcp: null,
+			},
 			content: "x".repeat(50000),
 			path: "/fake/big/SKILL.md",
 		};
@@ -193,7 +199,7 @@ describe("buildMultiSkillContext", () => {
 	it("respects token budget in full mode by truncating at section boundaries", () => {
 		const bigContent = "x".repeat(50000);
 		const bigSkill: LoadedSkill = {
-			frontmatter: { name: "big", description: "", stacks: [], requires: [] },
+			frontmatter: { name: "big", description: "", stacks: [], requires: [], mcp: null },
 			content: bigContent,
 			path: "/fake/big/SKILL.md",
 		};
@@ -248,6 +254,7 @@ describe("buildMultiSkillContext", () => {
 				description: "A short description",
 				stacks: [],
 				requires: [],
+				mcp: null,
 			},
 			content: longContent,
 			path: "/fake/verbose-skill/SKILL.md",
@@ -270,6 +277,7 @@ describe("buildMultiSkillContext", () => {
 				description: "A skill with sections",
 				stacks: [],
 				requires: [],
+				mcp: null,
 			},
 			content:
 				"---\nname: structured\n---\n# Heading\n\nParagraph one.\n\n## Section Two\n\nMore text.",

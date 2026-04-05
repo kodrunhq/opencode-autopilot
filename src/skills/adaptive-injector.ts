@@ -34,6 +34,9 @@ export const PHASE_SKILL_MAP: Readonly<Record<string, readonly string[]>> = Obje
 	EXPLORE: [],
 });
 
+const MCP_SUPPORT_NOTE =
+	"Embedded MCP support is available for skills that declare an MCP server when plugin config.mcp.enabled is true.";
+
 export type SkillMode = "summary" | "full";
 
 /**
@@ -147,7 +150,8 @@ export function buildSkillSummary(skill: LoadedSkill): string {
 	const { name, description } = skill.frontmatter;
 	const safeName = sanitizeTemplateContent(name);
 	const safeDesc = sanitizeTemplateContent((description ?? "").slice(0, 200));
-	return `[Skill: ${safeName}]\n${safeDesc}`;
+	const mcpNote = skill.frontmatter.mcp ? `\n${MCP_SUPPORT_NOTE}` : "";
+	return `[Skill: ${safeName}]\n${safeDesc}${mcpNote}`;
 }
 
 /**

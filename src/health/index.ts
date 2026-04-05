@@ -2,6 +2,7 @@ export {
 	agentHealthCheck,
 	assetHealthCheck,
 	configHealthCheck,
+	mcpHealthCheck,
 	routingHealthCheck,
 } from "./checks";
 export { runHealthChecks } from "./runner";

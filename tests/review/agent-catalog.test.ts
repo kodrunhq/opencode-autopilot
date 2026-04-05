@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { AGENT_CATALOG, CORE_SQUAD, getAgentsByCategory } from "../../src/review/agent-catalog";
 
 describe("AGENT_CATALOG", () => {
-	test("has 15+ entries", () => {
-		expect(AGENT_CATALOG.length).toBeGreaterThanOrEqual(15);
+	test("has 12+ entries", () => {
+		expect(AGENT_CATALOG.length).toBeGreaterThanOrEqual(12);
 	});
 
 	test("is frozen (immutable)", () => {
@@ -53,9 +53,9 @@ describe("CORE_SQUAD", () => {
 });
 
 describe("getAgentsByCategory", () => {
-	test("returns 10+ parallel agents", () => {
+	test("returns exactly 8 parallel agents", () => {
 		const parallel = getAgentsByCategory("parallel");
-		expect(parallel.length).toBeGreaterThanOrEqual(10);
+		expect(parallel).toHaveLength(8);
 		for (const agent of parallel) {
 			expect(agent.category).toBe("parallel");
 		}
