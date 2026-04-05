@@ -93,7 +93,11 @@ describe("resolveChain", () => {
 	});
 
 	test("filters non-string elements from global array", () => {
-		const result = resolveChain("agent-a", undefined, [42, null, "global-model"]);
+		const result = resolveChain("agent-a", undefined, [
+			42,
+			null,
+			"global-model",
+		] as unknown as string[]);
 		expect(result).toEqual(["global-model"]);
 	});
 
