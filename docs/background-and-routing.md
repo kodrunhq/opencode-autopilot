@@ -35,7 +35,7 @@ stateDiagram-v2
 
 To prevent resource exhaustion and model rate limiting, the background manager uses a slot based concurrency model.
 
-*   **Configurable Capacity**: The number of concurrent slots is controlled by `background.maxSlots` (default: 5).
+*   **Configurable Capacity**: The number of concurrent tasks is controlled by `background.maxConcurrent` (default: 5).
 *   **Priority Queueing**: Tasks are assigned a priority (0 to 100). When a slot becomes available, the highest priority pending task is allocated.
 *   **Isolation**: Each slot operates with its own execution context and timeout monitoring.
 
@@ -49,7 +49,7 @@ All background tasks are stored in the `background_tasks` table within the plugi
 
 ### Timeout Handling
 
-Every background task is wrapped in a timeout guard. If a task exceeds the `background.defaultTimeout` (or a task specific override), the execution is aborted via `AbortController`, and the task is marked as `failed`.
+Every background task is wrapped in a timeout guard. If a task exceeds its configured timeout (or a task specific override), the execution is aborted via `AbortController`, and the task is marked as `failed`.
 
 ## Category Routing
 
@@ -134,13 +134,14 @@ These subsystems are configured in `opencode-autopilot.json`.
 
 ### Background Options
 
-*   `background.maxSlots`: Maximum number of concurrent background tasks (default: 5).
-*   `background.defaultTimeout`: Default timeout in milliseconds for background tasks (default: 300000).
+*   `background.enabled`: Enable or disable background task management (boolean, default: false).
+*   `background.maxConcurrent`: Maximum number of concurrent background tasks (integer, 1-50, default: 5).
+*   `background.persistence`: Whether to persist task state in SQLite across sessions (boolean, default: true).
 
 ### Routing Options
 
-*   `routing.enabled`: Whether to use category based routing (default: false).
-*   `routing.defaultCategory`: The category to use when classification confidence is low (default: "unspecified-low").
+*   `routing.enabled`: Whether to use category based routing (boolean, default: false).
+*   `routing.categories`: A record of category names to CategoryConfig objects for custom category overrides (default: {}).
 
 ### Autonomy Options
 

@@ -95,9 +95,9 @@ Memory is injected into the model via the `experimental.chat.system.transform` h
 
 Memory behavior can be tuned in the plugin configuration:
 
-- `memory.tokenBudget`: Maximum tokens allocated for memory injection (default: 2000).
-- `memory.halfLifeDays`: Days until a memory loses half its relevance (default: 90).
-- `memory.maxObservations`: Maximum observations stored per project (default: 10000).
+- `memory.enabled`: Enable or disable the memory system (boolean, default: true).
+- `memory.injectionBudget`: Maximum tokens allocated for memory injection (number, 500-5000, default: 2000).
+- `memory.decayHalfLifeDays`: Days until a memory loses half its relevance (number, 7-365, default: 90).
 
 ---
 [Documentation Index](README.md)

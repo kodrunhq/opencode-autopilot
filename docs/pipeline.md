@@ -51,7 +51,7 @@ The **oc-implementer** agent executes the task plan. This phase includes an inli
 The **oc-shipper** agent finalizes the development cycle by generating documentation. This includes a technical walkthrough of the implementation, a record of key architectural decisions with their rationale, and a user-facing changelog.
 
 ### Phase 8: RETROSPECTIVE
-The **oc-retrospector** agent analyzes the entire run to extract lessons. These insights are stored in a persistent lesson memory and injected into future pipeline runs. This allows the system to learn from past successes and failures, improving its performance over time.
+The **oc-shipper** agent also handles the retrospective phase, analyzing the entire run to extract lessons. These insights are stored in a persistent lesson memory and injected into future pipeline runs. This allows the system to learn from past successes and failures, improving its performance over time.
 
 ## Confidence-Driven Architecture
 

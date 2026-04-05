@@ -49,7 +49,7 @@ OpenCode Autopilot is an autonomous SDLC orchestration plugin for the OpenCode A
 [Background & Routing](background-and-routing.md), Managing background tasks, category routing, and the autonomy loop.
 
 ### 12. Tools Reference
-[Tools Reference](tools-reference.md), Documentation for all 25 oc_* tools registered by the plugin.
+[Tools Reference](tools-reference.md), Documentation for all 27 oc_* tools registered by the plugin.
 
 ### 13. CLI Reference
-[CLI Reference](cli-reference.md), Reference for the standalone install, configure, and doctor commands.
+[CLI Reference](cli-reference.md), Reference for the standalone install, configure, doctor, and inspect commands.

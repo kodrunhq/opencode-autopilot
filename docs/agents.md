@@ -35,20 +35,18 @@ These nine agents are the primary tools visible in the OpenCode interface. They 
 
 ## Pipeline Agents
 
-The autonomous pipeline uses ten specialized agents to drive each phase of development. These agents work behind the scenes to transform an idea into shipped code.
+The autonomous pipeline uses eight specialized agents to drive each phase of development. Some agents serve double duty across multiple phases. These agents work behind the scenes to transform an idea into shipped code.
 
-| Agent | Role | Model Group |
-|-------|------|-------------|
-| oc-researcher | Domain research and feasibility assessment | Researchers |
-| oc-challenger | Proposes ambitious enhancements to ideas | Challengers |
-| oc-architect | Generates multiple design proposals | Architects |
-| oc-critic | Debates and critiques architecture proposals | Challengers |
-| oc-planner | Decomposes architecture into task waves | Architects |
-| oc-implementer | Implements code with inline review | Builders |
-| oc-reviewer | Multi-agent review orchestration | Reviewers |
-| oc-shipper | Generates walkthroughs and changelogs | Communicators |
-| oc-retrospector | Extracts lessons for future runs | Communicators |
-| oc-explorer | Speculative analysis and exploration | Researchers |
+| Agent | Phase(s) | Role | Model Group |
+|-------|----------|------|-------------|
+| oc-researcher | RECON, EXPLORE | Domain research, feasibility assessment, and speculative analysis | Researchers |
+| oc-challenger | CHALLENGE | Proposes ambitious enhancements to ideas | Challengers |
+| oc-architect | ARCHITECT | Generates multiple design proposals | Architects |
+| oc-critic | ARCHITECT | Debates and critiques architecture proposals | Challengers |
+| oc-planner | PLAN | Decomposes architecture into task waves | Architects |
+| oc-implementer | BUILD | Implements code with inline review | Builders |
+| oc-reviewer | BUILD | Multi-agent review orchestration | Reviewers |
+| oc-shipper | SHIP, RETROSPECTIVE | Generates walkthroughs, changelogs, and extracts lessons | Communicators |
 
 ## Review Agents
 

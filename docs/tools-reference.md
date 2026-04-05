@@ -31,7 +31,7 @@ Tools use Zod schemas for strict argument validation. If a tool is called with i
 | **Editing** | `oc_hashline_edit` |
 | **Memory** | `oc_memory_status`, `oc_memory_preferences` |
 | **Docs** | `oc_update_docs` |
-| **Testing** | `oc_mock_fallback`, `oc_replay` |
+| **Testing** | `oc_mock_fallback` |
 
 ---
 
@@ -459,19 +459,6 @@ Generate mock errors for fallback testing.
 
 **What it does:**
 Simulates different types of model errors (rate limits, timeouts, etc.) to verify how the fallback system classifies and handles them.
-
----
-
-### oc_replay
-
-Verify determinism by replaying inputs.
-
-**Arguments:**
-* `runId` (string): The pipeline runId to use as the random seed.
-* `inputs` (string[]): Array of raw JSON findings inputs.
-
-**What it does:**
-Replays a sequence of inputs through the review pipeline to ensure that the resulting state is identical. This is used to verify the determinism of the review aggregation logic.
 
 ---
 

@@ -66,6 +66,62 @@ The `doctor` command runs a suite of health diagnostics to ensure the plugin is 
 bunx @kodrunhq/opencode-autopilot doctor
 ```
 
+### inspect
+
+The `inspect` command queries the plugin kernel database for stored projects, pipeline runs, events, lessons, preferences, and memory data.
+
+**What it does:**
+*   Reads from the SQLite kernel database that the plugin maintains across sessions.
+*   Supports 8 views that expose different aspects of the plugin's stored state.
+*   Can output as human-readable text (default) or structured JSON.
+
+**Usage:**
+```bash
+bunx @kodrunhq/opencode-autopilot inspect <view> [options]
+```
+
+**Views:**
+
+| View | Description | Required Options |
+|------|-------------|------------------|
+| `projects` | List all known projects | None |
+| `project` | Show details for one project | `--project <ref>` |
+| `paths` | List a project's path history | `--project <ref>` |
+| `runs` | List pipeline runs (default limit: 20) | None (optional `--project`) |
+| `events` | List forensic events | None (optional `--project`, `--run-id`, `--session-id`, `--type`) |
+| `lessons` | List stored lessons | None (optional `--project`) |
+| `preferences` | List stored user preferences | None |
+| `memory` | Show memory overview | None |
+
+**Options:**
+
+*   `--project <ref>`: Project id, path, or unique name. Required for `project` and `paths` views, optional filter for `runs`, `events`, and `lessons`.
+*   `--run-id <id>`: Filter events by pipeline run id.
+*   `--session-id <id>`: Filter events by session id.
+*   `--type <type>`: Filter events by event type.
+*   `--limit <n>`: Limit the number of rows returned (default: 20 for `runs`, 50 for other views).
+*   `--json`: Emit output as structured JSON instead of formatted text.
+*   `--help`, `-h`: Show the inspect help message.
+
+**Examples:**
+
+```bash
+# List all known projects
+bunx @kodrunhq/opencode-autopilot inspect projects
+
+# Show details for a specific project
+bunx @kodrunhq/opencode-autopilot inspect project --project /path/to/repo
+
+# List recent pipeline runs as JSON
+bunx @kodrunhq/opencode-autopilot inspect runs --json --limit 10
+
+# View events for a specific run
+bunx @kodrunhq/opencode-autopilot inspect events --run-id abc123
+
+# Show memory overview
+bunx @kodrunhq/opencode-autopilot inspect memory
+```
+
 ## Examples
 
 **Register the plugin in a new project:**
@@ -81,6 +137,11 @@ bunx @kodrunhq/opencode-autopilot configure
 **Verify installation health:**
 ```bash
 bunx @kodrunhq/opencode-autopilot doctor
+```
+
+**Inspect stored projects:**
+```bash
+bunx @kodrunhq/opencode-autopilot inspect projects
 ```
 
 ## Exit Codes

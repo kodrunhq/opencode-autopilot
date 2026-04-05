@@ -80,7 +80,7 @@ Findings are categorized by severity to help prioritize fixes.
 
 ## Review Memory
 
-Project memory is maintained by the system to improve over time. It tracks recent findings and false positives in a local JSON file. If you mark a finding as a false positive, the engine suppresses it in future reviews. To keep the memory lean, entries older than 30 days are automatically pruned.
+Project memory is maintained by the system to improve over time. It stores recent findings and false positives in the project kernel database (SQLite), with a JSON file maintained as a compatibility mirror during the migration window. If you mark a finding as a false positive, the engine suppresses it in future reviews. To keep the memory lean, entries older than 30 days are automatically pruned.
 
 ## Fix Cycle Details
 
