@@ -199,6 +199,13 @@ const pluginConfigSchemaV7 = z
 		fallback: fallbackConfigSchemaV6.default(fallbackDefaultsV6),
 		memory: memoryConfigSchema.default(memoryDefaults),
 		background: backgroundConfigSchema.default(backgroundDefaults),
+		autonomy: z
+			.object({
+				enabled: z.boolean().default(false),
+				verification: z.enum(["strict", "normal", "lenient"]).default("normal"),
+				maxIterations: z.number().int().min(1).max(50).default(10),
+			})
+			.default({ enabled: false, verification: "normal", maxIterations: 10 }),
 		routing: routingConfigSchema.default(routingDefaults),
 		recovery: recoveryConfigSchema.default(recoveryDefaults),
 		mcp: mcpConfigSchema.default(mcpDefaults),
@@ -317,6 +324,18 @@ function migrateV5toV6(v5Config: PluginConfigV5): PluginConfigV6 {
 	};
 }
 
+export const v7ConfigDefaults = {
+	background: backgroundDefaults,
+	autonomy: {
+		enabled: false,
+		verification: "normal" as const,
+		maxIterations: 10,
+	},
+	routing: routingDefaults,
+	recovery: recoveryDefaults,
+	mcp: mcpDefaults,
+} as const;
+
 export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
 	return {
 		version: 7 as const,
@@ -328,6 +347,11 @@ export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
 		fallback: v6Config.fallback,
 		memory: v6Config.memory,
 		background: backgroundDefaults,
+		autonomy: {
+			enabled: false,
+			verification: "normal",
+			maxIterations: 10,
+		},
 		routing: routingDefaults,
 		recovery: recoveryDefaults,
 		mcp: mcpDefaults,
@@ -431,6 +455,11 @@ export function createDefaultConfig(): PluginConfig {
 		fallback: fallbackDefaultsV6,
 		memory: memoryDefaults,
 		background: backgroundDefaults,
+		autonomy: {
+			enabled: false,
+			verification: "normal",
+			maxIterations: 10,
+		},
 		routing: routingDefaults,
 		recovery: recoveryDefaults,
 		mcp: mcpDefaults,

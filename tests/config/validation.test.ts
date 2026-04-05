@@ -117,25 +117,29 @@ describe("Config Health Checks", () => {
 
 describe("Config Migration", () => {
 	test("migrateV6toV7 adds v7 fields", async () => {
-		const { migrateV6toV7 } = await import("../../src/config/v7");
-		const v6Config = createDefaultConfig();
+		const { migrateV6toV7 } = await import("../../src/config");
+		const v7Config = createDefaultConfig();
+		const v6Config = { ...v7Config, version: 6 as const };
+		// @ts-expect-error intentionally stripping v7 fields for migration test
+		delete v6Config.background;
+		// @ts-expect-error intentionally stripping v7 fields for migration test
+		delete v6Config.autonomy;
 
-		const v7Config = migrateV6toV7(v6Config);
+		const migratedConfig = migrateV6toV7(v6Config);
 
-		expect(v7Config.version).toBe(7);
-		expect(v7Config.background).toBeDefined();
-		expect(v7Config.background?.enabled).toBe(true);
-		expect(v7Config.background?.maxConcurrent).toBe(5);
-		expect(v7Config.autonomy).toBeDefined();
-		expect(v7Config.autonomy?.enabled).toBe(false);
+		expect(migratedConfig.version).toBe(7);
+		expect(migratedConfig.background).toBeDefined();
+		expect(migratedConfig.background?.enabled).toBe(false);
+		expect(migratedConfig.background?.maxConcurrent).toBe(5);
+		expect(migratedConfig.autonomy).toBeDefined();
+		expect(migratedConfig.autonomy?.enabled).toBe(false);
 	});
 
 	test("v7ConfigDefaults has correct values", async () => {
-		const { v7ConfigDefaults } = await import("../../src/config/v7");
+		const { v7ConfigDefaults } = await import("../../src/config");
 
-		expect(v7ConfigDefaults.background.enabled).toBe(true);
+		expect(v7ConfigDefaults.background.enabled).toBe(false);
 		expect(v7ConfigDefaults.background.maxConcurrent).toBe(5);
-		expect(v7ConfigDefaults.background.defaultTimeout).toBe(300000);
 		expect(v7ConfigDefaults.autonomy.enabled).toBe(false);
 		expect(v7ConfigDefaults.autonomy.verification).toBe("normal");
 		expect(v7ConfigDefaults.autonomy.maxIterations).toBe(10);

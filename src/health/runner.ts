@@ -44,8 +44,9 @@ export async function runHealthChecks(options?: {
 }): Promise<HealthReport> {
 	const start = Date.now();
 
+	const configOutcome = await Promise.allSettled([configHealthCheck(options?.configPath)]);
+
 	const settled = await Promise.allSettled([
-		configHealthCheck(options?.configPath),
 		agentHealthCheck(options?.openCodeConfig ?? null),
 		nativeAgentSuppressionHealthCheck(options?.openCodeConfig ?? null),
 		assetHealthCheck(options?.assetsDir, options?.targetDir),
@@ -54,6 +55,8 @@ export async function runHealthChecks(options?: {
 		commandHealthCheck(options?.targetDir),
 		configV7FieldsCheck(options?.configPath),
 	]);
+
+	const allSettled = [...configOutcome, ...settled];
 
 	const fallbackNames = [
 		"config-validity",
@@ -66,7 +69,7 @@ export async function runHealthChecks(options?: {
 		"config-v7-fields",
 	];
 	const results: readonly HealthResult[] = Object.freeze(
-		settled.map((outcome, i) => settledToResult(outcome, fallbackNames[i])),
+		allSettled.map((outcome, i) => settledToResult(outcome, fallbackNames[i])),
 	);
 
 	const allPassed = results.every((r) => r.status === "pass");

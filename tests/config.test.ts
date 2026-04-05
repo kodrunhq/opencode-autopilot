@@ -128,7 +128,7 @@ describe("saveConfig and loadConfig round-trip", () => {
 	});
 });
 
-describe("v1 to v5 migration", () => {
+describe("v1 to v7 migration", () => {
 	let tempDir: string;
 	let configPath: string;
 

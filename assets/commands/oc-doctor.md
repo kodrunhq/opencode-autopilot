@@ -5,18 +5,13 @@ description: Run plugin health diagnostics — config validity, agent injection,
 
 Invoke the `oc_doctor` tool to run a full health check on the opencode-autopilot plugin.
 
-Checks performed:
+`oc_doctor` runs the current built-in health checks and reports the results by diagnostic area. These checks cover:
 
-- **config-validity** — Plugin config file exists and passes Zod schema validation.
-- **config-version** — Config is on the latest version (currently v7); older configs will be auto-migrated.
-- **config-v7-fields** — v7 config has all four new top-level objects: `background`, `routing`, `recovery`, and `mcp`. Reports a pending-migration notice for pre-v7 configs.
-- **config-groups** — All eight model groups (architects, challengers, builders, reviewers, red-team, researchers, communicators, utilities) have a primary model assigned.
-- **agent-injection** — All expected agents (standard + pipeline) are present in the OpenCode config.
-- **native-agent-suppression** — OpenCode native `plan`/`build` agents are disabled and hidden as subagents.
-- **asset-directories** — Both the bundled asset source directory and the global `~/.config/opencode/` target directory are accessible.
-- **skill-loading** — Skills are loaded and filtered against the detected project stack.
-- **memory-db** — The memory SQLite database exists and is readable (or reports a clean first-install status).
-- **command-accessibility** — All expected slash command files exist and have valid YAML frontmatter.
-- **hook-registration** — Plugin tools are registered (confirmed by `oc_doctor` being callable).
+- **Config health** — The plugin config exists, parses correctly, and required modern config sections such as `background`, `routing`, `recovery`, and `mcp` are present or reported as needing migration.
+- **Agent setup** — Expected autopilot agents are present in the OpenCode config, and native `plan`/`build` agents are suppressed as subagents.
+- **Assets and installation paths** — Bundled asset directories and the global `~/.config/opencode/` target are accessible.
+- **Skill loading** — Skills load correctly and are filtered against the detected project stack.
+- **Memory storage** — The memory SQLite database is available, readable, or cleanly reported as not yet initialized on first install.
+- **Command files** — Expected slash command files exist and have valid YAML frontmatter.
 
 Each failing check includes a **Fix** suggestion. Run this after installation, after upgrades, or whenever something feels off.

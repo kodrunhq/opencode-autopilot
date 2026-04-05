@@ -247,14 +247,14 @@ describe("Config migration chain integration: v1 through v6", () => {
 		expect(result?.fallback.testMode.sequence).toEqual([]);
 	});
 
-	test("migration chain persists v6 config to disk after loading v1", async () => {
+	test("migration chain persists v7 config to disk after loading v1", async () => {
 		const configPath = join(tempDir, "persist-test.json");
 		const v1Config = { version: 1, configured: true, models: {} };
 		await writeFile(configPath, JSON.stringify(v1Config), "utf-8");
 
 		await loadConfig(configPath);
 
-		// File on disk should now be v6
+		// File on disk should now be v7
 		const raw = JSON.parse(await readFile(configPath, "utf-8"));
 		expect(raw.version).toBe(7);
 		expect(raw.orchestrator).toBeDefined();

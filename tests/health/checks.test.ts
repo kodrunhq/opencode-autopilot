@@ -393,7 +393,7 @@ describe("configV7FieldsCheck", () => {
 	});
 
 	test("returns pass with migration message for a pre-v7 config", async () => {
-		const tempDir = join(tmpdir(), `v7-check-prев7-${Date.now()}`);
+		const tempDir = join(tmpdir(), `v7-check-prev7-${Date.now()}`);
 		await mkdir(tempDir, { recursive: true });
 
 		const configPath = await writeTempConfig(tempDir, {
