@@ -778,6 +778,10 @@ export function listPreferences(input?: InspectDbInput): readonly InspectPrefere
 			);
 		}
 
+		if (!tableExists(db, "preferences")) {
+			return Object.freeze([]);
+		}
+
 		const rows = db
 			.query("SELECT * FROM preferences ORDER BY last_updated DESC, key ASC")
 			.all() as PreferenceRow[];

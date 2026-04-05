@@ -76,6 +76,7 @@ import { ContextWarningMonitor } from "./ux/context-warnings";
 import { getRemediationHint } from "./ux/error-hints";
 import { NotificationManager } from "./ux/notifications";
 import { ProgressTracker } from "./ux/progress";
+import { registerNotificationManager, registerProgressTracker } from "./ux/registry";
 
 let openCodeConfig: Config | null = null;
 
@@ -157,7 +158,10 @@ const plugin: Plugin = async (input) => {
 
 	// --- UX surfaces: context warnings, progress tracking, error hints ---
 	const contextWarningMonitor = new ContextWarningMonitor({ notificationManager });
-	const _progressTracker = new ProgressTracker({ notificationManager });
+	const progressTracker = new ProgressTracker({ notificationManager });
+
+	registerNotificationManager(notificationManager);
+	registerProgressTracker(progressTracker);
 
 	// --- Fallback subsystem initialization ---
 	const sdkOps: SdkOperations = {

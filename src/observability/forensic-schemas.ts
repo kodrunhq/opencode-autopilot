@@ -60,7 +60,10 @@ export const forensicEventSchema = z.object({
 	parentSessionId: z.string().max(256).nullable().default(null),
 	phase: z.string().max(128).nullable().default(null),
 	dispatchId: z.string().max(128).nullable().default(null),
-	taskId: z.number().int().positive().nullable().default(null),
+	taskId: z
+		.union([z.number().int().positive(), z.string().min(1).max(128)])
+		.nullable()
+		.default(null),
 	agent: z.string().max(128).nullable().default(null),
 	type: forensicEventTypeSchema,
 	code: z.string().max(128).nullable().default(null),

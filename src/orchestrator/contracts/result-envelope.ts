@@ -11,7 +11,10 @@ export const resultEnvelopeSchema = z.object({
 	dispatchId: z.string().min(1).max(128),
 	agent: z.string().min(1).max(128).nullable().default(null),
 	kind: resultKindSchema,
-	taskId: z.number().int().positive().nullable().default(null),
+	taskId: z
+		.union([z.number().int().positive(), z.string().min(1).max(128)])
+		.nullable()
+		.default(null),
 	payload: z
 		.object({
 			text: z.string().max(1_048_576).default(""),

@@ -28,6 +28,7 @@ import {
 	getProjectArtifactDir,
 	getProjectRootFromArtifactDir,
 } from "../utils/paths";
+import { getNotificationManager, getProgressTracker } from "../ux/registry";
 import { reviewCore } from "./review";
 
 interface OrchestrateArgs {
@@ -406,6 +407,10 @@ async function processHandlerResult(
 				action: "error",
 				message: `${codePrefix}${messageBody}`.slice(0, 500),
 			});
+			void getNotificationManager()?.error(
+				"Pipeline error",
+				`${normalizedResult.phase ?? "Unknown"}: ${messageBody}`.slice(0, 200),
+			);
 			return JSON.stringify(normalizedResult);
 		}
 
@@ -439,6 +444,18 @@ async function processHandlerResult(
 				promptLength: normalizedResult.prompt?.length,
 				attempt,
 			});
+
+			void getNotificationManager()?.info(
+				`${phase}: dispatching`,
+				`Agent: ${normalizedResult.agent ?? "unknown"} — ${normalizedResult.progress ?? ""}`.slice(
+					0,
+					200,
+				),
+			);
+			const tracker = getProgressTracker();
+			if (tracker) {
+				tracker.startPhase(phase, 1);
+			}
 
 			// Check if this is a review dispatch that should be inlined
 			const { inlined, reviewResult } = await maybeInlineReview(normalizedResult, artifactDir);
@@ -604,6 +621,13 @@ async function processHandlerResult(
 				phase: currentState.currentPhase,
 				action: "complete",
 			});
+
+			void getNotificationManager()?.success(
+				"Phase complete",
+				`${currentState.currentPhase} finished.`,
+			);
+			getProgressTracker()?.complete();
+
 			const nextPhase = getNextPhase(currentState.currentPhase);
 			const advanced = await updatePersistedState(artifactDir, currentState, (current) =>
 				completePhase(current),
@@ -611,6 +635,10 @@ async function processHandlerResult(
 
 			if (nextPhase === null) {
 				const idx = PHASE_INDEX[currentState.currentPhase] ?? TOTAL_PHASES;
+				void getNotificationManager()?.success(
+					"Pipeline complete",
+					`All ${TOTAL_PHASES} phases finished for: ${currentState.idea.slice(0, 100)}`,
+				);
 				return JSON.stringify({
 					action: "complete",
 					summary: `Pipeline completed all ${TOTAL_PHASES} phases. Idea: ${currentState.idea}`,

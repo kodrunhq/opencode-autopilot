@@ -177,7 +177,13 @@ export const handleBuild: PhaseHandler = async (
 
 	const hasTypedContext = context !== undefined;
 	const isTaskCompletion = hasTypedContext && context.envelope.kind === "task_completion";
-	const taskToComplete = isTaskCompletion ? context.envelope.taskId : buildProgress.currentTask;
+	const rawTaskId = isTaskCompletion ? context.envelope.taskId : buildProgress.currentTask;
+	const taskToComplete =
+		typeof rawTaskId === "number"
+			? rawTaskId
+			: typeof rawTaskId === "string"
+				? Number(rawTaskId) || null
+				: null;
 
 	if (resultText && !buildProgress.reviewPending && taskToComplete === null) {
 		return Object.freeze({

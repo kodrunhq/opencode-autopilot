@@ -18,6 +18,44 @@ function formatTimestamp(value: string | null): string {
 	return value ?? "-";
 }
 
+function truncateText(value: string, maxLength: number): string {
+	if (value.length <= maxLength) {
+		return value;
+	}
+
+	return `${value.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function formatFailure(run: InspectRunSummary): string {
+	if (run.failurePhase === null && run.failureAgent === null && run.failureMessage === null) {
+		return "-";
+	}
+
+	return truncateText(
+		`${run.failurePhase ?? "-"}/${run.failureAgent ?? "-"}: ${run.failureMessage ?? "-"}`,
+		60,
+	);
+}
+
+function formatPayloadSummary(payload: InspectEventSummary["payload"]): string {
+	if (Object.keys(payload).length === 0) {
+		return "-";
+	}
+
+	return truncateText(JSON.stringify(payload), 60);
+}
+
+function formatEvidenceSummary(evidence: InspectPreferenceSummary["evidence"]): string {
+	if (evidence.length === 0) {
+		return "none";
+	}
+
+	const confirmedCount = evidence.filter((item) => item.confirmed).length;
+	const unconfirmedCount = evidence.length - confirmedCount;
+
+	return `${confirmedCount} confirmed, ${unconfirmedCount} unconfirmed`;
+}
+
 export function formatProjects(projects: readonly InspectProjectSummary[]): string {
 	if (projects.length === 0) {
 		return "No projects found.";
@@ -86,13 +124,13 @@ export function formatRuns(runs: readonly InspectRunSummary[]): string {
 	const lines = [
 		"Runs",
 		"",
-		"| Project | Run ID | Status | Phase | Revision | Updated |",
-		"|---------|--------|--------|-------|----------|---------|",
+		"| Project | Run ID | Status | Phase | Idea | Failure | Revision | Updated |",
+		"|---------|--------|--------|-------|------|---------|----------|---------|",
 	];
 
 	for (const run of runs) {
 		lines.push(
-			`| ${sanitizeCell(run.projectName)} | ${sanitizeCell(run.runId)} | ${sanitizeCell(run.status)} | ${sanitizeCell(run.currentPhase ?? "-")} | ${run.stateRevision} | ${sanitizeCell(run.lastUpdatedAt)} |`,
+			`| ${sanitizeCell(run.projectName)} | ${sanitizeCell(run.runId)} | ${sanitizeCell(run.status)} | ${sanitizeCell(run.currentPhase ?? "-")} | ${sanitizeCell(truncateText(run.idea, 40))} | ${sanitizeCell(formatFailure(run))} | ${run.stateRevision} | ${sanitizeCell(run.lastUpdatedAt)} |`,
 		);
 	}
 
@@ -107,13 +145,13 @@ export function formatEvents(events: readonly InspectEventSummary[]): string {
 	const lines = [
 		"Events",
 		"",
-		"| Timestamp | Project | Domain | Type | Phase | Agent | Code | Message |",
-		"|-----------|---------|--------|------|-------|-------|------|---------|",
+		"| Timestamp | Project | Domain | Type | Phase | Agent | TaskID | Code | Message | Payload |",
+		"|-----------|---------|--------|------|-------|-------|--------|------|---------|---------|",
 	];
 
 	for (const event of events) {
 		lines.push(
-			`| ${sanitizeCell(event.timestamp)} | ${sanitizeCell(event.projectName)} | ${sanitizeCell(event.domain)} | ${sanitizeCell(event.type)} | ${sanitizeCell(event.phase ?? "-")} | ${sanitizeCell(event.agent ?? "-")} | ${sanitizeCell(event.code ?? "-")} | ${sanitizeCell(event.message ?? "")} |`,
+			`| ${sanitizeCell(event.timestamp)} | ${sanitizeCell(event.projectName)} | ${sanitizeCell(event.domain)} | ${sanitizeCell(event.type)} | ${sanitizeCell(event.phase ?? "-")} | ${sanitizeCell(event.agent ?? "-")} | ${sanitizeCell(event.taskId ?? "-")} | ${sanitizeCell(event.code ?? "-")} | ${sanitizeCell(event.message ?? "")} | ${sanitizeCell(formatPayloadSummary(event.payload))} |`,
 		);
 	}
 
@@ -134,7 +172,7 @@ export function formatLessons(lessons: readonly InspectLessonSummary[]): string 
 
 	for (const lesson of lessons) {
 		lines.push(
-			`| ${sanitizeCell(lesson.extractedAt)} | ${sanitizeCell(lesson.projectName)} | ${sanitizeCell(lesson.domain)} | ${sanitizeCell(lesson.sourcePhase)} | ${sanitizeCell(lesson.content)} |`,
+			`| ${sanitizeCell(lesson.extractedAt)} | ${sanitizeCell(lesson.projectName)} | ${sanitizeCell(lesson.domain)} | ${sanitizeCell(lesson.sourcePhase)} | ${sanitizeCell(truncateText(lesson.content, 80))} |`,
 		);
 	}
 
@@ -149,13 +187,13 @@ export function formatPreferences(preferences: readonly InspectPreferenceSummary
 	const lines = [
 		"Preferences",
 		"",
-		"| Key | Scope | Value | Confidence | Evidence | Updated |",
-		"|-----|-------|-------|------------|----------|---------|",
+		"| Key | Scope | Value | Confidence | Evidence Count | Evidence | Updated |",
+		"|-----|-------|-------|------------|----------------|----------|---------|",
 	];
 
 	for (const preference of preferences) {
 		lines.push(
-			`| ${sanitizeCell(preference.key)} | ${sanitizeCell(preference.scope)}${preference.projectId ? `:${sanitizeCell(preference.projectId)}` : ""} | ${sanitizeCell(preference.value)} | ${sanitizeCell(preference.confidence)} | ${sanitizeCell(preference.evidenceCount)} | ${sanitizeCell(preference.lastUpdated)} |`,
+			`| ${sanitizeCell(preference.key)} | ${sanitizeCell(preference.scope)}${preference.projectId ? `:${sanitizeCell(preference.projectId)}` : ""} | ${sanitizeCell(preference.value)} | ${sanitizeCell(preference.confidence)} | ${sanitizeCell(preference.evidenceCount)} | ${sanitizeCell(formatEvidenceSummary(preference.evidence))} | ${sanitizeCell(preference.lastUpdated)} |`,
 		);
 	}
 
@@ -195,7 +233,7 @@ export function formatMemoryOverview(overview: InspectMemoryOverview): string {
 	} else {
 		for (const preference of overview.preferences) {
 			lines.push(
-				`- ${preference.key}: ${preference.value} (${preference.scope}, confidence ${preference.confidence}, evidence ${preference.evidenceCount})`,
+				`- ${preference.key}: ${preference.value} (${preference.scope}, confidence ${preference.confidence}, evidence ${preference.evidenceCount}; ${formatEvidenceSummary(preference.evidence)})`,
 			);
 		}
 	}

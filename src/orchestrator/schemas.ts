@@ -67,7 +67,10 @@ export const pendingDispatchSchema = z.object({
 	agent: z.string().min(1).max(128),
 	issuedAt: z.string().max(128),
 	resultKind: dispatchResultKindSchema.default("phase_output"),
-	taskId: z.number().int().positive().nullable().default(null),
+	taskId: z
+		.union([z.number().int().positive(), z.string().min(1).max(128)])
+		.nullable()
+		.default(null),
 });
 
 export const failureContextSchema = z.object({
