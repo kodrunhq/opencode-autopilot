@@ -62,11 +62,12 @@ describe("plugin entry point", () => {
 		expect(eventResult).toBeUndefined();
 	});
 
-	test("registers all expected tools (22 total)", async () => {
+	test("registers all expected tools (25 total)", async () => {
 		const result = await plugin(mockInput);
 		expect(result.tool).toBeDefined();
 		const toolNames = [...Object.keys(result.tool ?? {})].sort();
 		const expected = [
+			"oc_background",
 			"oc_configure",
 			"oc_create_agent",
 			"oc_create_skill",
@@ -81,6 +82,7 @@ describe("plugin entry point", () => {
 			"oc_forensics",
 			"oc_review",
 			"oc_logs",
+			"oc_loop",
 			"oc_session_stats",
 			"oc_pipeline_report",
 			"oc_mock_fallback",
@@ -92,7 +94,7 @@ describe("plugin entry point", () => {
 			"oc_summary",
 		];
 		expect(toolNames).toEqual([...expected].sort());
-		expect(toolNames).toHaveLength(23);
+		expect(toolNames).toHaveLength(25);
 	});
 
 	test("every registered tool has a valid execute function", async () => {

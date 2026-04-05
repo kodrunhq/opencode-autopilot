@@ -5,6 +5,10 @@ import {
 import type { ForensicEventDomain, ForensicEventType } from "../observability/forensic-types";
 import type { LogEntry, LogSink } from "./types";
 
+function normalizeTaskId(taskId: unknown): number | null {
+	return typeof taskId === "number" && Number.isInteger(taskId) && taskId > 0 ? taskId : null;
+}
+
 export function createForensicSinkForArtifactDir(artifactDir: string): LogSink {
 	return {
 		write(entry: LogEntry): void {
@@ -63,7 +67,7 @@ export function createForensicSinkForArtifactDir(artifactDir: string): LogSink {
 				parentSessionId: (parentSessionId as string) ?? null,
 				phase: (phase as string) ?? null,
 				dispatchId: (dispatchId as string) ?? null,
-				taskId: (taskId as number) ?? null,
+				taskId: normalizeTaskId(taskId),
 				agent: (agent as string) ?? null,
 				type: forensicType,
 				code: (code as string) ?? null,
@@ -136,7 +140,7 @@ export function createForensicSink(projectRoot: string): LogSink {
 				parentSessionId: (parentSessionId as string) ?? null,
 				phase: (phase as string) ?? null,
 				dispatchId: (dispatchId as string) ?? null,
-				taskId: (taskId as number) ?? null,
+				taskId: normalizeTaskId(taskId),
 				agent: (agent as string) ?? null,
 				type: forensicType,
 				code: (code as string) ?? null,

@@ -30,6 +30,7 @@ import {
 } from "./orchestrator/fallback";
 import { fallbackDefaults } from "./orchestrator/fallback/fallback-config";
 import { resolveChain } from "./orchestrator/fallback/resolve-chain";
+import { ocBackground } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
 import {
 	ocConfigure,
@@ -44,6 +45,7 @@ import { ocDoctor, setOpenCodeConfig as setDoctorOpenCodeConfig } from "./tools/
 import { ocForensics } from "./tools/forensics";
 import { ocHashlineEdit } from "./tools/hashline-edit";
 import { ocLogs } from "./tools/logs";
+import { ocLoop } from "./tools/loop";
 import { ocMemoryPreferences } from "./tools/memory-preferences";
 import { ocMemoryStatus } from "./tools/memory-status";
 import { ocMockFallback } from "./tools/mock-fallback";
@@ -312,6 +314,7 @@ const plugin: Plugin = async (input) => {
 
 	return {
 		tool: {
+			oc_background: ocBackground,
 			oc_configure: ocConfigure,
 			oc_create_agent: ocCreateAgent,
 			oc_create_skill: ocCreateSkill,
@@ -327,6 +330,7 @@ const plugin: Plugin = async (input) => {
 			oc_hashline_edit: ocHashlineEdit,
 			oc_review: ocReview,
 			oc_logs: ocLogs,
+			oc_loop: ocLoop,
 			oc_session_stats: ocSessionStats,
 			oc_pipeline_report: ocPipelineReport,
 			oc_summary: ocSummary,
