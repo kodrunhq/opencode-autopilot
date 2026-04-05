@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.17.0...opencode-autopilot-v1.18.0) (2026-04-05)
+
+
+### Features
+
+* Phase 32 - Configuration v7 + Foundation ([b510b3b](https://github.com/kodrunhq/opencode-autopilot/commit/b510b3b349cdb1e90226c9fa0fdb3ecba1648571))
+
 ## [1.17.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.16.0...opencode-autopilot-v1.17.0) (2026-04-05)
 
 
