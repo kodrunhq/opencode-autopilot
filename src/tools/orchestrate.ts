@@ -1,14 +1,16 @@
 import { randomBytes } from "node:crypto";
-import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
+import { getLogger } from "../logging/domains";
 import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
+import { enrichErrorMessage } from "../orchestrator/error-context";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
 import type { DispatchResult, PhaseHandlerContext } from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
 import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
+import { getPhaseProgressString } from "../orchestrator/progress";
 import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
 import {
 	createInitialState,
@@ -26,12 +28,7 @@ import {
 	getProjectArtifactDir,
 	getProjectRootFromArtifactDir,
 } from "../utils/paths";
-import { getLogger } from "../logging/domains";
 import { reviewCore } from "./review";
-
-import { getPhaseProgressString } from "../orchestrator/progress";
-
-import { enrichErrorMessage } from "../orchestrator/error-context";
 
 interface OrchestrateArgs {
 	readonly idea?: string;

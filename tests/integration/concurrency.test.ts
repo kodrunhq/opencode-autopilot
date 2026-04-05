@@ -70,7 +70,7 @@ describe("Full Pipeline Concurrency", () => {
 				const phaseDir = join(tempDir, "phases", currentPhase);
 				try {
 					await mkdir(phaseDir, { recursive: true });
-				} catch (e) {}
+				} catch (_e) {}
 
 				if (currentPhase === "ARCHITECT") {
 					await writeFile(join(phaseDir, "design.md"), "test design");

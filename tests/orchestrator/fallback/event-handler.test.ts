@@ -115,8 +115,7 @@ const defaultConfig: FallbackConfig = {
 describe("createEventHandler", () => {
 	let mockManager: ReturnType<typeof createMockManager>;
 	let mockSdk: ReturnType<typeof createMockSdk>;
-	// biome-ignore lint/suspicious/noExplicitAny: dynamic import mock
-	let createEventHandler: any;
+	let createEventHandler: unknown;
 
 	beforeEach(async () => {
 		mockManager = createMockManager();
@@ -127,8 +126,7 @@ describe("createEventHandler", () => {
 
 	test("session.created calls manager.initSession with session model", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -150,8 +148,7 @@ describe("createEventHandler", () => {
 
 	test("session.created with parentID records parent-child mapping", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -172,8 +169,7 @@ describe("createEventHandler", () => {
 
 	test("session.created with agent forwards agentName to initSession", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -199,8 +195,7 @@ describe("createEventHandler", () => {
 
 	test("session.created without agent passes undefined agentName", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -221,8 +216,7 @@ describe("createEventHandler", () => {
 
 	test("session.deleted calls manager.cleanupSession", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -241,8 +235,7 @@ describe("createEventHandler", () => {
 
 	test("session.error with retryable error calls handleError", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -270,8 +263,7 @@ describe("createEventHandler", () => {
 			return null; // self-abort suppression happens inside handleError
 		};
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -296,8 +288,7 @@ describe("createEventHandler", () => {
 
 	test("session.compacted calls manager.clearCompactionInFlight", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -316,8 +307,7 @@ describe("createEventHandler", () => {
 
 	test("message.part.delta calls manager.recordFirstToken", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -336,8 +326,7 @@ describe("createEventHandler", () => {
 
 	test("message.updated with error calls handleError", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -382,8 +371,7 @@ describe("createEventHandler", () => {
 		};
 
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -414,8 +402,7 @@ describe("createEventHandler", () => {
 
 	test("session.created with model and timeout > 0 starts TTFT timeout", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -436,8 +423,7 @@ describe("createEventHandler", () => {
 
 	test("session.diff calls manager.recordFirstToken", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -456,8 +442,7 @@ describe("createEventHandler", () => {
 	test("session.error non-retryable does not trigger fallback dispatch", async () => {
 		// handleError returns null for non-retryable
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -478,8 +463,7 @@ describe("createEventHandler", () => {
 
 	test("session.created without model does not start TTFT timeout", async () => {
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -520,8 +504,7 @@ describe("createEventHandler", () => {
 		};
 
 		const handler = createEventHandler({
-			// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-			manager: mockManager as any,
+			manager: mockManager as unknown,
 			sdk: mockSdk,
 			config: { ...defaultConfig, notifyOnFallback: true },
 		});
@@ -543,8 +526,7 @@ describe("createEventHandler", () => {
 });
 
 describe("parseModelString", () => {
-	// biome-ignore lint/suspicious/noExplicitAny: dynamic import
-	let parseModelString: any;
+	let parseModelString: unknown;
 
 	beforeEach(async () => {
 		const mod = await import("../../../src/orchestrator/fallback/event-handler");
@@ -573,8 +555,7 @@ describe("parseModelString", () => {
 });
 
 describe("handleFallbackError additional coverage", () => {
-	// biome-ignore lint/suspicious/noExplicitAny: dynamic import
-	let createEventHandler: any;
+	let createEventHandler: unknown;
 	let mockManager: ReturnType<typeof createMockManagerForAdditional>;
 	let mockSdk: ReturnType<typeof createMockSdkForAdditional>;
 

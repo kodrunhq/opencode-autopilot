@@ -1,5 +1,5 @@
-import type { Phase, PipelineState } from "./types";
 import { PHASES } from "./schemas";
+import type { PipelineState } from "./types";
 
 /**
  * Generate a concise progress string for the user indicating current phase and progress.
@@ -10,10 +10,10 @@ export function getPhaseProgressString(state: PipelineState): string {
 	if (!currentPhase) {
 		if (state.status === "COMPLETED") return "[Done] Pipeline finished successfully.";
 		if (state.status === "FAILED") return "[Failed] Pipeline encountered an error.";
-		return "[0/8] Not started";
+		return `[0/${PHASES.length}] Not started`;
 	}
 
-	const phaseIndex = PHASES.indexOf(currentPhase as any) + 1;
+	const phaseIndex = PHASES.indexOf(currentPhase as unknown as string) + 1;
 	const totalPhases = PHASES.length;
 	const baseProgress = `[${phaseIndex}/${totalPhases}]`;
 

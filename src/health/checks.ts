@@ -114,7 +114,7 @@ export async function configGroupsCheck(configPath?: string): Promise<HealthResu
 
 		const groupsWithoutPrimary = assignedGroups.filter((g) => {
 			const group = config.groups[g];
-			return !group || !group.primary;
+			return !group?.primary;
 		});
 
 		if (groupsWithoutPrimary.length > 0) {

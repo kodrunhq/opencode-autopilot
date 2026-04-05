@@ -3,13 +3,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-	createDefaultConfig,
-	isFirstLoad,
-	loadConfig,
-	type PluginConfig,
-	saveConfig,
-} from "../src/config";
+import { createDefaultConfig, isFirstLoad, loadConfig, saveConfig } from "../src/config";
 import {
 	fallbackConfigSchemaV6,
 	testModeSchema,
@@ -389,14 +383,14 @@ describe("v3 to v5 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result!.version).toBe(6);
-		expect(result!.configured).toBe(true);
+		expect(result?.version).toBe(6);
+		expect(result?.configured).toBe(true);
 		// oc-architect and oc-planner are both "architects" group with same model
-		expect(result!.groups.architects).toBeDefined();
-		expect(result!.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
+		expect(result?.groups.architects).toBeDefined();
+		expect(result?.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
 		// oc-implementer is "builders" group
-		expect(result!.groups.builders).toBeDefined();
-		expect(result!.groups.builders.primary).toBe("openai/gpt-5.4");
+		expect(result?.groups.builders).toBeDefined();
+		expect(result?.groups.builders.primary).toBe("openai/gpt-5.4");
 	});
 
 	test("v3 agents with different models in same group become overrides", async () => {
@@ -435,11 +429,11 @@ describe("v3 to v5 migration", () => {
 		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
 
 		const result = await loadConfig(configPath);
-		expect(result!.version).toBe(6);
+		expect(result?.version).toBe(6);
 		// First agent sets group primary, second becomes override
-		expect(result!.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
-		expect(result!.overrides["oc-planner"]).toBeDefined();
-		expect(result!.overrides["oc-planner"].primary).toBe("openai/gpt-5.4");
+		expect(result?.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
+		expect(result?.overrides["oc-planner"]).toBeDefined();
+		expect(result?.overrides["oc-planner"].primary).toBe("openai/gpt-5.4");
 	});
 
 	test("v3 fallback_models string migrates to per-group fallbacks", async () => {
@@ -476,7 +470,7 @@ describe("v3 to v5 migration", () => {
 		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
 
 		const result = await loadConfig(configPath);
-		expect(result!.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
+		expect(result?.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
 	});
 
 	test("v3 fallback_models array migrates to per-group fallbacks", async () => {
@@ -513,7 +507,7 @@ describe("v3 to v5 migration", () => {
 		await writeFile(configPath, JSON.stringify(v3Config), "utf-8");
 
 		const result = await loadConfig(configPath);
-		expect(result!.groups.builders.fallbacks).toEqual(["openai/gpt-5.4", "google/gemini-3.1-pro"]);
+		expect(result?.groups.builders.fallbacks).toEqual(["openai/gpt-5.4", "google/gemini-3.1-pro"]);
 	});
 
 	test("v3 config writes migrated v5 back to disk", async () => {
@@ -606,9 +600,9 @@ describe("v4 to v5 migration", () => {
 		await writeFile(configPath, JSON.stringify(v4Config), "utf-8");
 
 		const result = await loadConfig(configPath);
-		expect(result!.version).toBe(6);
-		expect(result!.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
-		expect(result!.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
+		expect(result?.version).toBe(6);
+		expect(result?.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
+		expect(result?.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
 	});
 
 	test("createDefaultConfig returns v5 with empty groups", () => {
@@ -624,10 +618,10 @@ describe("v4 to v5 migration", () => {
 		await writeFile(configPath, JSON.stringify(v1Config), "utf-8");
 
 		const result = await loadConfig(configPath);
-		expect(result!.version).toBe(6);
-		expect(result!.configured).toBe(true);
-		expect(result!.groups).toBeDefined();
-		expect(result!.overrides).toBeDefined();
+		expect(result?.version).toBe(6);
+		expect(result?.configured).toBe(true);
+		expect(result?.groups).toBeDefined();
+		expect(result?.overrides).toBeDefined();
 	});
 });
 
@@ -771,8 +765,8 @@ describe("v5 to v6 migration", () => {
 
 		const result = await loadConfig(configPath);
 		expect(result).not.toBeNull();
-		expect(result!.version).toBe(6);
-		expect(result!.fallback.testMode).toEqual({ enabled: false, sequence: [] });
+		expect(result?.version).toBe(6);
+		expect(result?.fallback.testMode).toEqual({ enabled: false, sequence: [] });
 	});
 
 	test("loadConfig on v5 writes migrated v6 back to disk", async () => {
@@ -820,7 +814,7 @@ describe("v5 to v6 migration", () => {
 		await writeFile(configPath, JSON.stringify(v1Config), "utf-8");
 
 		const result = await loadConfig(configPath);
-		expect(result!.version).toBe(6);
-		expect(result!.fallback.testMode).toEqual({ enabled: false, sequence: [] });
+		expect(result?.version).toBe(6);
+		expect(result?.fallback.testMode).toEqual({ enabled: false, sequence: [] });
 	});
 });

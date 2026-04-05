@@ -42,23 +42,23 @@ describe("resolveModelForAgent", () => {
 	test("returns override when agent has per-agent override", () => {
 		const result = resolveModelForAgent("oc-planner", groups, overrides);
 		expect(result).not.toBeNull();
-		expect(result!.primary).toBe("openai/gpt-5.4");
-		expect(result!.fallbacks).toEqual(["google/gemini-3.1-pro"]);
-		expect(result!.source).toBe("override");
+		expect(result?.primary).toBe("openai/gpt-5.4");
+		expect(result?.fallbacks).toEqual(["google/gemini-3.1-pro"]);
+		expect(result?.source).toBe("override");
 	});
 
 	test("override takes precedence over group", () => {
 		// oc-planner is in architects group, but has an override
 		const result = resolveModelForAgent("oc-planner", groups, overrides);
-		expect(result!.primary).toBe("openai/gpt-5.4"); // override, not architects
+		expect(result?.primary).toBe("openai/gpt-5.4"); // override, not architects
 	});
 
 	test("returns group primary when no override exists", () => {
 		const result = resolveModelForAgent("oc-architect", groups, {});
 		expect(result).not.toBeNull();
-		expect(result!.primary).toBe("anthropic/claude-opus-4-6");
-		expect(result!.fallbacks).toEqual(["openai/gpt-5.4"]);
-		expect(result!.source).toBe("group");
+		expect(result?.primary).toBe("anthropic/claude-opus-4-6");
+		expect(result?.fallbacks).toEqual(["openai/gpt-5.4"]);
+		expect(result?.source).toBe("group");
 	});
 
 	test("returns null for unknown agent", () => {
@@ -77,7 +77,7 @@ describe("resolveModelForAgent", () => {
 			autopilot: { primary: "google/gemini-3.1-pro" },
 		};
 		const result = resolveModelForAgent("autopilot", groups, overridesNoFallback);
-		expect(result!.fallbacks).toEqual([]);
+		expect(result?.fallbacks).toEqual([]);
 	});
 
 	test("override fallbacks replace group fallbacks entirely", () => {
@@ -92,7 +92,7 @@ describe("resolveModelForAgent", () => {
 			groupsWithFallbacks,
 			overridesWithFallbacks,
 		);
-		expect(result!.fallbacks).toEqual(["xai/grok-3"]);
+		expect(result?.fallbacks).toEqual(["xai/grok-3"]);
 	});
 });
 
@@ -104,9 +104,9 @@ describe("resolveModelForGroup", () => {
 	test("returns assignment for existing group", () => {
 		const result = resolveModelForGroup("reviewers", groups);
 		expect(result).not.toBeNull();
-		expect(result!.primary).toBe("openai/gpt-5.4");
-		expect(result!.fallbacks).toEqual(["google/gemini-3.1-pro"]);
-		expect(result!.source).toBe("group");
+		expect(result?.primary).toBe("openai/gpt-5.4");
+		expect(result?.fallbacks).toEqual(["google/gemini-3.1-pro"]);
+		expect(result?.source).toBe("group");
 	});
 
 	test("returns null for missing group", () => {

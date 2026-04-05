@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { advancePipeline } from "../../src/review/pipeline";
 import { parseAgentFindings } from "../../src/review/parse-findings";
+import { advancePipeline } from "../../src/review/pipeline";
 import type { ReviewState } from "../../src/review/types";
 
 describe("parseAgentFindings", () => {

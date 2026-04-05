@@ -7,7 +7,7 @@ import { retrieveMemoryContext } from "../../src/memory/retrieval";
 describe("Memory Concurrency", () => {
 	it("should handle 10 parallel inserts without collision", async () => {
 		const db = getMemoryDb();
-		const randomProjectId = `test-project-${Date.now()}-${Math.random()}`;
+		const _randomProjectId = `test-project-${Date.now()}-${Math.random()}`;
 
 		const inserts = Array.from({ length: 10 }).map((_, i) => {
 			return new Promise<number>((resolve) => {

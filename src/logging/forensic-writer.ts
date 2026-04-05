@@ -68,10 +68,10 @@ export function createForensicSinkForArtifactDir(artifactDir: string): LogSink {
 				type: forensicType,
 				code: (code as string) ?? null,
 				message: entry.message,
-				payload: payload as Record<
-					string,
-					string | number | boolean | object | readonly unknown[] | null
-				>,
+				payload: {
+					...payload,
+					...(subsystem ? { subsystem } : {}),
+				} as Record<string, string | number | boolean | object | readonly unknown[] | null>,
 			});
 		},
 	};
@@ -91,6 +91,7 @@ export function createForensicSink(projectRoot: string): LogSink {
 				taskId,
 				agent,
 				code,
+				subsystem,
 				...payload
 			} = entry.metadata;
 
@@ -140,10 +141,10 @@ export function createForensicSink(projectRoot: string): LogSink {
 				type: forensicType,
 				code: (code as string) ?? null,
 				message: entry.message,
-				payload: payload as Record<
-					string,
-					string | number | boolean | object | readonly unknown[] | null
-				>,
+				payload: {
+					...payload,
+					...(subsystem ? { subsystem } : {}),
+				} as Record<string, string | number | boolean | object | readonly unknown[] | null>,
 			});
 		},
 	};

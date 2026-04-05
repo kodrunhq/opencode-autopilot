@@ -23,30 +23,30 @@ describe("Config migration chain integration: v1 through v6", () => {
 		const result = await loadConfig(configPath);
 
 		expect(result).not.toBeNull();
-		expect(result!.version).toBe(6);
-		expect(result!.configured).toBe(true);
+		expect(result?.version).toBe(6);
+		expect(result?.configured).toBe(true);
 
 		// Orchestrator defaults
-		expect(result!.orchestrator.autonomy).toBe("full");
-		expect(result!.orchestrator.strictness).toBe("normal");
-		expect(result!.orchestrator.phases.recon).toBe(true);
-		expect(result!.orchestrator.phases.build).toBe(true);
+		expect(result?.orchestrator.autonomy).toBe("full");
+		expect(result?.orchestrator.strictness).toBe("normal");
+		expect(result?.orchestrator.phases.recon).toBe(true);
+		expect(result?.orchestrator.phases.build).toBe(true);
 
 		// Confidence defaults
-		expect(result!.confidence.enabled).toBe(true);
-		expect(result!.confidence.thresholds.proceed).toBe("MEDIUM");
-		expect(result!.confidence.thresholds.abort).toBe("LOW");
+		expect(result?.confidence.enabled).toBe(true);
+		expect(result?.confidence.thresholds.proceed).toBe("MEDIUM");
+		expect(result?.confidence.thresholds.abort).toBe("LOW");
 
 		// Fallback defaults (v6 includes testMode)
-		expect(result!.fallback.enabled).toBe(true);
-		expect(result!.fallback.maxFallbackAttempts).toBe(10);
-		expect(result!.fallback.testMode.enabled).toBe(false);
-		expect(result!.fallback.testMode.sequence).toEqual([]);
+		expect(result?.fallback.enabled).toBe(true);
+		expect(result?.fallback.maxFallbackAttempts).toBe(10);
+		expect(result?.fallback.testMode.enabled).toBe(false);
+		expect(result?.fallback.testMode.sequence).toEqual([]);
 
 		// Memory defaults (v5 addition)
-		expect(result!.memory.enabled).toBe(true);
-		expect(result!.memory.injectionBudget).toBe(2000);
-		expect(result!.memory.decayHalfLifeDays).toBe(90);
+		expect(result?.memory.enabled).toBe(true);
+		expect(result?.memory.injectionBudget).toBe(2000);
+		expect(result?.memory.decayHalfLifeDays).toBe(90);
 	});
 
 	test("v2 config migrates to v6 preserving orchestrator and confidence settings", async () => {
@@ -78,18 +78,18 @@ describe("Config migration chain integration: v1 through v6", () => {
 
 		const result = await loadConfig(configPath);
 
-		expect(result!.version).toBe(6);
+		expect(result?.version).toBe(6);
 		// Preserved from v2
-		expect(result!.orchestrator.autonomy).toBe("supervised");
-		expect(result!.orchestrator.strictness).toBe("strict");
-		expect(result!.orchestrator.phases.challenge).toBe(false);
-		expect(result!.confidence.enabled).toBe(false);
-		expect(result!.confidence.thresholds.proceed).toBe("HIGH");
+		expect(result?.orchestrator.autonomy).toBe("supervised");
+		expect(result?.orchestrator.strictness).toBe("strict");
+		expect(result?.orchestrator.phases.challenge).toBe(false);
+		expect(result?.confidence.enabled).toBe(false);
+		expect(result?.confidence.thresholds.proceed).toBe("HIGH");
 		// Defaults added during migration
-		expect(result!.fallback.enabled).toBe(true);
-		expect(result!.fallback.testMode.enabled).toBe(false);
-		expect(result!.memory.enabled).toBe(true);
-		expect(result!.memory.injectionBudget).toBe(2000);
+		expect(result?.fallback.enabled).toBe(true);
+		expect(result?.fallback.testMode.enabled).toBe(false);
+		expect(result?.memory.enabled).toBe(true);
+		expect(result?.memory.injectionBudget).toBe(2000);
 	});
 
 	test("v3 config migrates to v6 preserving fallback settings", async () => {
@@ -127,17 +127,17 @@ describe("Config migration chain integration: v1 through v6", () => {
 
 		const result = await loadConfig(configPath);
 
-		expect(result!.version).toBe(6);
+		expect(result?.version).toBe(6);
 		// Preserved from v3
-		expect(result!.fallback.enabled).toBe(false);
-		expect(result!.fallback.retryOnErrors).toEqual([429, 500]);
-		expect(result!.fallback.maxFallbackAttempts).toBe(3);
-		expect(result!.fallback.cooldownSeconds).toBe(15);
+		expect(result?.fallback.enabled).toBe(false);
+		expect(result?.fallback.retryOnErrors).toEqual([429, 500]);
+		expect(result?.fallback.maxFallbackAttempts).toBe(3);
+		expect(result?.fallback.cooldownSeconds).toBe(15);
 		// v6 testMode defaults added
-		expect(result!.fallback.testMode.enabled).toBe(false);
+		expect(result?.fallback.testMode.enabled).toBe(false);
 		// Memory defaults added
-		expect(result!.memory.enabled).toBe(true);
-		expect(result!.memory.decayHalfLifeDays).toBe(90);
+		expect(result?.memory.enabled).toBe(true);
+		expect(result?.memory.decayHalfLifeDays).toBe(90);
 	});
 
 	test("v4 config migrates to v6 preserving groups and overrides, adding memory defaults", async () => {
@@ -180,20 +180,20 @@ describe("Config migration chain integration: v1 through v6", () => {
 
 		const result = await loadConfig(configPath);
 
-		expect(result!.version).toBe(6);
+		expect(result?.version).toBe(6);
 		// Preserved from v4
-		expect(result!.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
-		expect(result!.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
-		expect(result!.overrides["oc-planner"].primary).toBe("openai/gpt-5.4");
-		expect(result!.orchestrator.autonomy).toBe("manual");
-		expect(result!.orchestrator.phases.explore).toBe(false);
-		expect(result!.confidence.thresholds.proceed).toBe("LOW");
+		expect(result?.groups.architects.primary).toBe("anthropic/claude-opus-4-6");
+		expect(result?.groups.architects.fallbacks).toEqual(["openai/gpt-5.4"]);
+		expect(result?.overrides["oc-planner"].primary).toBe("openai/gpt-5.4");
+		expect(result?.orchestrator.autonomy).toBe("manual");
+		expect(result?.orchestrator.phases.explore).toBe(false);
+		expect(result?.confidence.thresholds.proceed).toBe("LOW");
 		// Memory defaults added by v4->v5 migration
-		expect(result!.memory.enabled).toBe(true);
-		expect(result!.memory.injectionBudget).toBe(2000);
-		expect(result!.memory.decayHalfLifeDays).toBe(90);
+		expect(result?.memory.enabled).toBe(true);
+		expect(result?.memory.injectionBudget).toBe(2000);
+		expect(result?.memory.decayHalfLifeDays).toBe(90);
 		// v6 testMode defaults
-		expect(result!.fallback.testMode.enabled).toBe(false);
+		expect(result?.fallback.testMode.enabled).toBe(false);
 	});
 
 	test("v5 config migrates to v6 adding testMode defaults", async () => {
@@ -237,14 +237,14 @@ describe("Config migration chain integration: v1 through v6", () => {
 
 		const result = await loadConfig(configPath);
 
-		expect(result!.version).toBe(6);
+		expect(result?.version).toBe(6);
 		// Custom memory settings preserved (not overwritten with defaults)
-		expect(result!.memory.enabled).toBe(false);
-		expect(result!.memory.injectionBudget).toBe(3000);
-		expect(result!.memory.decayHalfLifeDays).toBe(30);
+		expect(result?.memory.enabled).toBe(false);
+		expect(result?.memory.injectionBudget).toBe(3000);
+		expect(result?.memory.decayHalfLifeDays).toBe(30);
 		// v6 testMode defaults added
-		expect(result!.fallback.testMode.enabled).toBe(false);
-		expect(result!.fallback.testMode.sequence).toEqual([]);
+		expect(result?.fallback.testMode.enabled).toBe(false);
+		expect(result?.fallback.testMode.sequence).toEqual([]);
 	});
 
 	test("migration chain persists v6 config to disk after loading v1", async () => {

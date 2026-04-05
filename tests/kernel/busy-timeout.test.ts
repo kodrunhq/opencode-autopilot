@@ -1,8 +1,7 @@
-import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { getKernelDbPath, openKernelDb } from "../../src/kernel/database";
+import { openKernelDb } from "../../src/kernel/database";
 
 describe("SQLite busy_timeout configuration", () => {
 	let testDbPath: string;
@@ -11,13 +10,13 @@ describe("SQLite busy_timeout configuration", () => {
 		testDbPath = join(process.cwd(), ".opencode", "test-busy-timeout.db");
 		try {
 			unlinkSync(testDbPath);
-		} catch (e) {}
+		} catch (_e) {}
 	});
 
 	afterEach(() => {
 		try {
 			unlinkSync(testDbPath);
-		} catch (e) {}
+		} catch (_e) {}
 	});
 
 	it("should set busy_timeout to 5000", () => {

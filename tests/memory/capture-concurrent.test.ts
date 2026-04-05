@@ -56,7 +56,7 @@ describe("Memory Capture Concurrency", () => {
 
 		const observations = db
 			.query("SELECT * FROM observations WHERE session_id = ?")
-			.all(sessionId) as Array<any>;
+			.all(sessionId) as Array<unknown>;
 
 		expect(observations.length).toBe(10);
 		expect(observations.every((o) => o.type === "error")).toBe(true);

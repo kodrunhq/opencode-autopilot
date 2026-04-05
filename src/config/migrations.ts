@@ -181,7 +181,7 @@ export function migrateV4toV5(v4Config: PluginConfigV4): PluginConfigV5 {
 
 export function migrateV5toV6(
 	v5Config: PluginConfigV5,
-	fallbackDefaultsV6: typeof fallbackDefaults,
+	_fallbackDefaultsV6: typeof fallbackDefaults,
 ) {
 	return {
 		version: 6 as const,

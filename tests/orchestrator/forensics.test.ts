@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createForensicEvent } from "../../src/observability/forensic-log";
 import { failureContextSchema, PHASES, pipelineStateSchema } from "../../src/orchestrator/schemas";
-import type { FailureContext, PipelineState } from "../../src/orchestrator/types";
+import type { PipelineState } from "../../src/orchestrator/types";
 
 // ---------- helpers ----------
 
@@ -56,7 +56,7 @@ async function writeState(dir: string, state: PipelineState): Promise<void> {
 	await writeFile(join(dir, "state.json"), JSON.stringify(state, null, 2), "utf-8");
 }
 
-async function readState(dir: string): Promise<PipelineState> {
+async function _readState(dir: string): Promise<PipelineState> {
 	const raw = await readFile(join(dir, "state.json"), "utf-8");
 	return pipelineStateSchema.parse(JSON.parse(raw));
 }
@@ -157,9 +157,9 @@ describe("orchestrateCore failure metadata capture", () => {
 		expect(currentState).not.toBeNull();
 
 		const errorMessage = "Simulated RECON failure";
-		const lastDone = currentState!.phases.filter((p) => p.status === "DONE").pop();
+		const lastDone = currentState?.phases.filter((p) => p.status === "DONE").pop();
 		const failureContext = {
-			failedPhase: currentState!.currentPhase!,
+			failedPhase: currentState?.currentPhase ?? "",
 			failedAgent: null as string | null,
 			errorMessage: errorMessage.slice(0, 4096),
 			timestamp: new Date().toISOString(),
@@ -173,11 +173,11 @@ describe("orchestrateCore failure metadata capture", () => {
 
 		// Verify persisted state
 		const updatedState = await loadState(tmpDir);
-		expect(updatedState!.status).toBe("FAILED");
-		expect(updatedState!.failureContext).not.toBeNull();
-		expect(updatedState!.failureContext!.failedPhase).toBe("RECON");
-		expect(updatedState!.failureContext!.errorMessage).toBe("Simulated RECON failure");
-		expect(updatedState!.failureContext!.lastSuccessfulPhase).toBeNull();
+		expect(updatedState?.status).toBe("FAILED");
+		expect(updatedState?.failureContext).not.toBeNull();
+		expect(updatedState?.failureContext?.failedPhase).toBe("RECON");
+		expect(updatedState?.failureContext?.errorMessage).toBe("Simulated RECON failure");
+		expect(updatedState?.failureContext?.lastSuccessfulPhase).toBeNull();
 	});
 
 	test("lastSuccessfulPhase reflects the last DONE phase", async () => {
@@ -199,9 +199,9 @@ describe("orchestrateCore failure metadata capture", () => {
 		await writeState(tmpDir, state);
 
 		const currentState = await loadState(tmpDir);
-		const lastDone = currentState!.phases.filter((p) => p.status === "DONE").pop();
+		const lastDone = currentState?.phases.filter((p) => p.status === "DONE").pop();
 		const failureContext = {
-			failedPhase: currentState!.currentPhase!,
+			failedPhase: currentState?.currentPhase ?? "",
 			failedAgent: null as string | null,
 			errorMessage: "Arena crashed",
 			timestamp: new Date().toISOString(),
@@ -214,7 +214,7 @@ describe("orchestrateCore failure metadata capture", () => {
 		await saveState(failed, tmpDir);
 
 		const updatedState = await loadState(tmpDir);
-		expect(updatedState!.failureContext!.lastSuccessfulPhase).toBe("CHALLENGE");
+		expect(updatedState?.failureContext?.lastSuccessfulPhase).toBe("CHALLENGE");
 	});
 
 	test("if loadState fails in catch block, original error still returned", async () => {
@@ -222,7 +222,7 @@ describe("orchestrateCore failure metadata capture", () => {
 		// by confirming that a try/catch around a failing loadState still
 		// allows the outer return
 		let originalErrorReturned = false;
-		const errorMessage = "Build exploded";
+		const _errorMessage = "Build exploded";
 
 		try {
 			// Simulate loadState throwing by reading from a non-existent corrupt path

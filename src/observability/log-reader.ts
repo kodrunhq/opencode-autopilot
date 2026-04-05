@@ -45,7 +45,7 @@ export interface EventSearchFilters {
 	readonly severity?: string;
 }
 
-function isSessionForProject(event: Readonly<ForensicEvent>, sessionId: string): boolean {
+function _isSessionForProject(event: Readonly<ForensicEvent>, sessionId: string): boolean {
 	return event.domain === "session" && event.sessionId === sessionId;
 }
 

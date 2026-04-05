@@ -12,10 +12,8 @@ function createMockManager() {
 }
 
 describe("createToolExecuteAfterHandler", () => {
-	// biome-ignore lint/suspicious/noExplicitAny: dynamic import
-	let createToolExecuteAfterHandler: any;
-	// biome-ignore lint/suspicious/noExplicitAny: mock type
-	let mockManager: any;
+	let createToolExecuteAfterHandler: unknown;
+	let mockManager: unknown;
 
 	beforeEach(async () => {
 		const mod = await import("../../../src/orchestrator/fallback/tool-execute-handler");

@@ -30,7 +30,7 @@ describe("Event Store Concurrency", () => {
 		expect(session).toBeDefined();
 		expect(session?.events.length).toBe(100);
 
-		const tools = new Set(session?.events.map((e) => (e as any).tool));
+		const tools = new Set(session?.events.map((e) => (e as unknown).tool));
 		expect(tools.size).toBe(100);
 	});
 });

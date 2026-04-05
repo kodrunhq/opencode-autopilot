@@ -7,17 +7,17 @@ import { withTransaction } from "../../src/kernel/transaction";
 
 describe("Kernel DB Concurrency", () => {
 	let tempDir: string;
-	let testDbPath: string;
+	let _testDbPath: string;
 
 	beforeEach(() => {
 		tempDir = mkdtempSync(join(tmpdir(), "kernel-concurrency-"));
-		testDbPath = join(tempDir, "kernel.db");
+		_testDbPath = join(tempDir, "kernel.db");
 	});
 
 	afterEach(() => {
 		try {
 			rmSync(tempDir, { recursive: true, force: true });
-		} catch (e) {}
+		} catch (_e) {}
 	});
 
 	it("should handle 100 concurrent writes to pipeline_runs", async () => {

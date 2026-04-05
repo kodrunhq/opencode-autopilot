@@ -2,12 +2,7 @@ import type { Database } from "bun:sqlite";
 import { basename } from "node:path";
 import { getLogger } from "../logging/domains";
 import { resolveProjectIdentity } from "../projects/resolve";
-import {
-	extractExplicitPreferenceCandidates,
-	extractSessionId,
-	type PreferenceCandidate,
-	truncate,
-} from "./capture-utils";
+import * as captureUtils from "./capture-utils";
 import { pruneStaleObservations } from "./decay";
 import { insertObservation, upsertPreferenceRecord, upsertProject } from "./repository";
 import type { ObservationType } from "./types";
@@ -47,7 +42,7 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 					sessionId: currentSessionId,
 					type,
 					content,
-					summary: truncate(summary, 200),
+					summary: captureUtils.truncate(summary, 200),
 					confidence,
 					accessCount: 0,
 					createdAt: now(),
@@ -123,21 +118,21 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 			}
 
 			case "session.error": {
-				const sessionId = extractSessionId(properties);
+				const sessionId = captureUtils.extractSessionId(properties);
 				if (!sessionId || sessionId !== currentSessionId) return;
 
 				const error = properties.error as Record<string, unknown> | undefined;
 				const errorType = typeof error?.type === "string" ? error.type : "unknown";
 				const message = typeof error?.message === "string" ? error.message : "Unknown error";
 				const content = `${errorType}: ${message}`;
-				const summary = truncate(message, 200);
+				const summary = captureUtils.truncate(message, 200);
 
 				safeInsert("error", content, summary, 0.7);
 				return;
 			}
 
 			case "app.decision": {
-				const sessionId = extractSessionId(properties);
+				const sessionId = captureUtils.extractSessionId(properties);
 				if (!sessionId || sessionId !== currentSessionId) return;
 
 				const decision = typeof properties.decision === "string" ? properties.decision : "";
@@ -145,12 +140,12 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 
 				if (!decision) return;
 
-				safeInsert("decision", decision, rationale || truncate(decision, 200), 0.8);
+				safeInsert("decision", decision, rationale || captureUtils.truncate(decision, 200), 0.8);
 				return;
 			}
 
 			case "app.phase_transition": {
-				const sessionId = extractSessionId(properties);
+				const sessionId = captureUtils.extractSessionId(properties);
 				if (!sessionId || sessionId !== currentSessionId) return;
 
 				const fromPhase =
@@ -174,7 +169,7 @@ export function createMemoryChatMessageHandler(deps: MemoryCaptureDeps) {
 		output: { readonly parts: unknown[] },
 	): Promise<void> => {
 		try {
-			const candidates = extractExplicitPreferenceCandidates(output.parts);
+			const candidates = captureUtils.extractExplicitPreferenceCandidates(output.parts);
 			if (candidates.length === 0) {
 				return;
 			}
@@ -227,26 +222,4 @@ export function createMemoryChatMessageHandler(deps: MemoryCaptureDeps) {
 	};
 }
 
-export {
-	extractExplicitPreferenceCandidates,
-	extractTextPartContent,
-	inferPreferenceScope,
-	normalizePreferenceKey,
-	normalizePreferenceValue,
-} from "./capture-utils";
-
-import {
-	extractExplicitPreferenceCandidates as extractCandidates,
-	extractTextPartContent,
-	inferPreferenceScope,
-	normalizePreferenceKey,
-	normalizePreferenceValue,
-} from "./capture-utils";
-
-export const memoryCaptureInternals = Object.freeze({
-	extractExplicitPreferenceCandidates: extractCandidates,
-	extractTextPartContent,
-	inferPreferenceScope,
-	normalizePreferenceKey,
-	normalizePreferenceValue,
-});
+export { captureUtils as memoryCaptureInternals };

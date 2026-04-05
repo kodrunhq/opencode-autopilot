@@ -80,7 +80,7 @@ describe("ForensicWriter", () => {
 			{ level: "DEBUG", expected: "debug" },
 		];
 
-		for (const { level, expected } of levels) {
+		for (const { level } of levels) {
 			sink.write({
 				timestamp: "2026-04-05T12:00:00.000Z",
 				level,

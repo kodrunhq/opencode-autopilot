@@ -23,7 +23,7 @@ export function parseAgentFindings(raw: string, agentName: string): readonly Rev
 
 		if (!Array.isArray(items)) return Object.freeze(findings);
 
-		for (let item of items) {
+		for (const item of items) {
 			if (typeof item !== "object" || item === null) continue;
 
 			const problem = item.problem || item.description || item.issue || "No description provided";
@@ -53,7 +53,7 @@ export function parseAgentFindings(raw: string, agentName: string): readonly Rev
 	return Object.freeze(findings);
 }
 
-function normalizeSeverity(sev: any): string {
+function normalizeSeverity(sev: unknown): string {
 	if (typeof sev !== "string") return "LOW";
 	const upper = sev.toUpperCase();
 	if (["CRITICAL", "HIGH", "MEDIUM", "LOW"].includes(upper)) return upper;

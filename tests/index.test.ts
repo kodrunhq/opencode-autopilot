@@ -26,8 +26,7 @@ describe("plugin entry point", () => {
 		directory: "/tmp",
 		worktree: "/tmp",
 		serverUrl: new URL("http://localhost:3000"),
-		// biome-ignore lint/suspicious/noExplicitAny: BunShell mock requires any
-		$: {} as any,
+		$: {} as unknown,
 	};
 
 	test("default export is a function", () => {
@@ -53,10 +52,9 @@ describe("plugin entry point", () => {
 
 	test("event handler handles session.created gracefully", async () => {
 		const result = await plugin(mockInput);
-		const eventResult = await result.event?.(
-			// biome-ignore lint/suspicious/noExplicitAny: SDK event mock requires any
-			{ event: { type: "session.created", properties: {} } } as any,
-		);
+		const eventResult = await result.event?.({
+			event: { type: "session.created", properties: {} },
+		} as unknown);
 		expect(eventResult).toBeUndefined();
 	});
 
@@ -104,16 +102,14 @@ describe("plugin entry point", () => {
 
 	test("returns chat.message hook", async () => {
 		const result = await plugin(mockInput);
-		// biome-ignore lint/suspicious/noExplicitAny: accessing dynamic hook key
-		const chatMessage = (result as any)["chat.message"];
+		const chatMessage = (result as unknown)["chat.message"];
 		expect(chatMessage).toBeDefined();
 		expect(typeof chatMessage).toBe("function");
 	});
 
 	test("returns tool.execute.after hook", async () => {
 		const result = await plugin(mockInput);
-		// biome-ignore lint/suspicious/noExplicitAny: accessing dynamic hook key
-		const toolExecAfter = (result as any)["tool.execute.after"];
+		const toolExecAfter = (result as unknown)["tool.execute.after"];
 		expect(toolExecAfter).toBeDefined();
 		expect(typeof toolExecAfter).toBe("function");
 	});
@@ -131,8 +127,7 @@ describe("plugin entry point", () => {
 
 	test("returns tool.execute.before hook", async () => {
 		const result = await plugin(mockInput);
-		// biome-ignore lint/suspicious/noExplicitAny: accessing dynamic hook key
-		const toolExecBefore = (result as any)["tool.execute.before"];
+		const toolExecBefore = (result as unknown)["tool.execute.before"];
 		expect(toolExecBefore).toBeDefined();
 		expect(typeof toolExecBefore).toBe("function");
 	});

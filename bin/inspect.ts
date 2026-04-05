@@ -249,7 +249,7 @@ export async function inspectCliCore(
 			);
 		}
 		case "project": {
-			const details = getProjectDetails(parsed.projectRef!, dbInput);
+			const details = getProjectDetails(parsed.projectRef ?? "", dbInput);
 			if (details === null) {
 				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}
@@ -260,7 +260,7 @@ export async function inspectCliCore(
 			);
 		}
 		case "paths": {
-			const details = getProjectDetails(parsed.projectRef!, dbInput);
+			const details = getProjectDetails(parsed.projectRef ?? "", dbInput);
 			if (details === null) {
 				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}

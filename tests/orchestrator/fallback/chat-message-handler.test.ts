@@ -54,8 +54,7 @@ function createFallbackState(overrides: Partial<FallbackState> = {}): FallbackSt
 
 describe("createChatMessageHandler", () => {
 	let mockManager: ReturnType<typeof createMockManager>;
-	// biome-ignore lint/suspicious/noExplicitAny: dynamic import
-	let createChatMessageHandler: any;
+	let createChatMessageHandler: unknown;
 
 	beforeEach(async () => {
 		mockManager = createMockManager();
@@ -64,8 +63,7 @@ describe("createChatMessageHandler", () => {
 	});
 
 	test("when no fallback state exists, does not modify output", async () => {
-		// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -79,8 +77,7 @@ describe("createChatMessageHandler", () => {
 
 	test("when currentModel equals originalModel, does not modify output", async () => {
 		mockManager.states.set("sess-1", createFallbackState());
-		// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -101,8 +98,7 @@ describe("createChatMessageHandler", () => {
 				attemptCount: 1,
 			}),
 		);
-		// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -123,8 +119,7 @@ describe("createChatMessageHandler", () => {
 			}),
 		);
 		mockManager.setDispatchInFlight(true);
-		// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -146,8 +141,7 @@ describe("createChatMessageHandler", () => {
 			}),
 		);
 		mockManager.setCompactionInFlight(true);
-		// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -168,8 +162,7 @@ describe("createChatMessageHandler", () => {
 				attemptCount: 1,
 			}),
 		);
-		// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown);
 
 		const output = {
 			message: { model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } },
@@ -183,8 +176,7 @@ describe("createChatMessageHandler", () => {
 
 	test("calls tryRecoverToOriginal to check for cooldown expiry", async () => {
 		mockManager.states.set("sess-1", createFallbackState());
-		// biome-ignore lint/suspicious/noExplicitAny: mock manager type
-		const handler = createChatMessageHandler(mockManager as any);
+		const handler = createChatMessageHandler(mockManager as unknown);
 
 		await handler({ sessionID: "sess-1" }, { message: { model: undefined }, parts: [] });
 

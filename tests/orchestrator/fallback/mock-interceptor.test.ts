@@ -69,6 +69,6 @@ describe("createMockInterceptor", () => {
 		const result = createMockInterceptor({ enabled: true, sequence: ["rate_limit", "timeout"] });
 		expect(result).not.toBeNull();
 		expect(result).toBeInstanceOf(MockInterceptor);
-		expect(result!.nextMode()).toBe("rate_limit");
+		expect(result?.nextMode()).toBe("rate_limit");
 	});
 });

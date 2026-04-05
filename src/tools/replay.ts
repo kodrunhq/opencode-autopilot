@@ -20,12 +20,16 @@ export const ocReplay = tool({
 			startedAt: "2026-04-05T00:00:00.000Z",
 		};
 
-		const results = [];
 		for (const input of args.inputs) {
-			const res = advancePipeline(input, currentState as any);
-			results.push(res);
+			const res = advancePipeline(
+				input,
+				currentState as unknown as Record<string, unknown>,
+				undefined,
+				args.runId,
+				args.runId,
+			);
 			if (res.state) {
-				currentState = res.state as any;
+				currentState = res.state as unknown as Record<string, unknown>;
 			}
 		}
 
@@ -33,6 +37,7 @@ export const ocReplay = tool({
 			{
 				success: true,
 				message: `Replayed ${args.inputs.length} inputs deterministically.`,
+				replayedRunId: args.runId,
 				finalState: currentState,
 			},
 			null,

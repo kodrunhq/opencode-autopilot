@@ -119,7 +119,7 @@ describe("review agent registry", () => {
 		for (const name of stackGated) {
 			const agent = ALL_REVIEW_AGENTS.find((a) => a.name === name);
 			expect(agent).toBeDefined();
-			expect(agent!.relevantStacks.length).toBeGreaterThan(0);
+			expect(agent?.relevantStacks.length).toBeGreaterThan(0);
 		}
 	});
 
@@ -136,7 +136,7 @@ describe("review agent registry", () => {
 		for (const name of universalSpecialists) {
 			const agent = ALL_REVIEW_AGENTS.find((a) => a.name === name);
 			expect(agent).toBeDefined();
-			expect(agent!.relevantStacks).toHaveLength(0);
+			expect(agent?.relevantStacks).toHaveLength(0);
 		}
 	});
 });

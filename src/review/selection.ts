@@ -79,9 +79,10 @@ export function selectAgents(
 	const rng = createSeededRandom(seed);
 
 	const shuffledGated = deterministicShuffle([...gatedCandidates], rng);
-	const finalGated = options.limit ? shuffledGated.slice(0, options.limit) : shuffledGated;
+	const finalGated =
+		options.limit !== undefined ? shuffledGated.slice(0, options.limit) : shuffledGated;
 
-	if (options.limit && finalGated.length < shuffledGated.length) {
+	if (options.limit !== undefined && finalGated.length < shuffledGated.length) {
 		const dropped = shuffledGated.slice(options.limit);
 		for (const agent of dropped) {
 			excluded.push(

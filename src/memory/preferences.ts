@@ -4,8 +4,8 @@
  */
 
 import type { Database } from "bun:sqlite";
-import { systemTimeProvider, type TimeProvider } from "../scoring/time-provider";
 import { createHash } from "node:crypto";
+import { systemTimeProvider, type TimeProvider } from "../scoring/time-provider";
 import { getMemoryDb } from "./database";
 import { preferenceEvidenceSchema, preferenceRecordSchema, preferenceSchema } from "./schemas";
 import type { Preference, PreferenceEvidence, PreferenceRecord } from "./types";

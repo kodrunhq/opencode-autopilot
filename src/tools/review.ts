@@ -22,6 +22,8 @@ import {
 	loadActiveReviewStateFromKernel,
 	saveActiveReviewStateToKernel,
 } from "../kernel/repository";
+import { getLogger } from "../logging/domains";
+import { loadState as loadPipelineState } from "../orchestrator/state";
 import { REVIEW_AGENTS, SPECIALIZED_AGENTS } from "../review/agents/index";
 import {
 	createEmptyMemory,
@@ -35,9 +37,7 @@ import { reviewFindingsEnvelopeSchema, reviewStateSchema } from "../review/schem
 import { selectAgents } from "../review/selection";
 import { detectStackTags } from "../review/stack-gate";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
-import { getLogger } from "../logging/domains";
 import { getProjectArtifactDir } from "../utils/paths";
-import { loadState as loadPipelineState } from "../orchestrator/state";
 
 interface ReviewArgs {
 	readonly scope?: string;

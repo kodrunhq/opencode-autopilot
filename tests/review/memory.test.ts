@@ -51,7 +51,7 @@ describe("loadReviewMemory", () => {
 
 		const result = await loadReviewMemory(tempDir);
 		expect(result).not.toBeNull();
-		expect(result!.schemaVersion).toBe(1);
+		expect(result?.schemaVersion).toBe(1);
 	});
 
 	test("returns null on invalid JSON content (recoverable)", async () => {

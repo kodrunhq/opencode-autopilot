@@ -80,36 +80,28 @@ describe("resolveChain", () => {
 	test("filters non-string elements from per-agent array", () => {
 		const result = resolveChain(
 			"agent-a",
-			// biome-ignore lint/suspicious/noExplicitAny: testing runtime type safety
-			{ "agent-a": { fallback_models: [42, null, "valid-model", "", true] as any } },
+			{ "agent-a": { fallback_models: [42, null, "valid-model", "", true] as unknown } },
 			undefined,
 		);
 		expect(result).toEqual(["valid-model"]);
 	});
 
 	test("filters non-string elements from global array", () => {
-		// biome-ignore lint/suspicious/noExplicitAny: testing runtime type safety
-		const result = resolveChain("agent-a", undefined, [42, null, "global-model"] as any);
+		const result = resolveChain("agent-a", undefined, [42, null, "global-model"] as unknown);
 		expect(result).toEqual(["global-model"]);
 	});
 
 	test("falls through to global when per-agent fallback_models is a number", () => {
-		const result = resolveChain(
-			"agent-a",
-			// biome-ignore lint/suspicious/noExplicitAny: testing runtime type safety
-			{ "agent-a": { fallback_models: 42 } as any },
-			["global-fallback"],
-		);
+		const result = resolveChain("agent-a", { "agent-a": { fallback_models: 42 } as unknown }, [
+			"global-fallback",
+		]);
 		expect(result).toEqual(["global-fallback"]);
 	});
 
 	test("falls through to global when per-agent fallback_models is boolean true", () => {
-		const result = resolveChain(
-			"agent-a",
-			// biome-ignore lint/suspicious/noExplicitAny: testing runtime type safety
-			{ "agent-a": { fallback_models: true } as any },
-			["global-fallback"],
-		);
+		const result = resolveChain("agent-a", { "agent-a": { fallback_models: true } as unknown }, [
+			"global-fallback",
+		]);
 		expect(result).toEqual(["global-fallback"]);
 	});
 

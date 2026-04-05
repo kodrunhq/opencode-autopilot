@@ -1,10 +1,10 @@
 import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
-import { getLogger, initLoggers } from "./logging/domains";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { installAssets } from "./installer";
+import { getLogger, initLoggers } from "./logging/domains";
 import {
 	createMemoryCaptureHandler,
 	createMemoryChatMessageHandler,

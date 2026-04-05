@@ -1,7 +1,6 @@
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
-import type { Task } from "../types";
 import { assignWaves } from "../wave-assigner";
 import {
 	buildPendingResultError,

@@ -32,9 +32,9 @@ describe("FallbackManager Concurrency", () => {
 		manager.initSession("session-123", "openai/gpt-4");
 
 		const error = new Error("Rate limit exceeded");
-		(error as any).status = 429;
+		(error as unknown).status = 429;
 
-		const calls = Array.from({ length: 10 }).map((_, i) => {
+		const calls = Array.from({ length: 10 }).map((_, _i) => {
 			return new Promise<FallbackPlan | null>((resolve) => {
 				setTimeout(async () => {
 					const result = manager.handleError("session-123", error, "openai/gpt-4");

@@ -4,7 +4,7 @@ import type { PipelineState } from "../../src/orchestrator/types";
 
 describe("Progress Display (Task 1)", () => {
 	test("generates correct format for regular phases", () => {
-		const state: any = {
+		const state: unknown = {
 			status: "IN_PROGRESS",
 			currentPhase: "ARCHITECT",
 			phases: [],
@@ -16,7 +16,7 @@ describe("Progress Display (Task 1)", () => {
 	});
 
 	test("generates detailed build wave progress", () => {
-		const state: any = {
+		const state: unknown = {
 			status: "IN_PROGRESS",
 			currentPhase: "BUILD",
 			phases: [],
@@ -35,7 +35,7 @@ describe("Progress Display (Task 1)", () => {
 	});
 
 	test("generates review pending progress", () => {
-		const state: any = {
+		const state: unknown = {
 			status: "IN_PROGRESS",
 			currentPhase: "BUILD",
 			phases: [],

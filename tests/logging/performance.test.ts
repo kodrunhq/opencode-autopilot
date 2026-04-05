@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
 import { initLoggers } from "../../src/logging/domains";
-import type { LogEntry } from "../../src/logging/types";
 import {
 	recordAgentResponseTime,
 	recordMemoryUsage,
 	startTimer,
 } from "../../src/logging/performance";
+import type { LogEntry } from "../../src/logging/types";
 
 function makeSink(): { entries: LogEntry[]; sink: { write(entry: LogEntry): void } } {
 	const entries: LogEntry[] = [];

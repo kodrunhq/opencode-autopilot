@@ -1,7 +1,7 @@
 import { describe, expect, it, setSystemTime } from "bun:test";
-import { generateSessionSummary } from "../../src/ux/session-summary";
 import type { SessionEvents } from "../../src/observability/event-store";
 import type { PipelineState } from "../../src/orchestrator/types";
+import { generateSessionSummary } from "../../src/ux/session-summary";
 
 describe("generateSessionSummary", () => {
 	it("handles null/undefined inputs gracefully", () => {
@@ -29,7 +29,7 @@ describe("generateSessionSummary", () => {
 					confidence: "HIGH",
 				},
 			],
-		} as any;
+		} as unknown;
 
 		const sessionData: SessionEvents = {
 			tokens: {
@@ -51,7 +51,7 @@ describe("generateSessionSummary", () => {
 				},
 			],
 			startedAt: "2024-01-01T00:00:00Z",
-		} as any;
+		} as unknown;
 
 		const summary = generateSessionSummary(sessionData, pipelineState);
 		expect(summary).toContain("**Pipeline Status**: COMPLETED (Current Phase: RETROSPECTIVE)");
@@ -75,7 +75,7 @@ describe("generateSessionSummary", () => {
 				},
 			],
 			startedAt: "2024-01-01T00:00:00Z",
-		} as any;
+		} as unknown;
 
 		const summary = generateSessionSummary(sessionData, null);
 		expect(summary).toContain("**Errors Encountered**:");
@@ -89,7 +89,7 @@ describe("generateSessionSummary", () => {
 		const sessionData: SessionEvents = {
 			events: [],
 			startedAt,
-		} as any;
+		} as unknown;
 
 		const summary = generateSessionSummary(sessionData, null);
 		expect(summary).toContain("**Duration (active)**: 5.0s");
@@ -101,7 +101,7 @@ describe("generateSessionSummary", () => {
 			status: "IN_PROGRESS",
 			currentPhase: "RECON",
 			phases: [],
-		} as any;
+		} as unknown;
 
 		const summary = generateSessionSummary(undefined, pipelineState);
 		expect(summary).toContain("**Pipeline Status**: IN_PROGRESS (Current Phase: RECON)");

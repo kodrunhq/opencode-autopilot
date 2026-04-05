@@ -12,7 +12,7 @@ describe("withTransaction", () => {
 		testDbPath = join(process.cwd(), ".opencode", "test-transaction.db");
 		try {
 			unlinkSync(testDbPath);
-		} catch (e) {}
+		} catch (_e) {}
 
 		db = new Database(testDbPath);
 		db.run("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)");
@@ -24,7 +24,7 @@ describe("withTransaction", () => {
 		}
 		try {
 			unlinkSync(testDbPath);
-		} catch (e) {}
+		} catch (_e) {}
 	});
 
 	it("should execute successful transaction", () => {
@@ -57,15 +57,15 @@ describe("withTransaction", () => {
 
 		let calls = 0;
 		const originalRun = db.run;
-		db.run = function (this: any, ...args: any[]) {
+		db.run = function (this: unknown, ...args: unknown[]) {
 			if (args[0] === "BEGIN IMMEDIATE") {
 				calls++;
 				if (calls < 3) {
 					throw new Error("database is locked");
 				}
 			}
-			return originalRun.apply(this, args as any);
-		} as any;
+			return originalRun.apply(this, args as unknown);
+		} as unknown;
 
 		const result = withTransaction(
 			db,
@@ -86,13 +86,13 @@ describe("withTransaction", () => {
 	it("should fail after max retries", () => {
 		let calls = 0;
 		const originalRun = db.run;
-		db.run = function (this: any, ...args: any[]) {
+		db.run = function (this: unknown, ...args: unknown[]) {
 			if (args[0] === "BEGIN IMMEDIATE") {
 				calls++;
 				throw new Error("database is locked");
 			}
-			return originalRun.apply(this, args as any);
-		} as any;
+			return originalRun.apply(this, args as unknown);
+		} as unknown;
 
 		expect(() => {
 			withTransaction(

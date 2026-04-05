@@ -11,8 +11,8 @@
 
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getLogger } from "../logging/domains";
 import { loadReviewMemoryFromKernel, saveReviewMemoryToKernel } from "../kernel/repository";
+import { getLogger } from "../logging/domains";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
 import { getProjectArtifactDir } from "../utils/paths";
 import { reviewMemorySchema } from "./schemas";

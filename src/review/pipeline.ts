@@ -18,10 +18,9 @@ import { buildCrossVerificationPrompts, condenseFinding } from "./cross-verifica
 const STAGE3_NAMES: ReadonlySet<string> = new Set(STAGE3_AGENTS.map((a) => a.name));
 
 import { buildFixInstructions, determineFixableFindings } from "./fix-cycle";
+import { parseAgentFindings, parseTypedFindingsEnvelope } from "./parse-findings";
 import { buildReport } from "./report";
-import { reviewFindingsEnvelopeSchema } from "./schemas";
 import type { ReviewFinding, ReviewFindingsEnvelope, ReviewReport, ReviewState } from "./types";
-import { parseTypedFindingsEnvelope, parseAgentFindings } from "./parse-findings";
 
 export type { ReviewState };
 
@@ -50,6 +49,8 @@ export function advancePipeline(
 	findingsJson: string,
 	currentState: ReviewState,
 	agentName = "unknown",
+	_runId?: string,
+	_seed?: string,
 ): ReviewStageResult {
 	const typedEnvelope = parseTypedFindingsEnvelope(findingsJson);
 	const parseMode = typedEnvelope ? "typed" : "legacy";

@@ -10,6 +10,7 @@
  */
 
 import type { Database } from "bun:sqlite";
+import { systemTimeProvider, type TimeProvider } from "../scoring/time-provider";
 import {
 	DEFAULT_HALF_LIFE_DAYS,
 	MAX_OBSERVATIONS_PER_PROJECT,
@@ -17,7 +18,6 @@ import {
 	TYPE_WEIGHTS,
 } from "./constants";
 import { getMemoryDb } from "./database";
-import { systemTimeProvider, type TimeProvider } from "../scoring/time-provider";
 import { deleteObservation, getObservationsByProject } from "./repository";
 import type { ObservationType } from "./types";
 

@@ -28,12 +28,13 @@ export function withTransaction<T>(db: Database, fn: () => T, options: Transacti
 
 			const transaction = db.transaction(fn);
 			return transaction();
-		} catch (error: any) {
+		} catch (error: unknown) {
+			const e = error as Error;
 			const isBusyError =
-				error.message &&
-				(error.message.includes("database is locked") ||
-					error.message.includes("SQLITE_BUSY") ||
-					error.message.includes("database table is locked"));
+				e.message &&
+				(e.message.includes("database is locked") ||
+					e.message.includes("SQLITE_BUSY") ||
+					e.message.includes("database table is locked"));
 
 			if (isBusyError && attempts < maxRetries) {
 				attempts++;
