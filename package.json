@@ -1,6 +1,6 @@
 {
 	"name": "@kodrunhq/opencode-autopilot",
-	"version": "1.16.0",
+	"version": "1.17.0",
 	"description": "Curated agents, skills, and commands for the OpenCode AI coding CLI — autonomous orchestrator, multi-agent code review, model fallback, and in-session asset creation tools.",
 	"main": "src/index.ts",
 	"keywords": [

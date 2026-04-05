@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.17.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.16.0...opencode-autopilot-v1.17.0) (2026-04-05)
+
+
+### Features
+
+* implement Phases 27-31 (Architecture, Concurrency, Determinism, UX, Logging) ([a842e0f](https://github.com/kodrunhq/opencode-autopilot/commit/a842e0f7225b58e0ca05e9cad0219bd1c1fb1522))
+* Implement Phases 27-31 (Cumulative) ([bf06f5c](https://github.com/kodrunhq/opencode-autopilot/commit/bf06f5c13a9ffac5f1e3696843aaddd7017ba627))
+* implement structured logging system (Phase 31) ([8975f7c](https://github.com/kodrunhq/opencode-autopilot/commit/8975f7cde2b6e72fc4bb081c86641a25e37a6c35))
+
+
+### Bug Fixes
+
+* address PR [#67](https://github.com/kodrunhq/opencode-autopilot/issues/67) review comments and biome linting issues ([bc48919](https://github.com/kodrunhq/opencode-autopilot/commit/bc48919640c24be5012fbffbdf8b92c9fb60ec7b))
+* **tests:** remove unused variables and imports in busy-timeout.test.ts to fix lint error ([16e6dfd](https://github.com/kodrunhq/opencode-autopilot/commit/16e6dfdb0c61851e666900ed7a3ae81a4d761b87))
+* **tests:** use temp dir for SQLite tests to prevent CI failure on fresh clones ([83b875b](https://github.com/kodrunhq/opencode-autopilot/commit/83b875b039c5d93ecf25e37959b6cf17d0b43c79))
+
 ## [1.16.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.15.2...opencode-autopilot-v1.16.0) (2026-04-04)
 
 
