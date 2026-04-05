@@ -1,80 +1,53 @@
-import { authFlowVerifier } from "./auth-flow-verifier";
+import { architectureVerifier } from "./architecture-verifier";
+import { codeHygieneAuditor } from "./code-hygiene-auditor";
 import { codeQualityAuditor } from "./code-quality-auditor";
-import { concurrencyChecker } from "./concurrency-checker";
 import { contractVerifier } from "./contract-verifier";
+import { correctnessAuditor } from "./correctness-auditor";
 import { databaseAuditor } from "./database-auditor";
-import { deadCodeScanner } from "./dead-code-scanner";
-import { goIdiomsAuditor } from "./go-idioms-auditor";
+import { frontendAuditor } from "./frontend-auditor";
+import { languageIdiomsAuditor } from "./language-idioms-auditor";
 import { logicAuditor } from "./logic-auditor";
 import { productThinker } from "./product-thinker";
-import { pythonDjangoAuditor } from "./python-django-auditor";
-import { reactPatternsAuditor } from "./react-patterns-auditor";
 import { redTeam } from "./red-team";
-import { rustSafetyAuditor } from "./rust-safety-auditor";
-import { scopeIntentVerifier } from "./scope-intent-verifier";
 import { securityAuditor } from "./security-auditor";
-import { silentFailureHunter } from "./silent-failure-hunter";
-import { specChecker } from "./spec-checker";
-import { stateMgmtAuditor } from "./state-mgmt-auditor";
 import { testInterrogator } from "./test-interrogator";
-import { typeSoundness } from "./type-soundness";
-import { wiringInspector } from "./wiring-inspector";
 
 export {
-	authFlowVerifier,
+	architectureVerifier,
+	codeHygieneAuditor,
 	codeQualityAuditor,
-	concurrencyChecker,
 	contractVerifier,
+	correctnessAuditor,
 	databaseAuditor,
-	deadCodeScanner,
-	goIdiomsAuditor,
+	frontendAuditor,
+	languageIdiomsAuditor,
 	logicAuditor,
 	productThinker,
-	pythonDjangoAuditor,
-	reactPatternsAuditor,
 	redTeam,
-	rustSafetyAuditor,
-	scopeIntentVerifier,
 	securityAuditor,
-	silentFailureHunter,
-	specChecker,
-	stateMgmtAuditor,
 	testInterrogator,
-	typeSoundness,
-	wiringInspector,
 };
 
-/** The 6 universal specialist agents (Stage 1 & 2 reviews). */
 export const REVIEW_AGENTS = Object.freeze([
 	logicAuditor,
 	securityAuditor,
 	codeQualityAuditor,
 	testInterrogator,
-	silentFailureHunter,
+	codeHygieneAuditor,
 	contractVerifier,
 ] as const);
 
 /** Stage 3 agents: adversarial red team + product completeness. */
 export const STAGE3_AGENTS = Object.freeze([redTeam, productThinker] as const);
 
-/** The 13 specialized agents added for stack-aware review. */
 export const SPECIALIZED_AGENTS = Object.freeze([
-	wiringInspector,
-	deadCodeScanner,
-	specChecker,
+	architectureVerifier,
 	databaseAuditor,
-	authFlowVerifier,
-	typeSoundness,
-	stateMgmtAuditor,
-	concurrencyChecker,
-	scopeIntentVerifier,
-	reactPatternsAuditor,
-	goIdiomsAuditor,
-	pythonDjangoAuditor,
-	rustSafetyAuditor,
+	correctnessAuditor,
+	frontendAuditor,
+	languageIdiomsAuditor,
 ] as const);
 
-/** All 21 review agents combined (6 universal + 13 specialized + 2 sequenced). */
 export const ALL_REVIEW_AGENTS = Object.freeze([
 	...REVIEW_AGENTS,
 	...SPECIALIZED_AGENTS,

@@ -528,23 +528,17 @@ describe("configHook pipeline agents", () => {
 		// standard agents
 		expect(agents.researcher).toBeDefined();
 		expect(agents.metaprompter).toBeDefined();
-		expect(agents.documenter).toBeDefined();
 		expect(agents["pr-reviewer"]).toBeDefined();
 		expect(agents.autopilot).toBeDefined();
 		expect(agents.debugger).toBeDefined();
 		expect(agents.planner).toBeDefined();
 		expect(agents.reviewer).toBeDefined();
 		expect(agents.coder).toBeDefined();
+		expect(agents["security-auditor"]).toBeDefined();
 
 		// pipeline agents
 		expect(agents["oc-researcher"]).toBeDefined();
 		expect(agents["oc-implementer"]).toBeDefined();
-
-		// new subagent agents
-		expect(agents["db-specialist"]).toBeDefined();
-		expect(agents.devops).toBeDefined();
-		expect(agents["frontend-engineer"]).toBeDefined();
-		expect(agents["security-auditor"]).toBeDefined();
 
 		// deterministic suppression entries for OpenCode native built-ins
 		expect(agents.plan).toBeDefined();
@@ -556,8 +550,8 @@ describe("configHook pipeline agents", () => {
 		expect((agents.build as Record<string, unknown>).mode).toBe("subagent");
 		expect((agents.build as Record<string, unknown>).hidden).toBe(true);
 
-		// Total: 13 standard + 10 pipeline + 2 suppressed native = 25
-		expect(Object.keys(agents).length).toBe(25);
+		// Total: 9 standard + 8 pipeline + 2 suppressed native = 19
+		expect(Object.keys(agents).length).toBe(19);
 	});
 
 	test("pipeline agents have mode subagent", async () => {

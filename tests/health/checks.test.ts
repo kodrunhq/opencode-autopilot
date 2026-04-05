@@ -1,14 +1,17 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	commandHealthCheck,
 	configV7FieldsCheck,
+	mcpHealthCheck,
 	memoryHealthCheck,
 	nativeAgentSuppressionHealthCheck,
+	routingHealthCheck,
 	skillHealthCheck,
 } from "../../src/health/checks";
+import { resetGlobalMcpManager } from "../../src/mcp";
 
 // ---------------------------------------------------------------------------
 // skillHealthCheck
@@ -491,6 +494,106 @@ describe("configV7FieldsCheck", () => {
 
 		const result = await configV7FieldsCheck(join(tempDir, "nonexistent.json"));
 		expect(Object.isFrozen(result)).toBe(true);
+
+		await rm(tempDir, { recursive: true, force: true });
+	});
+});
+
+describe("routingHealthCheck", () => {
+	test("returns frozen result", async () => {
+		const result = await routingHealthCheck("/nonexistent/path/config.json");
+		expect(Object.isFrozen(result)).toBe(true);
+	});
+});
+
+describe("mcpHealthCheck", () => {
+	beforeEach(() => {
+		resetGlobalMcpManager();
+	});
+
+	test("returns pass when mcp is disabled", async () => {
+		const tempDir = join(tmpdir(), `mcp-health-disabled-${Date.now()}`);
+		await mkdir(tempDir, { recursive: true });
+		const configPath = join(tempDir, "opencode-autopilot.json");
+		await writeFile(
+			configPath,
+			JSON.stringify({
+				version: 7,
+				configured: true,
+				groups: {},
+				overrides: {},
+				orchestrator: { autonomy: "full", strictness: "normal", phases: {} },
+				confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+				fallback: {
+					enabled: true,
+					notifyOnFallback: true,
+					cooldownMinutes: 10,
+					maxFallbacksPerSession: 5,
+					testMode: { forceError: false, forcedErrorType: null },
+				},
+				memory: { enabled: true, injectionBudget: 2000, decayHalfLifeDays: 90 },
+				background: {},
+				autonomy: { enabled: false, verification: "normal", maxIterations: 10 },
+				routing: {},
+				recovery: {},
+				mcp: { enabled: false, skills: {} },
+			}),
+		);
+
+		const result = await mcpHealthCheck(configPath);
+		expect(result.status).toBe("pass");
+		expect(result.message).toContain("disabled");
+
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("reports mcp-capable skills when enabled", async () => {
+		const tempDir = join(tmpdir(), `mcp-health-enabled-${Date.now()}`);
+		const skillsDir = join(tempDir, "skills", "docs");
+		await mkdir(skillsDir, { recursive: true });
+		await writeFile(
+			join(skillsDir, "SKILL.md"),
+			`---
+name: docs
+description: Docs skill
+stacks: []
+requires: []
+mcp:
+  serverName: docs-server
+  command: npx
+---
+# Docs`,
+		);
+		const configPath = join(tempDir, "opencode-autopilot.json");
+		await writeFile(
+			configPath,
+			JSON.stringify({
+				version: 7,
+				configured: true,
+				groups: {},
+				overrides: {},
+				orchestrator: { autonomy: "full", strictness: "normal", phases: {} },
+				confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+				fallback: {
+					enabled: true,
+					notifyOnFallback: true,
+					cooldownMinutes: 10,
+					maxFallbacksPerSession: 5,
+					testMode: { forceError: false, forcedErrorType: null },
+				},
+				memory: { enabled: true, injectionBudget: 2000, decayHalfLifeDays: 90 },
+				background: {},
+				autonomy: { enabled: false, verification: "normal", maxIterations: 10 },
+				routing: {},
+				recovery: {},
+				mcp: { enabled: true, skills: {} },
+			}),
+		);
+
+		const result = await mcpHealthCheck(configPath);
+		expect(result.status).toBe("pass");
+		expect(result.message).toContain("1 MCP-capable skill");
+		expect(result.details).toContain("docs: docs-server (stdio)");
 
 		await rm(tempDir, { recursive: true, force: true });
 	});

@@ -92,11 +92,11 @@ describe("AGENT_NAMES", () => {
 		expect(AGENT_NAMES.CHALLENGE).toBe("oc-challenger");
 		expect(AGENT_NAMES.ARCHITECT).toBe("oc-architect");
 		expect(AGENT_NAMES.CRITIC).toBe("oc-critic");
-		expect(AGENT_NAMES.EXPLORE).toBe("oc-explorer");
+		expect(AGENT_NAMES.EXPLORE).toBe("oc-researcher");
 		expect(AGENT_NAMES.PLAN).toBe("oc-planner");
 		expect(AGENT_NAMES.BUILD).toBe("oc-implementer");
 		expect(AGENT_NAMES.SHIP).toBe("oc-shipper");
-		expect(AGENT_NAMES.RETROSPECTIVE).toBe("oc-retrospector");
+		expect(AGENT_NAMES.RETROSPECTIVE).toBe("oc-shipper");
 	});
 });
 

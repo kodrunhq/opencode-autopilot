@@ -2,6 +2,8 @@ import { getLogger } from "../logging/domains";
 import { createForensicSinkForArtifactDir } from "../logging/forensic-writer";
 import type { LogLevel } from "../logging/types";
 
+const logger = getLogger("orchestrator", "orchestration-logger");
+
 export interface OrchestrationEvent {
 	readonly timestamp: string;
 	readonly phase: string;
@@ -36,10 +38,12 @@ export function logOrchestrationEvent(artifactDir: string, event: OrchestrationE
 
 		const metadata = {
 			domain,
+			subsystem: event.phase.toLowerCase(),
 			operation,
 			runId: event.runId ?? null,
 			sessionId: event.sessionId ?? null,
 			phase: event.phase,
+			timestamp: event.timestamp,
 			dispatchId: event.dispatchId ?? null,
 			taskId: event.taskId ?? null,
 			agent: event.agent ?? null,
@@ -61,9 +65,17 @@ export function logOrchestrationEvent(artifactDir: string, event: OrchestrationE
 
 		const globalLogger = getLogger(domain);
 		if (event.action === "error") {
-			globalLogger.error(event.message ?? event.action, { operation, phase: event.phase });
+			globalLogger.error(event.message ?? event.action, metadata);
 		} else {
-			globalLogger.info(event.message ?? event.action, { operation, phase: event.phase });
+			globalLogger.info(event.message ?? event.action, metadata);
 		}
-	} catch {}
+	} catch (error: unknown) {
+		logger.warn("failed to log orchestration event", {
+			operation: "error",
+			error: error instanceof Error ? error.message : String(error),
+			phase: event.phase,
+			action: event.action,
+			timestamp: event.timestamp,
+		});
+	}
 }

@@ -62,12 +62,14 @@ describe("plugin entry point", () => {
 		expect(eventResult).toBeUndefined();
 	});
 
-	test("registers all expected tools (22 total)", async () => {
+	test("registers all expected tools (27 total)", async () => {
 		const result = await plugin(mockInput);
 		expect(result.tool).toBeDefined();
 		const toolNames = [...Object.keys(result.tool ?? {})].sort();
 		const expected = [
+			"oc_background",
 			"oc_configure",
+			"oc_delegate",
 			"oc_create_agent",
 			"oc_create_skill",
 			"oc_create_command",
@@ -78,9 +80,11 @@ describe("plugin entry point", () => {
 			"oc_plan",
 			"oc_orchestrate",
 			"oc_quick",
+			"oc_recover",
 			"oc_forensics",
 			"oc_review",
 			"oc_logs",
+			"oc_loop",
 			"oc_session_stats",
 			"oc_pipeline_report",
 			"oc_mock_fallback",
@@ -92,7 +96,7 @@ describe("plugin entry point", () => {
 			"oc_summary",
 		];
 		expect(toolNames).toEqual([...expected].sort());
-		expect(toolNames).toHaveLength(23);
+		expect(toolNames).toHaveLength(27);
 	});
 
 	test("every registered tool has a valid execute function", async () => {
@@ -127,6 +131,16 @@ describe("plugin entry point", () => {
 		expect(keys).toContain("chat.message");
 		expect(keys).toContain("tool.execute.before");
 		expect(keys).toContain("tool.execute.after");
+		expect(keys).toContain("experimental.chat.system.transform");
+	});
+
+	test("returns experimental.chat.system.transform hook", async () => {
+		const result = await plugin(mockInput);
+		const transformHook = (result as unknown as Record<string, unknown>)[
+			"experimental.chat.system.transform"
+		];
+		expect(transformHook).toBeDefined();
+		expect(typeof transformHook).toBe("function");
 	});
 
 	test("returns tool.execute.before hook", async () => {

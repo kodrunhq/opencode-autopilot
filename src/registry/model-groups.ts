@@ -11,56 +11,39 @@ function deepFreeze<T extends object>(obj: T): Readonly<T> {
 
 export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = deepFreeze({
 	// ── Architects ─────────────────────────────────────────────
-	// Deep reasoning: system design, task decomposition, orchestration
 	"oc-architect": { group: "architects" },
 	"oc-planner": { group: "architects" },
 	autopilot: { group: "architects" },
 	planner: { group: "architects" },
 
 	// ── Challengers ────────────────────────────────────────────
-	// Adversarial to Architects: critique proposals, enhance ideas
 	"oc-critic": { group: "challengers" },
 	"oc-challenger": { group: "challengers" },
 
 	// ── Builders ───────────────────────────────────────────────
-	// Code generation and debugging
 	"oc-implementer": { group: "builders" },
+	coder: { group: "builders" },
 	debugger: { group: "builders" },
 
 	// ── Reviewers ──────────────────────────────────────────────
-	// Code analysis, adversarial to Builders
-	// NOTE: The 21 internal ReviewAgent objects (logic-auditor, security-auditor,
-	// etc.) are NOT in this registry. They use the ReviewAgent type from
-	// src/review/types.ts, not AgentConfig. The review pipeline resolves their
-	// model via resolveModelForGroup("reviewers") directly.
 	"oc-reviewer": { group: "reviewers" },
 	reviewer: { group: "reviewers" },
 
 	// ── Red Team ───────────────────────────────────────────────
-	// Final adversarial pass
-	// NOTE: red-team and product-thinker are ALSO internal ReviewAgent objects
-	// in STAGE3_AGENTS (src/review/agents/index.ts). They appear here so the
-	// review pipeline can resolve their model via resolveModelForGroup("red-team")
-	// separately from the "reviewers" group.
 	"red-team": { group: "red-team" },
 	"product-thinker": { group: "red-team" },
 
 	// ── Researchers ────────────────────────────────────────────
-	// Domain research, feasibility analysis
 	"oc-researcher": { group: "researchers" },
 	researcher: { group: "researchers" },
 
 	// ── Communicators ──────────────────────────────────────────
-	// Docs, changelogs, lesson extraction
 	"oc-shipper": { group: "communicators" },
-	documenter: { group: "communicators" },
-	"oc-retrospector": { group: "communicators" },
 
 	// ── Utilities ──────────────────────────────────────────────
-	// Fast lookups, prompt tuning, PR scanning
-	"oc-explorer": { group: "utilities" },
 	metaprompter: { group: "utilities" },
 	"pr-reviewer": { group: "utilities" },
+	"security-auditor": { group: "reviewers" },
 });
 
 export const GROUP_DEFINITIONS: Readonly<Record<GroupId, GroupDefinition>> = deepFreeze({

@@ -15,12 +15,12 @@ describe("review agent registry", () => {
 		expect(STAGE3_AGENTS).toHaveLength(2);
 	});
 
-	test("SPECIALIZED_AGENTS has exactly 13 entries", () => {
-		expect(SPECIALIZED_AGENTS).toHaveLength(13);
+	test("SPECIALIZED_AGENTS has exactly 5 entries", () => {
+		expect(SPECIALIZED_AGENTS).toHaveLength(5);
 	});
 
-	test("ALL_REVIEW_AGENTS has exactly 21 entries", () => {
-		expect(ALL_REVIEW_AGENTS).toHaveLength(21);
+	test("ALL_REVIEW_AGENTS has exactly 13 entries", () => {
+		expect(ALL_REVIEW_AGENTS).toHaveLength(13);
 	});
 
 	test("ALL_REVIEW_AGENTS is the union of REVIEW_AGENTS, SPECIALIZED_AGENTS, and STAGE3_AGENTS", () => {
@@ -108,14 +108,7 @@ describe("review agent registry", () => {
 	});
 
 	test("stack-gated agents have non-empty relevantStacks", () => {
-		const stackGated = [
-			"type-soundness",
-			"state-mgmt-auditor",
-			"react-patterns-auditor",
-			"go-idioms-auditor",
-			"python-django-auditor",
-			"rust-safety-auditor",
-		];
+		const stackGated = ["frontend-auditor", "language-idioms-auditor"];
 		for (const name of stackGated) {
 			const agent = ALL_REVIEW_AGENTS.find((a) => a.name === name);
 			expect(agent).toBeDefined();
@@ -125,13 +118,10 @@ describe("review agent registry", () => {
 
 	test("universal specialized agents have empty relevantStacks", () => {
 		const universalSpecialists = [
-			"wiring-inspector",
-			"dead-code-scanner",
-			"spec-checker",
+			"architecture-verifier",
+			"code-hygiene-auditor",
 			"database-auditor",
-			"auth-flow-verifier",
-			"concurrency-checker",
-			"scope-intent-verifier",
+			"correctness-auditor",
 		];
 		for (const name of universalSpecialists) {
 			const agent = ALL_REVIEW_AGENTS.find((a) => a.name === name);

@@ -3,6 +3,7 @@ import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadLatestPipelineStateFromKernel, savePipelineStateToKernel } from "../kernel/repository";
 import { KERNEL_STATE_CONFLICT_CODE } from "../kernel/types";
+import { getLogger } from "../logging/domains";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
 import { assertStateInvariants } from "./contracts/invariants";
 import { PHASES, pipelineStateSchema } from "./schemas";
@@ -10,6 +11,7 @@ import type { PipelineState } from "./types";
 
 const STATE_FILE = "state.json";
 let legacyStateMirrorWarned = false;
+const logger = getLogger("orchestrator", "state");
 
 function generateRunId(): string {
 	return `run_${randomBytes(8).toString("hex")}`;
@@ -70,7 +72,10 @@ async function syncLegacyStateMirror(state: PipelineState, artifactDir: string):
 	} catch (error: unknown) {
 		if (!legacyStateMirrorWarned) {
 			legacyStateMirrorWarned = true;
-			console.warn("[opencode-autopilot] state.json mirror write failed:", error);
+			logger.warn("state.json mirror write failed", {
+				operation: "legacy_state_mirror",
+				error: error instanceof Error ? error.message : String(error),
+			});
 		}
 	}
 }

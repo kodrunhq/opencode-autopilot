@@ -1,16 +1,16 @@
-import { describe, expect, it, setSystemTime } from "bun:test";
+import { describe, expect, setSystemTime, test } from "bun:test";
 import type { SessionEvents } from "../../src/observability/event-store";
 import type { PipelineState } from "../../src/orchestrator/types";
-import { generateSessionSummary } from "../../src/ux/session-summary";
+import { generateSessionSummary, type SessionSummaryData } from "../../src/ux/session-summary";
 
 describe("generateSessionSummary", () => {
-	it("handles null/undefined inputs gracefully", () => {
+	test("handles null/undefined inputs gracefully", () => {
 		const summary = generateSessionSummary(undefined, null);
 		expect(summary).toContain("## Session Summary");
 		expect(summary).toContain("**Pipeline Status**: Unknown");
 	});
 
-	it("summarizes a successful completed session", () => {
+	test("summarizes a successful completed session", () => {
 		const pipelineState = {
 			status: "COMPLETED",
 			currentPhase: "RETROSPECTIVE",
@@ -62,7 +62,7 @@ describe("generateSessionSummary", () => {
 		expect(summary).toContain("**Duration**: 120.0s");
 	});
 
-	it("includes errors in the summary", () => {
+	test("includes errors in the summary", () => {
 		const sessionData = {
 			events: [
 				{
@@ -82,7 +82,7 @@ describe("generateSessionSummary", () => {
 		expect(summary).toContain("- RATE_LIMIT: Too many requests");
 	});
 
-	it("shows active duration if session hasn't ended", () => {
+	test("shows active duration if session hasn't ended", () => {
 		const now = new Date("2024-01-01T00:00:05Z");
 		setSystemTime(now);
 		const startedAt = new Date("2024-01-01T00:00:00Z").toISOString();
@@ -96,7 +96,7 @@ describe("generateSessionSummary", () => {
 		setSystemTime();
 	});
 
-	it("handles empty phases list", () => {
+	test("handles empty phases list", () => {
 		const pipelineState = {
 			status: "IN_PROGRESS",
 			currentPhase: "RECON",
@@ -106,5 +106,29 @@ describe("generateSessionSummary", () => {
 		const summary = generateSessionSummary(undefined, pipelineState);
 		expect(summary).toContain("**Pipeline Status**: IN_PROGRESS (Current Phase: RECON)");
 		expect(summary).toContain("**Phases Completed**: None");
+	});
+
+	test("generates structured markdown summaries for UX surfaces", () => {
+		const summaryData: SessionSummaryData = {
+			sessionId: "ses_123",
+			startedAt: "2026-01-01T00:00:00.000Z",
+			endedAt: "2026-01-01T00:10:00.000Z",
+			tokensUsed: 12_345,
+			phasesCompleted: ["RECON", "PLAN", "BUILD"],
+			errorsEncountered: 2,
+			tasksCompleted: 9,
+			lessonsLearned: ["Prefer smaller waves", "Compact earlier near token limits"],
+		};
+
+		const summary = generateSessionSummary(summaryData);
+
+		expect(summary).toContain("# Session Summary: ses_123");
+		expect(summary).toContain("- Tokens Used: 12,345");
+		expect(summary).toContain("- Tasks Completed: 9");
+		expect(summary).toContain("- Errors Encountered: 2");
+		expect(summary).toContain("## Phases Completed");
+		expect(summary).toContain("- RECON");
+		expect(summary).toContain("## Lessons Learned");
+		expect(summary).toContain("- Prefer smaller waves");
 	});
 });

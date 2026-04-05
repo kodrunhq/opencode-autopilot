@@ -14,7 +14,7 @@
 
 <p align="center">
   <strong>Autonomous AI coding pipeline for OpenCode.</strong><br/>
-  Idea to shipped code &bull; 21-agent code review &bull; Adversarial model diversity &bull; Guided setup
+  Idea to shipped code &bull; 13-agent code review &bull; Adversarial model diversity &bull; Background task management &bull; Session recovery
 </p>
 
 ---
@@ -93,7 +93,7 @@ Agents are organized into 8 groups by the type of thinking they do. Each group g
 | **Architects** | oc-architect, oc-planner, autopilot | System design, planning, orchestration | Most powerful available |
 | **Challengers** | oc-critic, oc-challenger | Challenge architecture, find design flaws | Strong model, **different family from Architects** |
 | **Builders** | oc-implementer | Write production code | Strong coding model |
-| **Reviewers** | oc-reviewer + 19 review agents | Find bugs, security issues, logic errors | Strong model, **different family from Builders** |
+| **Reviewers** | oc-reviewer + 11 review agents | Find bugs, security issues, logic errors | Strong model, **different family from Builders** |
 | **Red Team** | red-team, product-thinker | Final adversarial pass, hunt exploits | **Different family from both Builders and Reviewers** |
 | **Researchers** | oc-researcher, researcher | Domain research, feasibility analysis | Good comprehension, any family |
 | **Communicators** | oc-shipper, documenter, oc-retrospector | Docs, changelogs, lesson extraction | Mid-tier model |
@@ -113,7 +113,7 @@ The installer warns when adversarial pairs share a model family:
 
 ```json
 {
-  "version": 4,
+  "version": 7,
   "configured": true,
   "groups": {
     "architects":    { "primary": "anthropic/claude-opus-4-6",   "fallbacks": ["openai/gpt-5.4"] },
@@ -125,7 +125,22 @@ The installer warns when adversarial pairs share a model family:
     "communicators": { "primary": "anthropic/claude-sonnet-4-6", "fallbacks": ["anthropic/claude-haiku-4-5"] },
     "utilities":     { "primary": "anthropic/claude-haiku-4-5",  "fallbacks": ["google/gemini-3-flash"] }
   },
-  "overrides": {}
+  "overrides": {},
+  "background": {
+    "maxSlots": 5,
+    "defaultTimeout": 300000
+  },
+  "routing": {
+    "defaultCategory": "unspecified"
+  },
+  "recovery": {
+    "maxRetries": 3,
+    "strategies": ["retry", "fallback", "checkpoint"]
+  },
+  "mcp": {
+    "enabled": true,
+    "timeout": 30000
+  }
 }
 ```
 
@@ -190,12 +205,12 @@ The `oc_review` tool provides a 4-stage multi-agent review pipeline:
 
 **Stage 4 -- Report or fix cycle:** CRITICAL findings with actionable fixes trigger an automatic fix cycle; everything else lands in the final report.
 
-### 21 Review Agents
+### 13 Review Agents
 
 | Category | Agents | When selected |
 |----------|--------|--------------|
-| **Universal** (always run) | logic-auditor, security-auditor, code-quality-auditor, test-interrogator, silent-failure-hunter, contract-verifier | Every review |
-| **Stack-aware** (auto-selected) | type-soundness, react-patterns-auditor, go-idioms-auditor, python-django-auditor, rust-safety-auditor, database-auditor, auth-flow-verifier, state-mgmt-auditor, concurrency-checker, scope-intent-verifier, wiring-inspector, dead-code-scanner, spec-checker | Based on changed file types |
+| **Universal** (always run) | logic-auditor, security-auditor, code-quality-auditor, test-interrogator, code-hygiene-auditor, contract-verifier | Every review |
+| **Stack-aware** (auto-selected) | architecture-verifier, database-auditor, correctness-auditor, frontend-auditor, language-idioms-auditor | Based on changed file types |
 | **Sequenced** (run last) | red-team, product-thinker | After all findings collected |
 
 Review memory persists per project -- false positives are tracked and suppressed in future reviews (auto-pruned after 30 days).
@@ -242,12 +257,19 @@ Config lives at `~/.config/opencode/opencode-autopilot.json`. Run `bunx @kodrunh
 | `confidence.thresholds.proceed` | `HIGH`, `MEDIUM`, `LOW` | `MEDIUM` |
 | `confidence.thresholds.abort` | `HIGH`, `MEDIUM`, `LOW` | `LOW` |
 | `fallback.enabled` | `true` / `false` | `true` |
+| `background.maxSlots` | `1`-`10` | `5` |
+| `background.defaultTimeout` | milliseconds | `300000` |
+| `routing.defaultCategory` | category string | `"unspecified"` |
+| `recovery.maxRetries` | `1`-`10` | `3` |
+| `recovery.strategies` | array of strategy names | `["retry", "fallback", "checkpoint"]` |
+| `mcp.enabled` | `true` / `false` | `true` |
+| `mcp.timeout` | milliseconds | `30000` |
 
-Config auto-migrates across schema versions (v1 -> v2 -> v3 -> v4).
+Config auto-migrates across schema versions (v1 -> v2 -> v3 -> v4 -> v5 -> v6 -> v7).
 
 ## Tools
 
-The plugin registers 11 tools, all prefixed with `oc_` to avoid conflicts with OpenCode built-ins:
+The plugin registers 25 tools, all prefixed with `oc_` to avoid conflicts with OpenCode built-ins:
 
 | Tool | Purpose |
 |------|---------|
@@ -262,13 +284,29 @@ The plugin registers 11 tools, all prefixed with `oc_` to avoid conflicts with O
 | `oc_create_agent` | Create custom agents in-session |
 | `oc_create_skill` | Create custom skills in-session |
 | `oc_create_command` | Create custom commands in-session |
+| `oc_background` | Manage background tasks (spawn, monitor, cancel) |
+| `oc_loop` | Start/stop autonomy loop with verification checkpoints |
+| `oc_delegate` | Category-based task routing with skill injection |
+| `oc_recover` | Session recovery with strategy selection |
+| `oc_doctor` | Run plugin health diagnostics |
+| `oc_quick` | Quick-mode pipeline bypass for trivial tasks |
+| `oc_hashline_edit` | Hash-anchored line edits with FNV-1a verification |
+| `oc_logs` | Query structured session logs |
+| `oc_session_stats` | Session statistics and token usage |
+| `oc_pipeline_report` | Generate pipeline execution report |
+| `oc_summary` | Session summary generation |
+| `oc_mock_fallback` | Fallback chain testing with mock providers |
+| `oc_stocktake` | Audit installed assets (agents, skills, commands) |
+| `oc_update_docs` | Detect docs affected by code changes |
+| `oc_memory_status` | Memory system status and statistics |
+| `oc_memory_preferences` | Manage user preference observations |
 
 ## Architecture
 
 ```
 src/
 +-- index.ts                 Plugin entry -- registers tools, hooks, fallback handlers
-+-- config.ts                Zod-validated config with v1->v2->v3->v4 migration
++-- config.ts                Zod-validated config with v1->v7 migration chain
 +-- installer.ts             Self-healing asset copier (COPYFILE_EXCL, never overwrites)
 +-- registry/
 |   +-- types.ts             GroupId, AgentEntry, GroupDefinition, DiversityRule, ...
@@ -278,13 +316,57 @@ src/
 |   +-- doctor.ts            Shared diagnosis logic (CLI + tool)
 +-- tools/                   Tool definitions (thin wrappers calling *Core functions)
 +-- templates/               Pure functions: input -> markdown string
-+-- review/                  21-agent review engine, stack gate, memory, severity
++-- review/                  13-agent review engine, stack gate, memory, severity
 +-- orchestrator/
 |   +-- handlers/            Per-phase state machine handlers
 |   +-- fallback/            Model fallback: classifier, manager, state, chain resolver
 |   +-- artifacts.ts         Phase artifact path management
 |   +-- lesson-memory.ts     Cross-run lesson persistence
 |   +-- schemas.ts           Pipeline state Zod schemas
++-- background/              Background task management with slot-based concurrency
+|   +-- database.ts          SQLite persistence for task state
+|   +-- state-machine.ts     Task lifecycle (queued -> running -> completed/failed)
+|   +-- slot-manager.ts      Concurrent slot allocation and limits
+|   +-- executor.ts          Task execution with timeout handling
+|   +-- manager.ts           High-level API combining all background components
++-- autonomy/                Autonomy loop with verification checkpoints
+|   +-- state.ts             Loop state tracking (iterations, context accumulation)
+|   +-- completion.ts        Completion detection via positive/negative signals
+|   +-- verification.ts      Post-iteration verification (tests, lint, artifacts)
+|   +-- controller.ts        Loop lifecycle management (start, iterate, stop)
++-- routing/                 Category-based task routing
+|   +-- categories.ts        Category definitions with model and skill mappings
+|   +-- classifier.ts        Intent classification from task descriptions
+|   +-- engine.ts            Routing engine combining classification + delegation
++-- recovery/                Session recovery and failure resilience
+|   +-- classifier.ts        Failure classification (transient, permanent, partial)
+|   +-- strategies.ts        Recovery strategies (retry, fallback, checkpoint)
+|   +-- orchestrator.ts      Strategy selection and execution
+|   +-- persistence.ts       Checkpoint save/restore via SQLite
++-- context/                 Context window management and injection
+|   +-- discovery.ts         Active context discovery from session state
+|   +-- budget.ts            Token budget allocation across injection sources
+|   +-- injector.ts          System prompt injection orchestrator
+|   +-- compaction-handler.ts  Context compaction when approaching limits
++-- ux/                      User experience surfaces
+|   +-- notifications.ts     Toast and inline notification system
+|   +-- progress.ts          Progress tracking for multi-step operations
+|   +-- task-status.ts       Task status formatting and display
+|   +-- context-warnings.ts  Context usage warnings and suggestions
+|   +-- error-hints.ts       Actionable error hints with fix suggestions
+|   +-- session-summary.ts   End-of-session summary generation
++-- mcp/                     MCP (Model Context Protocol) skill integration
+|   +-- types.ts             MCP server and tool type definitions
+|   +-- manager.ts           MCP server lifecycle management
+|   +-- scope-filter.ts      Scope-based MCP server filtering
++-- kernel/                  Database primitives and concurrency
+|   +-- transaction.ts       SQLite transactions with retry on SQLITE_BUSY
+|   +-- retry.ts             Exponential backoff retry for busy errors
++-- logging/                 Structured logging with sinks and rotation
++-- memory/                  Smart dual-scope memory (project patterns + user preferences)
++-- observability/           Session observability and structured event logging
++-- skills/                  Adaptive skill loading and injection
++-- health/                  Plugin self-diagnostics
 +-- utils/                   Validators, paths, fs-helpers, gitignore management
 
 bin/
@@ -292,7 +374,7 @@ bin/
 ```
 
 **Dependency flow** (strictly top-down, no cycles):
-`index.ts` -> `tools/*` -> `registry/*` + `templates/*` + `utils/*` -> Node built-ins + `yaml`
+`index.ts` -> `tools/*` -> `registry/*` + `templates/*` + `utils/*` + `kernel/*` -> Node built-ins + `yaml`
 
 **Key patterns:**
 - **Declarative registry** -- adding an agent = one line in AGENT_REGISTRY, everything derives from it
@@ -310,7 +392,7 @@ bun install
 bun test && bun run lint
 ```
 
-834 tests across 64 files. No build step -- Bun runs TypeScript natively.
+1790+ tests across 190 files. No build step -- Bun runs TypeScript natively.
 
 ## License
 

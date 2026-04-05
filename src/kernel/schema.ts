@@ -1,4 +1,6 @@
-export const KERNEL_SCHEMA_VERSION = 1;
+import { BACKGROUND_TASKS_SCHEMA_STATEMENTS } from "../background/schema";
+
+export const KERNEL_SCHEMA_VERSION = 3;
 
 export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 	`CREATE TABLE IF NOT EXISTS pipeline_runs (
@@ -119,4 +121,10 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 	`CREATE INDEX IF NOT EXISTS idx_forensic_events_run ON forensic_events(run_id, timestamp, event_id)`,
 	`CREATE INDEX IF NOT EXISTS idx_forensic_events_dispatch ON forensic_events(dispatch_id, timestamp, event_id)`,
 	`CREATE INDEX IF NOT EXISTS idx_forensic_events_type ON forensic_events(type, timestamp, event_id)`,
+	`CREATE TABLE IF NOT EXISTS recovery_state (
+		session_id TEXT PRIMARY KEY,
+		state_json TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	...BACKGROUND_TASKS_SCHEMA_STATEMENTS,
 ]);

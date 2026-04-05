@@ -38,6 +38,7 @@ describe("logOrchestrationEvent", () => {
 		expect(parsed.phase).toBe("RECON");
 		expect(parsed.type).toBe("dispatch");
 		expect(parsed.agent).toBe("oc-researcher");
+		expect(parsed.payload.subsystem).toBe("recon");
 		expect(parsed.payload.promptLength).toBe(42);
 		expect(parsed.domain).toBe("orchestrator");
 	});

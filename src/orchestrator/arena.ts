@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { getLogger } from "../logging/domains";
 import { getObservationsByProject, getProjectByPath } from "../memory/repository";
 import { summarizeConfidence } from "./confidence";
 import type { ConfidenceEntry } from "./types";
@@ -16,6 +17,7 @@ const LEVEL_ORDER: Readonly<Record<ConfidenceLevel, number>> = Object.freeze({
 	MEDIUM: 2,
 	LOW: 1,
 });
+const logger = getLogger("orchestrator", "arena");
 
 /**
  * Determines arena debate depth based on aggregate confidence.
@@ -66,7 +68,11 @@ export function getMemoryTunedDepth(
 			return Math.min(baseDepth + 1, 3);
 		}
 	} catch (err) {
-		console.warn("[opencode-autopilot] memory-tuned depth failed, using base:", err);
+		logger.warn("memory-tuned depth failed, using base depth", {
+			operation: "memory_tuned_depth",
+			projectPath,
+			error: err instanceof Error ? err.message : String(err),
+		});
 	}
 	return baseDepth;
 }

@@ -1,10 +1,15 @@
 import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
+import { getLoopController } from "./autonomy";
+import { createLoopInjector } from "./autonomy/injector";
 import { isFirstLoad, loadConfig } from "./config";
+import { createCompactionHandler, createContextInjector } from "./context";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { installAssets } from "./installer";
+import { openKernelDb } from "./kernel/database";
 import { getLogger, initLoggers } from "./logging/domains";
+import { McpLifecycleManager, setGlobalMcpManager } from "./mcp";
 import {
 	createMemoryCaptureHandler,
 	createMemoryChatMessageHandler,
@@ -30,6 +35,12 @@ import {
 } from "./orchestrator/fallback";
 import { fallbackDefaults } from "./orchestrator/fallback/fallback-config";
 import { resolveChain } from "./orchestrator/fallback/resolve-chain";
+import {
+	createRecoveryEventHandler,
+	createRecoveryOrchestratorWithDb,
+	getDefaultRecoveryOrchestrator,
+} from "./recovery/index";
+import { ocBackground, setBackgroundSdkOperations } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
 import {
 	ocConfigure,
@@ -40,10 +51,12 @@ import {
 import { ocCreateAgent } from "./tools/create-agent";
 import { ocCreateCommand } from "./tools/create-command";
 import { ocCreateSkill } from "./tools/create-skill";
+import { ocDelegate, setDelegateSdkOperations } from "./tools/delegate";
 import { ocDoctor, setOpenCodeConfig as setDoctorOpenCodeConfig } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
 import { ocHashlineEdit } from "./tools/hashline-edit";
 import { ocLogs } from "./tools/logs";
+import { ocLoop } from "./tools/loop";
 import { ocMemoryPreferences } from "./tools/memory-preferences";
 import { ocMemoryStatus } from "./tools/memory-status";
 import { ocMockFallback } from "./tools/mock-fallback";
@@ -52,12 +65,17 @@ import { ocPhase } from "./tools/phase";
 import { ocPipelineReport } from "./tools/pipeline-report";
 import { ocPlan } from "./tools/plan";
 import { ocQuick } from "./tools/quick";
+import { ocRecover } from "./tools/recover";
 import { ocReview } from "./tools/review";
 import { ocSessionStats } from "./tools/session-stats";
 import { ocState } from "./tools/state";
 import { ocStocktake } from "./tools/stocktake";
 import { ocSummary } from "./tools/summary";
 import { ocUpdateDocs } from "./tools/update-docs";
+import { ContextWarningMonitor } from "./ux/context-warnings";
+import { getRemediationHint } from "./ux/error-hints";
+import { NotificationManager } from "./ux/notifications";
+import { ProgressTracker } from "./ux/progress";
 
 let openCodeConfig: Config | null = null;
 
@@ -127,6 +145,20 @@ const plugin: Plugin = async (input) => {
 		});
 	});
 
+	// --- UX notification manager (rate-limited, best-effort) ---
+	const notificationManager = new NotificationManager({
+		sink: {
+			showToast: async (title, message, variant, duration) => {
+				await sdkOps.showToast(title, message, variant as "info" | "warning" | "error");
+				void duration;
+			},
+		},
+	});
+
+	// --- UX surfaces: context warnings, progress tracking, error hints ---
+	const contextWarningMonitor = new ContextWarningMonitor({ notificationManager });
+	const _progressTracker = new ProgressTracker({ notificationManager });
+
 	// --- Fallback subsystem initialization ---
 	const sdkOps: SdkOperations = {
 		abortSession: async (sessionID) => {
@@ -159,6 +191,24 @@ const plugin: Plugin = async (input) => {
 			});
 		},
 	};
+
+	// --- Background task SDK wiring (enables real dispatch via promptAsync) ---
+	const backgroundSdkOps = {
+		promptAsync: async (
+			sessionId: string,
+			model: string | undefined,
+			parts: ReadonlyArray<{ type: "text"; text: string }>,
+		) => {
+			const modelSpec = model ? { providerID: "", modelID: model } : undefined;
+			await sdkOps.promptAsync(
+				sessionId,
+				modelSpec as { readonly providerID: string; readonly modelID: string },
+				parts as readonly import("./orchestrator/fallback").MessagePart[],
+			);
+		},
+	};
+	setBackgroundSdkOperations(backgroundSdkOps);
+	setDelegateSdkOperations(backgroundSdkOps);
 
 	const manager = new FallbackManager({
 		config: fallbackConfig,
@@ -202,6 +252,23 @@ const plugin: Plugin = async (input) => {
 	});
 	const chatMessageHandler = createChatMessageHandler(manager);
 	const toolExecuteAfterHandler = createToolExecuteAfterHandler(manager);
+	const recoveryEventHandler = (() => {
+		try {
+			const kernelDb = openKernelDb();
+			const orchestrator = createRecoveryOrchestratorWithDb(kernelDb);
+			return createRecoveryEventHandler({
+				orchestrator,
+				db: kernelDb,
+				sdk: {
+					abortSession: sdkOps.abortSession,
+					showToast: (title, message, variant) =>
+						sdkOps.showToast(title, message, variant as "info" | "warning" | "error"),
+				},
+			});
+		} catch {
+			return createRecoveryEventHandler(getDefaultRecoveryOrchestrator());
+		}
+	})();
 
 	// --- Anti-slop hook initialization ---
 	const antiSlopHandler = createAntiSlopHandler({ showToast: sdkOps.showToast });
@@ -228,6 +295,16 @@ const plugin: Plugin = async (input) => {
 				getDb: () => getMemoryDb(),
 			})
 		: null;
+	const contextInjector = createContextInjector({
+		projectRoot: process.cwd(),
+		totalBudget: 4000,
+	});
+	const compactionHandler = createCompactionHandler(contextInjector);
+	const loopInjector = createLoopInjector(getLoopController());
+
+	// --- MCP lifecycle manager (lazy — servers start when skills with mcp: config activate) ---
+	const mcpManager = new McpLifecycleManager();
+	setGlobalMcpManager(mcpManager);
 
 	// --- Observability handlers ---
 	const toolStartTimes = new Map<string, number>();
@@ -312,7 +389,9 @@ const plugin: Plugin = async (input) => {
 
 	return {
 		tool: {
+			oc_background: ocBackground,
 			oc_configure: ocConfigure,
+			oc_delegate: ocDelegate,
 			oc_create_agent: ocCreateAgent,
 			oc_create_skill: ocCreateSkill,
 			oc_create_command: ocCreateCommand,
@@ -323,10 +402,12 @@ const plugin: Plugin = async (input) => {
 			oc_orchestrate: ocOrchestrate,
 			oc_doctor: ocDoctor,
 			oc_quick: ocQuick,
+			oc_recover: ocRecover,
 			oc_forensics: ocForensics,
 			oc_hashline_edit: ocHashlineEdit,
 			oc_review: ocReview,
 			oc_logs: ocLogs,
+			oc_loop: ocLoop,
 			oc_session_stats: ocSessionStats,
 			oc_pipeline_report: ocPipelineReport,
 			oc_summary: ocSummary,
@@ -337,10 +418,8 @@ const plugin: Plugin = async (input) => {
 			oc_memory_preferences: ocMemoryPreferences,
 		},
 		event: async ({ event }) => {
-			// 1. Observability: collect (pure observer, no side effects on session)
 			await observabilityEventHandler({ event });
 
-			// 2. Memory capture (pure observer, best-effort)
 			if (memoryCaptureHandler) {
 				try {
 					await memoryCaptureHandler({ event });
@@ -349,18 +428,44 @@ const plugin: Plugin = async (input) => {
 				}
 			}
 
-			// 3. First-load toast
 			if (event.type === "session.created" && isFirstLoad(config)) {
-				await sdkOps.showToast(
+				await notificationManager.info(
 					"Welcome to OpenCode Autopilot!",
 					"Plugin loaded. Run oc_doctor to verify your setup.",
-					"info",
 				);
 			}
 
-			// 4. Fallback event handling
+			if (event.type === "session.error") {
+				const props = event.properties;
+				const errorMsg =
+					props && typeof props === "object" && "error" in props
+						? String((props as Record<string, unknown>).error)
+						: "Unknown error";
+				const hint = getRemediationHint(errorMsg);
+				const displayMsg = hint ? `${errorMsg}\n${hint}` : errorMsg;
+				await notificationManager.error("Session Error", displayMsg);
+			}
+
+			if (event.type === "message.updated") {
+				const props = (event.properties ?? {}) as Record<string, unknown>;
+				const info = props.info as Record<string, unknown> | undefined;
+				if (info) {
+					const tokens = info.tokens as { input?: number } | undefined;
+					if (tokens && typeof tokens.input === "number") {
+						contextWarningMonitor.checkUtilization(tokens.input, 200_000);
+					}
+				}
+			}
+
 			if (fallbackConfig.enabled) {
 				await fallbackEventHandler({ event });
+			}
+
+			await recoveryEventHandler({ event });
+			await compactionHandler({ event });
+
+			if (event.type === "session.deleted") {
+				mcpManager.stopAll().catch(() => {});
 			}
 		},
 		config: async (cfg: Config) => {
@@ -422,6 +527,8 @@ const plugin: Plugin = async (input) => {
 			if (memoryInjector) {
 				await memoryInjector(input, output);
 			}
+			await contextInjector(input, output);
+			await loopInjector(input, output);
 		},
 	};
 };

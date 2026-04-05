@@ -6,12 +6,12 @@ export const AGENT_NAMES = Object.freeze({
 	CHALLENGE: "oc-challenger",
 	ARCHITECT: "oc-architect",
 	CRITIC: "oc-critic",
-	EXPLORE: "oc-explorer",
+	EXPLORE: "oc-researcher",
 	PLAN: "oc-planner",
 	BUILD: "oc-implementer",
 	REVIEW: "oc-reviewer",
 	SHIP: "oc-shipper",
-	RETROSPECTIVE: "oc-retrospector",
+	RETROSPECTIVE: "oc-shipper",
 } as const);
 
 export interface DispatchResult {

@@ -14,6 +14,7 @@ import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadLessonMemoryFromKernel, saveLessonMemoryToKernel } from "../kernel/repository";
+import { getLogger } from "../logging/domains";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
 import { getProjectArtifactDir } from "../utils/paths";
 import { lessonMemorySchema } from "./lesson-schemas";
@@ -25,6 +26,7 @@ const LESSON_FILE = "lesson-memory.json";
 const MAX_LESSONS = 50;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 let legacyLessonMemoryMirrorWarned = false;
+const logger = getLogger("orchestrator", "lesson-memory");
 
 /**
  * Create a valid empty lesson memory object.
@@ -97,7 +99,10 @@ export async function saveLessonMemory(memory: LessonMemory, projectRoot: string
 	} catch (error: unknown) {
 		if (!legacyLessonMemoryMirrorWarned) {
 			legacyLessonMemoryMirrorWarned = true;
-			console.warn("[opencode-autopilot] lesson-memory.json mirror write failed:", error);
+			logger.warn("lesson-memory.json mirror write failed", {
+				operation: "legacy_lesson_memory_mirror",
+				error: error instanceof Error ? error.message : String(error),
+			});
 		}
 	}
 }

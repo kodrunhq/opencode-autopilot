@@ -9,6 +9,8 @@
 
 import { access, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { getLogger } from "../logging/domains";
+import { getGlobalMcpManager } from "../mcp";
 import { sanitizeTemplateContent } from "../review/sanitize";
 import { isEnoentError } from "../utils/fs-helpers";
 import { resolveDependencyOrder } from "./dependency-resolver";
@@ -17,6 +19,26 @@ import type { LoadedSkill } from "./loader";
 const DEFAULT_TOKEN_BUDGET = 8000;
 /** Rough estimate: 1 token ~ 4 chars */
 const CHARS_PER_TOKEN = 4;
+
+const mcpLogger = getLogger("mcp", "skill-activation");
+
+function activateMcpForSkills(skills: ReadonlyMap<string, LoadedSkill>, mcpEnabled: boolean): void {
+	if (!mcpEnabled) return;
+
+	const manager = getGlobalMcpManager();
+	if (!manager) return;
+
+	for (const [name, skill] of skills) {
+		if (skill.frontmatter.mcp) {
+			manager.startServer(name, skill.frontmatter.mcp).catch((error: unknown) => {
+				mcpLogger.warn("Failed to start MCP server for skill", {
+					skill: name,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			});
+		}
+	}
+}
 
 /**
  * Maps pipeline phases to the skill names relevant for that phase.
@@ -33,6 +55,9 @@ export const PHASE_SKILL_MAP: Readonly<Record<string, readonly string[]>> = Obje
 	RETROSPECTIVE: [],
 	EXPLORE: [],
 });
+
+const MCP_SUPPORT_NOTE =
+	"Embedded MCP support is available for skills that declare an MCP server when plugin config.mcp.enabled is true.";
 
 export type SkillMode = "summary" | "full";
 
@@ -147,7 +172,8 @@ export function buildSkillSummary(skill: LoadedSkill): string {
 	const { name, description } = skill.frontmatter;
 	const safeName = sanitizeTemplateContent(name);
 	const safeDesc = sanitizeTemplateContent((description ?? "").slice(0, 200));
-	return `[Skill: ${safeName}]\n${safeDesc}`;
+	const mcpNote = skill.frontmatter.mcp ? `\n${MCP_SUPPORT_NOTE}` : "";
+	return `[Skill: ${safeName}]\n${safeDesc}${mcpNote}`;
 }
 
 /**
@@ -173,8 +199,11 @@ export function buildMultiSkillContext(
 	skills: ReadonlyMap<string, LoadedSkill>,
 	tokenBudget: number = DEFAULT_TOKEN_BUDGET,
 	mode: SkillMode = "summary",
+	mcpEnabled = true,
 ): string {
 	if (skills.size === 0) return "";
+
+	activateMcpForSkills(skills, mcpEnabled);
 
 	// Resolve dependency order
 	const depMap = new Map(
@@ -232,11 +261,13 @@ export function buildAdaptiveSkillContext(
 		readonly phase?: string;
 		readonly budget?: number;
 		readonly mode?: SkillMode;
+		readonly mcpEnabled?: boolean;
 	},
 ): string {
 	const phase = options?.phase;
 	const budget = options?.budget ?? DEFAULT_TOKEN_BUDGET;
 	const mode = options?.mode ?? "summary";
+	const mcpEnabled = options?.mcpEnabled ?? true;
 
 	if (phase !== undefined) {
 		const allowedNames = PHASE_SKILL_MAP[phase] ?? [];
@@ -250,9 +281,9 @@ export function buildAdaptiveSkillContext(
 			}
 		}
 
-		return buildMultiSkillContext(filtered, budget, mode);
+		return buildMultiSkillContext(filtered, budget, mode, mcpEnabled);
 	}
 
 	// No phase -- include all provided skills (caller already stack-filtered)
-	return buildMultiSkillContext(skills, budget, mode);
+	return buildMultiSkillContext(skills, budget, mode, mcpEnabled);
 }

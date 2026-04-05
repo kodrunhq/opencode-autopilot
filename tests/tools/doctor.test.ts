@@ -52,26 +52,26 @@ describe("doctorCore", () => {
 			}),
 		);
 
-		// Simulate all 15 agents injected
+		// Simulate all agents injected (9 standard + 8 pipeline + 2 suppressed native)
 		const agentMap: Record<string, unknown> = {};
 		for (const name of [
-			"plan",
-			"build",
-			"researcher",
-			"metaprompter",
-			"documenter",
-			"pr-reviewer",
 			"autopilot",
+			"coder",
+			"debugger",
+			"metaprompter",
+			"planner",
+			"pr-reviewer",
+			"researcher",
+			"reviewer",
+			"security-auditor",
 			"oc-researcher",
 			"oc-challenger",
 			"oc-architect",
 			"oc-critic",
-			"oc-explorer",
 			"oc-planner",
 			"oc-implementer",
 			"oc-reviewer",
 			"oc-shipper",
-			"oc-retrospector",
 		]) {
 			agentMap[name] = { systemPrompt: "test" };
 		}
@@ -196,7 +196,7 @@ describe("doctorCore", () => {
 		}
 	});
 
-	test("includes exactly 9 checks with expected names", async () => {
+	test("includes exactly 11 checks with expected names", async () => {
 		const result = JSON.parse(
 			await doctorCore({
 				configPath: "/nonexistent/path/config.json",
@@ -206,7 +206,7 @@ describe("doctorCore", () => {
 		);
 
 		const checkNames = result.checks.map((c: { name: string }) => c.name);
-		expect(result.checks.length).toBe(9);
+		expect(result.checks.length).toBe(11);
 		expect(checkNames).toEqual([
 			"config-validity",
 			"agent-injection",
@@ -216,6 +216,8 @@ describe("doctorCore", () => {
 			"memory-db",
 			"command-accessibility",
 			"config-v7-fields",
+			"routing-health",
+			"mcp-health",
 			"hook-registration",
 		]);
 	});

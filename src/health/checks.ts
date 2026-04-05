@@ -1,10 +1,13 @@
 import { Database } from "bun:sqlite";
 import { access, readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Config } from "@opencode-ai/plugin";
 import { parse } from "yaml";
 import { loadConfig } from "../config";
+import { getGlobalMcpManager } from "../mcp";
 import { AGENT_NAMES } from "../orchestrator/handlers/types";
+import { ALL_GROUP_IDS } from "../registry/model-groups";
+import { getAllCategories } from "../routing";
 import { detectProjectStackTags, filterSkillsByStack } from "../skills/adaptive-injector";
 import { loadAllSkills } from "../skills/loader";
 import {
@@ -14,6 +17,8 @@ import {
 	getLegacyMemoryDbPath,
 } from "../utils/paths";
 import type { HealthResult } from "./types";
+
+const VALID_CATEGORY_NAMES = new Set(getAllCategories().map((definition) => definition.category));
 
 /**
  * Check that the plugin config file exists and passes Zod validation.
@@ -213,9 +218,13 @@ export async function configV7FieldsCheck(configPath?: string): Promise<HealthRe
 const STANDARD_AGENT_NAMES: readonly string[] = Object.freeze([
 	"researcher",
 	"metaprompter",
-	"documenter",
 	"pr-reviewer",
 	"autopilot",
+	"coder",
+	"debugger",
+	"planner",
+	"reviewer",
+	"security-auditor",
 ]);
 
 /** Pipeline agent names, derived from AGENT_NAMES in the orchestrator. */
@@ -410,6 +419,88 @@ export async function skillHealthCheck(
 	}
 }
 
+export async function mcpHealthCheck(configPath?: string): Promise<HealthResult> {
+	try {
+		const config = await loadConfig(configPath);
+		if (config === null) {
+			return Object.freeze({
+				name: "mcp-health",
+				status: "fail" as const,
+				message: "Plugin config file not found",
+			});
+		}
+
+		if (!config.mcp.enabled) {
+			return Object.freeze({
+				name: "mcp-health",
+				status: "pass" as const,
+				message: "MCP disabled in config",
+			});
+		}
+
+		const manager = getGlobalMcpManager();
+		if (manager) {
+			const healthResults = await manager.healthCheckAll();
+			if (healthResults.length === 0) {
+				return Object.freeze({
+					name: "mcp-health",
+					status: "pass" as const,
+					message: "MCP enabled, no servers running",
+				});
+			}
+
+			const unhealthy = healthResults.filter((result) => result.state !== "healthy");
+			const details = Object.freeze(
+				healthResults.map((result) => {
+					const status = result.state === "healthy" ? "ok" : result.state;
+					const errorSuffix = result.error ? ` - ${result.error}` : "";
+					return `${result.serverName} (${result.skillName}): ${status}${errorSuffix}`;
+				}),
+			);
+
+			if (unhealthy.length > 0) {
+				return Object.freeze({
+					name: "mcp-health",
+					status: "warn" as const,
+					message: `MCP enabled: ${healthResults.length} server(s), ${unhealthy.length} unhealthy`,
+					details,
+				});
+			}
+
+			return Object.freeze({
+				name: "mcp-health",
+				status: "pass" as const,
+				message: `MCP enabled: ${healthResults.length} server(s) healthy`,
+				details,
+			});
+		}
+
+		const skillsDir = join(configPath ? dirname(configPath) : getGlobalConfigDir(), "skills");
+		const skills = await loadAllSkills(skillsDir);
+		const mcpSkills = [...skills.values()].filter((skill) => skill.frontmatter.mcp !== null);
+		const details = Object.freeze(
+			mcpSkills.map((skill) => {
+				const mcp = skill.frontmatter.mcp;
+				return `${skill.frontmatter.name}: ${mcp?.serverName} (${mcp?.transport})`;
+			}),
+		);
+
+		return Object.freeze({
+			name: "mcp-health",
+			status: "pass" as const,
+			message: `MCP enabled with ${mcpSkills.length} MCP-capable skill${mcpSkills.length === 1 ? "" : "s"} (manager not initialized)`,
+			details,
+		});
+	} catch (error: unknown) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "mcp-health",
+			status: "fail" as const,
+			message: `MCP health check failed: ${msg}`,
+		});
+	}
+}
+
 /**
  * Check memory DB health: existence, readability, observation count.
  * Does NOT call getMemoryDb() to avoid creating an empty DB as a side effect.
@@ -572,4 +663,56 @@ export async function commandHealthCheck(targetDir?: string): Promise<HealthResu
 		message: `${issues.length} command issue(s) found`,
 		details: Object.freeze(issues),
 	});
+}
+
+export async function routingHealthCheck(configPath?: string): Promise<HealthResult> {
+	try {
+		const invalidDefinitions = getAllCategories().flatMap((definition) => {
+			const issues: string[] = [];
+			if (!VALID_CATEGORY_NAMES.has(definition.category)) {
+				issues.push(`${definition.category}: unknown category`);
+			}
+			if (!ALL_GROUP_IDS.includes(definition.modelGroup as (typeof ALL_GROUP_IDS)[number])) {
+				issues.push(`${definition.category}: invalid model group '${definition.modelGroup}'`);
+			}
+			if (definition.maxIterations < 1) {
+				issues.push(`${definition.category}: maxIterations must be >= 1`);
+			}
+			if (definition.timeoutSeconds < 1) {
+				issues.push(`${definition.category}: timeoutSeconds must be >= 1`);
+			}
+			return issues;
+		});
+
+		const config = await loadConfig(configPath);
+		const invalidOverrides = Object.keys(config?.routing.categories ?? {}).flatMap(
+			(categoryName) =>
+				VALID_CATEGORY_NAMES.has(categoryName as import("../types/routing").Category)
+					? []
+					: [`Invalid routing override category '${categoryName}'`],
+		);
+
+		const issues = [...invalidDefinitions, ...invalidOverrides];
+		if (issues.length > 0) {
+			return Object.freeze({
+				name: "routing-health",
+				status: "fail" as const,
+				message: `${issues.length} routing issue(s) found`,
+				details: Object.freeze(issues),
+			});
+		}
+
+		return Object.freeze({
+			name: "routing-health",
+			status: "pass" as const,
+			message: `All ${getAllCategories().length} routing categories and overrides are valid`,
+		});
+	} catch (error: unknown) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "routing-health",
+			status: "fail" as const,
+			message: `Routing health check failed: ${msg}`,
+		});
+	}
 }

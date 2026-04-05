@@ -142,13 +142,13 @@ describe("handleRetrospective", () => {
 		expect(savedMemory.lessons.every((l) => (l.domain as string) !== "invalid-domain")).toBe(true);
 	});
 
-	test("without result returns dispatch action with oc-retrospector agent", async () => {
+	test("without result returns dispatch action with oc-shipper agent", async () => {
 		const state = makeState();
 
 		const dispatch = await handleRetrospective(state, "/tmp/test-artifacts");
 
 		expect(dispatch.action).toBe("dispatch");
-		expect(dispatch.agent).toBe("oc-retrospector");
+		expect(dispatch.agent).toBe("oc-shipper");
 		expect(dispatch.prompt).toBeTruthy();
 		expect(dispatch.phase).toBe("RETROSPECTIVE");
 	});

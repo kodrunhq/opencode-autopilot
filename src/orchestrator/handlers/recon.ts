@@ -1,8 +1,11 @@
+import { getLogger } from "../../logging/domains";
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { fileExists } from "../../utils/fs-helpers";
 import { ensurePhaseDir, getArtifactRef } from "../artifacts";
 import type { PipelineState } from "../types";
 import { AGENT_NAMES, type DispatchResult, type PhaseHandlerContext } from "./types";
+
+const logger = getLogger("orchestrator", "recon");
 
 /**
  * RECON phase handler — dispatches oc-researcher with idea and artifact path.
@@ -18,7 +21,11 @@ export async function handleRecon(
 		// Warn if artifact wasn't written (best-effort — still complete the phase)
 		const artifactPath = getArtifactRef(artifactDir, "RECON", "report.md");
 		if (!(await fileExists(artifactPath))) {
-			console.warn("[opencode-autopilot] RECON completed but artifact not found");
+			logger.warn("RECON completed but artifact not found", {
+				operation: "phase_transition",
+				phase: "RECON",
+				artifactPath,
+			});
 		}
 		return Object.freeze({
 			action: "complete" as const,

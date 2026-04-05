@@ -30,13 +30,17 @@ development system. It provides:
 
 - **8-phase autonomous pipeline** — from idea to shipped code
   (research → architecture → planning → implementation → review → docs)
-- **21 specialized code review agents** — security, logic, concurrency,
+- **13 specialized code review agents** — security, logic, concurrency,
   type soundness, stack-specific patterns (React, Go, Python, Rust, etc.)
 - **Intelligent model routing** — different models for different jobs.
   Your architect designs in one model, your critic challenges in another,
   your red team attacks from a third perspective.
 - **Automatic model fallback** — when a model is rate-limited, the system
   retries with the next model in the chain.
+- **Background task management** — spawn, monitor, and cancel background tasks with slot-based concurrency
+- **Category-based task routing** — automatic routing of tasks to the best agent/model based on intent classification
+- **Session recovery** — automatic failure detection with retry, fallback, and checkpoint strategies
+- **Context injection** — adaptive context management with token budgeting and compaction
 
 The key idea: **adversarial diversity**. Agents that review each other's
 work should use different model families. Claude reviewing Claude's
@@ -123,8 +127,12 @@ The plugin will load with the new model assignments.
 
 Key features to mention:
 - Use the **autopilot** agent for full autonomous pipelines
-- Use **/oc-review-pr** to review pull requests with 21 agents
+- Use **/oc-review-pr** to review pull requests with 13 agents
 - Use **/oc-new-agent**, **/oc-new-skill**, **/oc-new-command** to extend the plugin
+- Use **oc_background** to spawn and manage background tasks
+- Use **oc_delegate** for category-based task routing
+- Use **oc_recover** for session recovery
+- Use **oc_loop** for autonomy loop control
 - Run `bunx @kodrunhq/opencode-autopilot configure` to change assignments
 
 ### ⚠ Warning

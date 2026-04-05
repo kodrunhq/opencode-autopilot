@@ -69,8 +69,8 @@ describe("advancePipeline with expanded agent set", () => {
 			selectedAgentNames: [
 				"logic-auditor",
 				"security-auditor",
-				"wiring-inspector",
-				"dead-code-scanner",
+				"architecture-verifier",
+				"code-hygiene-auditor",
 			],
 			accumulatedFindings: [],
 			scope: "all",
@@ -89,8 +89,8 @@ describe("advancePipeline with expanded agent set", () => {
 		if (result.agents) {
 			const agentNames = result.agents.map((a) => a.name);
 			// Should include specialized agents that are selected
-			expect(agentNames).toContain("wiring-inspector");
-			expect(agentNames).toContain("dead-code-scanner");
+			expect(agentNames).toContain("architecture-verifier");
+			expect(agentNames).toContain("code-hygiene-auditor");
 			// Should NOT include stage 3 agents
 			expect(agentNames).not.toContain("red-team");
 			expect(agentNames).not.toContain("product-thinker");
@@ -136,8 +136,8 @@ describe("advancePipeline with expanded agent set", () => {
 			selectedAgentNames: [
 				"logic-auditor",
 				"security-auditor",
-				"wiring-inspector",
-				"concurrency-checker",
+				"architecture-verifier",
+				"correctness-auditor",
 				"database-auditor",
 			],
 		});
