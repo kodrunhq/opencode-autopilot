@@ -1,8 +1,10 @@
 export * from "./database";
 export * from "./executor";
 export * from "./manager";
+export { PRIORITY, type PriorityItem, type PriorityLevel, PriorityQueue } from "./priority-queue";
 export * from "./repository";
 export * from "./schema";
 export * from "./sdk-runner";
 export * from "./slot-manager";
 export * from "./state-machine";
+export { type TaskDependency, TaskDependencyTracker } from "./task-dependencies";

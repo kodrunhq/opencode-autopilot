@@ -5,6 +5,7 @@ import type { TaskStatus } from "../types/background";
 import type { BackgroundTaskRecord, BackgroundTaskResultRecord } from "./database";
 import { listBackgroundTasks } from "./database";
 import { type ExecuteTaskDependencies, type ExecuteTaskResult, executeTask } from "./executor";
+import { PRIORITY, type PriorityLevel, PriorityQueue } from "./priority-queue";
 import {
 	cancelTask,
 	createTask,
@@ -15,6 +16,7 @@ import {
 	updateStatus,
 } from "./repository";
 import { SlotManager } from "./slot-manager";
+import { TaskDependencyTracker } from "./task-dependencies";
 
 function isClosedDatabaseError(error: unknown): boolean {
 	return (
@@ -29,6 +31,8 @@ export interface BackgroundSpawnOptions {
 	readonly agent?: string;
 	readonly model?: string;
 	readonly priority?: number;
+	readonly parentId?: string;
+	readonly dependsOn?: readonly string[];
 	readonly timeoutMs?: number;
 	readonly executionDelayMs?: number;
 }
@@ -56,6 +60,10 @@ export class BackgroundManager {
 	private readonly maxConcurrent: number;
 	private readonly logger: Logger;
 	private readonly slotManager: SlotManager;
+	private readonly pendingTasks = new PriorityQueue<string>();
+	private readonly enqueuedTaskIds = new Set<string>();
+	private readonly completedTaskIds = new Set<string>();
+	private readonly dependencyTracker = new TaskDependencyTracker();
 	private readonly runningTasks = new Map<string, RunningTaskEntry>();
 	private readonly execute: (
 		task: BackgroundTaskRecord,
@@ -82,8 +90,13 @@ export class BackgroundManager {
 			category: options.category,
 			agent: options.agent,
 			model: options.model,
-			priority: options.priority,
+			priority: options.priority ?? PRIORITY.NORMAL,
 		});
+		this.dependencyTracker.register(task.id, {
+			parentId: options.parentId,
+			dependsOn: options.dependsOn,
+		});
+		this.enqueueTask(task.id, task.priority);
 		this.logger.info("Background task queued", {
 			backgroundTaskId: task.id,
 			sessionId,
@@ -117,6 +130,9 @@ export class BackgroundManager {
 	async dispose(): Promise<void> {
 		await this.waitForIdle();
 		this.disposed = true;
+		this.pendingTasks.clear();
+		this.enqueuedTaskIds.clear();
+		this.dependencyTracker.clear();
 	}
 
 	cancel(taskId: string): boolean {
@@ -157,6 +173,18 @@ export class BackgroundManager {
 		return getTaskResult(this.options.db, taskId);
 	}
 
+	getBlockedTasks(): readonly BackgroundTaskRecord[] {
+		const blockedTaskIds = this.dependencyTracker.getBlockedTasks(this.completedTaskIds);
+		const blockedTasks = blockedTaskIds
+			.map((taskId) => getTaskById(this.options.db, taskId))
+			.filter((task): task is BackgroundTaskRecord => task !== null && task.status === "pending");
+		return Object.freeze(blockedTasks);
+	}
+
+	getTaskChildren(taskId: string): readonly string[] {
+		return this.dependencyTracker.getChildren(taskId);
+	}
+
 	private async pumpQueue(): Promise<void> {
 		if (this.disposed || this.isPumping) {
 			return;
@@ -164,18 +192,17 @@ export class BackgroundManager {
 
 		this.isPumping = true;
 		try {
-			while (!this.slotManager.isFull()) {
-				const nextTask = listBackgroundTasks(this.options.db, {
-					status: "pending",
-					limit: 1,
-					prioritizePending: true,
-				})[0];
-				if (!nextTask || this.runningTasks.has(nextTask.id)) {
+			this.syncPendingTasks();
+			while (!this.pendingTasks.isEmpty()) {
+				const nextTask = this.dequeueNextReadyTask();
+				if (!nextTask) {
 					break;
 				}
 
-				const slotId = this.slotManager.acquire();
+				const priority = normalizePriority(nextTask.priority);
+				const slotId = this.slotManager.acquireByPriority(priority);
 				if (!slotId) {
+					this.enqueueTask(nextTask.id, nextTask.priority);
 					break;
 				}
 
@@ -220,6 +247,10 @@ export class BackgroundManager {
 				throw error;
 			}
 		} finally {
+			const currentTask = getTaskById(this.options.db, task.id);
+			if (currentTask?.status === "completed") {
+				this.completedTaskIds.add(task.id);
+			}
 			this.runningTasks.delete(task.id);
 			this.slotManager.release(slotId);
 			queueMicrotask(() => {
@@ -229,4 +260,101 @@ export class BackgroundManager {
 			});
 		}
 	}
+
+	private syncPendingTasks(): void {
+		const pendingTasks = listBackgroundTasks(this.options.db, {
+			status: "pending",
+			prioritizePending: true,
+		});
+
+		for (const task of pendingTasks) {
+			if (this.runningTasks.has(task.id)) {
+				continue;
+			}
+
+			this.enqueueTask(task.id, task.priority);
+		}
+	}
+
+	private dequeueNextReadyTask(): BackgroundTaskRecord | null {
+		const blockedTaskIds: string[] = [];
+
+		while (!this.pendingTasks.isEmpty()) {
+			const taskId = this.pendingTasks.dequeue();
+			if (!taskId) {
+				break;
+			}
+
+			this.enqueuedTaskIds.delete(taskId);
+
+			const task = getTaskById(this.options.db, taskId);
+			if (!task || task.status !== "pending" || this.runningTasks.has(taskId)) {
+				continue;
+			}
+
+			if (!this.dependencyTracker.areDependenciesMet(taskId, this.completedTaskIds)) {
+				blockedTaskIds.push(taskId);
+				continue;
+			}
+
+			for (const blockedTaskId of blockedTaskIds) {
+				const blockedTask = getTaskById(this.options.db, blockedTaskId);
+				if (blockedTask?.status === "pending") {
+					this.enqueueTask(blockedTask.id, blockedTask.priority);
+				}
+			}
+
+			return task;
+		}
+
+		for (const blockedTaskId of blockedTaskIds) {
+			const blockedTask = getTaskById(this.options.db, blockedTaskId);
+			if (blockedTask?.status === "pending") {
+				this.enqueueTask(blockedTask.id, blockedTask.priority);
+			}
+		}
+
+		return null;
+	}
+
+	private enqueueTask(taskId: string, priority: number): void {
+		if (this.enqueuedTaskIds.has(taskId) || this.runningTasks.has(taskId)) {
+			return;
+		}
+
+		this.pendingTasks.enqueue(taskId, normalizePriority(priority));
+		this.enqueuedTaskIds.add(taskId);
+	}
+}
+
+function normalizePriority(priority: number): PriorityLevel {
+	if (priority <= PRIORITY.CRITICAL) {
+		return PRIORITY.CRITICAL;
+	}
+
+	if (priority <= PRIORITY.HIGH) {
+		return PRIORITY.HIGH;
+	}
+
+	if (priority <= PRIORITY.NORMAL) {
+		return PRIORITY.NORMAL;
+	}
+
+	if (priority <= PRIORITY.LOW) {
+		return PRIORITY.LOW;
+	}
+
+	if (priority >= 75) {
+		return PRIORITY.CRITICAL;
+	}
+
+	if (priority >= 50) {
+		return PRIORITY.HIGH;
+	}
+
+	if (priority >= 25) {
+		return PRIORITY.NORMAL;
+	}
+
+	return PRIORITY.LOW;
 }

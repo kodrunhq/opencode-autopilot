@@ -6,6 +6,10 @@ import { isFirstLoad, loadConfig } from "./config";
 import { createCompactionHandler, createContextInjector } from "./context";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
+import { createKeywordDetectorHandler } from "./hooks/keyword-detector";
+import { createPreemptiveCompactionHandler } from "./hooks/preemptive-compaction";
+import { createSessionRecoveryHandler } from "./hooks/session-recovery";
+import { createToolOutputTruncatorHandler } from "./hooks/tool-output-truncator";
 import { installAssets } from "./installer";
 import { openKernelDb } from "./kernel/database";
 import { getLogger, initLoggers } from "./logging/domains";
@@ -276,6 +280,12 @@ const plugin: Plugin = async (input) => {
 
 	// --- Anti-slop hook initialization ---
 	const antiSlopHandler = createAntiSlopHandler({ showToast: sdkOps.showToast });
+	const keywordDetectorHandler = createKeywordDetectorHandler({ showToast: sdkOps.showToast });
+	const preemptiveCompactionHandler = createPreemptiveCompactionHandler({
+		showToast: sdkOps.showToast,
+	});
+	const sessionRecoveryHandler = createSessionRecoveryHandler({ showToast: sdkOps.showToast });
+	const toolOutputTruncatorHandler = createToolOutputTruncatorHandler({});
 
 	// --- Memory subsystem initialization ---
 	const memoryConfig = config?.memory ?? {
@@ -515,6 +525,12 @@ const plugin: Plugin = async (input) => {
 			// Observability: record tool execution (pure observer)
 			obsToolAfterHandler(hookInput, output);
 
+			try {
+				await toolOutputTruncatorHandler(hookInput, output);
+			} catch {
+				// best-effort
+			}
+
 			// Fallback handling
 			if (fallbackConfig.enabled) {
 				await toolExecuteAfterHandler(hookInput, output);
@@ -523,6 +539,31 @@ const plugin: Plugin = async (input) => {
 			// Anti-slop comment detection (best-effort, non-blocking)
 			try {
 				await antiSlopHandler(hookInput, output);
+			} catch {
+				// best-effort
+			}
+
+			try {
+				await keywordDetectorHandler(hookInput, output);
+			} catch {
+				// best-effort
+			}
+		},
+		"chat.completion.after": async (
+			hookInput: {
+				readonly sessionID: string;
+				readonly tokens?: { readonly used?: number; readonly limit?: number };
+			},
+			output: { output?: string },
+		) => {
+			try {
+				await preemptiveCompactionHandler(hookInput, output);
+			} catch {
+				// best-effort
+			}
+
+			try {
+				await sessionRecoveryHandler(hookInput, output);
 			} catch {
 				// best-effort
 			}
