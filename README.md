@@ -84,6 +84,26 @@ bunx @kodrunhq/opencode-autopilot doctor
 
 This checks config health, model assignments, and adversarial diversity between agent groups.
 
+## Documentation
+
+For detailed guides on every subsystem, see the **[full documentation](docs/README.md)**.
+
+| Topic | Description |
+|-------|-------------|
+| [Installation Guide](docs/guide/installation.md) | Step-by-step setup with AI-guided or manual options |
+| [Architecture](docs/architecture.md) | System architecture and internal module map |
+| [The Pipeline](docs/pipeline.md) | 8-phase autonomous development pipeline |
+| [Agents](docs/agents.md) | Complete catalog of all agents and model groups |
+| [Code Review](docs/code-review.md) | 13-agent adversarial review pipeline |
+| [Configuration](docs/configuration.md) | v7 configuration schema reference |
+| [Tools Reference](docs/tools-reference.md) | All 27 `oc_*` tools |
+| [CLI Reference](docs/cli-reference.md) | `install`, `configure`, `doctor`, and `inspect` commands |
+| [Memory System](docs/memory-system.md) | Dual-scope project and user preference memory |
+| [Model Fallback](docs/model-fallback.md) | Automatic fallback chains and session recovery |
+| [Background & Routing](docs/background-and-routing.md) | Background tasks, category routing, and autonomy loop |
+| [Skills & Commands](docs/skills-and-commands.md) | Adaptive skills and slash commands |
+| [Observability](docs/observability.md) | Event tracking, structured logging, and diagnostics |
+
 ## Model Groups
 
 Agents are organized into 8 groups by the type of thinking they do. Each group gets a primary model and fallback chain. Run `bunx @kodrunhq/opencode-autopilot configure` to assign models interactively. For advanced use, the `oc_configure` tool is also available in-session.
