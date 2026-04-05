@@ -285,6 +285,27 @@ describe("oc_logs tool", () => {
 			).toBe(true);
 		});
 
+		test("combines domain, subsystem, and severity filters end-to-end", async () => {
+			const result = JSON.parse(
+				await logsCore(
+					"search",
+					{
+						sessionID: sessionId,
+						domain: "orchestrator",
+						subsystem: "planner",
+						severity: "info",
+					},
+					testDir,
+				),
+			);
+
+			expect(result.action).toBe("logs_search");
+			expect(result.events).toBeArrayOfSize(1);
+			expect(result.events[0].domain).toBe("orchestrator");
+			expect(result.events[0].payload.subsystem).toBe("planner");
+			expect(result.events[0].type).toBe("info");
+		});
+
 		test("search result includes matchCount and filters fields", async () => {
 			const result = JSON.parse(
 				await logsCore("search", { sessionID: sessionId, domain: "review" }, testDir),

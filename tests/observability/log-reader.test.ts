@@ -117,4 +117,42 @@ describe("log-reader", () => {
 		expect(searchEvents(events, { type: "error" })).toHaveLength(1);
 		expect(searchEvents(events, { after: "2026-04-01T10:05:00Z" })).toHaveLength(1);
 	});
+
+	test("searchEvents filters by domain, subsystem, and severity", () => {
+		const events = [
+			createForensicEvent({
+				projectRoot,
+				domain: "orchestrator",
+				timestamp: "2026-04-01T10:00:00Z",
+				sessionId: "sess-1",
+				type: "warning",
+				message: "planner warning",
+				payload: { subsystem: "planner", severity: "warning" },
+			}),
+			createForensicEvent({
+				projectRoot,
+				domain: "orchestrator",
+				timestamp: "2026-04-01T10:01:00Z",
+				sessionId: "sess-1",
+				type: "info",
+				message: "builder info",
+				payload: { subsystem: "builder", level: "info" },
+			}),
+			createForensicEvent({
+				projectRoot,
+				domain: "review",
+				timestamp: "2026-04-01T10:02:00Z",
+				sessionId: "sess-1",
+				type: "info",
+				message: "review info",
+				payload: { subsystem: "reviewer" },
+			}),
+		] as const;
+
+		expect(searchEvents(events, { domain: "orchestrator" })).toHaveLength(2);
+		expect(searchEvents(events, { subsystem: "planner" })).toHaveLength(1);
+		expect(searchEvents(events, { severity: "warning" })).toHaveLength(1);
+		expect(searchEvents(events, { severity: "info" })).toHaveLength(2);
+		expect(searchEvents(events, { domain: "orchestrator", subsystem: "builder" })).toHaveLength(1);
+	});
 });

@@ -67,6 +67,62 @@ describe("BaseLogger", () => {
 		expect(entries.map((e) => e.level)).toEqual(["DEBUG", "INFO", "WARN", "ERROR"]);
 	});
 
+	it("writes complete log entry structure for each level", () => {
+		const entries: LogEntry[] = [];
+		const sink: LogSink = {
+			write: (entry) => entries.push(entry),
+		};
+		const logger = new BaseLogger(sink, { domain: "logging", subsystem: "test" });
+
+		logger.debug("debug message", { operation: "debug_op" });
+		logger.info("info message", { operation: "info_op" });
+		logger.warn("warn message", { operation: "warn_op" });
+		logger.error("error message", { operation: "error_op" });
+
+		expect(entries).toHaveLength(4);
+		expect(entries).toEqual([
+			expect.objectContaining({
+				level: "DEBUG",
+				message: "debug message",
+				metadata: expect.objectContaining({
+					domain: "logging",
+					subsystem: "test",
+					operation: "debug_op",
+				}),
+			}),
+			expect.objectContaining({
+				level: "INFO",
+				message: "info message",
+				metadata: expect.objectContaining({
+					domain: "logging",
+					subsystem: "test",
+					operation: "info_op",
+				}),
+			}),
+			expect.objectContaining({
+				level: "WARN",
+				message: "warn message",
+				metadata: expect.objectContaining({
+					domain: "logging",
+					subsystem: "test",
+					operation: "warn_op",
+				}),
+			}),
+			expect.objectContaining({
+				level: "ERROR",
+				message: "error message",
+				metadata: expect.objectContaining({
+					domain: "logging",
+					subsystem: "test",
+					operation: "error_op",
+				}),
+			}),
+		]);
+		for (const entry of entries) {
+			expect(entry.timestamp).toBeString();
+		}
+	});
+
 	it("should produce immutable log entries", () => {
 		const entries: LogEntry[] = [];
 		const sink: LogSink = {

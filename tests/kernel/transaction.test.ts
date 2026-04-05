@@ -114,4 +114,13 @@ describe("withTransaction", () => {
 
 		db.run = originalRun;
 	});
+
+	it("should reject nested transactions", () => {
+		expect(() => {
+			withTransaction(db, () => {
+				withTransaction(db, () => "nested");
+				return "outer";
+			});
+		}).toThrow(/nested/i);
+	});
 });

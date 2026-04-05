@@ -1,8 +1,11 @@
+import { getLogger } from "../../logging/domains";
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { fileExists } from "../../utils/fs-helpers";
 import { ensurePhaseDir, getArtifactRef } from "../artifacts";
 import type { PipelineState } from "../types";
 import { AGENT_NAMES, type DispatchResult, type PhaseHandlerContext } from "./types";
+
+const logger = getLogger("orchestrator", "challenge");
 
 /**
  * CHALLENGE phase handler — dispatches oc-challenger with RECON artifact references.
@@ -18,7 +21,11 @@ export async function handleChallenge(
 		// Warn if artifact wasn't written (best-effort — still complete the phase)
 		const artifactPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
 		if (!(await fileExists(artifactPath))) {
-			console.warn("[opencode-autopilot] CHALLENGE completed but artifact not found");
+			logger.warn("CHALLENGE completed but artifact not found", {
+				operation: "phase_transition",
+				phase: "CHALLENGE",
+				artifactPath,
+			});
 		}
 		return Object.freeze({
 			action: "complete" as const,

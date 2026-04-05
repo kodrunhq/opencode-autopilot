@@ -1,7 +1,10 @@
+import { getLogger } from "../../logging/domains";
 import type { FallbackConfig } from "./fallback-config";
 import type { FallbackManager } from "./fallback-manager";
 import { replayWithDegradation } from "./message-replay";
 import type { MessagePart } from "./types";
+
+const logger = getLogger("orchestrator", "fallback-event-handler");
 
 /**
  * SDK operations interface for dependency injection.
@@ -272,8 +275,16 @@ async function handleFallbackError(
 
 		// Release lock after dispatch (or skip if model unparseable)
 		manager.releaseRetryLock(sessionID);
-	} catch {
+	} catch (error: unknown) {
 		// On failure, release the lock to allow future retries
+		logger.warn("fallback replay failed", {
+			operation: "fallback",
+			sessionId: sessionID,
+			failedModel: plan.failedModel,
+			nextModel: plan.newModel,
+			reason: plan.reason,
+			error: error instanceof Error ? error.message : String(error),
+		});
 		manager.releaseRetryLock(sessionID);
 	}
 }

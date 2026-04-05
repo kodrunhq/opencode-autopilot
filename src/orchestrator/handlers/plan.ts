@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { getLogger } from "../../logging/domains";
 import { isEnoentError } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
 import { normalizePlanTasks, planTasksArtifactSchema } from "../contracts/phase-artifacts";
@@ -12,6 +13,7 @@ import { AGENT_NAMES } from "./types";
 const EXPECTED_COLUMN_COUNT = 6;
 const taskIdPattern = /^W(\d+)-T(\d+)$/i;
 const separatorCellPattern = /^:?-{3,}:?$/;
+const logger = getLogger("orchestrator", "plan");
 
 function parseTableColumns(line: string): readonly string[] | null {
 	const trimmed = line.trim();
@@ -146,7 +148,12 @@ export const handlePlan: PhaseHandler = async (_state, artifactDir, result?) => 
 			if (usedLegacyMarkdown) {
 				const msg =
 					"PLAN fallback: parsed legacy tasks.md (tasks.json missing). Migrate planner output to tasks.json.";
-				console.warn(`[opencode-autopilot] ${msg}`);
+				logger.warn(msg, {
+					operation: "phase_transition",
+					phase: "PLAN",
+					tasksJsonPath,
+					tasksPath,
+				});
 				logOrchestrationEvent(artifactDir, {
 					timestamp: new Date().toISOString(),
 					phase: "PLAN",

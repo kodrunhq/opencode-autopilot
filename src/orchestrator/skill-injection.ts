@@ -9,6 +9,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { getLogger } from "../logging/domains";
 import { sanitizeTemplateContent } from "../review/sanitize";
 import {
 	buildAdaptiveSkillContext,
@@ -20,6 +21,7 @@ import { loadAllSkills } from "../skills/loader";
 import { isEnoentError } from "../utils/fs-helpers";
 
 const MAX_SKILL_LENGTH = 2048;
+const logger = getLogger("orchestrator", "skill-injection");
 
 /**
  * Load the coding-standards skill content from the global config dir.
@@ -89,7 +91,10 @@ export async function loadAdaptiveSkillContext(
 		return buildAdaptiveSkillContext(matchingSkills, options);
 	} catch (err) {
 		// Best-effort: all errors return empty string.
-		console.warn("[opencode-autopilot] adaptive skill load failed:", err);
+		logger.warn("adaptive skill load failed", {
+			operation: "skill_injection",
+			error: err instanceof Error ? err.message : String(err),
+		});
 		return "";
 	}
 }
