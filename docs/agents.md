@@ -19,7 +19,9 @@ The system organizes agents into eight groups based on their cognitive requireme
 
 ## Standard Agents
 
-These nine agents are the primary tools visible in the OpenCode interface. They handle common development tasks and are accessible through the standard Tab cycle.
+The plugin registers nine agents. Six are primary agents visible in the OpenCode Tab cycle, and three are subagents invoked programmatically by other agents or tools.
+
+### Primary Agents (Tab cycle)
 
 | Agent | Role | Model Group |
 |-------|------|-------------|
@@ -29,9 +31,14 @@ These nine agents are the primary tools visible in the OpenCode interface. They 
 | planner | Task decomposition and planning | Architects |
 | researcher | Domain research and analysis | Researchers |
 | reviewer | Code review orchestration | Reviewers |
-| documenter | Documentation generation | Communicators |
+
+### Subagents (invoked programmatically)
+
+| Agent | Role | Model Group |
+|-------|------|-------------|
 | metaprompter | Prompt tuning and optimization | Utilities |
 | pr-reviewer | Pull request scanning | Utilities |
+| security-auditor | Security auditing and OWASP analysis | Reviewers |
 
 ## Pipeline Agents
 

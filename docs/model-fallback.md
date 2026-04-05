@@ -121,8 +121,8 @@ Configuration options for fallback and recovery systems are managed in `opencode
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `recovery.maxRetries` | `3` | Maximum number of recovery attempts per session |
-| `recovery.strategies` | `["retry", "fallback", "checkpoint"]` | Enabled recovery strategies |
+| `recovery.enabled` | `true` | Enable or disable session recovery |
+| `recovery.maxRetries` | `3` | Maximum number of recovery attempts per session (0-10) |
 
 ---
 [Documentation Index](README.md)

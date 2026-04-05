@@ -52,7 +52,7 @@ The `ContextMonitor` tracks token usage against model limits to prevent context 
 The log writer persists session data as structured JSONL (JSON Lines) for machine parsing and forensic analysis.
 
 *   **Format**: Each line is a valid JSON object containing a timestamp, domain, event type, and payload.
-*   **Location**: Logs are stored in `~/.config/opencode/logs/` and project-specific `.opencode-autopilot/` directories.
+*   **Location**: Logs are stored in the project artifact directory (`.opencode-autopilot/`).
 *   **Atomic Writes**: Uses atomic append operations to ensure log integrity even during crashes.
 *   **Redaction**: Automatically redacts absolute file paths from log messages to protect user privacy.
 

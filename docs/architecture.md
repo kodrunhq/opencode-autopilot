@@ -35,14 +35,14 @@ The following tree describes the purpose of each module in the `src/` directory:
 - `src/skills/`: Adaptive skill loading and injection based on the current task context.
 - `src/health/`: Plugin self-diagnostics and health check runner.
 - `src/utils/`: Shared utilities for validation, path management, and filesystem helpers.
-- `src/agents/`: Type definitions for agent configurations.
-- `src/config/`: Type definitions for the configuration subsystem.
+- `src/agents/`: Agent configuration objects and registrations for all nine standard agents.
+- `src/config/`: Configuration subsystem including schema definitions, v7 validation, and migration chain.
 - `src/hooks/`: Handlers for various OpenCode plugin hooks.
 - `src/inspect/`: Utilities for inspecting session state and artifacts.
 - `src/projects/`: Logic for detecting project roots and types.
 - `src/scoring/`: Utilities for scoring model outputs and review findings.
 - `src/types/`: Shared TypeScript type definitions used across the project.
-- `bin/cli.ts`: CLI entry point for standalone commands like `install`, `doctor`, and `configure`.
+- `bin/cli.ts`: CLI entry point for standalone commands: `install`, `configure`, `doctor`, and `inspect`.
 
 ## Dependency Flow
 

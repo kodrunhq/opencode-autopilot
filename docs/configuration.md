@@ -7,7 +7,7 @@ The OpenCode Autopilot Plugin uses a versioned JSON configuration file to manage
 The configuration file is located at:
 `~/.config/opencode/opencode-autopilot.json`
 
-This file is automatically created on first load and migrates across versions as the plugin updates.
+This file is created by the CLI installer (`bunx @kodrunhq/opencode-autopilot install`) and migrates across versions as the plugin updates.
 
 ## Schema Reference (v7)
 
@@ -88,7 +88,7 @@ Configures the automatic model fallback mechanism.
 Configures the smart dual-scope memory.
 
 *   `enabled`: boolean. Whether to enable the memory system.
-*   `injectionBudget`: number. Maximum characters to inject from memory into the system prompt (default: `2000`).
+*   `injectionBudget`: number. Maximum tokens to inject from memory into the system prompt (default: `2000`). Internally converted to a character budget using a tokens-to-characters ratio.
 *   `decayHalfLifeDays`: number. The half-life for relevance scoring of observations (default: `90`).
 
 ### Background Tasks (`background`)
