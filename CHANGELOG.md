@@ -1,6 +1,6 @@
 # Changelog
 
-## [7.0.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.17.0...opencode-autopilot-v7.0.0) (2026-04-05)
+## [7.0.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.18.0...opencode-autopilot-v7.0.0) (2026-04-05)
 
 v7.0 is a major release adding 11 new subsystems (Phases 33-43) that transform the plugin from a pipeline orchestrator into a fully autonomous development platform with background task management, self-healing recovery, context-aware injection, and MCP integration.
 
@@ -22,7 +22,14 @@ v7.0 is a major release adding 11 new subsystems (Phases 33-43) that transform t
 
 * Config schema upgraded to v7 (auto-migrates from v1-v6) with new `background`, `routing`, `recovery`, and `mcp` sections
 * Review agents reduced from 21 to 13 — consolidated agents cover the same domains with less overhead
-* Package version bumped from 1.17.0 to 7.0.0 to align with config schema version
+* Package version bumped from 1.18.0 to 7.0.0 to align with config schema version
+
+## [1.18.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.17.0...opencode-autopilot-v1.18.0) (2026-04-05)
+
+
+### Features
+
+* Phase 32 - Configuration v7 + Foundation ([b510b3b](https://github.com/kodrunhq/opencode-autopilot/commit/b510b3b349cdb1e90226c9fa0fdb3ecba1648571))
 
 ## [1.17.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.16.0...opencode-autopilot-v1.17.0) (2026-04-05)
 
