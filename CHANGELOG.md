@@ -1,5 +1,29 @@
 # Changelog
 
+## [7.0.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.17.0...opencode-autopilot-v7.0.0) (2026-04-05)
+
+v7.0 is a major release adding 11 new subsystems (Phases 33-43) that transform the plugin from a pipeline orchestrator into a fully autonomous development platform with background task management, self-healing recovery, context-aware injection, and MCP integration.
+
+### Features
+
+* **Phase 33 — Concurrency Extended:** SQLite contention tests, WAL read/write isolation, `withRetry()` exponential backoff for SQLITE_BUSY, nested transaction guard, kernel barrel export
+* **Phase 34 — Unified Logging:** Export performance and rotation from logging barrel, migrate orchestrator to structured logger, add test extensions for logging
+* **Phase 35 — Background Manager:** `src/background/` subsystem with slot-based concurrency, SQLite persistence, task state machine (queued/running/completed/failed), timeout handling, `oc_background` tool
+* **Phase 36 — Autonomy Loop:** `src/autonomy/` subsystem with iteration state tracking, completion detection via positive/negative signals, verification checkpoints (tests + lint + artifacts), `oc_loop` tool
+* **Phase 37 — Category Routing:** `src/routing/` subsystem with category definitions, intent classification from task descriptions, routing engine with skill injection, `oc_delegate` tool
+* **Phase 38 — Session Recovery:** `src/recovery/` subsystem with failure classification (transient/permanent/partial), recovery strategies (retry/fallback/checkpoint), SQLite checkpoint persistence, `oc_recover` tool
+* **Phase 39 — Context Injection:** `src/context/` subsystem with active context discovery, token budget allocation, system prompt injection orchestrator, context compaction handler
+* **Phase 40 — UX Surfaces:** `src/ux/` subsystem with toast notifications, progress tracking, task status formatting, context usage warnings, actionable error hints, session summary generation
+* **Phase 41 — Agent Consolidation:** Consolidated 21 review agents to 13 — merged security-auditor+auth-flow, dead-code+silent-failure, wiring+scope-intent+spec, type-soundness+concurrency, state-mgmt+react-patterns, go+python+rust into focused composite agents
+* **Phase 42 — MCP Skills:** `src/mcp/` subsystem with MCP server lifecycle management, scope-based filtering, skill loader MCP frontmatter parsing, MCP health check
+* **Phase 43 — Integration Polish:** 4 cross-cutting integration test suites (background+routing+loop, recovery+logging, context+compaction, full-pipeline-v7), README v7 update, config v7 documentation
+
+### Breaking Changes
+
+* Config schema upgraded to v7 (auto-migrates from v1-v6) with new `background`, `routing`, `recovery`, and `mcp` sections
+* Review agents reduced from 21 to 13 — consolidated agents cover the same domains with less overhead
+* Package version bumped from 1.17.0 to 7.0.0 to align with config schema version
+
 ## [1.17.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.16.0...opencode-autopilot-v1.17.0) (2026-04-05)
 
 
