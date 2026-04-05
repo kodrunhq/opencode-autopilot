@@ -1,6 +1,7 @@
 import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
 import { isFirstLoad, loadConfig } from "./config";
+import { createCompactionHandler, createContextInjector } from "./context";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { installAssets } from "./installer";
@@ -234,6 +235,11 @@ const plugin: Plugin = async (input) => {
 				getDb: () => getMemoryDb(),
 			})
 		: null;
+	const contextInjector = createContextInjector({
+		projectRoot: process.cwd(),
+		totalBudget: 4000,
+	});
+	const compactionHandler = createCompactionHandler(contextInjector);
 
 	// --- Observability handlers ---
 	const toolStartTimes = new Map<string, number>();
@@ -374,6 +380,7 @@ const plugin: Plugin = async (input) => {
 			}
 
 			await recoveryEventHandler({ event });
+			await compactionHandler({ event });
 		},
 		config: async (cfg: Config) => {
 			openCodeConfig = cfg;
@@ -434,6 +441,7 @@ const plugin: Plugin = async (input) => {
 			if (memoryInjector) {
 				await memoryInjector(input, output);
 			}
+			await contextInjector(input, output);
 		},
 	};
 };

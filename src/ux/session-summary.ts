@@ -1,7 +1,32 @@
 import type { SessionEvents } from "../observability/event-store";
 import type { PipelineState } from "../orchestrator/types";
 
+export interface SessionSummaryData {
+	readonly sessionId: string;
+	readonly startedAt: string;
+	readonly endedAt: string;
+	readonly tokensUsed: number;
+	readonly phasesCompleted: readonly string[];
+	readonly errorsEncountered: number;
+	readonly tasksCompleted: number;
+	readonly lessonsLearned: readonly string[];
+}
+
 export function generateSessionSummary(
+	sessionData: SessionEvents | SessionSummaryData | undefined,
+	pipelineState?: PipelineState | null,
+): string {
+	if (isStructuredSessionSummaryData(sessionData) && pipelineState === undefined) {
+		return generateStructuredSessionSummary(sessionData);
+	}
+
+	return generatePipelineSessionSummary(
+		sessionData as SessionEvents | undefined,
+		pipelineState ?? null,
+	);
+}
+
+function generatePipelineSessionSummary(
 	sessionData: SessionEvents | undefined,
 	pipelineState: PipelineState | null,
 ): string {
@@ -53,4 +78,46 @@ export function generateSessionSummary(
 	}
 
 	return sections.join("\n").trim();
+}
+
+function generateStructuredSessionSummary(data: SessionSummaryData): string {
+	const sections = [
+		`# Session Summary: ${data.sessionId}`,
+		"",
+		"## Overview",
+		`- Started: ${data.startedAt}`,
+		`- Ended: ${data.endedAt}`,
+		`- Tokens Used: ${data.tokensUsed.toLocaleString()}`,
+		`- Tasks Completed: ${data.tasksCompleted}`,
+		`- Errors Encountered: ${data.errorsEncountered}`,
+		"",
+		"## Phases Completed",
+		...(data.phasesCompleted.length > 0
+			? data.phasesCompleted.map((phase) => `- ${phase}`)
+			: ["- None"]),
+		"",
+		"## Lessons Learned",
+		...(data.lessonsLearned.length > 0
+			? data.lessonsLearned.map((lesson) => `- ${lesson}`)
+			: ["- None recorded"]),
+	];
+
+	return sections.join("\n").trim();
+}
+
+function isStructuredSessionSummaryData(
+	value: SessionEvents | SessionSummaryData | undefined,
+): value is SessionSummaryData {
+	if (!value) {
+		return false;
+	}
+
+	return (
+		"endedAt" in value &&
+		"tokensUsed" in value &&
+		"phasesCompleted" in value &&
+		"errorsEncountered" in value &&
+		"tasksCompleted" in value &&
+		"lessonsLearned" in value
+	);
 }

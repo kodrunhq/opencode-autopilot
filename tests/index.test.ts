@@ -131,6 +131,16 @@ describe("plugin entry point", () => {
 		expect(keys).toContain("chat.message");
 		expect(keys).toContain("tool.execute.before");
 		expect(keys).toContain("tool.execute.after");
+		expect(keys).toContain("experimental.chat.system.transform");
+	});
+
+	test("returns experimental.chat.system.transform hook", async () => {
+		const result = await plugin(mockInput);
+		const transformHook = (result as unknown as Record<string, unknown>)[
+			"experimental.chat.system.transform"
+		];
+		expect(transformHook).toBeDefined();
+		expect(typeof transformHook).toBe("function");
 	});
 
 	test("returns tool.execute.before hook", async () => {
