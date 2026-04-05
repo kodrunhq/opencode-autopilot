@@ -29,7 +29,7 @@ describe("generateSessionSummary", () => {
 					confidence: "HIGH",
 				},
 			],
-		} as unknown;
+		} as any;
 
 		const sessionData: SessionEvents = {
 			tokens: {
@@ -51,7 +51,7 @@ describe("generateSessionSummary", () => {
 				},
 			],
 			startedAt: "2024-01-01T00:00:00Z",
-		} as unknown;
+		} as any;
 
 		const summary = generateSessionSummary(sessionData, pipelineState);
 		expect(summary).toContain("**Pipeline Status**: COMPLETED (Current Phase: RETROSPECTIVE)");
@@ -75,7 +75,7 @@ describe("generateSessionSummary", () => {
 				},
 			],
 			startedAt: "2024-01-01T00:00:00Z",
-		} as unknown;
+		} as any;
 
 		const summary = generateSessionSummary(sessionData, null);
 		expect(summary).toContain("**Errors Encountered**:");
@@ -89,7 +89,7 @@ describe("generateSessionSummary", () => {
 		const sessionData: SessionEvents = {
 			events: [],
 			startedAt,
-		} as unknown;
+		} as any;
 
 		const summary = generateSessionSummary(sessionData, null);
 		expect(summary).toContain("**Duration (active)**: 5.0s");
@@ -101,7 +101,7 @@ describe("generateSessionSummary", () => {
 			status: "IN_PROGRESS",
 			currentPhase: "RECON",
 			phases: [],
-		} as unknown;
+		} as any;
 
 		const summary = generateSessionSummary(undefined, pipelineState);
 		expect(summary).toContain("**Pipeline Status**: IN_PROGRESS (Current Phase: RECON)");

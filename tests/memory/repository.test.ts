@@ -553,7 +553,7 @@ describe("repository", () => {
 			const obs = getObservationsByProject(null, 50, db);
 			expect(obs.length).toBe(1);
 
-			deleteObservation(obs[0].id ?? "", db);
+			deleteObservation(obs[0].id as number, db);
 			const after = getObservationsByProject(null, 50, db);
 			expect(after.length).toBe(0);
 		});
@@ -565,7 +565,7 @@ describe("repository", () => {
 			const obs = getObservationsByProject(null, 50, db);
 			expect(obs[0].accessCount).toBe(0);
 
-			updateAccessCount(obs[0].id ?? "", db);
+			updateAccessCount(obs[0].id as number, db);
 			const after = getObservationsByProject(null, 50, db);
 			expect(after[0].accessCount).toBe(1);
 		});
@@ -592,7 +592,7 @@ describe("repository", () => {
 			insertObservation({ ...validObs, projectId: null }, db);
 			const obs = getObservationsByProject(null, 50, db);
 
-			deleteObservation(obs[0].id ?? "", db);
+			deleteObservation(obs[0].id as number, db);
 
 			const ftsResults = searchObservations("SQLite", null, 10, db);
 			expect(ftsResults.length).toBe(0);

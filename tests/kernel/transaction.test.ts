@@ -57,15 +57,15 @@ describe("withTransaction", () => {
 
 		let calls = 0;
 		const originalRun = db.run;
-		db.run = function (this: unknown, ...args: unknown[]) {
+		db.run = function (this: unknown, ...args: any[]) {
 			if (args[0] === "BEGIN IMMEDIATE") {
 				calls++;
 				if (calls < 3) {
 					throw new Error("database is locked");
 				}
 			}
-			return originalRun.apply(this, args as unknown);
-		} as unknown;
+			return (originalRun as any)(...args);
+		} as any;
 
 		const result = withTransaction(
 			db,
@@ -86,13 +86,13 @@ describe("withTransaction", () => {
 	it("should fail after max retries", () => {
 		let calls = 0;
 		const originalRun = db.run;
-		db.run = function (this: unknown, ...args: unknown[]) {
+		db.run = function (this: unknown, ...args: any[]) {
 			if (args[0] === "BEGIN IMMEDIATE") {
 				calls++;
 				throw new Error("database is locked");
 			}
-			return originalRun.apply(this, args as unknown);
-		} as unknown;
+			return (originalRun as any)(...args);
+		} as any;
 
 		expect(() => {
 			withTransaction(

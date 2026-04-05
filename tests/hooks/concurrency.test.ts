@@ -48,7 +48,7 @@ describe("Hook Concurrency", () => {
 
 		const session = eventStore.getSession("test-session");
 		expect(session?.events.length).toBe(10);
-		expect(session?.events.every((e: unknown) => e.type === "tool_complete")).toBe(true);
+		expect(session?.events.every((e: any) => e.type === "tool_complete")).toBe(true);
 
 		expect(startTimes.size).toBe(0);
 	});

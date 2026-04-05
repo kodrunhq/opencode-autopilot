@@ -115,7 +115,7 @@ const defaultConfig: FallbackConfig = {
 describe("createEventHandler", () => {
 	let mockManager: ReturnType<typeof createMockManager>;
 	let mockSdk: ReturnType<typeof createMockSdk>;
-	let createEventHandler: unknown;
+	let createEventHandler: any;
 
 	beforeEach(async () => {
 		mockManager = createMockManager();
@@ -126,7 +126,7 @@ describe("createEventHandler", () => {
 
 	test("session.created calls manager.initSession with session model", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as any,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -148,7 +148,7 @@ describe("createEventHandler", () => {
 
 	test("session.created with parentID records parent-child mapping", async () => {
 		const handler = createEventHandler({
-			manager: mockManager as unknown,
+			manager: mockManager as any,
 			sdk: mockSdk,
 			config: defaultConfig,
 		});
@@ -526,7 +526,7 @@ describe("createEventHandler", () => {
 });
 
 describe("parseModelString", () => {
-	let parseModelString: unknown;
+	let parseModelString: any;
 
 	beforeEach(async () => {
 		const mod = await import("../../../src/orchestrator/fallback/event-handler");
@@ -555,7 +555,7 @@ describe("parseModelString", () => {
 });
 
 describe("handleFallbackError additional coverage", () => {
-	let createEventHandler: unknown;
+	let createEventHandler: any;
 	let mockManager: ReturnType<typeof createMockManagerForAdditional>;
 	let mockSdk: ReturnType<typeof createMockSdkForAdditional>;
 

@@ -12,8 +12,8 @@ function createMockManager() {
 }
 
 describe("createToolExecuteAfterHandler", () => {
-	let createToolExecuteAfterHandler: unknown;
-	let mockManager: unknown;
+	let createToolExecuteAfterHandler: any;
+	let mockManager: any;
 
 	beforeEach(async () => {
 		const mod = await import("../../../src/orchestrator/fallback/tool-execute-handler");
@@ -38,7 +38,7 @@ describe("createToolExecuteAfterHandler", () => {
 	test("task tool with empty output and parentID sets fallbackPending", async () => {
 		mockManager.parentIDs.set("sess-1", "parent-1");
 		const handler = createToolExecuteAfterHandler(mockManager);
-		const output = { title: "task", output: "", metadata: {} as unknown };
+		const output = { title: "task", output: "", metadata: {} as any };
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect((output.metadata as Record<string, unknown>).fallbackPending).toBe(true);
 	});
@@ -64,7 +64,7 @@ describe("createToolExecuteAfterHandler", () => {
 		const output = {
 			title: "task",
 			output: "<task_result></task_result>",
-			metadata: {} as unknown,
+			metadata: {} as any,
 		};
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect((output.metadata as Record<string, unknown>).fallbackPending).toBe(true);
@@ -76,7 +76,7 @@ describe("createToolExecuteAfterHandler", () => {
 		const output = {
 			title: "task",
 			output: "",
-			metadata: { existing: "value" } as unknown,
+			metadata: { existing: "value" } as any,
 		};
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		const meta = output.metadata as Record<string, unknown>;
@@ -87,7 +87,7 @@ describe("createToolExecuteAfterHandler", () => {
 	test("whitespace-only output is treated as empty", async () => {
 		mockManager.parentIDs.set("sess-1", "parent-1");
 		const handler = createToolExecuteAfterHandler(mockManager);
-		const output = { title: "task", output: "   \n\t  ", metadata: {} as unknown };
+		const output = { title: "task", output: "   \n\t  ", metadata: {} as any };
 		await handler({ tool: "task", sessionID: "sess-1", callID: "c1", args: {} }, output);
 		expect((output.metadata as Record<string, unknown>).fallbackPending).toBe(true);
 	});

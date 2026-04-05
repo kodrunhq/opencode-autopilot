@@ -10,6 +10,7 @@ describe("Deterministic Replay (Task 3)", () => {
 		scope: initialScope,
 		selectedAgentNames: ["security-auditor", "auth-flow-verifier"],
 		accumulatedFindings: [],
+		startedAt: "2026-01-01T00:00:00.000Z",
 	});
 
 	const stage1Inputs = [

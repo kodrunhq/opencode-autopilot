@@ -154,7 +154,7 @@ describe("configureCore reset", () => {
 
 describe("configureCore edge cases", () => {
 	test("returns error for unknown subcommand", async () => {
-		const result = JSON.parse(await configureCore({ subcommand: "invalid" as unknown }));
+		const result = JSON.parse(await configureCore({ subcommand: "invalid" as any }));
 		expect(result.action).toBe("error");
 	});
 

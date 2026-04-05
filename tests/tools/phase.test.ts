@@ -58,7 +58,7 @@ describe("phaseCore", () => {
 	});
 
 	test("unknown subcommand returns error", async () => {
-		const result = await phaseCore({ subcommand: "nonexistent" as unknown }, tempDir);
+		const result = await phaseCore({ subcommand: "nonexistent" as any }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.error).toContain("unknown subcommand");
 	});

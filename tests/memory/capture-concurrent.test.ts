@@ -59,6 +59,6 @@ describe("Memory Capture Concurrency", () => {
 			.all(sessionId) as Array<unknown>;
 
 		expect(observations.length).toBe(10);
-		expect(observations.every((o) => o.type === "error")).toBe(true);
+		expect(observations.every((o: any) => o.type === "error")).toBe(true);
 	});
 });

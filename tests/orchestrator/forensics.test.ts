@@ -155,17 +155,18 @@ describe("orchestrateCore failure metadata capture", () => {
 		// Simulate what the catch block does
 		const currentState = await loadState(tmpDir);
 		expect(currentState).not.toBeNull();
+		if (!currentState) throw new Error("Expected current state");
 
 		const errorMessage = "Simulated RECON failure";
-		const lastDone = currentState?.phases.filter((p) => p.status === "DONE").pop();
+		const lastDone = currentState.phases.filter((p) => p.status === "DONE").pop();
 		const failureContext = {
-			failedPhase: currentState?.currentPhase ?? "",
+			failedPhase: currentState.currentPhase as NonNullable<PipelineState["currentPhase"]>,
 			failedAgent: null as string | null,
 			errorMessage: errorMessage.slice(0, 4096),
 			timestamp: new Date().toISOString(),
 			lastSuccessfulPhase: lastDone?.name ?? null,
 		};
-		const failed = patchState(currentState!, {
+		const failed = patchState(currentState, {
 			status: "FAILED" as const,
 			failureContext,
 		});
@@ -199,15 +200,16 @@ describe("orchestrateCore failure metadata capture", () => {
 		await writeState(tmpDir, state);
 
 		const currentState = await loadState(tmpDir);
-		const lastDone = currentState?.phases.filter((p) => p.status === "DONE").pop();
+		if (!currentState) throw new Error("Expected current state");
+		const lastDone = currentState.phases.filter((p) => p.status === "DONE").pop();
 		const failureContext = {
-			failedPhase: currentState?.currentPhase ?? "",
+			failedPhase: currentState.currentPhase as NonNullable<PipelineState["currentPhase"]>,
 			failedAgent: null as string | null,
 			errorMessage: "Arena crashed",
 			timestamp: new Date().toISOString(),
 			lastSuccessfulPhase: lastDone?.name ?? null,
 		};
-		const failed = patchState(currentState!, {
+		const failed = patchState(currentState, {
 			status: "FAILED" as const,
 			failureContext,
 		});

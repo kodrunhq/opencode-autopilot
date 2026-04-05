@@ -22,8 +22,8 @@ describe("oc_replay tool (Task 7)", () => {
 			],
 		};
 
-		const res1 = await ocReplay.execute(args, { toolCallId: "1", messages: [] });
-		const res2 = await ocReplay.execute(args, { toolCallId: "2", messages: [] });
+		const res1 = await ocReplay.execute(args, { toolCallId: "1", messages: [] } as any);
+		const res2 = await ocReplay.execute(args, { toolCallId: "2", messages: [] } as any);
 
 		expect(res1).toBe(res2); // string output should be identical
 	});

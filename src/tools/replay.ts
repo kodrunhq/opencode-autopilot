@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
+import type { ReviewState } from "../review/types";
 
 export const ocReplay = tool({
 	description:
@@ -12,7 +13,7 @@ export const ocReplay = tool({
 	async execute(args) {
 		const { advancePipeline } = await import("../review/pipeline");
 
-		let currentState = {
+		let currentState: ReviewState = {
 			stage: 1,
 			scope: "replay-scope",
 			selectedAgentNames: ["logic-auditor", "security-auditor"],
@@ -21,15 +22,9 @@ export const ocReplay = tool({
 		};
 
 		for (const input of args.inputs) {
-			const res = advancePipeline(
-				input,
-				currentState as unknown as Record<string, unknown>,
-				undefined,
-				args.runId,
-				args.runId,
-			);
+			const res = advancePipeline(input, currentState, undefined, args.runId, args.runId);
 			if (res.state) {
-				currentState = res.state as unknown as Record<string, unknown>;
+				currentState = res.state;
 			}
 		}
 

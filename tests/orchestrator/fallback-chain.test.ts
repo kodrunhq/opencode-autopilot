@@ -80,26 +80,26 @@ describe("resolveChain", () => {
 	test("filters non-string elements from per-agent array", () => {
 		const result = resolveChain(
 			"agent-a",
-			{ "agent-a": { fallback_models: [42, null, "valid-model", "", true] as unknown } },
+			{ "agent-a": { fallback_models: [42, null, "valid-model", "", true] as any } },
 			undefined,
 		);
 		expect(result).toEqual(["valid-model"]);
 	});
 
 	test("filters non-string elements from global array", () => {
-		const result = resolveChain("agent-a", undefined, [42, null, "global-model"] as unknown);
+		const result = resolveChain("agent-a", undefined, [42, null, "global-model"] as any);
 		expect(result).toEqual(["global-model"]);
 	});
 
 	test("falls through to global when per-agent fallback_models is a number", () => {
-		const result = resolveChain("agent-a", { "agent-a": { fallback_models: 42 } as unknown }, [
+		const result = resolveChain("agent-a", { "agent-a": { fallback_models: 42 } as any }, [
 			"global-fallback",
 		]);
 		expect(result).toEqual(["global-fallback"]);
 	});
 
 	test("falls through to global when per-agent fallback_models is boolean true", () => {
-		const result = resolveChain("agent-a", { "agent-a": { fallback_models: true } as unknown }, [
+		const result = resolveChain("agent-a", { "agent-a": { fallback_models: true } as any }, [
 			"global-fallback",
 		]);
 		expect(result).toEqual(["global-fallback"]);

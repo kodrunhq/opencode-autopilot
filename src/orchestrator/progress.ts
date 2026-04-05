@@ -1,6 +1,13 @@
 import { PHASES } from "./schemas";
 import type { PipelineState } from "./types";
 
+const PHASE_INDEX = Object.freeze(
+	Object.fromEntries(PHASES.map((phase, index) => [phase, index + 1])) as Record<
+		(typeof PHASES)[number],
+		number
+	>,
+);
+
 /**
  * Generate a concise progress string for the user indicating current phase and progress.
  * e.g., "[1/8] Analyzing requirements..." or "[6/8] Building wave 2 of 5..."
@@ -13,7 +20,7 @@ export function getPhaseProgressString(state: PipelineState): string {
 		return `[0/${PHASES.length}] Not started`;
 	}
 
-	const phaseIndex = PHASES.indexOf(currentPhase as unknown as string) + 1;
+	const phaseIndex = PHASE_INDEX[currentPhase];
 	const totalPhases = PHASES.length;
 	const baseProgress = `[${phaseIndex}/${totalPhases}]`;
 
