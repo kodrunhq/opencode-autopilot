@@ -5,8 +5,14 @@ import {
 import type { ForensicEventDomain, ForensicEventType } from "../observability/forensic-types";
 import type { LogEntry, LogSink } from "./types";
 
-function normalizeTaskId(taskId: unknown): number | null {
-	return typeof taskId === "number" && Number.isInteger(taskId) && taskId > 0 ? taskId : null;
+function normalizeTaskId(taskId: unknown): number | string | null {
+	if (typeof taskId === "number" && Number.isInteger(taskId) && taskId > 0) {
+		return taskId;
+	}
+	if (typeof taskId === "string" && taskId.length > 0 && taskId.length <= 128) {
+		return taskId;
+	}
+	return null;
 }
 
 export function createForensicSinkForArtifactDir(artifactDir: string): LogSink {

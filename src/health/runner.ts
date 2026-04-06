@@ -5,6 +5,7 @@ import {
 	commandHealthCheck,
 	configHealthCheck,
 	configV7FieldsCheck,
+	lspHealthCheck,
 	mcpHealthCheck,
 	memoryHealthCheck,
 	nativeAgentSuppressionHealthCheck,
@@ -58,6 +59,7 @@ export async function runHealthChecks(options?: {
 		configV7FieldsCheck(options?.configPath),
 		routingHealthCheck(options?.configPath),
 		mcpHealthCheck(options?.configPath),
+		lspHealthCheck(),
 	]);
 
 	const allSettled = [...configOutcome, ...settled];
@@ -73,6 +75,7 @@ export async function runHealthChecks(options?: {
 		"config-v7-fields",
 		"routing-health",
 		"mcp-health",
+		"lsp-servers",
 	];
 	const results: readonly HealthResult[] = Object.freeze(
 		allSettled.map((outcome, i) => settledToResult(outcome, fallbackNames[i])),

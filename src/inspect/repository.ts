@@ -65,7 +65,7 @@ interface ForensicEventSummaryRow {
 	readonly parent_session_id: string | null;
 	readonly phase: string | null;
 	readonly dispatch_id: string | null;
-	readonly task_id: number | null;
+	readonly task_id: string | number | null;
 	readonly agent: string | null;
 	readonly type: string;
 	readonly code: string | null;
@@ -193,7 +193,7 @@ export interface InspectEventSummary {
 	readonly parentSessionId: string | null;
 	readonly phase: string | null;
 	readonly dispatchId: string | null;
-	readonly taskId: number | null;
+	readonly taskId: string | number | null;
 	readonly agent: string | null;
 	readonly type: string;
 	readonly code: string | null;
@@ -776,6 +776,10 @@ export function listPreferences(input?: InspectDbInput): readonly InspectPrefere
 					});
 				}),
 			);
+		}
+
+		if (!tableExists(db, "preferences")) {
+			return Object.freeze([]);
 		}
 
 		const rows = db

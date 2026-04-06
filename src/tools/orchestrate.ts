@@ -28,6 +28,7 @@ import {
 	getProjectArtifactDir,
 	getProjectRootFromArtifactDir,
 } from "../utils/paths";
+import { getNotificationManager, getProgressTracker, getTaskToastManager } from "../ux/registry";
 import { reviewCore } from "./review";
 
 interface OrchestrateArgs {
@@ -325,6 +326,14 @@ function buildUserProgress(state: PipelineState, label?: string, attempt?: numbe
 	return `${baseProgress}${label ? ` — ${label}` : ""}${att}`;
 }
 
+function formatElapsed(issuedAt: string): string {
+	const ms = Date.now() - Date.parse(issuedAt);
+	const seconds = Math.floor(ms / 1000);
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
+	return `${minutes}m ${seconds % 60}s`;
+}
+
 /** Per-phase dispatch limits. BUILD is high because of multi-task waves. */
 const MAX_PHASE_DISPATCHES: Readonly<Record<string, number>> = Object.freeze({
 	RECON: 3,
@@ -406,6 +415,10 @@ async function processHandlerResult(
 				action: "error",
 				message: `${codePrefix}${messageBody}`.slice(0, 500),
 			});
+			void getNotificationManager()?.error(
+				"Pipeline error",
+				`${normalizedResult.phase ?? "Unknown"}: ${messageBody}`.slice(0, 200),
+			);
 			return JSON.stringify(normalizedResult);
 		}
 
@@ -439,6 +452,24 @@ async function processHandlerResult(
 				promptLength: normalizedResult.prompt?.length,
 				attempt,
 			});
+
+			void getNotificationManager()?.info(
+				`${phase}: dispatching`,
+				`Agent: ${normalizedResult.agent ?? "unknown"} — ${normalizedResult.progress ?? ""}`.slice(
+					0,
+					200,
+				),
+			);
+			getTaskToastManager()?.addTask({
+				id: pendingEntry.dispatchId,
+				description: normalizedResult.progress ?? phase,
+				agent: normalizedResult.agent ?? "unknown",
+				isBackground: false,
+			});
+			const tracker = getProgressTracker();
+			if (tracker) {
+				tracker.startPhase(phase, 1);
+			}
 
 			// Check if this is a review dispatch that should be inlined
 			const { inlined, reviewResult } = await maybeInlineReview(normalizedResult, artifactDir);
@@ -604,6 +635,17 @@ async function processHandlerResult(
 				phase: currentState.currentPhase,
 				action: "complete",
 			});
+
+			for (const pending of currentState.pendingDispatches) {
+				getTaskToastManager()?.showCompletionToast({
+					id: pending.dispatchId,
+					description: `${pending.phase}: ${pending.agent}`,
+					duration: formatElapsed(pending.issuedAt),
+				});
+			}
+
+			getProgressTracker()?.complete();
+
 			const nextPhase = getNextPhase(currentState.currentPhase);
 			const advanced = await updatePersistedState(artifactDir, currentState, (current) =>
 				completePhase(current),
@@ -611,6 +653,10 @@ async function processHandlerResult(
 
 			if (nextPhase === null) {
 				const idx = PHASE_INDEX[currentState.currentPhase] ?? TOTAL_PHASES;
+				void getNotificationManager()?.success(
+					"Pipeline complete",
+					`All ${TOTAL_PHASES} phases finished for: ${currentState.idea.slice(0, 100)}`,
+				);
 				return JSON.stringify({
 					action: "complete",
 					summary: `Pipeline completed all ${TOTAL_PHASES} phases. Idea: ${currentState.idea}`,

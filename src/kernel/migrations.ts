@@ -51,6 +51,100 @@ function backfillProjectAwareColumns(database: Database): void {
 	}
 }
 
+function columnType(database: Database, tableName: string, columnName: string): string | null {
+	const columns = database.query(`PRAGMA table_info(${tableName})`).all() as Array<{
+		name?: string;
+		type?: string;
+	}>;
+	const col = columns.find((c) => c.name === columnName);
+	return col?.type?.toUpperCase() ?? null;
+}
+
+function getTableColumns(database: Database, tableName: string): readonly string[] {
+	const columns = database.query(`PRAGMA table_info(${tableName})`).all() as Array<{
+		name?: string;
+	}>;
+	return columns.map((c) => c.name ?? "").filter(Boolean);
+}
+
+const REBUILD_DDLS: Readonly<Record<string, string>> = Object.freeze({
+	run_tasks: `CREATE TABLE _rebuild_run_tasks (
+		run_id TEXT NOT NULL,
+		task_id TEXT NOT NULL,
+		title TEXT NOT NULL,
+		status TEXT NOT NULL,
+		wave INTEGER NOT NULL,
+		depends_on_json TEXT NOT NULL,
+		attempt INTEGER NOT NULL,
+		strike INTEGER NOT NULL,
+		PRIMARY KEY (run_id, task_id),
+		FOREIGN KEY (run_id) REFERENCES pipeline_runs(run_id) ON DELETE CASCADE
+	)`,
+	run_pending_dispatches: `CREATE TABLE _rebuild_run_pending_dispatches (
+		run_id TEXT NOT NULL,
+		dispatch_id TEXT NOT NULL,
+		phase TEXT NOT NULL,
+		agent TEXT NOT NULL,
+		issued_at TEXT NOT NULL,
+		result_kind TEXT NOT NULL,
+		task_id TEXT,
+		PRIMARY KEY (run_id, dispatch_id),
+		FOREIGN KEY (run_id) REFERENCES pipeline_runs(run_id) ON DELETE CASCADE
+	)`,
+	forensic_events: `CREATE TABLE _rebuild_forensic_events (
+		event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+		project_id TEXT NOT NULL,
+		schema_version INTEGER NOT NULL,
+		timestamp TEXT NOT NULL,
+		project_root TEXT NOT NULL,
+		domain TEXT NOT NULL,
+		run_id TEXT,
+		session_id TEXT,
+		parent_session_id TEXT,
+		phase TEXT,
+		dispatch_id TEXT,
+		task_id TEXT,
+		agent TEXT,
+		type TEXT NOT NULL,
+		code TEXT,
+		message TEXT,
+		payload_json TEXT NOT NULL,
+		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+	)`,
+});
+
+function rebuildTableWithTextTaskId(database: Database, tableName: string): void {
+	if (!tableExists(database, tableName)) return;
+	const currentType = columnType(database, tableName, "task_id");
+	if (currentType === null || currentType === "TEXT") return;
+
+	const ddl = REBUILD_DDLS[tableName];
+	if (!ddl) return;
+
+	const columns = getTableColumns(database, tableName);
+	if (columns.length === 0) return;
+
+	const rebuildTable = `_rebuild_${tableName}`;
+	const columnList = columns.join(", ");
+	const castColumns = columns
+		.map((col) => (col === "task_id" ? "CAST(task_id AS TEXT) AS task_id" : col))
+		.join(", ");
+
+	database.run(`DROP TABLE IF EXISTS ${rebuildTable}`);
+	database.run(ddl);
+	database.run(
+		`INSERT INTO ${rebuildTable} (${columnList}) SELECT ${castColumns} FROM ${tableName}`,
+	);
+	database.run(`DROP TABLE ${tableName}`);
+	database.run(`ALTER TABLE ${rebuildTable} RENAME TO ${tableName}`);
+}
+
+function migrateTaskIdToText(database: Database): void {
+	rebuildTableWithTextTaskId(database, "run_tasks");
+	rebuildTableWithTextTaskId(database, "run_pending_dispatches");
+	rebuildTableWithTextTaskId(database, "forensic_events");
+}
+
 function backfillBackgroundTaskColumns(database: Database): void {
 	if (!tableExists(database, "background_tasks")) {
 		return;
@@ -104,6 +198,7 @@ export function runKernelMigrations(database: Database): void {
 	}
 
 	backfillProjectAwareColumns(database);
+	migrateTaskIdToText(database);
 	backfillBackgroundTaskColumns(database);
 
 	if (currentVersion < KERNEL_SCHEMA_VERSION) {

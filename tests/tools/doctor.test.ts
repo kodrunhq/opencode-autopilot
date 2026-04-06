@@ -196,7 +196,7 @@ describe("doctorCore", () => {
 		}
 	});
 
-	test("includes exactly 11 checks with expected names", async () => {
+	test("includes exactly 12 checks with expected names", async () => {
 		const result = JSON.parse(
 			await doctorCore({
 				configPath: "/nonexistent/path/config.json",
@@ -206,7 +206,7 @@ describe("doctorCore", () => {
 		);
 
 		const checkNames = result.checks.map((c: { name: string }) => c.name);
-		expect(result.checks.length).toBe(11);
+		expect(result.checks.length).toBe(12);
 		expect(checkNames).toEqual([
 			"config-validity",
 			"agent-injection",
@@ -218,6 +218,7 @@ describe("doctorCore", () => {
 			"config-v7-fields",
 			"routing-health",
 			"mcp-health",
+			"lsp-servers",
 			"hook-registration",
 		]);
 	});

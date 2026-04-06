@@ -67,7 +67,10 @@ export const pendingDispatchSchema = z.object({
 	agent: z.string().min(1).max(128),
 	issuedAt: z.string().max(128),
 	resultKind: dispatchResultKindSchema.default("phase_output"),
-	taskId: z.number().int().positive().nullable().default(null),
+	taskId: z
+		.union([z.number().int().positive(), z.string().min(1).max(128)])
+		.nullable()
+		.default(null),
 });
 
 export const failureContextSchema = z.object({
@@ -76,6 +79,17 @@ export const failureContextSchema = z.object({
 	errorMessage: z.string().max(4096),
 	timestamp: z.string().max(128),
 	lastSuccessfulPhase: phaseSchema.nullable(),
+});
+
+export const branchLifecycleSchema = z.object({
+	currentBranch: z.string().max(256).nullable().default(null),
+	baseBranch: z.string().max(256).nullable().default(null),
+	prNumber: z.number().int().positive().nullable().default(null),
+	prUrl: z.string().max(1024).nullable().default(null),
+	worktreePath: z.string().max(1024).nullable().default(null),
+	createdAt: z.string().max(128).nullable().default(null),
+	lastPushedAt: z.string().max(128).nullable().default(null),
+	tasksPushed: z.array(z.string().max(128)).max(1000).default([]),
 });
 
 export const pipelineStateSchema = z.object({
@@ -103,5 +117,6 @@ export const pipelineStateSchema = z.object({
 	pendingDispatches: z.array(pendingDispatchSchema).max(2000).default([]),
 	processedResultIds: z.array(z.string().max(128)).max(10_000).default([]),
 	failureContext: failureContextSchema.nullable().default(null),
+	branchLifecycle: branchLifecycleSchema.nullable().default(null),
 	phaseDispatchCounts: z.record(z.string().max(32), z.number().int().min(0).max(1000)).default({}),
 });

@@ -22,7 +22,7 @@ export interface DispatchResult {
 		readonly agent: string;
 		readonly prompt: string;
 		readonly dispatchId?: string;
-		readonly taskId?: number | null;
+		readonly taskId?: number | string | null;
 		readonly resultKind?: DispatchResultKind;
 	}[];
 	readonly prompt?: string;
@@ -30,7 +30,7 @@ export interface DispatchResult {
 	readonly progress?: string;
 	readonly message?: string;
 	readonly resultKind?: DispatchResultKind;
-	readonly taskId?: number | null;
+	readonly taskId?: number | string | null;
 	readonly dispatchId?: string;
 	readonly runId?: string;
 	readonly expectedResultKind?: DispatchResultKind;

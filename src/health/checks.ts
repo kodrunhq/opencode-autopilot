@@ -665,6 +665,106 @@ export async function commandHealthCheck(targetDir?: string): Promise<HealthResu
 	});
 }
 
+/**
+ * Well-known LSP server binaries mapped to their language and install hint.
+ * Used by the health check to report which servers are available on PATH.
+ */
+const LSP_SERVER_BINARIES: ReadonlyArray<{
+	readonly binary: string;
+	readonly language: string;
+	readonly installHint: string;
+}> = Object.freeze([
+	{
+		binary: "typescript-language-server",
+		language: "TypeScript/JavaScript",
+		installHint: "npm install -g typescript-language-server typescript",
+	},
+	{
+		binary: "gopls",
+		language: "Go",
+		installHint: "go install golang.org/x/tools/gopls@latest",
+	},
+	{
+		binary: "rust-analyzer",
+		language: "Rust",
+		installHint: "rustup component add rust-analyzer",
+	},
+	{
+		binary: "pyright-langserver",
+		language: "Python (pyright)",
+		installHint: "pip install pyright",
+	},
+	{
+		binary: "basedpyright-langserver",
+		language: "Python (basedpyright)",
+		installHint: "pip install basedpyright",
+	},
+	{
+		binary: "clangd",
+		language: "C/C++",
+		installHint: "See https://clangd.llvm.org/installation",
+	},
+	{
+		binary: "vscode-css-language-server",
+		language: "CSS/SCSS/Less",
+		installHint: "npm install -g vscode-langservers-extracted",
+	},
+	{
+		binary: "vscode-html-language-server",
+		language: "HTML",
+		installHint: "npm install -g vscode-langservers-extracted",
+	},
+	{
+		binary: "lua-language-server",
+		language: "Lua",
+		installHint: "See https://github.com/LuaLS/lua-language-server",
+	},
+]);
+
+/**
+ * Check which well-known LSP server binaries are available on PATH.
+ * Reports found and missing servers — missing is a warning, not a failure,
+ * since users may not need every language. Zero found = warn.
+ */
+export async function lspHealthCheck(): Promise<HealthResult> {
+	const { execFile } = await import("node:child_process");
+	const { promisify } = await import("node:util");
+	const execFileAsync = promisify(execFile);
+
+	const found: string[] = [];
+	const missing: string[] = [];
+
+	await Promise.all(
+		LSP_SERVER_BINARIES.map(async ({ binary, language, installHint }) => {
+			try {
+				await execFileAsync("which", [binary], { timeout: 3000 });
+				found.push(`${language}: ${binary}`);
+			} catch {
+				missing.push(`${language}: ${binary} (${installHint})`);
+			}
+		}),
+	);
+
+	found.sort();
+	missing.sort();
+
+	if (found.length === 0) {
+		return Object.freeze({
+			name: "lsp-servers",
+			status: "warn" as const,
+			message: `No LSP servers found on PATH. Install at least one for oc_lsp_* tools to work.`,
+			details: Object.freeze(missing),
+		});
+	}
+
+	return Object.freeze({
+		name: "lsp-servers",
+		status: "pass" as const,
+		message: `${found.length} LSP server(s) found${missing.length > 0 ? `, ${missing.length} not installed` : ""}`,
+		details: Object.freeze([...found.map((f) => `✓ ${f}`), ...missing.map((m) => `✗ ${m}`)]),
+	});
+}
+
 export async function routingHealthCheck(configPath?: string): Promise<HealthResult> {
 	try {
 		const invalidDefinitions = getAllCategories().flatMap((definition) => {

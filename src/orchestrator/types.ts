@@ -12,6 +12,17 @@ import type {
 	taskSchema,
 } from "./schemas";
 
+export interface BranchLifecycle {
+	readonly currentBranch: string | null;
+	readonly baseBranch: string | null;
+	readonly prNumber: number | null;
+	readonly prUrl: string | null;
+	readonly worktreePath: string | null;
+	readonly createdAt: string | null;
+	readonly lastPushedAt: string | null;
+	readonly tasksPushed: readonly string[];
+}
+
 export type PipelineState = z.infer<typeof pipelineStateSchema>;
 export type Phase = z.infer<typeof phaseSchema>;
 export type PhaseStatus = z.infer<typeof phaseStatusSchema>;

@@ -84,6 +84,83 @@ export function completePhase(state: Readonly<PipelineState>): PipelineState {
 }
 
 /**
+ * Skips the current phase (marks it SKIPPED) and advances to the next one.
+ * Use when a phase is not needed (e.g., EXPLORE reserved for future use,
+ * or CHALLENGE skipped in high-confidence scenarios).
+ * Returns a new state object (never mutates the input).
+ * Throws if currentPhase is null.
+ */
+export function skipPhase(state: Readonly<PipelineState>, reason?: string): PipelineState {
+	if (state.currentPhase === null) {
+		throw new Error("Cannot skip phase: no current phase (pipeline may be finished)");
+	}
+
+	const currentPhaseName = state.currentPhase;
+	const nextPhase = getNextPhase(currentPhaseName);
+	const skippedAt = new Date().toISOString();
+
+	const updatedPhases = state.phases.map((phase) => {
+		if (phase.name === currentPhaseName) {
+			return { ...phase, status: "SKIPPED" as const, completedAt: skippedAt };
+		}
+		if (nextPhase !== null && phase.name === nextPhase) {
+			return { ...phase, status: "IN_PROGRESS" as const };
+		}
+		return phase;
+	});
+
+	const skipDecision: import("./types").DecisionEntry = {
+		phase: currentPhaseName,
+		agent: "pipeline",
+		decision: `Skipped phase ${currentPhaseName}`,
+		rationale: reason ?? "Phase not required for this run",
+		timestamp: skippedAt,
+	};
+
+	return patchState(state, {
+		status: nextPhase === null ? "COMPLETED" : state.status,
+		currentPhase: nextPhase,
+		phases: updatedPhases,
+		decisions: [...state.decisions, skipDecision],
+		pendingDispatches:
+			nextPhase === null
+				? []
+				: state.pendingDispatches.filter((entry) => entry.phase === nextPhase),
+	});
+}
+
+/**
+ * Skips forward to a target phase, marking all intermediate phases as SKIPPED.
+ * Useful for quick-mode or high-confidence scenarios where multiple phases can be bypassed.
+ * Throws if target phase is behind or equal to current phase.
+ */
+export function skipToPhase(
+	state: Readonly<PipelineState>,
+	targetPhase: Phase,
+	reason?: string,
+): PipelineState {
+	if (state.currentPhase === null) {
+		throw new Error("Cannot skip to phase: no current phase (pipeline may be finished)");
+	}
+
+	const currentIndex = PHASE_INDEX[state.currentPhase];
+	const targetIndex = PHASE_INDEX[targetPhase];
+
+	if (targetIndex <= currentIndex) {
+		throw new Error(
+			`Cannot skip backward: ${state.currentPhase} (${currentIndex}) -> ${targetPhase} (${targetIndex})`,
+		);
+	}
+
+	let current = state;
+	while (current.currentPhase !== null && current.currentPhase !== targetPhase) {
+		current = skipPhase(current, reason ?? `Skipping to ${targetPhase}`);
+	}
+
+	return current;
+}
+
+/**
  * Returns the PhaseStatus entry for the given phase name, or undefined if not found.
  */
 export function getPhaseStatus(

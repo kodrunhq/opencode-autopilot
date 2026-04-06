@@ -3,10 +3,20 @@ export type ErrorType =
 	| "quota_exceeded"
 	| "service_unavailable"
 	| "missing_api_key"
+	| "invalid_api_key"
 	| "model_not_found"
 	| "content_filter"
 	| "context_length"
 	| "unknown";
+
+export interface AutoRetrySignal {
+	readonly signal: string;
+}
+
+export interface ErrorContentResult {
+	readonly hasError: boolean;
+	readonly errorMessage?: string;
+}
 
 export type ContentTier = 1 | 2 | 3;
 

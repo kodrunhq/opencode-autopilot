@@ -20,7 +20,7 @@ interface ForensicEventInput {
 	readonly parentSessionId?: string | null;
 	readonly phase?: string | null;
 	readonly dispatchId?: string | null;
-	readonly taskId?: number | null;
+	readonly taskId?: number | string | null;
 	readonly agent?: string | null;
 	readonly type: ForensicEventType;
 	readonly code?: string | null;

@@ -1,7 +1,9 @@
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
+import type { BranchLifecycle } from "../types";
 import { assignWaves } from "../wave-assigner";
+import { initBranchLifecycle, recordTaskPush } from "./branch-pr";
 import {
 	buildPendingResultError,
 	buildTaskPrompt,
@@ -17,6 +19,20 @@ import {
 import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
 
+/**
+ * Coerce a raw taskId (number, string, or null) to a numeric Task.id.
+ * Handles: number → keep (including 0), numeric string → Number(), else → null.
+ */
+function coerceTaskId(raw: unknown): number | null {
+	if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+	if (typeof raw === "string") {
+		const parsed = Number(raw);
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+	return null;
+}
+
+const cloneBranchLifecycle = (bl: BranchLifecycle) => ({ ...bl, tasksPushed: [...bl.tasksPushed] });
 export const handleBuild: PhaseHandler = async (
 	state,
 	artifactDir,
@@ -25,7 +41,17 @@ export const handleBuild: PhaseHandler = async (
 ) => {
 	const { tasks, buildProgress } = state;
 	const resultText = context?.envelope.payload.text ?? result;
-
+	const initialBranchLifecycle =
+		state.branchLifecycle ??
+		initBranchLifecycle({
+			runId: state.runId,
+			baseBranch: "main",
+			description: state.idea.slice(0, 60),
+		});
+	const branchLifecycleUpdates =
+		state.branchLifecycle === null
+			? Object.freeze({ branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle) })
+			: undefined;
 	if (tasks.length === 0) {
 		return Object.freeze({
 			action: "error",
@@ -128,6 +154,7 @@ export const handleBuild: PhaseHandler = async (
 				phase: "BUILD",
 				progress: "All tasks and reviews complete",
 				_stateUpdates: {
+					branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
 					buildProgress: {
 						...buildProgress,
 						currentTask: null,
@@ -177,7 +204,8 @@ export const handleBuild: PhaseHandler = async (
 
 	const hasTypedContext = context !== undefined;
 	const isTaskCompletion = hasTypedContext && context.envelope.kind === "task_completion";
-	const taskToComplete = isTaskCompletion ? context.envelope.taskId : buildProgress.currentTask;
+	const rawTaskId = isTaskCompletion ? context.envelope.taskId : buildProgress.currentTask;
+	const taskToComplete = coerceTaskId(rawTaskId);
 
 	if (resultText && !buildProgress.reviewPending && taskToComplete === null) {
 		return Object.freeze({
@@ -199,6 +227,10 @@ export const handleBuild: PhaseHandler = async (
 		}
 
 		const updatedTasks = markTaskDone(effectiveTasks, taskToComplete);
+		const updatedBranchLifecycle = recordTaskPush(
+			initialBranchLifecycle,
+			taskToComplete.toString(),
+		);
 		const waveMap = groupByWave(updatedTasks);
 		const currentWave = buildProgress.currentWave ?? 1;
 
@@ -212,6 +244,7 @@ export const handleBuild: PhaseHandler = async (
 				progress: `Wave ${currentWave} complete — review pending`,
 				_stateUpdates: {
 					tasks: [...updatedTasks],
+					branchLifecycle: cloneBranchLifecycle(updatedBranchLifecycle),
 					buildProgress: {
 						...buildProgress,
 						currentTask: taskToComplete,
@@ -235,6 +268,7 @@ export const handleBuild: PhaseHandler = async (
 				progress: `Wave ${currentWave} — task ${next.id}`,
 				_stateUpdates: {
 					tasks: [...markTasksInProgress(updatedTasks, [next.id])],
+					branchLifecycle: cloneBranchLifecycle(updatedBranchLifecycle),
 					buildProgress: {
 						...buildProgress,
 						currentTask: next.id,
@@ -257,6 +291,9 @@ export const handleBuild: PhaseHandler = async (
 			action: "complete",
 			phase: "BUILD",
 			progress: "All tasks complete",
+			_stateUpdates: {
+				branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
+			},
 		} satisfies DispatchResult);
 	}
 
@@ -272,27 +309,8 @@ export const handleBuild: PhaseHandler = async (
 			action: "complete",
 			phase: "BUILD",
 			progress: "All tasks complete",
-		} satisfies DispatchResult);
-	}
-
-	if (pendingTasks.length === 1) {
-		const task = pendingTasks[0];
-		const prompt = await buildTaskPrompt(task, artifactDir);
-		return Object.freeze({
-			action: "dispatch",
-			agent: AGENT_NAMES.BUILD,
-			prompt,
-			phase: "BUILD",
-			resultKind: "task_completion",
-			taskId: task.id,
-			progress: `Wave ${currentWave} — task ${task.id}`,
 			_stateUpdates: {
-				tasks: [...markTasksInProgress(effectiveTasks, [task.id])],
-				buildProgress: {
-					...buildProgress,
-					currentTask: task.id,
-					currentWave,
-				},
+				branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
 			},
 		} satisfies DispatchResult);
 	}
@@ -308,6 +326,7 @@ export const handleBuild: PhaseHandler = async (
 		taskId: task.id,
 		progress: `Wave ${currentWave} — task ${task.id}`,
 		_stateUpdates: {
+			...(branchLifecycleUpdates ?? {}),
 			tasks: [...markTasksInProgress(effectiveTasks, [task.id])],
 			buildProgress: {
 				...buildProgress,
