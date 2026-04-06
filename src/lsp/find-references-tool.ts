@@ -23,6 +23,7 @@ export const ocLspFindReferences: ToolDefinition = tool({
 						args.character,
 						args.includeDeclaration ?? true,
 					) as Promise<readonly Location[] | null>,
+				"references",
 			);
 			if (!references || references.length === 0) return "No references found";
 			const limited = references.slice(0, DEFAULT_MAX_REFERENCES);

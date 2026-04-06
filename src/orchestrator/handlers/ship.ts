@@ -1,9 +1,28 @@
 import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef, getPhaseDir } from "../artifacts";
+import { buildPrBody, shouldCreatePr } from "./branch-pr";
 import type { DispatchResult, PhaseHandler } from "./types";
 import { AGENT_NAMES } from "./types";
 
-export const handleShip: PhaseHandler = async (_state, artifactDir, result?) => {
+function buildPrInstructions(state: Parameters<PhaseHandler>[0]): string {
+	const bl = state.branchLifecycle;
+	if (!bl || !shouldCreatePr(bl)) return "";
+
+	const prBody = buildPrBody(bl, { idea: state.idea });
+	return [
+		"",
+		"## PR Creation Instructions",
+		`Create a pull request from branch \`${bl.currentBranch}\` into \`${bl.baseBranch}\`.`,
+		`Title: ${state.idea.slice(0, 72)}`,
+		"",
+		"PR body:",
+		"```markdown",
+		prBody,
+		"```",
+	].join("\n");
+}
+
+export const handleShip: PhaseHandler = async (state, artifactDir, result?) => {
 	if (result) {
 		return Object.freeze({
 			action: "complete",
@@ -21,6 +40,8 @@ export const handleShip: PhaseHandler = async (_state, artifactDir, result?) => 
 	const planRef = (await fileExists(tasksJsonRef)) ? tasksJsonRef : tasksMarkdownRef;
 	const shipDir = getPhaseDir(artifactDir, "SHIP");
 
+	const prInstructions = buildPrInstructions(state);
+
 	const prompt = [
 		"Review all prior phase artifacts:",
 		`${reconRef},`,
@@ -31,7 +52,10 @@ export const handleShip: PhaseHandler = async (_state, artifactDir, result?) => 
 		"decisions.md (key decisions with rationale),",
 		"changelog.md (user-facing changes).",
 		`Write output to ${shipDir}/.`,
-	].join(" ");
+		prInstructions,
+	]
+		.filter(Boolean)
+		.join(" ");
 
 	return Object.freeze({
 		action: "dispatch",

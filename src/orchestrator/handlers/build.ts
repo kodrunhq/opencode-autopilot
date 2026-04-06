@@ -141,6 +141,7 @@ export const handleBuild: PhaseHandler = async (
 				phase: "BUILD",
 				progress: "All tasks and reviews complete",
 				_stateUpdates: {
+					branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
 					buildProgress: {
 						...buildProgress,
 						currentTask: null,
@@ -282,6 +283,9 @@ export const handleBuild: PhaseHandler = async (
 			action: "complete",
 			phase: "BUILD",
 			progress: "All tasks complete",
+			_stateUpdates: {
+				branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
+			},
 		} satisfies DispatchResult);
 	}
 
@@ -297,28 +301,8 @@ export const handleBuild: PhaseHandler = async (
 			action: "complete",
 			phase: "BUILD",
 			progress: "All tasks complete",
-		} satisfies DispatchResult);
-	}
-
-	if (pendingTasks.length === 1) {
-		const task = pendingTasks[0];
-		const prompt = await buildTaskPrompt(task, artifactDir);
-		return Object.freeze({
-			action: "dispatch",
-			agent: AGENT_NAMES.BUILD,
-			prompt,
-			phase: "BUILD",
-			resultKind: "task_completion",
-			taskId: task.id,
-			progress: `Wave ${currentWave} — task ${task.id}`,
 			_stateUpdates: {
-				...(branchLifecycleUpdates ?? {}),
-				tasks: [...markTasksInProgress(effectiveTasks, [task.id])],
-				buildProgress: {
-					...buildProgress,
-					currentTask: task.id,
-					currentWave,
-				},
+				branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
 			},
 		} satisfies DispatchResult);
 	}

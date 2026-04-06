@@ -18,6 +18,7 @@ export const ocLspGotoDefinition: ToolDefinition = tool({
 					client.definition(args.filePath, args.line, args.character) as Promise<
 						Location | readonly Location[] | readonly LocationLink[] | null
 					>,
+				"definition",
 			);
 			const locations = result ? (Array.isArray(result) ? result : [result]) : [];
 			return locations.length > 0

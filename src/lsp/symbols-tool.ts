@@ -28,6 +28,7 @@ export const ocLspSymbols: ToolDefinition = tool({
 					args.filePath,
 					(client) =>
 						client.workspaceSymbols(args.query ?? "") as Promise<readonly SymbolInfo[] | null>,
+					"symbols",
 				);
 				if (!symbols || symbols.length === 0) return "No symbols found";
 				const lines = symbols.slice(0, limit).map((symbol) => formatSymbolInfo(symbol));
@@ -41,6 +42,7 @@ export const ocLspSymbols: ToolDefinition = tool({
 					client.documentSymbols(args.filePath) as Promise<
 						readonly DocumentSymbol[] | readonly SymbolInfo[] | null
 					>,
+				"symbols",
 			);
 			if (!symbols || symbols.length === 0) return "No symbols found";
 			const limited = symbols.slice(0, limit);

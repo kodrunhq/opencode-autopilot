@@ -56,7 +56,7 @@ export async function aggregateDiagnosticsForDirectory(
 	const absoluteDirectory = resolve(directory);
 	if (!existsSync(absoluteDirectory))
 		throw new Error(`Directory does not exist: ${absoluteDirectory}`);
-	const serverResult = findServerForExtension(extension);
+	const serverResult = findServerForExtension(extension, "diagnostics");
 	if (serverResult.status !== "found") throw new Error(formatServerLookupError(serverResult));
 	const allFiles = collectFilesWithExtension(absoluteDirectory, extension, maxFiles + 1);
 	const filesToProcess = allFiles.slice(0, maxFiles);

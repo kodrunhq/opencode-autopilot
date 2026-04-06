@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { LspClient } from "./lsp-client";
 import { lspManager } from "./lsp-server";
 import { findServerForExtension } from "./server-resolution";
-import type { ServerLookupResult } from "./types";
+import type { LspCapability, ServerLookupResult } from "./types";
 
 const workspaceMarkers = [
 	".git",
@@ -63,13 +63,14 @@ export function formatServerLookupError(
 export async function withLspClient<T>(
 	filePath: string,
 	callback: (client: LspClient) => Promise<T>,
+	requiredCapability?: LspCapability,
 ): Promise<T> {
 	const absolutePath = resolve(filePath);
 	if (isDirectoryPath(absolutePath))
 		throw new Error(
 			"Directory paths are not supported by this LSP tool. Use oc_lsp_diagnostics for directory diagnostics.",
 		);
-	const serverResult = findServerForExtension(extname(absolutePath));
+	const serverResult = findServerForExtension(extname(absolutePath), requiredCapability);
 	if (serverResult.status !== "found") throw new Error(formatServerLookupError(serverResult));
 	const root = findWorkspaceRoot(absolutePath);
 	const client = await lspManager.getClient(root, serverResult.server);

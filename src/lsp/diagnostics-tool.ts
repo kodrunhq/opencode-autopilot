@@ -40,6 +40,7 @@ export const ocLspDiagnostics: ToolDefinition = tool({
 					client.diagnostics(args.filePath) as Promise<
 						{ readonly items?: readonly Diagnostic[] } | readonly Diagnostic[] | null
 					>,
+				"diagnostics",
 			);
 			const diagnostics = filterDiagnosticsBySeverity(extractDiagnostics(result), args.severity);
 			if (diagnostics.length === 0) return "No diagnostics found";

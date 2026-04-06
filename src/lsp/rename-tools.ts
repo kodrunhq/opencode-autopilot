@@ -19,6 +19,7 @@ export const ocLspPrepareRename: ToolDefinition = tool({
 					client.prepareRename(args.filePath, args.line, args.character) as Promise<
 						PrepareRenameResult | PrepareRenameDefaultBehavior | null
 					>,
+				"rename",
 			);
 			return formatPrepareRenameResult(result);
 		} catch (error) {
@@ -46,6 +47,7 @@ export const ocLspRename: ToolDefinition = tool({
 						args.character,
 						args.newName,
 					) as Promise<WorkspaceEdit | null>,
+				"rename",
 			);
 			return formatApplyResult(await applyWorkspaceEdit(edit));
 		} catch (error) {
