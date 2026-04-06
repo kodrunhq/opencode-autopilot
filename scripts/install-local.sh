@@ -88,8 +88,9 @@ if [[ -z "$VERSION" ]]; then
   echo "Fetching latest release version..."
   LATEST_JSON_FILE="$(mktemp)"
   download "https://api.github.com/repos/${REPO}/releases/latest" "$LATEST_JSON_FILE"
-  # Parse tag_name (e.g. "v1.2.3") and strip leading 'v'
-  VERSION="$(grep -o '"tag_name": *"[^"]*"' "$LATEST_JSON_FILE" | grep -o '"v[^"]*"' | tr -d '"v')"
+  # Parse tag_name (e.g. "v1.2.3") and strip only the leading 'v'
+  TAG_NAME="$(grep -o '"tag_name": *"[^"]*"' "$LATEST_JSON_FILE" | grep -o '"[^"]*"' | tr -d '"')"
+  VERSION="${TAG_NAME#v}"
   rm -f "$LATEST_JSON_FILE"
   if [[ -z "$VERSION" ]]; then
     echo "Error: Could not determine latest version from GitHub API." >&2
@@ -118,25 +119,27 @@ download "$CHECKSUM_URL" "$CHECKSUM_FILE"
 
 # ── Checksum verification ─────────────────────────────────────────────────────
 echo "Verifying checksum..."
-# The .sha256 file contains only the hex digest (no filename); reconstruct the
-# standard "digest  filename" line that sha256sum/shasum expect.
-EXPECTED_DIGEST="$(cat "$CHECKSUM_FILE" | awk '{print $1}')"
+CHECKSUM_ERR="Error: Checksum verification failed. The downloaded file may be corrupt."
 
 if command -v sha256sum >/dev/null 2>&1; then
-  echo "${EXPECTED_DIGEST}  ${TARBALL_FILE}" | sha256sum --check --status || {
-    echo "Error: Checksum verification failed. The downloaded file may be corrupt." >&2
-    exit 1
+  (cd "$TMPDIR_WORK" && sha256sum --check --status "$CHECKSUM_NAME") || {
+    echo "$CHECKSUM_ERR" >&2; exit 1
   }
-  echo "Checksum OK."
 elif command -v shasum >/dev/null 2>&1; then
-  echo "${EXPECTED_DIGEST}  ${TARBALL_FILE}" | shasum -a 256 --check --status || {
-    echo "Error: Checksum verification failed. The downloaded file may be corrupt." >&2
-    exit 1
+  (cd "$TMPDIR_WORK" && shasum -a 256 --check --status "$CHECKSUM_NAME") || {
+    echo "$CHECKSUM_ERR" >&2; exit 1
   }
-  echo "Checksum OK."
+elif command -v openssl >/dev/null 2>&1; then
+  EXPECTED_DIGEST="$(awk '{print $1}' "$CHECKSUM_FILE")"
+  ACTUAL_DIGEST="$(openssl dgst -sha256 "$TARBALL_FILE" | awk '{print $NF}')"
+  if [[ "$EXPECTED_DIGEST" != "$ACTUAL_DIGEST" ]]; then
+    echo "$CHECKSUM_ERR" >&2; exit 1
+  fi
 else
-  echo "Warning: Neither sha256sum nor shasum found — skipping checksum verification." >&2
+  echo "Error: No checksum tool found (sha256sum, shasum, or openssl required)." >&2
+  exit 1
 fi
+echo "Checksum OK."
 
 # ── Install (atomic: extract to staging on same filesystem, verify, then swap) ─
 PLUGINS_DIR="$(dirname "$INSTALL_DIR")"
