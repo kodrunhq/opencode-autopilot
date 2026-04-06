@@ -692,9 +692,17 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 			});
 		}
 
-		// No state but idea provided -> check intent guard before starting pipeline
+		// No state but idea provided -> intent guard: require explicit intent classification
 		if (state === null && args.idea) {
-			if (args.intent && args.intent !== "implementation") {
+			if (!args.intent) {
+				return JSON.stringify({
+					action: "error",
+					code: "E_INTENT_REQUIRED",
+					message:
+						"Intent classification is required to start the pipeline. Call oc_route first to classify the user's intent, then pass intent: 'implementation' to oc_orchestrate.",
+				});
+			}
+			if (args.intent !== "implementation") {
 				const routing = getIntentRouting(args.intent);
 				return JSON.stringify({
 					action: "error",
@@ -721,6 +729,15 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 
 		// State exists
 		if (state !== null) {
+			if (args.intent && args.intent !== "implementation") {
+				const routing = getIntentRouting(args.intent);
+				return JSON.stringify({
+					action: "error",
+					code: "E_INTENT_NOT_IMPLEMENTATION",
+					message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
+				});
+			}
+
 			let phaseHandlerContext: PhaseHandlerContext | undefined;
 			let handlerInputResult = args.result;
 
@@ -865,7 +882,7 @@ export const ocOrchestrate = tool({
 			.optional()
 			.describe("Result from previous agent to advance the pipeline"),
 		intent: IntentTypeSchema.optional().describe(
-			"Intent classification from oc_route. When provided and not 'implementation', the pipeline is rejected with routing guidance. Omit for backward-compatible unguarded calls.",
+			"Intent classification from oc_route. Required for new pipeline starts — must be 'implementation'. Non-implementation intents are rejected with routing guidance. Optional when resuming an existing pipeline with a result.",
 		),
 	},
 	async execute(args) {

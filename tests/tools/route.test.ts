@@ -32,6 +32,7 @@ describe("routeCore", () => {
 		expect(result.targetAgent).toBe("autopilot");
 		expect(result.usePipeline).toBe(true);
 		expect(result.instruction).toContain("oc_orchestrate");
+		expect(result.instruction).toContain('intent: "implementation"');
 	});
 
 	test("routes fix intent to debugger without pipeline", () => {
@@ -315,7 +316,7 @@ describe("routeCore behavioral scenarios (MEDIUM 7)", () => {
 	});
 });
 
-describe("routeCore multi-intent chaining (end-to-end)", () => {
+describe("routeCore multi-intent routing metadata", () => {
 	test("secondary instruction is actionable — contains agent name and behavior", () => {
 		const result = JSON.parse(
 			routeCore({

@@ -160,7 +160,17 @@ describe("autopilot prompt — Oracle-identified gaps", () => {
 		expect(prompt).toContain('intent set to "implementation"');
 	});
 
-	test("prompt has runtime intent guard constraint", () => {
-		expect(prompt).toContain("pipeline rejects non-implementation intents at runtime");
+	test("prompt states pipeline requires intent classification", () => {
+		expect(prompt).toContain("pipeline REQUIRES intent");
+	});
+
+	test("prompt forbids calling oc_orchestrate without oc_route", () => {
+		expect(prompt).toContain("DO NOT call oc_orchestrate without first calling oc_route");
+	});
+
+	test("prompt warns about non-implementation intent on active pipelines", () => {
+		expect(prompt).toContain(
+			"rejects non-implementation intents at runtime even on active pipelines",
+		);
 	});
 });

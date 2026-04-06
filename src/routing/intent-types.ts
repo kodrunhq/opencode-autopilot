@@ -8,9 +8,10 @@ import { z } from "zod";
  * category-based routing in classifier.ts — categories route by task
  * domain, intents route by user goal.
  *
- * Supports multi-intent classification: a primary intent drives routing,
- * with an optional secondary intent for combined requests like
- * "research this then implement it".
+ * Multi-intent is supported as routing metadata: a primary intent drives
+ * the immediate routing decision, and an optional secondary intent provides
+ * follow-up guidance to the LLM. Secondary intent execution is prompt-driven
+ * (the LLM decides when to act on it), not runtime-chained.
  */
 
 export const IntentTypeSchema = z.enum([
@@ -81,7 +82,8 @@ const ROUTING_ENTRIES: ReadonlyArray<readonly [IntentType, IntentRouting]> = Obj
 		Object.freeze({
 			targetAgent: "debugger",
 			usePipeline: false,
-			behavior: "Diagnose and fix the issue directly. Minimal change — do not refactor.",
+			behavior:
+				"Reproduce, isolate, diagnose, and fix the issue. Write a regression test first. Minimal change — do not refactor.",
 		}),
 	],
 	[

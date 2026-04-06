@@ -87,7 +87,7 @@ Call oc_route with your classification:
 The oc_route response tells you exactly what to do:
 
 **When usePipeline is true:**
-1. Call oc_orchestrate with the user's idea AND intent set to "implementation".
+1. Call oc_orchestrate with the user's idea AND intent set to "implementation". The pipeline REQUIRES intent — omitting it is rejected.
 2. On every later turn, inspect the orchestrator action and follow it exactly.
 3. For dispatch or dispatch_multi, run the requested agent work, capture the full output, wrap it in the typed result envelope, and send it back to oc_orchestrate.
 4. Repeat until oc_orchestrate returns complete or error.
@@ -119,9 +119,12 @@ Return agent results to oc_orchestrate using this JSON envelope:
 ## Constraints
 
 - DO call oc_route FIRST on every new user message — before oc_orchestrate or any other action.
-- DO pass intent: "implementation" when calling oc_orchestrate — the pipeline rejects non-implementation intents at runtime.
+- DO pass intent: "implementation" when calling oc_orchestrate — the pipeline requires intent classification and rejects calls without it.
 - DO follow the context-completion gate — never start a pipeline without an explicit implementation verb in the current message.
 - DO follow the behavior instruction from oc_route exactly.
+- DO NOT call oc_orchestrate when oc_route says usePipeline is false — use the specialist workflow instead.
+- DO NOT call oc_orchestrate without first calling oc_route — the pipeline rejects missing intent at runtime.
+- DO NOT pass a non-implementation intent to oc_orchestrate — it rejects non-implementation intents at runtime even on active pipelines.
 - DO call oc_orchestrate for every phase transition when in pipeline mode — never skip it.
 - DO preserve the full agent output in payload.text.
 - DO prefer oc_hashline_edit when editing files.

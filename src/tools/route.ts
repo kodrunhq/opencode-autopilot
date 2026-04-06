@@ -11,7 +11,7 @@ function buildInstruction(
 	routing: Readonly<{ targetAgent: string; usePipeline: boolean; behavior: string }>,
 ): string {
 	if (routing.usePipeline) {
-		return `Proceed with oc_orchestrate — full pipeline via ${routing.targetAgent}. ${routing.behavior}`;
+		return `Proceed with oc_orchestrate (pass intent: "implementation") — full pipeline via ${routing.targetAgent}. ${routing.behavior}`;
 	}
 	return `Route to ${routing.targetAgent} agent directly — no pipeline needed. ${routing.behavior}`;
 }

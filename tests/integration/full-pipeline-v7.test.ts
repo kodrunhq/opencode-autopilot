@@ -42,7 +42,10 @@ describe("Integration: full pipeline v7 — all subsystems active", () => {
 	});
 
 	test("orchestrateCore initializes RECON phase for new idea", async () => {
-		const result = await orchestrateCore({ idea: "v7 full pipeline integration test" }, tempDir);
+		const result = await orchestrateCore(
+			{ idea: "v7 full pipeline integration test", intent: "implementation" },
+			tempDir,
+		);
 		const parsed = JSON.parse(result);
 
 		expect(parsed.action).toBe("dispatch");
