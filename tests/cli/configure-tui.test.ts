@@ -100,6 +100,65 @@ describe("configure-tui model grouping", () => {
 	});
 });
 
+describe("configure-tui search source filtering", () => {
+	const models: DiscoveredModel[] = [
+		{ id: "anthropic/claude-opus-4-6", provider: "anthropic", model: "claude-opus-4-6" },
+		{ id: "anthropic/claude-sonnet-4-6", provider: "anthropic", model: "claude-sonnet-4-6" },
+		{ id: "openai/gpt-5.4", provider: "openai", model: "gpt-5.4" },
+		{ id: "openai/gpt-5.4-mini", provider: "openai", model: "gpt-5.4-mini" },
+		{ id: "google/gemini-3.1-pro", provider: "google", model: "gemini-3.1-pro" },
+	];
+
+	function filterModels(
+		allModels: readonly DiscoveredModel[],
+		term: string | undefined,
+		exclude?: Set<string>,
+	): DiscoveredModel[] {
+		return allModels.filter((m) => {
+			if (exclude?.has(m.id)) return false;
+			if (!term) return true;
+			return m.id.toLowerCase().includes(term.toLowerCase());
+		});
+	}
+
+	test("returns all models when no search term", () => {
+		const result = filterModels(models, undefined);
+		expect(result.length).toBe(5);
+	});
+
+	test("filters by search term (case-insensitive)", () => {
+		const result = filterModels(models, "claude");
+		expect(result.length).toBe(2);
+		expect(result[0].id).toBe("anthropic/claude-opus-4-6");
+		expect(result[1].id).toBe("anthropic/claude-sonnet-4-6");
+	});
+
+	test("filters by provider name", () => {
+		const result = filterModels(models, "openai");
+		expect(result.length).toBe(2);
+	});
+
+	test("excludes specified models (primary + already-selected fallbacks)", () => {
+		const exclude = new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.4"]);
+		const result = filterModels(models, undefined, exclude);
+		expect(result.length).toBe(3);
+		expect(result.some((m) => m.id === "anthropic/claude-opus-4-6")).toBe(false);
+		expect(result.some((m) => m.id === "openai/gpt-5.4")).toBe(false);
+	});
+
+	test("combines search term with exclusion", () => {
+		const exclude = new Set(["anthropic/claude-opus-4-6"]);
+		const result = filterModels(models, "claude", exclude);
+		expect(result.length).toBe(1);
+		expect(result[0].id).toBe("anthropic/claude-sonnet-4-6");
+	});
+
+	test("returns empty for no matches", () => {
+		const result = filterModels(models, "nonexistent");
+		expect(result.length).toBe(0);
+	});
+});
+
 describe("configure-tui CLI integration", () => {
 	test("configure-tui module can be imported", async () => {
 		// Just verify the module loads without errors

@@ -1,23 +1,11 @@
-declare module "@inquirer/checkbox" {
+declare module "@inquirer/core" {
 	class Separator {
 		constructor(label?: string);
+		static isSeparator(item: unknown): item is Separator;
 		readonly separator: true;
 	}
 
-	interface CheckboxChoice {
-		readonly value: string;
-		readonly name?: string;
-	}
-
-	interface CheckboxOptions {
-		readonly message: string;
-		readonly choices: readonly (CheckboxChoice | Separator)[];
-		readonly pageSize?: number;
-	}
-
-	function checkbox(options: CheckboxOptions): Promise<string[]>;
 	export { Separator };
-	export default checkbox;
 }
 
 declare module "@inquirer/confirm" {
