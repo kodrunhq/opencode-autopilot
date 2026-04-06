@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.24.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.23.0...opencode-autopilot-v1.24.0) (2026-04-06)
+
+
+### Features
+
+* **configure:** replace checkbox with searchable fallback model selection ([1ac5ab6](https://github.com/kodrunhq/opencode-autopilot/commit/1ac5ab620ca47d4e64e484a6e9c3168623d10d6b))
+* **configure:** replace checkbox with searchable fallback model selection ([33cf53e](https://github.com/kodrunhq/opencode-autopilot/commit/33cf53e285cc9b5046daa50d6bc579f685e35bb5))
+
+
+### Bug Fixes
+
+* **configure:** add preflight guard before first fallback search prompt ([ab36ac0](https://github.com/kodrunhq/opencode-autopilot/commit/ab36ac0f22f1e643c2fc301aadf3c358fc571588))
+* **configure:** use direct @inquirer/search Separator, guard exhausted models, test real exports ([9fc2e03](https://github.com/kodrunhq/opencode-autopilot/commit/9fc2e030bbebb1c9b8a49176a97dfd8b05d4d693))
+
 ## [1.23.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.22.0...opencode-autopilot-v1.23.0) (2026-04-06)
 
 
