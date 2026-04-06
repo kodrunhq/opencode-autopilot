@@ -53,6 +53,8 @@ describe("autopilot intent gate prompt", () => {
 		const intents = [
 			"research",
 			"implementation",
+			"investigation",
+			"evaluation",
 			"fix",
 			"review",
 			"planning",
@@ -101,5 +103,56 @@ describe("autopilot intent gate prompt", () => {
 	test("prompt includes typed result envelope", () => {
 		expect(prompt).toContain("Typed Result Envelope");
 		expect(prompt).toContain("schemaVersion");
+	});
+});
+
+describe("autopilot prompt — Oracle-identified gaps", () => {
+	const prompt = autopilotAgent.prompt ?? "";
+
+	test("CRITICAL 2: prompt prohibits pipeline for open_ended", () => {
+		expect(prompt).toContain("DO NOT start the pipeline for open_ended requests");
+	});
+
+	test("CRITICAL 3: prompt contains context-completion gate", () => {
+		expect(prompt).toContain("Context-Completion Gate");
+		expect(prompt).toContain("explicit implementation verb");
+		expect(prompt).toContain("implement, add, create, fix, change, write, build, develop");
+	});
+
+	test("CRITICAL 3: gate requires all three conditions", () => {
+		expect(prompt).toContain("ONLY when ALL three conditions are true");
+	});
+
+	test("HIGH 5: prompt includes behavior instruction from oc_route", () => {
+		expect(prompt).toContain("behavior instruction");
+	});
+
+	test("HIGH 6: prompt contains verbalize-before-classification", () => {
+		expect(prompt).toContain("Verbalize Intent");
+		expect(prompt).toContain("BEFORE Classification");
+	});
+
+	test("HIGH 6: prompt contains ambiguity check gate", () => {
+		expect(prompt).toContain("Check for Ambiguity");
+		expect(prompt).toContain("2x+ effort difference");
+	});
+
+	test("HIGH 6: prompt supports multi-intent (primary + secondary)", () => {
+		expect(prompt).toContain("primaryIntent");
+		expect(prompt).toContain("secondaryIntent");
+	});
+
+	test("HIGH 6: prompt includes evaluation intent (propose then WAIT)", () => {
+		expect(prompt).toContain("evaluation");
+		expect(prompt).toContain("WAIT");
+	});
+
+	test("HIGH 6: prompt includes investigation intent", () => {
+		expect(prompt).toContain("investigation");
+	});
+
+	test("prompt instructs open_ended to assess then wait for confirmation", () => {
+		expect(prompt).toContain("assess");
+		expect(prompt).toContain("propose");
 	});
 });

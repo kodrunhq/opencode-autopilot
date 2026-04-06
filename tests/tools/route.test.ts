@@ -5,15 +5,16 @@ describe("routeCore", () => {
 	test("routes research intent to researcher without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "research",
+				primaryIntent: "research",
 				reasoning: "User asked how the system works",
 				verbalization: "I detect research intent",
 			}),
 		);
 		expect(result.action).toBe("route");
-		expect(result.intent).toBe("research");
+		expect(result.primaryIntent).toBe("research");
 		expect(result.targetAgent).toBe("researcher");
 		expect(result.usePipeline).toBe(false);
+		expect(result.behavior).toBeDefined();
 		expect(result.instruction).toContain("researcher");
 		expect(result.instruction).not.toContain("oc_orchestrate");
 	});
@@ -21,13 +22,13 @@ describe("routeCore", () => {
 	test("routes implementation intent to autopilot with pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "implementation",
+				primaryIntent: "implementation",
 				reasoning: "User said 'add feature X'",
 				verbalization: "I detect implementation intent",
 			}),
 		);
 		expect(result.action).toBe("route");
-		expect(result.intent).toBe("implementation");
+		expect(result.primaryIntent).toBe("implementation");
 		expect(result.targetAgent).toBe("autopilot");
 		expect(result.usePipeline).toBe(true);
 		expect(result.instruction).toContain("oc_orchestrate");
@@ -36,7 +37,7 @@ describe("routeCore", () => {
 	test("routes fix intent to debugger without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "fix",
+				primaryIntent: "fix",
 				reasoning: "User reported a bug",
 				verbalization: "I detect fix intent",
 			}),
@@ -49,7 +50,7 @@ describe("routeCore", () => {
 	test("routes review intent to reviewer without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "review",
+				primaryIntent: "review",
 				reasoning: "User asked for code review",
 				verbalization: "I detect review intent",
 			}),
@@ -61,7 +62,7 @@ describe("routeCore", () => {
 	test("routes planning intent to planner without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "planning",
+				primaryIntent: "planning",
 				reasoning: "User wants a plan",
 				verbalization: "I detect planning intent",
 			}),
@@ -74,7 +75,7 @@ describe("routeCore", () => {
 	test("routes quick intent to coder without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "quick",
+				primaryIntent: "quick",
 				reasoning: "Simple rename",
 				verbalization: "I detect quick intent",
 			}),
@@ -84,36 +85,76 @@ describe("routeCore", () => {
 		expect(result.usePipeline).toBe(false);
 	});
 
-	test("routes open_ended intent to autopilot with pipeline", () => {
+	test("routes investigation to researcher without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "open_ended",
-				reasoning: "Ambiguous request",
+				primaryIntent: "investigation",
+				reasoning: "User said look into X",
+				verbalization: "I detect investigation intent",
+			}),
+		);
+		expect(result.action).toBe("route");
+		expect(result.targetAgent).toBe("researcher");
+		expect(result.usePipeline).toBe(false);
+	});
+
+	test("routes evaluation to reviewer without pipeline", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "evaluation",
+				reasoning: "User asked what do you think",
+				verbalization: "I detect evaluation intent",
+			}),
+		);
+		expect(result.action).toBe("route");
+		expect(result.targetAgent).toBe("reviewer");
+		expect(result.usePipeline).toBe(false);
+	});
+
+	test("CRITICAL 2: open_ended does NOT use pipeline", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "open_ended",
+				reasoning: "Ambiguous request to improve something",
 				verbalization: "I detect open-ended intent",
 			}),
 		);
 		expect(result.action).toBe("route");
 		expect(result.targetAgent).toBe("autopilot");
-		expect(result.usePipeline).toBe(true);
+		expect(result.usePipeline).toBe(false);
+		expect(result.behavior).toContain("Assess");
 	});
 
-	test("returns error for invalid intent", () => {
+	test("returns error for invalid primary intent", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "banana",
+				primaryIntent: "banana",
 				reasoning: "some reason",
 				verbalization: "some verbalization",
 			}),
 		);
 		expect(result.action).toBe("error");
-		expect(result.message).toContain("Invalid intent");
+		expect(result.message).toContain("Invalid primary intent");
 		expect(result.message).toContain("banana");
+	});
+
+	test("returns error for invalid secondary intent", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "research",
+				secondaryIntent: "invalid",
+				reasoning: "some reason",
+				verbalization: "some verbalization",
+			}),
+		);
+		expect(result.action).toBe("error");
+		expect(result.message).toContain("Invalid secondary intent");
 	});
 
 	test("returns error for empty reasoning", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "research",
+				primaryIntent: "research",
 				reasoning: "",
 				verbalization: "I detect research intent",
 			}),
@@ -125,7 +166,7 @@ describe("routeCore", () => {
 	test("returns error for empty verbalization", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "fix",
+				primaryIntent: "fix",
 				reasoning: "User said something is broken",
 				verbalization: "",
 			}),
@@ -137,12 +178,139 @@ describe("routeCore", () => {
 	test("preserves reasoning and verbalization in response", () => {
 		const result = JSON.parse(
 			routeCore({
-				intent: "research",
+				primaryIntent: "research",
 				reasoning: "User wants to understand auth flow",
 				verbalization: "I detect research intent — user asked how auth works",
 			}),
 		);
 		expect(result.reasoning).toBe("User wants to understand auth flow");
 		expect(result.verbalization).toBe("I detect research intent — user asked how auth works");
+	});
+});
+
+describe("routeCore multi-intent (CRITICAL 1)", () => {
+	test("supports combined research+implementation intent", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "research",
+				secondaryIntent: "implementation",
+				reasoning: "User wants to research then implement",
+				verbalization: "I detect research+implementation intent",
+			}),
+		);
+		expect(result.action).toBe("route");
+		expect(result.primaryIntent).toBe("research");
+		expect(result.secondaryIntent).toBe("implementation");
+		expect(result.targetAgent).toBe("researcher");
+		expect(result.usePipeline).toBe(false);
+		expect(result.secondaryTargetAgent).toBe("autopilot");
+		expect(result.secondaryUsePipeline).toBe(true);
+		expect(result.secondaryInstruction).toBeDefined();
+	});
+
+	test("supports combined review+fix intent", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "review",
+				secondaryIntent: "fix",
+				reasoning: "User wants to review then fix issues",
+				verbalization: "I detect review+fix intent",
+			}),
+		);
+		expect(result.primaryIntent).toBe("review");
+		expect(result.secondaryIntent).toBe("fix");
+		expect(result.targetAgent).toBe("reviewer");
+		expect(result.secondaryTargetAgent).toBe("debugger");
+	});
+
+	test("single intent has no secondary fields", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "fix",
+				reasoning: "Simple bug fix",
+				verbalization: "I detect fix intent",
+			}),
+		);
+		expect(result.secondaryIntent).toBeUndefined();
+		expect(result.secondaryTargetAgent).toBeUndefined();
+		expect(result.secondaryInstruction).toBeUndefined();
+	});
+});
+
+describe("routeCore behavioral scenarios (MEDIUM 7)", () => {
+	test("'How does the auth flow work?' routes to research, no pipeline", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "research",
+				reasoning: "User asked 'how does' — research signal",
+				verbalization: "I detect research intent — user asked how auth works",
+			}),
+		);
+		expect(result.usePipeline).toBe(false);
+		expect(result.targetAgent).toBe("researcher");
+	});
+
+	test("'Make the dashboard better' routes to open_ended, no pipeline", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "open_ended",
+				reasoning: "Vague request with no implementation verb",
+				verbalization: "I detect open-ended intent — user wants improvement but scope unclear",
+			}),
+		);
+		expect(result.usePipeline).toBe(false);
+		expect(result.behavior).toContain("Assess");
+		expect(result.behavior).toContain("DO NOT start the pipeline");
+	});
+
+	test("'Add dark mode to settings' routes to implementation with pipeline", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "implementation",
+				reasoning: "User said 'add' — explicit implementation verb",
+				verbalization: "I detect implementation intent — user wants dark mode added",
+			}),
+		);
+		expect(result.usePipeline).toBe(true);
+		expect(result.targetAgent).toBe("autopilot");
+	});
+
+	test("'Review the changes in src/auth' routes to review, no pipeline", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "review",
+				reasoning: "User said 'review' — review signal",
+				verbalization: "I detect review intent — user wants code review",
+			}),
+		);
+		expect(result.usePipeline).toBe(false);
+		expect(result.targetAgent).toBe("reviewer");
+	});
+
+	test("'The login page crashes on submit' routes to fix, no pipeline", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "fix",
+				reasoning: "User reported a crash — fix signal",
+				verbalization: "I detect fix intent — user reports crash on login",
+			}),
+		);
+		expect(result.usePipeline).toBe(false);
+		expect(result.targetAgent).toBe("debugger");
+	});
+
+	test("'Research the auth library then implement SSO' uses multi-intent", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "research",
+				secondaryIntent: "implementation",
+				reasoning: "User wants to research first then implement — combined intent",
+				verbalization: "I detect research then implementation intent",
+			}),
+		);
+		expect(result.usePipeline).toBe(false);
+		expect(result.targetAgent).toBe("researcher");
+		expect(result.secondaryUsePipeline).toBe(true);
+		expect(result.secondaryTargetAgent).toBe("autopilot");
 	});
 });
