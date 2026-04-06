@@ -55,6 +55,7 @@
 		"@inquirer/confirm": "^6.0.10",
 		"@inquirer/search": "^4.1.6",
 		"@inquirer/select": "^5.1.2",
+		"vscode-jsonrpc": "^8.2.0",
 		"yaml": "^2.8.3"
 	}
 }

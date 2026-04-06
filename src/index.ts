@@ -13,6 +13,14 @@ import { createToolOutputTruncatorHandler } from "./hooks/tool-output-truncator"
 import { installAssets } from "./installer";
 import { openKernelDb } from "./kernel/database";
 import { getLogger, initLoggers } from "./logging/domains";
+import {
+	ocLspDiagnostics,
+	ocLspFindReferences,
+	ocLspGotoDefinition,
+	ocLspPrepareRename,
+	ocLspRename,
+	ocLspSymbols,
+} from "./lsp/tools";
 import { McpLifecycleManager, setGlobalMcpManager } from "./mcp";
 import {
 	createMemoryCaptureHandler,
@@ -80,7 +88,12 @@ import { ContextWarningMonitor } from "./ux/context-warnings";
 import { getRemediationHint } from "./ux/error-hints";
 import { NotificationManager } from "./ux/notifications";
 import { ProgressTracker } from "./ux/progress";
-import { registerNotificationManager, registerProgressTracker } from "./ux/registry";
+import {
+	registerNotificationManager,
+	registerProgressTracker,
+	registerTaskToastManager,
+} from "./ux/registry";
+import { TaskToastManager } from "./ux/task-toast-manager";
 
 let openCodeConfig: Config | null = null;
 
@@ -166,6 +179,9 @@ const plugin: Plugin = async (input) => {
 
 	registerNotificationManager(notificationManager);
 	registerProgressTracker(progressTracker);
+
+	const taskToastManager = new TaskToastManager(notificationManager);
+	registerTaskToastManager(taskToastManager);
 
 	// --- Fallback subsystem initialization ---
 	const sdkOps: SdkOperations = {
@@ -400,36 +416,45 @@ const plugin: Plugin = async (input) => {
 	});
 	const obsToolBeforeHandler = createToolExecuteBeforeHandler(toolStartTimes);
 	const obsToolAfterHandler = createObsToolAfterHandler(eventStore, toolStartTimes);
+	const tools = {
+		oc_background: ocBackground,
+		oc_configure: ocConfigure,
+		oc_lsp_goto_definition: ocLspGotoDefinition,
+		oc_lsp_find_references: ocLspFindReferences,
+		oc_lsp_symbols: ocLspSymbols,
+		oc_lsp_diagnostics: ocLspDiagnostics,
+		oc_lsp_prepare_rename: ocLspPrepareRename,
+		oc_lsp_rename: ocLspRename,
+		oc_delegate: ocDelegate,
+		oc_create_agent: ocCreateAgent,
+		oc_create_skill: ocCreateSkill,
+		oc_create_command: ocCreateCommand,
+		oc_state: ocState,
+		oc_confidence: ocConfidence,
+		oc_phase: ocPhase,
+		oc_plan: ocPlan,
+		oc_orchestrate: ocOrchestrate,
+		oc_doctor: ocDoctor,
+		oc_quick: ocQuick,
+		oc_recover: ocRecover,
+		oc_forensics: ocForensics,
+		oc_hashline_edit: ocHashlineEdit,
+		oc_review: ocReview,
+		oc_logs: ocLogs,
+		oc_loop: ocLoop,
+		oc_session_stats: ocSessionStats,
+		oc_pipeline_report: ocPipelineReport,
+		oc_summary: ocSummary,
+		oc_mock_fallback: ocMockFallback,
+		oc_stocktake: ocStocktake,
+		oc_update_docs: ocUpdateDocs,
+		oc_memory_status: ocMemoryStatus,
+		oc_memory_preferences: ocMemoryPreferences,
+	};
 
 	return {
 		tool: {
-			oc_background: ocBackground,
-			oc_configure: ocConfigure,
-			oc_delegate: ocDelegate,
-			oc_create_agent: ocCreateAgent,
-			oc_create_skill: ocCreateSkill,
-			oc_create_command: ocCreateCommand,
-			oc_state: ocState,
-			oc_confidence: ocConfidence,
-			oc_phase: ocPhase,
-			oc_plan: ocPlan,
-			oc_orchestrate: ocOrchestrate,
-			oc_doctor: ocDoctor,
-			oc_quick: ocQuick,
-			oc_recover: ocRecover,
-			oc_forensics: ocForensics,
-			oc_hashline_edit: ocHashlineEdit,
-			oc_review: ocReview,
-			oc_logs: ocLogs,
-			oc_loop: ocLoop,
-			oc_session_stats: ocSessionStats,
-			oc_pipeline_report: ocPipelineReport,
-			oc_summary: ocSummary,
-			oc_mock_fallback: ocMockFallback,
-			oc_stocktake: ocStocktake,
-			oc_update_docs: ocUpdateDocs,
-			oc_memory_status: ocMemoryStatus,
-			oc_memory_preferences: ocMemoryPreferences,
+			...tools,
 		},
 		event: async ({ event }) => {
 			await observabilityEventHandler({ event });

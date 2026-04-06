@@ -96,7 +96,7 @@ For detailed guides on every subsystem, see the **[full documentation](docs/READ
 | [Agents](docs/agents.md) | Complete catalog of all agents and model groups |
 | [Code Review](docs/code-review.md) | 13-agent adversarial review pipeline |
 | [Configuration](docs/configuration.md) | v7 configuration schema reference |
-| [Tools Reference](docs/tools-reference.md) | All 27 `oc_*` tools |
+| [Tools Reference](docs/tools-reference.md) | All 33 `oc_*` tools |
 | [CLI Reference](docs/cli-reference.md) | `install`, `configure`, `doctor`, and `inspect` commands |
 | [Memory System](docs/memory-system.md) | Dual-scope project and user preference memory |
 | [Model Fallback](docs/model-fallback.md) | Automatic fallback chains and session recovery |
@@ -289,7 +289,7 @@ Config auto-migrates across schema versions (v1 -> v2 -> v3 -> v4 -> v5 -> v6 ->
 
 ## Tools
 
-The plugin registers 25 tools, all prefixed with `oc_` to avoid conflicts with OpenCode built-ins:
+The plugin registers 33 tools, all prefixed with `oc_` to avoid conflicts with OpenCode built-ins:
 
 | Tool | Purpose |
 |------|---------|
@@ -320,6 +320,12 @@ The plugin registers 25 tools, all prefixed with `oc_` to avoid conflicts with O
 | `oc_update_docs` | Detect docs affected by code changes |
 | `oc_memory_status` | Memory system status and statistics |
 | `oc_memory_preferences` | Manage user preference observations |
+| `oc_lsp_goto_definition` | Jump to symbol definition via LSP |
+| `oc_lsp_find_references` | Find all references to a symbol via LSP |
+| `oc_lsp_symbols` | Document or workspace symbol search via LSP |
+| `oc_lsp_diagnostics` | Get errors/warnings from language server |
+| `oc_lsp_prepare_rename` | Check if a symbol can be renamed via LSP |
+| `oc_lsp_rename` | Rename a symbol across the workspace via LSP |
 
 ## Architecture
 
