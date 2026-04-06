@@ -16,14 +16,14 @@ describe("coder agent config", () => {
 		expect(coderAgent.description?.length).toBeGreaterThan(0);
 	});
 
-	test("prompt contains skill name=tdd-workflow tag", () => {
+	test("prompt references TDD workflow skill", () => {
 		const prompt = coderAgent.prompt ?? "";
-		expect(prompt).toContain('<skill name="tdd-workflow">');
+		expect(prompt).toContain("TDD workflow");
 	});
 
-	test("prompt contains skill name=coding-standards tag", () => {
+	test("prompt references coding standards skill", () => {
 		const prompt = coderAgent.prompt ?? "";
-		expect(prompt).toContain('<skill name="coding-standards">');
+		expect(prompt).toContain("coding standards");
 	});
 
 	test("permissions: exact shape (edit, bash allowed; webfetch denied)", () => {
@@ -38,7 +38,7 @@ describe("coder agent config", () => {
 		expect(coderAgent.maxSteps).toBe(30);
 	});
 
-	test("prompt has production-ready length with embedded skills", () => {
+	test("prompt has production-ready length", () => {
 		expect(typeof coderAgent.prompt).toBe("string");
 		expect(coderAgent.prompt?.length).toBeGreaterThanOrEqual(100);
 	});

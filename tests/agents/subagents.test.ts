@@ -21,7 +21,7 @@ describe("Phase 25 subagent agents", () => {
 			expect(prompt).toContain("security");
 		});
 
-		test("prompt has production-ready length with embedded skills", () => {
+		test("prompt has production-ready length", () => {
 			expect(typeof securityAuditorAgent.prompt).toBe("string");
 			expect((securityAuditorAgent.prompt ?? "").length).toBeGreaterThanOrEqual(100);
 		});

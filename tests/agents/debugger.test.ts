@@ -11,7 +11,7 @@ describe("debugger agent config", () => {
 		expect(debuggerAgent.description?.length).toBeGreaterThan(0);
 	});
 
-	test("has a production-ready prompt with embedded skill content", () => {
+	test("has a production-ready prompt", () => {
 		expect(typeof debuggerAgent.prompt).toBe("string");
 		expect(debuggerAgent.prompt?.length).toBeGreaterThanOrEqual(100);
 	});

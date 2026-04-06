@@ -53,6 +53,7 @@ import {
 	createRecoveryOrchestratorWithDb,
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
+import { createAgentSkillInjector } from "./skills/agent-injector";
 import { ocBackground, setBackgroundSdkOperations } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
 import {
@@ -85,6 +86,7 @@ import { ocState } from "./tools/state";
 import { ocStocktake } from "./tools/stocktake";
 import { ocSummary } from "./tools/summary";
 import { ocUpdateDocs } from "./tools/update-docs";
+import { getGlobalConfigDir } from "./utils/paths";
 import { ContextWarningMonitor } from "./ux/context-warnings";
 import { getRemediationHint } from "./ux/error-hints";
 import { NotificationManager } from "./ux/notifications";
@@ -365,6 +367,7 @@ const plugin: Plugin = async (input) => {
 	});
 	const compactionHandler = createCompactionHandler(contextInjector);
 	const loopInjector = createLoopInjector(getLoopController());
+	const agentSkillInjector = createAgentSkillInjector({ baseDir: getGlobalConfigDir() });
 
 	// --- MCP lifecycle manager (lazy — servers start when skills with mcp: config activate) ---
 	const mcpManager = new McpLifecycleManager();
@@ -640,6 +643,7 @@ const plugin: Plugin = async (input) => {
 			}
 			await contextInjector(input, output);
 			await loopInjector(input, output);
+			await agentSkillInjector(input, output);
 		},
 	};
 };
