@@ -1,19 +1,22 @@
 import { describe, expect, test } from "bun:test";
+import { Separator } from "@inquirer/search";
+import { createSearchSource, type DiscoveredModel, groupByProvider } from "../../bin/configure-tui";
 
-/**
- * Tests for the configure TUI's pure helper functions.
- * We can't test the interactive prompts (they need a real TTY),
- * but we can test model parsing, grouping, and diversity logic.
- */
-
-// Re-implement the pure functions from configure-tui.ts for testing
-// (they're not exported from the module since they're internal helpers)
-
-interface DiscoveredModel {
-	readonly id: string;
-	readonly provider: string;
-	readonly model: string;
+interface SearchChoice {
+	readonly name: string;
+	readonly value: string;
+	readonly description: string;
 }
+
+const MODELS: readonly DiscoveredModel[] = [
+	{ id: "anthropic/claude-opus-4-6", provider: "anthropic", model: "claude-opus-4-6" },
+	{ id: "anthropic/claude-sonnet-4-6", provider: "anthropic", model: "claude-sonnet-4-6" },
+	{ id: "openai/gpt-5.4", provider: "openai", model: "gpt-5.4" },
+	{ id: "openai/gpt-5.4-mini", provider: "openai", model: "gpt-5.4-mini" },
+	{ id: "google/gemini-3.1-pro", provider: "google", model: "gemini-3.1-pro" },
+] as const;
+
+// ── Model parsing (pure re-impl — these mirror configure-tui internals) ───
 
 function parseModelLine(line: string): DiscoveredModel {
 	const id = line.trim();
@@ -23,16 +26,6 @@ function parseModelLine(line: string): DiscoveredModel {
 		provider: slashIndex > 0 ? id.slice(0, slashIndex) : "unknown",
 		model: slashIndex > 0 ? id.slice(slashIndex + 1) : id,
 	};
-}
-
-function groupByProvider(models: readonly DiscoveredModel[]): Map<string, DiscoveredModel[]> {
-	const grouped = new Map<string, DiscoveredModel[]>();
-	for (const m of models) {
-		const existing = grouped.get(m.provider) ?? [];
-		existing.push(m);
-		grouped.set(m.provider, existing);
-	}
-	return grouped;
 }
 
 describe("configure-tui model parsing", () => {
@@ -63,17 +56,11 @@ describe("configure-tui model parsing", () => {
 	});
 });
 
-describe("configure-tui model grouping", () => {
-	const models: DiscoveredModel[] = [
-		{ id: "anthropic/claude-opus-4-6", provider: "anthropic", model: "claude-opus-4-6" },
-		{ id: "anthropic/claude-sonnet-4-6", provider: "anthropic", model: "claude-sonnet-4-6" },
-		{ id: "openai/gpt-5.4", provider: "openai", model: "gpt-5.4" },
-		{ id: "openai/gpt-5.4-mini", provider: "openai", model: "gpt-5.4-mini" },
-		{ id: "google/gemini-3.1-pro", provider: "google", model: "gemini-3.1-pro" },
-	];
+// ── groupByProvider (real export) ──────────────────────────────────
 
+describe("configure-tui model grouping", () => {
 	test("groups models by provider", () => {
-		const grouped = groupByProvider(models);
+		const grouped = groupByProvider(MODELS);
 		expect(grouped.size).toBe(3);
 		expect(grouped.get("anthropic")?.length).toBe(2);
 		expect(grouped.get("openai")?.length).toBe(2);
@@ -81,7 +68,7 @@ describe("configure-tui model grouping", () => {
 	});
 
 	test("preserves model order within groups", () => {
-		const grouped = groupByProvider(models);
+		const grouped = groupByProvider(MODELS);
 		const anthropic = grouped.get("anthropic") ?? [];
 		expect(anthropic[0].id).toBe("anthropic/claude-opus-4-6");
 		expect(anthropic[1].id).toBe("anthropic/claude-sonnet-4-6");
@@ -100,69 +87,107 @@ describe("configure-tui model grouping", () => {
 	});
 });
 
-describe("configure-tui search source filtering", () => {
-	const models: DiscoveredModel[] = [
-		{ id: "anthropic/claude-opus-4-6", provider: "anthropic", model: "claude-opus-4-6" },
-		{ id: "anthropic/claude-sonnet-4-6", provider: "anthropic", model: "claude-sonnet-4-6" },
-		{ id: "openai/gpt-5.4", provider: "openai", model: "gpt-5.4" },
-		{ id: "openai/gpt-5.4-mini", provider: "openai", model: "gpt-5.4-mini" },
-		{ id: "google/gemini-3.1-pro", provider: "google", model: "gemini-3.1-pro" },
-	];
+// ── createSearchSource (real export) ───────────────────────────────
 
-	function filterModels(
-		allModels: readonly DiscoveredModel[],
-		term: string | undefined,
-		exclude?: Set<string>,
-	): DiscoveredModel[] {
-		return allModels.filter((m) => {
-			if (exclude?.has(m.id)) return false;
-			if (!term) return true;
-			return m.id.toLowerCase().includes(term.toLowerCase());
-		});
-	}
+describe("configure-tui createSearchSource", () => {
+	test("returns all models with separators when no search term", async () => {
+		const source = createSearchSource(MODELS);
+		const results = await source(undefined);
 
-	test("returns all models when no search term", () => {
-		const result = filterModels(models, undefined);
-		expect(result.length).toBe(5);
+		const separators = results.filter((r) => r instanceof Separator);
+		const choices = results.filter((r) => !(r instanceof Separator));
+		expect(separators.length).toBe(3);
+		expect(choices.length).toBe(5);
 	});
 
-	test("filters by search term (case-insensitive)", () => {
-		const result = filterModels(models, "claude");
-		expect(result.length).toBe(2);
-		expect(result[0].id).toBe("anthropic/claude-opus-4-6");
-		expect(result[1].id).toBe("anthropic/claude-sonnet-4-6");
+	test("filters by search term (case-insensitive)", async () => {
+		const source = createSearchSource(MODELS);
+		const results = await source("claude");
+
+		const choices = results.filter((r) => !(r instanceof Separator));
+		expect(choices.length).toBe(2);
+		expect(choices.every((c) => (c as SearchChoice).value.includes("claude"))).toBe(true);
 	});
 
-	test("filters by provider name", () => {
-		const result = filterModels(models, "openai");
-		expect(result.length).toBe(2);
+	test("filters by provider name", async () => {
+		const source = createSearchSource(MODELS);
+		const results = await source("openai");
+
+		const choices = results.filter((r) => !(r instanceof Separator));
+		expect(choices.length).toBe(2);
+		expect(choices.every((c) => (c as SearchChoice).value.startsWith("openai/"))).toBe(true);
 	});
 
-	test("excludes specified models (primary + already-selected fallbacks)", () => {
+	test("excludes specified models", async () => {
 		const exclude = new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.4"]);
-		const result = filterModels(models, undefined, exclude);
-		expect(result.length).toBe(3);
-		expect(result.some((m) => m.id === "anthropic/claude-opus-4-6")).toBe(false);
-		expect(result.some((m) => m.id === "openai/gpt-5.4")).toBe(false);
+		const source = createSearchSource(MODELS, exclude);
+		const results = await source(undefined);
+
+		const choices = results.filter((r) => !(r instanceof Separator));
+		expect(choices.length).toBe(3);
+		const ids = choices.map((c) => (c as SearchChoice).value);
+		expect(ids).not.toContain("anthropic/claude-opus-4-6");
+		expect(ids).not.toContain("openai/gpt-5.4");
 	});
 
-	test("combines search term with exclusion", () => {
+	test("combines search term with exclusion", async () => {
 		const exclude = new Set(["anthropic/claude-opus-4-6"]);
-		const result = filterModels(models, "claude", exclude);
-		expect(result.length).toBe(1);
-		expect(result[0].id).toBe("anthropic/claude-sonnet-4-6");
+		const source = createSearchSource(MODELS, exclude);
+		const results = await source("claude");
+
+		const choices = results.filter((r) => !(r instanceof Separator));
+		expect(choices.length).toBe(1);
+		expect((choices[0] as SearchChoice).value).toBe("anthropic/claude-sonnet-4-6");
 	});
 
-	test("returns empty for no matches", () => {
-		const result = filterModels(models, "nonexistent");
-		expect(result.length).toBe(0);
+	test("returns empty for no matches", async () => {
+		const source = createSearchSource(MODELS);
+		const results = await source("nonexistent");
+		expect(results.length).toBe(0);
+	});
+
+	test("omits provider separator when all its models are excluded", async () => {
+		const exclude = new Set(["google/gemini-3.1-pro"]);
+		const source = createSearchSource(MODELS, exclude);
+		const results = await source(undefined);
+
+		const separators = results.filter((r) => r instanceof Separator);
+		expect(separators.length).toBe(2);
+
+		const choices = results.filter((r) => !(r instanceof Separator));
+		expect(choices.length).toBe(4);
+	});
+
+	test("returns empty when all models excluded (exhausted fallback list)", async () => {
+		const exclude = new Set(MODELS.map((m) => m.id));
+		const source = createSearchSource(MODELS, exclude);
+		const results = await source(undefined);
+		expect(results.length).toBe(0);
+	});
+
+	test("choice objects contain name, value, and description", async () => {
+		const source = createSearchSource(MODELS);
+		const results = await source(undefined);
+
+		const firstChoice = results.find((r) => !(r instanceof Separator)) as SearchChoice | undefined;
+		expect(firstChoice).toBeDefined();
+		expect(firstChoice?.name).toBe("anthropic/claude-opus-4-6");
+		expect(firstChoice?.value).toBe("anthropic/claude-opus-4-6");
+		expect(firstChoice?.description).toBe("claude-opus-4-6");
 	});
 });
 
+// ── CLI integration ────────────────────────────────────────────────
+
 describe("configure-tui CLI integration", () => {
 	test("configure-tui module can be imported", async () => {
-		// Just verify the module loads without errors
 		const mod = await import("../../bin/configure-tui");
 		expect(typeof mod.runConfigure).toBe("function");
+	});
+
+	test("exports createSearchSource and groupByProvider", async () => {
+		const mod = await import("../../bin/configure-tui");
+		expect(typeof mod.createSearchSource).toBe("function");
+		expect(typeof mod.groupByProvider).toBe("function");
 	});
 });

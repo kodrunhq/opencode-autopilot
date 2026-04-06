@@ -7,8 +7,7 @@
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 import confirm from "@inquirer/confirm";
-import { Separator } from "@inquirer/core";
-import search from "@inquirer/search";
+import search, { Separator } from "@inquirer/search";
 import { CONFIG_PATH, createDefaultConfig, loadConfig, saveConfig } from "../src/config";
 import { checkDiversity } from "../src/registry/diversity";
 import { ALL_GROUP_IDS, DIVERSITY_RULES, GROUP_DEFINITIONS } from "../src/registry/model-groups";
@@ -32,6 +31,8 @@ interface DiscoveredModel {
 	readonly provider: string;
 	readonly model: string;
 }
+
+export type { DiscoveredModel };
 
 /**
  * Discover available models by running `opencode models`.
@@ -61,7 +62,9 @@ async function discoverModels(): Promise<readonly DiscoveredModel[]> {
 /**
  * Group models by provider for display with separators.
  */
-function groupByProvider(models: readonly DiscoveredModel[]): Map<string, DiscoveredModel[]> {
+export function groupByProvider(
+	models: readonly DiscoveredModel[],
+): Map<string, DiscoveredModel[]> {
 	const grouped = new Map<string, DiscoveredModel[]>();
 	for (const m of models) {
 		const existing = grouped.get(m.provider) ?? [];
@@ -73,7 +76,7 @@ function groupByProvider(models: readonly DiscoveredModel[]): Map<string, Discov
 
 // ── Search source for @inquirer/search ─────────────────────────────
 
-function createSearchSource(models: readonly DiscoveredModel[], exclude?: Set<string>) {
+export function createSearchSource(models: readonly DiscoveredModel[], exclude?: Set<string>) {
 	const byProvider = groupByProvider(models);
 
 	return async (term: string | undefined) => {
@@ -141,6 +144,13 @@ async function selectFallbacksViaSearch(
 		selected.push(fallback);
 		excluded.add(fallback);
 		console.log(`  ${green("+")} ${cyan(fallback)}`);
+
+		// Check if any selectable models remain before offering to add more
+		const remaining = models.filter((m) => !excluded.has(m.id));
+		if (remaining.length === 0) {
+			console.log(`  ${dim("No more models available.")}`);
+			break;
+		}
 
 		const addMore = await confirm({
 			message: "Add another fallback?",
