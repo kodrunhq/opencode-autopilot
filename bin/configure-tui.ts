@@ -1,14 +1,13 @@
 /**
  * Interactive TUI for configuring model assignments.
- * Uses @inquirer/search (filterable single-select) and @inquirer/checkbox
- * (multi-select) to handle 100+ models deterministically — no LLM involved.
+ * Uses @inquirer/search (filterable single-select) for both primary and
+ * fallback model selection — type to search through 400+ models instantly.
  */
 
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
-import checkbox, { Separator as CheckboxSeparator } from "@inquirer/checkbox";
 import confirm from "@inquirer/confirm";
-import search from "@inquirer/search";
+import search, { Separator } from "@inquirer/search";
 import { CONFIG_PATH, createDefaultConfig, loadConfig, saveConfig } from "../src/config";
 import { checkDiversity } from "../src/registry/diversity";
 import { ALL_GROUP_IDS, DIVERSITY_RULES, GROUP_DEFINITIONS } from "../src/registry/model-groups";
@@ -32,6 +31,8 @@ interface DiscoveredModel {
 	readonly provider: string;
 	readonly model: string;
 }
+
+export type { DiscoveredModel };
 
 /**
  * Discover available models by running `opencode models`.
@@ -61,7 +62,9 @@ async function discoverModels(): Promise<readonly DiscoveredModel[]> {
 /**
  * Group models by provider for display with separators.
  */
-function groupByProvider(models: readonly DiscoveredModel[]): Map<string, DiscoveredModel[]> {
+export function groupByProvider(
+	models: readonly DiscoveredModel[],
+): Map<string, DiscoveredModel[]> {
 	const grouped = new Map<string, DiscoveredModel[]>();
 	for (const m of models) {
 		const existing = grouped.get(m.provider) ?? [];
@@ -73,13 +76,11 @@ function groupByProvider(models: readonly DiscoveredModel[]): Map<string, Discov
 
 // ── Search source for @inquirer/search ─────────────────────────────
 
-function createSearchSource(models: readonly DiscoveredModel[], exclude?: Set<string>) {
+export function createSearchSource(models: readonly DiscoveredModel[], exclude?: Set<string>) {
 	const byProvider = groupByProvider(models);
 
 	return async (term: string | undefined) => {
-		const results: Array<
-			{ name: string; value: string; description: string } | typeof CheckboxSeparator.prototype
-		> = [];
+		const results: Array<{ name: string; value: string; description: string } | Separator> = [];
 
 		for (const [provider, providerModels] of byProvider) {
 			const filtered = providerModels.filter((m) => {
@@ -90,7 +91,7 @@ function createSearchSource(models: readonly DiscoveredModel[], exclude?: Set<st
 
 			if (filtered.length === 0) continue;
 
-			results.push(new CheckboxSeparator(`── ${provider} ──`));
+			results.push(new Separator(`── ${provider} ──`));
 			for (const m of filtered) {
 				results.push({
 					name: m.id,
@@ -104,27 +105,65 @@ function createSearchSource(models: readonly DiscoveredModel[], exclude?: Set<st
 	};
 }
 
-// ── Checkbox choices for fallback selection ─────────────────────────
+// ── Searchable fallback selection ──────────────────────────────────
 
-function createCheckboxChoices(models: readonly DiscoveredModel[], excludePrimary: string) {
-	const byProvider = groupByProvider(models);
-	const choices: Array<{ name: string; value: string } | InstanceType<typeof CheckboxSeparator>> =
-		[];
+/**
+ * Select fallback models one at a time using the searchable prompt.
+ * Each iteration lets the user type to search, pick a model, then
+ * decide whether to add another. Already-selected models and the
+ * primary are excluded from subsequent searches.
+ */
+async function selectFallbacksViaSearch(
+	models: readonly DiscoveredModel[],
+	primary: string,
+	groupLabel: string,
+): Promise<string[]> {
+	const selected: string[] = [];
+	const excluded = new Set<string>([primary]);
 
-	for (const [provider, providerModels] of byProvider) {
-		const filtered = providerModels.filter((m) => m.id !== excludePrimary);
-		if (filtered.length === 0) continue;
-
-		choices.push(new CheckboxSeparator(`── ${provider} ──`));
-		for (const m of filtered) {
-			choices.push({
-				name: m.id,
-				value: m.id,
-			});
+	while (true) {
+		const available = models.filter((m) => !excluded.has(m.id));
+		if (available.length === 0) {
+			if (selected.length === 0) {
+				console.log(`  ${dim("No other models available for fallbacks.")}`);
+			} else {
+				console.log(`  ${dim("No more models available.")}`);
+			}
+			break;
 		}
+
+		const orderLabel =
+			selected.length === 0
+				? "1st"
+				: selected.length === 1
+					? "2nd"
+					: selected.length === 2
+						? "3rd"
+						: `${selected.length + 1}th`;
+
+		if (selected.length > 0) {
+			console.log(`  ${dim("Selected so far:")} ${selected.map(cyan).join(" → ")}`);
+		}
+
+		const fallback = await search({
+			message: `${orderLabel} fallback for ${groupLabel} (type to search):`,
+			source: createSearchSource(models, excluded),
+			pageSize: 15,
+		});
+
+		selected.push(fallback);
+		excluded.add(fallback);
+		console.log(`  ${green("+")} ${cyan(fallback)}`);
+
+		const addMore = await confirm({
+			message: "Add another fallback?",
+			default: false,
+		});
+
+		if (!addMore) break;
 	}
 
-	return choices;
+	return selected;
 }
 
 // ── Diversity check display ────────────────────────────────────────
@@ -189,19 +228,20 @@ async function configureGroup(
 		pageSize: 15,
 	});
 
-	// Fallback models — checkbox multi-select
-	const wantFallbacks = await confirm({
-		message: "Add fallback models? (recommended for resilience)",
-		default: true,
-	});
-
 	let fallbacks: string[] = [];
-	if (wantFallbacks) {
-		fallbacks = await checkbox({
-			message: `Fallback models for ${def.label} (space to select, enter to confirm):`,
-			choices: createCheckboxChoices(models, primary),
-			pageSize: 15,
+	const hasFallbackCandidates = models.some((m) => m.id !== primary);
+
+	if (hasFallbackCandidates) {
+		const wantFallbacks = await confirm({
+			message: "Add fallback models? (recommended for resilience)",
+			default: true,
 		});
+
+		if (wantFallbacks) {
+			fallbacks = await selectFallbacksViaSearch(models, primary, def.label);
+		}
+	} else {
+		console.log(`  ${dim("No other models available for fallbacks.")}`);
 	}
 
 	const assignment: GroupModelAssignment = Object.freeze({
@@ -260,7 +300,7 @@ export async function runConfigure(configPath: string = CONFIG_PATH): Promise<vo
 	console.log("");
 	console.log(bold("Walk through each agent group and assign models."));
 	console.log(dim("Type to search, arrow keys to navigate, enter to select."));
-	console.log(dim("For fallbacks: space to toggle, enter to confirm selection."));
+	console.log(dim("Both primary and fallback selection support search filtering."));
 
 	// 3. Walk through each group
 	const assignments: Record<string, GroupModelAssignment> = {};
