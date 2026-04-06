@@ -51,6 +51,46 @@ function backfillProjectAwareColumns(database: Database): void {
 	}
 }
 
+function columnType(database: Database, tableName: string, columnName: string): string | null {
+	const columns = database.query(`PRAGMA table_info(${tableName})`).all() as Array<{
+		name?: string;
+		type?: string;
+	}>;
+	const col = columns.find((c) => c.name === columnName);
+	return col?.type?.toUpperCase() ?? null;
+}
+
+function migrateTaskIdToText(database: Database): void {
+	const tablesToMigrate = Object.freeze([
+		{ table: "run_tasks", nullable: false },
+		{ table: "run_pending_dispatches", nullable: true },
+		{ table: "forensic_events", nullable: true },
+	]);
+
+	for (const { table, nullable } of tablesToMigrate) {
+		if (!tableExists(database, table)) {
+			continue;
+		}
+		const currentType = columnType(database, table, "task_id");
+		if (currentType === null || currentType === "TEXT") {
+			continue;
+		}
+		// SQLite does not support ALTER COLUMN, so we cast in-place.
+		// INTEGER values stored in a TEXT column are valid — SQLite is
+		// dynamically typed. We backfill by converting existing integer
+		// values to their text representation.
+		if (nullable) {
+			database.run(
+				`UPDATE ${table} SET task_id = CAST(task_id AS TEXT) WHERE task_id IS NOT NULL AND typeof(task_id) != 'text'`,
+			);
+		} else {
+			database.run(
+				`UPDATE ${table} SET task_id = CAST(task_id AS TEXT) WHERE typeof(task_id) != 'text'`,
+			);
+		}
+	}
+}
+
 function backfillBackgroundTaskColumns(database: Database): void {
 	if (!tableExists(database, "background_tasks")) {
 		return;
@@ -104,6 +144,7 @@ export function runKernelMigrations(database: Database): void {
 	}
 
 	backfillProjectAwareColumns(database);
+	migrateTaskIdToText(database);
 	backfillBackgroundTaskColumns(database);
 
 	if (currentVersion < KERNEL_SCHEMA_VERSION) {

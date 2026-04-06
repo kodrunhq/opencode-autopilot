@@ -2,12 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getGlobalConfigDir } from "../utils/paths";
 import { BUILTIN_SERVERS } from "./server-definitions";
-import type { ResolvedServer } from "./types";
+import type { LspCapability, ResolvedServer } from "./types";
 
 interface LspEntry {
 	readonly disabled?: boolean;
 	readonly command?: readonly string[];
 	readonly extensions?: readonly string[];
+	readonly capabilities?: readonly LspCapability[];
 	readonly priority?: number;
 	readonly env?: Readonly<Record<string, string>>;
 	readonly initialization?: Readonly<Record<string, unknown>>;
@@ -85,6 +86,7 @@ export function getMergedServers(): readonly ServerWithSource[] {
 			if (seen.has(id) || !entry.command || !entry.extensions) continue;
 			merged.push({
 				command: [...entry.command],
+				capabilities: [...(entry.capabilities ?? [])],
 				env: entry.env,
 				extensions: [...entry.extensions],
 				id,
@@ -100,6 +102,7 @@ export function getMergedServers(): readonly ServerWithSource[] {
 		if (disabled.has(id) || seen.has(id)) continue;
 		merged.push({
 			command: [...server.command],
+			capabilities: [...(server.capabilities ?? [])],
 			extensions: [...server.extensions],
 			id,
 			priority: -100,

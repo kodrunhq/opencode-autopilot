@@ -22,7 +22,7 @@ export class LspClient extends LspClientConnection {
 			this.openedFiles.add(absolutePath);
 			this.documentVersions.set(uri, version);
 			this.lastSyncedText.set(uri, text);
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			await this.waitForDiagnostics(uri, 50, 3000);
 			return;
 		}
 		if (this.lastSyncedText.get(uri) === text) return;
@@ -76,7 +76,7 @@ export class LspClient extends LspClientConnection {
 		const absolutePath = resolve(filePath);
 		const uri = pathToFileURL(absolutePath).href;
 		await this.openFile(absolutePath);
-		await new Promise((resolve) => setTimeout(resolve, 500));
+		await this.waitForDiagnostics(uri, 50, 2000);
 		try {
 			const result = await this.sendRequest<{ readonly items?: readonly Diagnostic[] }>(
 				"textDocument/diagnostic",

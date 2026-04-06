@@ -56,6 +56,6 @@ export class LspClientConnection extends LspClientTransport {
 		this.sendNotification("workspace/didChangeConfiguration", {
 			settings: { json: { validate: { enable: true } } },
 		});
-		await new Promise((resolve) => setTimeout(resolve, 300));
+		await this.waitForServerActivity(10, 3000);
 	}
 }

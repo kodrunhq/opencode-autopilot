@@ -4,5 +4,6 @@ export {
 	clearCompactionTracking,
 	createPreemptiveCompactionHandler,
 } from "./preemptive-compaction";
+export { createSessionNotificationHandler } from "./session-notification";
 export { clearRecoveryTracking, createSessionRecoveryHandler } from "./session-recovery";
 export { createToolOutputTruncatorHandler } from "./tool-output-truncator";

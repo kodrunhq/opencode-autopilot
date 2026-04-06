@@ -1,7 +1,18 @@
+export type LspCapability =
+	| "diagnostics"
+	| "definition"
+	| "references"
+	| "symbols"
+	| "rename"
+	| "codeAction"
+	| "hover"
+	| "formatting";
+
 export interface LspServerConfig {
 	readonly id: string;
 	readonly command: readonly string[];
 	readonly extensions: readonly string[];
+	readonly capabilities?: readonly LspCapability[];
 	readonly disabled?: boolean;
 	readonly env?: Readonly<Record<string, string>>;
 	readonly initialization?: Readonly<Record<string, unknown>>;
@@ -119,6 +130,7 @@ export interface ResolvedServer {
 	readonly id: string;
 	readonly command: readonly string[];
 	readonly extensions: readonly string[];
+	readonly capabilities: readonly LspCapability[];
 	readonly priority: number;
 	readonly env?: Readonly<Record<string, string>>;
 	readonly initialization?: Readonly<Record<string, unknown>>;

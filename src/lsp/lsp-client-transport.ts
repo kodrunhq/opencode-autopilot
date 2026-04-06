@@ -22,6 +22,7 @@ export class LspClientTransport {
 	protected readonly diagnosticsStore = new Map<string, readonly Diagnostic[]>();
 	protected readonly requestTimeoutMs = 15000;
 	protected processExited = false;
+	protected serverActivityCount = 0;
 
 	constructor(
 		protected readonly root: string,
@@ -39,11 +40,19 @@ export class LspClientTransport {
 		if (process.platform === "win32" && env.Path !== undefined) env.Path = spawnPath;
 		this.proc = spawnProcess(this.server.command, { cwd: this.root, env });
 		this.startStderrReading();
-		await new Promise((resolve) => setTimeout(resolve, 100));
-		if (this.proc.exitCode !== null)
-			throw new Error(
-				`LSP server exited immediately with code ${this.proc.exitCode}${this.formatStderr()}`,
-			);
+		await this.pollUntil(
+			() => {
+				const exitCode = this.proc?.exitCode;
+				if (exitCode !== null && exitCode !== undefined) {
+					throw new Error(
+						`LSP server exited immediately with code ${exitCode}${this.formatStderr()}`,
+					);
+				}
+				return exitCode === null;
+			},
+			10,
+			2000,
+		);
 
 		const stdoutReader = this.proc.stdout.getReader();
 		const nodeReadable = new Readable({
@@ -78,13 +87,21 @@ export class LspClientTransport {
 		);
 		this.connection.onRequest(
 			"workspace/configuration",
-			(params: { readonly items?: readonly { readonly section?: string }[] }) =>
-				(params.items ?? []).map((item) =>
+			(params: { readonly items?: readonly { readonly section?: string }[] }) => {
+				this.serverActivityCount += 1;
+				return (params.items ?? []).map((item) =>
 					item.section === "json" ? { validate: { enable: true } } : {},
-				),
+				);
+			},
 		);
-		this.connection.onRequest("client/registerCapability", () => null);
-		this.connection.onRequest("window/workDoneProgress/create", () => null);
+		this.connection.onRequest("client/registerCapability", () => {
+			this.serverActivityCount += 1;
+			return null;
+		});
+		this.connection.onRequest("window/workDoneProgress/create", () => {
+			this.serverActivityCount += 1;
+			return null;
+		});
 		this.connection.onClose(() => {
 			this.processExited = true;
 		});
@@ -117,10 +134,45 @@ export class LspClientTransport {
 				params === undefined
 					? this.connection.sendRequest(method)
 					: this.connection.sendRequest(method, params);
-			return await Promise.race([request as Promise<T>, timeoutPromise]);
+			const result = await Promise.race([request as Promise<T>, timeoutPromise]);
+			this.serverActivityCount += 1;
+			return result;
 		} finally {
 			if (timeoutId) clearTimeout(timeoutId);
 		}
+	}
+
+	protected waitForServerActivity(intervalMs: number, maxMs: number): Promise<boolean> {
+		const initialActivityCount = this.serverActivityCount;
+		return this.pollUntil(
+			() => {
+				const exitCode = this.proc?.exitCode;
+				if (this.processExited || (exitCode !== null && exitCode !== undefined)) {
+					throw new Error(
+						`LSP server already exited (code: ${this.proc?.exitCode})${this.formatStderr(10)}`,
+					);
+				}
+				return this.serverActivityCount > initialActivityCount;
+			},
+			intervalMs,
+			maxMs,
+		);
+	}
+
+	protected waitForDiagnostics(uri: string, intervalMs: number, maxMs: number): Promise<boolean> {
+		return this.pollUntil(
+			() => {
+				const exitCode = this.proc?.exitCode;
+				if (this.processExited || (exitCode !== null && exitCode !== undefined)) {
+					throw new Error(
+						`LSP server already exited (code: ${this.proc?.exitCode})${this.formatStderr(10)}`,
+					);
+				}
+				return this.diagnosticsStore.has(uri);
+			},
+			intervalMs,
+			maxMs,
+		);
 	}
 
 	protected sendNotification(method: string, params?: unknown): void {
@@ -143,6 +195,21 @@ export class LspClientTransport {
 				}
 			} catch {}
 		})();
+	}
+
+	private async pollUntil(
+		predicate: () => boolean,
+		intervalMs: number,
+		maxMs: number,
+	): Promise<boolean> {
+		const startedAt = Date.now();
+		while (Date.now() - startedAt < maxMs) {
+			if (predicate()) return true;
+			await new Promise<void>((resolve) => {
+				setTimeout(resolve, intervalMs);
+			});
+		}
+		return predicate();
 	}
 
 	private formatStderr(limit = this.stderrBuffer.length, label = "stderr"): string {

@@ -56,7 +56,7 @@ export interface ForensicEventRow {
 	readonly parent_session_id: string | null;
 	readonly phase: string | null;
 	readonly dispatch_id: string | null;
-	readonly task_id: number | null;
+	readonly task_id: string | number | null;
 	readonly agent: string | null;
 	readonly type: ForensicEvent["type"];
 	readonly code: string | null;

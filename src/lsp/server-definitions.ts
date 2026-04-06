@@ -1,4 +1,17 @@
-import type { LspServerConfig } from "./types";
+import type { LspCapability, LspServerConfig } from "./types";
+
+const FULL_CAPABILITIES: readonly LspCapability[] = [
+	"diagnostics",
+	"definition",
+	"references",
+	"symbols",
+	"rename",
+	"hover",
+];
+
+const DIAGNOSTICS_AND_FORMATTING: readonly LspCapability[] = ["diagnostics", "formatting"];
+
+const DIAGNOSTICS_ONLY: readonly LspCapability[] = ["diagnostics"];
 
 export const LSP_INSTALL_HINTS: Readonly<Record<string, string>> = {
 	bash: "npm install -g bash-language-server",
@@ -43,16 +56,23 @@ export const LSP_INSTALL_HINTS: Readonly<Record<string, string>> = {
 };
 
 export const BUILTIN_SERVERS: Readonly<Record<string, Omit<LspServerConfig, "id">>> = {
-	astro: { command: ["astro-ls", "--stdio"], extensions: [".astro"] },
+	astro: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["astro-ls", "--stdio"],
+		extensions: [".astro"],
+	},
 	bash: {
+		capabilities: FULL_CAPABILITIES,
 		command: ["bash-language-server", "start"],
 		extensions: [".sh", ".bash", ".zsh", ".ksh"],
 	},
 	"bash-ls": {
+		capabilities: FULL_CAPABILITIES,
 		command: ["bash-language-server", "start"],
 		extensions: [".sh", ".bash", ".zsh", ".ksh"],
 	},
 	biome: {
+		capabilities: DIAGNOSTICS_AND_FORMATTING,
 		command: ["biome", "lsp-proxy", "--stdio"],
 		extensions: [
 			".ts",
@@ -74,37 +94,78 @@ export const BUILTIN_SERVERS: Readonly<Record<string, Omit<LspServerConfig, "id"
 			".html",
 		],
 	},
-	basedpyright: { command: ["basedpyright-langserver", "--stdio"], extensions: [".py", ".pyi"] },
+	basedpyright: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["basedpyright-langserver", "--stdio"],
+		extensions: [".py", ".pyi"],
+	},
 	clangd: {
+		capabilities: FULL_CAPABILITIES,
 		command: ["clangd", "--background-index", "--clang-tidy"],
 		extensions: [".c", ".cpp", ".cc", ".cxx", ".c++", ".h", ".hpp", ".hh", ".hxx", ".h++"],
 	},
 	"clojure-lsp": {
+		capabilities: FULL_CAPABILITIES,
 		command: ["clojure-lsp", "listen"],
 		extensions: [".clj", ".cljs", ".cljc", ".edn"],
 	},
-	csharp: { command: ["csharp-ls"], extensions: [".cs"] },
-	dart: { command: ["dart", "language-server", "--lsp"], extensions: [".dart"] },
-	deno: { command: ["deno", "lsp"], extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs"] },
-	dockerfile: { command: ["docker-langserver", "--stdio"], extensions: [".dockerfile"] },
-	"elixir-ls": { command: ["elixir-ls"], extensions: [".ex", ".exs"] },
+	csharp: { capabilities: FULL_CAPABILITIES, command: ["csharp-ls"], extensions: [".cs"] },
+	dart: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["dart", "language-server", "--lsp"],
+		extensions: [".dart"],
+	},
+	deno: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["deno", "lsp"],
+		extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs"],
+	},
+	dockerfile: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["docker-langserver", "--stdio"],
+		extensions: [".dockerfile"],
+	},
+	"elixir-ls": {
+		capabilities: FULL_CAPABILITIES,
+		command: ["elixir-ls"],
+		extensions: [".ex", ".exs"],
+	},
 	eslint: {
+		capabilities: DIAGNOSTICS_ONLY,
 		command: ["vscode-eslint-language-server", "--stdio"],
 		extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".vue"],
 	},
-	fsharp: { command: ["fsautocomplete"], extensions: [".fs", ".fsi", ".fsx", ".fsscript"] },
-	gleam: { command: ["gleam", "lsp"], extensions: [".gleam"] },
-	gopls: { command: ["gopls"], extensions: [".go"] },
+	fsharp: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["fsautocomplete"],
+		extensions: [".fs", ".fsi", ".fsx", ".fsscript"],
+	},
+	gleam: { capabilities: FULL_CAPABILITIES, command: ["gleam", "lsp"], extensions: [".gleam"] },
+	gopls: { capabilities: FULL_CAPABILITIES, command: ["gopls"], extensions: [".go"] },
 	"haskell-language-server": {
+		capabilities: FULL_CAPABILITIES,
 		command: ["haskell-language-server-wrapper", "--lsp"],
 		extensions: [".hs", ".lhs"],
 	},
-	jdtls: { command: ["jdtls"], extensions: [".java"] },
-	"kotlin-ls": { command: ["kotlin-lsp"], extensions: [".kt", ".kts"] },
-	"lua-ls": { command: ["lua-language-server"], extensions: [".lua"] },
-	nixd: { command: ["nixd"], extensions: [".nix"] },
-	"ocaml-lsp": { command: ["ocamllsp"], extensions: [".ml", ".mli"] },
+	jdtls: { capabilities: FULL_CAPABILITIES, command: ["jdtls"], extensions: [".java"] },
+	"kotlin-ls": {
+		capabilities: FULL_CAPABILITIES,
+		command: ["kotlin-lsp"],
+		extensions: [".kt", ".kts"],
+	},
+	"lua-ls": {
+		capabilities: FULL_CAPABILITIES,
+		command: ["lua-language-server"],
+		extensions: [".lua"],
+	},
+	nixd: { capabilities: FULL_CAPABILITIES, command: ["nixd"], extensions: [".nix"] },
+	"ocaml-lsp": {
+		capabilities: FULL_CAPABILITIES,
+		command: ["ocamllsp"],
+		extensions: [".ml", ".mli"],
+	},
 	oxlint: {
+		capabilities: DIAGNOSTICS_ONLY,
 		command: ["oxlint", "--lsp"],
 		extensions: [
 			".ts",
@@ -120,24 +181,73 @@ export const BUILTIN_SERVERS: Readonly<Record<string, Omit<LspServerConfig, "id"
 			".svelte",
 		],
 	},
-	php: { command: ["intelephense", "--stdio"], extensions: [".php"] },
-	prisma: { command: ["prisma", "language-server"], extensions: [".prisma"] },
-	pyright: { command: ["pyright-langserver", "--stdio"], extensions: [".py", ".pyi"] },
-	"ruby-lsp": { command: ["rubocop", "--lsp"], extensions: [".rb", ".rake", ".gemspec", ".ru"] },
-	ruff: { command: ["ruff", "server"], extensions: [".py", ".pyi"] },
-	rust: { command: ["rust-analyzer"], extensions: [".rs"] },
-	"sourcekit-lsp": { command: ["sourcekit-lsp"], extensions: [".swift", ".objc", ".objcpp"] },
-	svelte: { command: ["svelteserver", "--stdio"], extensions: [".svelte"] },
-	terraform: { command: ["terraform-ls", "serve"], extensions: [".tf", ".tfvars"] },
-	"terraform-ls": { command: ["terraform-ls", "serve"], extensions: [".tf", ".tfvars"] },
-	texlab: { command: ["texlab"], extensions: [".tex", ".bib"] },
-	tinymist: { command: ["tinymist"], extensions: [".typ", ".typc"] },
+	php: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["intelephense", "--stdio"],
+		extensions: [".php"],
+	},
+	prisma: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["prisma", "language-server"],
+		extensions: [".prisma"],
+	},
+	pyright: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["pyright-langserver", "--stdio"],
+		extensions: [".py", ".pyi"],
+	},
+	"ruby-lsp": {
+		capabilities: FULL_CAPABILITIES,
+		command: ["rubocop", "--lsp"],
+		extensions: [".rb", ".rake", ".gemspec", ".ru"],
+	},
+	ruff: {
+		capabilities: DIAGNOSTICS_ONLY,
+		command: ["ruff", "server"],
+		extensions: [".py", ".pyi"],
+	},
+	rust: { capabilities: FULL_CAPABILITIES, command: ["rust-analyzer"], extensions: [".rs"] },
+	"sourcekit-lsp": {
+		capabilities: FULL_CAPABILITIES,
+		command: ["sourcekit-lsp"],
+		extensions: [".swift", ".objc", ".objcpp"],
+	},
+	svelte: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["svelteserver", "--stdio"],
+		extensions: [".svelte"],
+	},
+	terraform: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["terraform-ls", "serve"],
+		extensions: [".tf", ".tfvars"],
+	},
+	"terraform-ls": {
+		capabilities: FULL_CAPABILITIES,
+		command: ["terraform-ls", "serve"],
+		extensions: [".tf", ".tfvars"],
+	},
+	texlab: { capabilities: FULL_CAPABILITIES, command: ["texlab"], extensions: [".tex", ".bib"] },
+	tinymist: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["tinymist"],
+		extensions: [".typ", ".typc"],
+	},
 	typescript: {
+		capabilities: FULL_CAPABILITIES,
 		command: ["typescript-language-server", "--stdio"],
 		extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
 	},
-	ty: { command: ["ty", "server"], extensions: [".py", ".pyi"] },
-	vue: { command: ["vue-language-server", "--stdio"], extensions: [".vue"] },
-	"yaml-ls": { command: ["yaml-language-server", "--stdio"], extensions: [".yaml", ".yml"] },
-	zls: { command: ["zls"], extensions: [".zig", ".zon"] },
+	ty: { capabilities: FULL_CAPABILITIES, command: ["ty", "server"], extensions: [".py", ".pyi"] },
+	vue: {
+		capabilities: FULL_CAPABILITIES,
+		command: ["vue-language-server", "--stdio"],
+		extensions: [".vue"],
+	},
+	"yaml-ls": {
+		capabilities: FULL_CAPABILITIES,
+		command: ["yaml-language-server", "--stdio"],
+		extensions: [".yaml", ".yml"],
+	},
+	zls: { capabilities: FULL_CAPABILITIES, command: ["zls"], extensions: [".zig", ".zon"] },
 };

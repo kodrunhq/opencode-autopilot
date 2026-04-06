@@ -14,7 +14,7 @@ export interface OrchestrationEvent {
 	readonly message?: string;
 	readonly runId?: string;
 	readonly dispatchId?: string;
-	readonly taskId?: number | null;
+	readonly taskId?: string | number | null;
 	readonly code?: string;
 	readonly sessionId?: string;
 	readonly payload?: Record<string, string | number | boolean | null>;

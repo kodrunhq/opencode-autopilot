@@ -1,6 +1,6 @@
 import { BACKGROUND_TASKS_SCHEMA_STATEMENTS } from "../background/schema";
 
-export const KERNEL_SCHEMA_VERSION = 3;
+export const KERNEL_SCHEMA_VERSION = 4;
 
 export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 	`CREATE TABLE IF NOT EXISTS pipeline_runs (
@@ -32,7 +32,7 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 	)`,
 	`CREATE TABLE IF NOT EXISTS run_tasks (
 		run_id TEXT NOT NULL,
-		task_id INTEGER NOT NULL,
+		task_id TEXT NOT NULL,
 		title TEXT NOT NULL,
 		status TEXT NOT NULL,
 		wave INTEGER NOT NULL,
@@ -49,7 +49,7 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 		agent TEXT NOT NULL,
 		issued_at TEXT NOT NULL,
 		result_kind TEXT NOT NULL,
-		task_id INTEGER,
+		task_id TEXT,
 		PRIMARY KEY (run_id, dispatch_id),
 		FOREIGN KEY (run_id) REFERENCES pipeline_runs(run_id) ON DELETE CASCADE
 	)`,
@@ -107,7 +107,7 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 		parent_session_id TEXT,
 		phase TEXT,
 		dispatch_id TEXT,
-		task_id INTEGER,
+		task_id TEXT,
 		agent TEXT,
 		type TEXT NOT NULL,
 		code TEXT,

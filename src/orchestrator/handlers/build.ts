@@ -1,7 +1,9 @@
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
+import type { BranchLifecycle } from "../types";
 import { assignWaves } from "../wave-assigner";
+import { initBranchLifecycle, recordTaskPush } from "./branch-pr";
 import {
 	buildPendingResultError,
 	buildTaskPrompt,
@@ -17,6 +19,7 @@ import {
 import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
 
+const cloneBranchLifecycle = (bl: BranchLifecycle) => ({ ...bl, tasksPushed: [...bl.tasksPushed] });
 export const handleBuild: PhaseHandler = async (
 	state,
 	artifactDir,
@@ -25,7 +28,17 @@ export const handleBuild: PhaseHandler = async (
 ) => {
 	const { tasks, buildProgress } = state;
 	const resultText = context?.envelope.payload.text ?? result;
-
+	const initialBranchLifecycle =
+		state.branchLifecycle ??
+		initBranchLifecycle({
+			runId: state.runId,
+			baseBranch: "main",
+			description: state.idea.slice(0, 60),
+		});
+	const branchLifecycleUpdates =
+		state.branchLifecycle === null
+			? Object.freeze({ branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle) })
+			: undefined;
 	if (tasks.length === 0) {
 		return Object.freeze({
 			action: "error",
@@ -205,6 +218,10 @@ export const handleBuild: PhaseHandler = async (
 		}
 
 		const updatedTasks = markTaskDone(effectiveTasks, taskToComplete);
+		const updatedBranchLifecycle = recordTaskPush(
+			initialBranchLifecycle,
+			taskToComplete.toString(),
+		);
 		const waveMap = groupByWave(updatedTasks);
 		const currentWave = buildProgress.currentWave ?? 1;
 
@@ -218,6 +235,7 @@ export const handleBuild: PhaseHandler = async (
 				progress: `Wave ${currentWave} complete — review pending`,
 				_stateUpdates: {
 					tasks: [...updatedTasks],
+					branchLifecycle: cloneBranchLifecycle(updatedBranchLifecycle),
 					buildProgress: {
 						...buildProgress,
 						currentTask: taskToComplete,
@@ -241,6 +259,7 @@ export const handleBuild: PhaseHandler = async (
 				progress: `Wave ${currentWave} — task ${next.id}`,
 				_stateUpdates: {
 					tasks: [...markTasksInProgress(updatedTasks, [next.id])],
+					branchLifecycle: cloneBranchLifecycle(updatedBranchLifecycle),
 					buildProgress: {
 						...buildProgress,
 						currentTask: next.id,
@@ -293,6 +312,7 @@ export const handleBuild: PhaseHandler = async (
 			taskId: task.id,
 			progress: `Wave ${currentWave} — task ${task.id}`,
 			_stateUpdates: {
+				...(branchLifecycleUpdates ?? {}),
 				tasks: [...markTasksInProgress(effectiveTasks, [task.id])],
 				buildProgress: {
 					...buildProgress,
@@ -314,6 +334,7 @@ export const handleBuild: PhaseHandler = async (
 		taskId: task.id,
 		progress: `Wave ${currentWave} — task ${task.id}`,
 		_stateUpdates: {
+			...(branchLifecycleUpdates ?? {}),
 			tasks: [...markTasksInProgress(effectiveTasks, [task.id])],
 			buildProgress: {
 				...buildProgress,

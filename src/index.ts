@@ -8,6 +8,7 @@ import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { createKeywordDetectorHandler } from "./hooks/keyword-detector";
 import { createPreemptiveCompactionHandler } from "./hooks/preemptive-compaction";
+import { createSessionNotificationHandler } from "./hooks/session-notification";
 import { createSessionRecoveryHandler } from "./hooks/session-recovery";
 import { createToolOutputTruncatorHandler } from "./hooks/tool-output-truncator";
 import { installAssets } from "./installer";
@@ -215,6 +216,39 @@ const plugin: Plugin = async (input) => {
 			});
 		},
 	};
+
+	const sessionNotificationHandler = createSessionNotificationHandler({
+		getSessionTitle: async (sessionID) => {
+			try {
+				const response = await client.session.get({ path: { id: sessionID } });
+				const data = response.data as { title?: string } | undefined;
+				return data?.title?.trim() || sessionID;
+			} catch {
+				return sessionID;
+			}
+		},
+		getSessionMessages: async (sessionID) => {
+			try {
+				const response = await client.session.messages({
+					path: { id: sessionID },
+					query: { directory: process.cwd() },
+				});
+				const messages = (response.data ?? []) as ReadonlyArray<{
+					role?: string;
+					parts?: readonly { type?: string; text?: string }[];
+				}>;
+				return messages.map((message) => ({
+					role: message.role ?? "unknown",
+					text: (message.parts ?? [])
+						.filter((part) => part.type === "text" && typeof part.text === "string")
+						.map((part) => part.text ?? "")
+						.join("\n"),
+				}));
+			} catch {
+				return [];
+			}
+		},
+	});
 
 	// --- Background task SDK wiring (enables real dispatch via promptAsync) ---
 	const backgroundSdkOps = {
@@ -501,6 +535,13 @@ const plugin: Plugin = async (input) => {
 			}
 
 			await recoveryEventHandler({ event });
+
+			try {
+				await sessionNotificationHandler({ event });
+			} catch {
+				/* best-effort */
+			}
+
 			await compactionHandler({ event });
 
 			if (event.type === "session.deleted") {
