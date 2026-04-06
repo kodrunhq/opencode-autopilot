@@ -21,6 +21,7 @@ import {
 	updatePersistedState,
 } from "../orchestrator/state";
 import type { Phase, PipelineState } from "../orchestrator/types";
+import { getIntentRouting, type IntentType, IntentTypeSchema } from "../routing/intent-types";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
 import {
@@ -34,6 +35,7 @@ import { reviewCore } from "./review";
 interface OrchestrateArgs {
 	readonly idea?: string;
 	readonly result?: string;
+	readonly intent?: IntentType;
 }
 
 const ORCHESTRATE_ERROR_CODES = Object.freeze({
@@ -690,8 +692,17 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 			});
 		}
 
-		// No state but idea provided -> create initial state and dispatch RECON via handler
+		// No state but idea provided -> check intent guard before starting pipeline
 		if (state === null && args.idea) {
+			if (args.intent && args.intent !== "implementation") {
+				const routing = getIntentRouting(args.intent);
+				return JSON.stringify({
+					action: "error",
+					code: "E_INTENT_NOT_IMPLEMENTATION",
+					message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
+				});
+			}
+
 			const newState = createInitialState(args.idea);
 			await saveState(newState, artifactDir);
 
@@ -853,6 +864,9 @@ export const ocOrchestrate = tool({
 			.max(1_048_576)
 			.optional()
 			.describe("Result from previous agent to advance the pipeline"),
+		intent: IntentTypeSchema.optional().describe(
+			"Intent classification from oc_route. When provided and not 'implementation', the pipeline is rejected with routing guidance. Omit for backward-compatible unguarded calls.",
+		),
 	},
 	async execute(args) {
 		return orchestrateCore(args, getProjectArtifactDir(process.cwd()));

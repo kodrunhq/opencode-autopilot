@@ -269,6 +269,78 @@ describe("orchestrateCore", () => {
 		expect(parsed.action).toBe("error");
 		expect(parsed.message).toBeDefined();
 	});
+
+	test("rejects non-implementation intent with routing guidance", async () => {
+		const result = await orchestrateCore(
+			{ idea: "explain how auth works", intent: "research" },
+			tempDir,
+		);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.code).toBe("E_INTENT_NOT_IMPLEMENTATION");
+		expect(parsed.message).toContain("research");
+		expect(parsed.message).toContain("researcher");
+		expect(parsed.message).not.toContain("oc_orchestrate");
+	});
+
+	test("allows implementation intent to start pipeline normally", async () => {
+		const result = await orchestrateCore(
+			{ idea: "add dark mode", intent: "implementation" },
+			tempDir,
+		);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.phase).toBe("RECON");
+		expect(parsed.agent).toBe("oc-researcher");
+	});
+
+	test("allows omitted intent for backward compatibility", async () => {
+		const result = await orchestrateCore({ idea: "build a widget" }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.phase).toBe("RECON");
+	});
+
+	test("rejects fix intent with debugger routing guidance", async () => {
+		const result = await orchestrateCore({ idea: "fix the login bug", intent: "fix" }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.code).toBe("E_INTENT_NOT_IMPLEMENTATION");
+		expect(parsed.message).toContain("debugger");
+	});
+
+	test("rejects open_ended intent from starting pipeline", async () => {
+		const result = await orchestrateCore(
+			{ idea: "make things better", intent: "open_ended" },
+			tempDir,
+		);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.code).toBe("E_INTENT_NOT_IMPLEMENTATION");
+		expect(parsed.message).toContain("autopilot");
+		expect(parsed.message).toContain("Assess");
+	});
+
+	test("intent guard does not affect result-based calls (existing pipeline)", async () => {
+		const first = JSON.parse(await orchestrateCore({ idea: "test project" }, tempDir));
+		expect(first.action).toBe("dispatch");
+
+		const envelope = {
+			schemaVersion: 1,
+			resultId: "intent-guard-resume",
+			runId: first.runId,
+			phase: "RECON",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "research complete" },
+		};
+		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.phase).toBe("CHALLENGE");
+	});
 });
 
 describe("autopilotAgent", () => {

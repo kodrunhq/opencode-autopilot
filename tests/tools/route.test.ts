@@ -314,3 +314,78 @@ describe("routeCore behavioral scenarios (MEDIUM 7)", () => {
 		expect(result.secondaryTargetAgent).toBe("autopilot");
 	});
 });
+
+describe("routeCore multi-intent chaining (end-to-end)", () => {
+	test("secondary instruction is actionable — contains agent name and behavior", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "research",
+				secondaryIntent: "implementation",
+				reasoning: "Research then build",
+				verbalization: "I detect research + implementation",
+			}),
+		);
+		expect(result.secondaryInstruction).toContain("autopilot");
+		expect(result.secondaryInstruction).toContain("pipeline");
+		expect(typeof result.secondaryBehavior).toBe("string");
+		expect(result.secondaryBehavior.length).toBeGreaterThan(0);
+	});
+
+	test("primary instruction does not mention pipeline for non-pipeline intents", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "review",
+				secondaryIntent: "fix",
+				reasoning: "Review then fix",
+				verbalization: "I detect review + fix",
+			}),
+		);
+		expect(result.instruction).not.toContain("oc_orchestrate");
+		expect(result.instruction).toContain("reviewer");
+		expect(result.secondaryInstruction).toContain("debugger");
+	});
+
+	test("investigation + planning chains correctly", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "investigation",
+				secondaryIntent: "planning",
+				reasoning: "Investigate then plan",
+				verbalization: "I detect investigation + planning",
+			}),
+		);
+		expect(result.targetAgent).toBe("researcher");
+		expect(result.usePipeline).toBe(false);
+		expect(result.secondaryTargetAgent).toBe("planner");
+		expect(result.secondaryUsePipeline).toBe(false);
+		expect(result.secondaryInstruction).toContain("planner");
+	});
+
+	test("all 9 intents produce valid routing when used as primary", () => {
+		const intents = [
+			"research",
+			"implementation",
+			"investigation",
+			"evaluation",
+			"fix",
+			"review",
+			"planning",
+			"quick",
+			"open_ended",
+		] as const;
+		for (const intent of intents) {
+			const result = JSON.parse(
+				routeCore({
+					primaryIntent: intent,
+					reasoning: `Testing ${intent}`,
+					verbalization: `I detect ${intent}`,
+				}),
+			);
+			expect(result.action).toBe("route");
+			expect(result.targetAgent).toBeTruthy();
+			expect(typeof result.usePipeline).toBe("boolean");
+			expect(typeof result.behavior).toBe("string");
+			expect(result.behavior.length).toBeGreaterThan(0);
+		}
+	});
+});

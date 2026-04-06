@@ -155,4 +155,12 @@ describe("autopilot prompt — Oracle-identified gaps", () => {
 		expect(prompt).toContain("assess");
 		expect(prompt).toContain("propose");
 	});
+
+	test("prompt instructs passing intent: 'implementation' to oc_orchestrate", () => {
+		expect(prompt).toContain('intent set to "implementation"');
+	});
+
+	test("prompt has runtime intent guard constraint", () => {
+		expect(prompt).toContain("pipeline rejects non-implementation intents at runtime");
+	});
 });
