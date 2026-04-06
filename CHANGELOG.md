@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.20.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.19.0...opencode-autopilot-v1.20.0) (2026-04-06)
+
+
+### Features
+
+* autopilot agent rewrite, hooks system, priority queue, pipeline flexibility, and error hints ([436ed0c](https://github.com/kodrunhq/opencode-autopilot/commit/436ed0c408a95b6c7e7c00f2d2e2d5653d263911))
+* complete Oracle remediation — taskId schema, LSP capability selection, CLI formatters, notifications, PR lifecycle, and test coverage ([59e07be](https://github.com/kodrunhq/opencode-autopilot/commit/59e07be5af881c2afde075a36d812f5dba5a2aca))
+* enhanced error classifier with deep extraction and task toast manager for real-time UX feedback ([54b37b7](https://github.com/kodrunhq/opencode-autopilot/commit/54b37b701941a29c0e63073fce1f2509d7c73ba9))
+* LSP tools subsystem with 6 language server tools and health check ([05df0cc](https://github.com/kodrunhq/opencode-autopilot/commit/05df0cc2461add8b53742e1a116432dec3f544b7))
+
+
+### Bug Fixes
+
+* address 5 Copilot review comments — taskId coercion, priority scale, truncator cap, keyword casing, duplicate toast ([8e59dc5](https://github.com/kodrunhq/opencode-autopilot/commit/8e59dc574da9646783f0965cec6660911db60bc5))
+* close 3 remaining Oracle gaps — table-rebuild migration, LSP capability threading, PR lifecycle wiring ([1711f33](https://github.com/kodrunhq/opencode-autopilot/commit/1711f338f8680fa49878bd4c913e7ce8d92f561d))
+* complete plugin overhaul — schema, UX, hooks, pipeline, and agent rewrites ([e628601](https://github.com/kodrunhq/opencode-autopilot/commit/e628601d367e5f2dd9b43e2375eea59ed4bdd4fb))
+* schema validation, UX wiring, and CLI formatter bugs ([1c04461](https://github.com/kodrunhq/opencode-autopilot/commit/1c04461d60a54351d270d90f2c5c8da685e4efff))
+
 ## [1.19.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.18.0...opencode-autopilot-v1.19.0) (2026-04-05)
 
 
