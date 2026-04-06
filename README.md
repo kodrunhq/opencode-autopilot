@@ -62,6 +62,67 @@ npm install -g @kodrunhq/opencode-autopilot
 
 Launch OpenCode. The plugin auto-installs agents, skills, and commands on first load and shows a welcome toast.
 
+### Option D: GitHub Release (corporate)
+
+For environments that cannot access npm registries (e.g. corporate firewalls). Requires GitHub access.
+
+**Automated:**
+
+```bash
+curl -fsSL https://github.com/kodrunhq/opencode-autopilot/releases/latest/download/install-local.sh | bash
+```
+
+Or pin a specific version:
+
+```bash
+curl -fsSL https://github.com/kodrunhq/opencode-autopilot/releases/download/v1.20.0/install-local.sh | bash -s -- --version=1.20.0
+```
+
+**Manual:**
+
+1. Download the latest `opencode-autopilot-local-vX.Y.Z.tar.gz` and its `.sha256` file from [GitHub Releases](https://github.com/kodrunhq/opencode-autopilot/releases)
+2. Verify the checksum:
+   ```bash
+   sha256sum -c opencode-autopilot-local-v*.tar.gz.sha256
+   ```
+3. Extract and install:
+   ```bash
+   mkdir -p ~/.config/opencode/plugins
+   STAGING="$(mktemp -d ~/.config/opencode/plugins/.oca-staging-XXXXXX)"
+   tar -xzf opencode-autopilot-local-v*.tar.gz -C "$STAGING"
+   # Verify the bundle looks correct
+   test -f "$STAGING/src/index.ts" && test -d "$STAGING/assets" && test -d "$STAGING/node_modules"
+   # Rollback-safe swap (backup old, move staging in, remove backup)
+   DEST=~/.config/opencode/plugins/opencode-autopilot
+   BACKUP=""
+   if [ -d "$DEST" ]; then
+     BACKUP="$(mktemp -d ~/.config/opencode/plugins/.oca-backup-XXXXXX)"
+     mv "$DEST" "$BACKUP/old" || { rm -rf "$STAGING" "$BACKUP"; exit 1; }
+   fi
+   mv "$STAGING" "$DEST" || {
+     [ -n "$BACKUP" ] && mv "$BACKUP/old" "$DEST" 2>/dev/null
+     rm -rf "$STAGING" "$BACKUP"
+     exit 1
+   }
+   [ -n "$BACKUP" ] && rm -rf "$BACKUP"
+   ```
+4. Create a shim for auto-discovery:
+   ```bash
+   echo 'export { default } from "./opencode-autopilot/src/index";' > ~/.config/opencode/plugins/opencode-autopilot.ts
+   ```
+
+Alternatively, add to your `opencode.json` with an absolute path:
+
+```json
+{
+  "plugin": ["file:///home/YOU/.config/opencode/plugins/opencode-autopilot/src/index.ts"]
+}
+```
+
+Replace `/home/YOU` with your actual home directory.
+
+To verify a local installation, open OpenCode and run `/oc-doctor` in the chat.
+
 ### Agent visibility defaults
 
 Primary Tab-cycle agents provided by this plugin are:
