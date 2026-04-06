@@ -11,7 +11,7 @@ describe("planner agent config", () => {
 		expect(plannerAgent.description?.length).toBeGreaterThan(0);
 	});
 
-	test("has a production-ready prompt with embedded skill content", () => {
+	test("has a production-ready prompt", () => {
 		expect(typeof plannerAgent.prompt).toBe("string");
 		expect(plannerAgent.prompt?.length).toBeGreaterThanOrEqual(100);
 	});

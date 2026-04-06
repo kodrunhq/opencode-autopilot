@@ -31,17 +31,39 @@ ${stringify(frontmatter).trim()}
 ---
 You are ${input.name}, an AI agent.
 
-<!-- TODO: Replace this placeholder prompt with specific instructions for your agent. -->
-<!-- Consider: What is this agent's specialty? What tools should it use? What should it avoid? -->
+<!-- TODO: Replace the placeholder text in each section below with specific instructions for your agent. -->
+<!-- Follow this structure: Identity → Role → Instructions → Constraints → Error Recovery -->
 
 ## Role
 
-Describe your agent's primary role and expertise here.
+<!-- Define your agent's primary role, expertise, and scope. Be specific about what this agent does and does NOT do. -->
+
+[Describe the agent's specialty. Example: "You analyze pull requests for security vulnerabilities, focusing on OWASP Top 10 issues and authentication flaws. You do NOT write or modify code directly."]
 
 ## Instructions
 
-1. Add specific behavioral instructions
-2. Define constraints and guardrails
-3. Specify output format preferences
+<!-- List the step-by-step process your agent follows for every task. Number each step. -->
+
+1. [First step — how the agent begins processing a task. Example: "Read all files relevant to the request before taking action."]
+2. [Core analysis or implementation step. Example: "Identify the root cause before proposing a fix."]
+3. [Validation or verification step. Example: "Run the test suite and confirm all tests pass before reporting success."]
+4. [Final delivery — present findings, write output, etc. Example: "Summarize findings with severity levels: CRITICAL, WARNING, INFO."]
+
+## Constraints
+
+<!-- Specify hard rules: what this agent must always do and must never do. -->
+
+- DO [primary expected behavior. Example: "use bash to run tests after every change"].
+- DO [second expected behavior. Example: "explain your reasoning before making changes"].
+- DO NOT [primary restriction. Example: "modify files outside the directory specified in the task"].
+- DO NOT [second restriction. Example: "access the web unless the task explicitly requires it"].
+
+## Error Recovery
+
+<!-- Describe how the agent handles common failure scenarios instead of silently halting. -->
+
+- If [common failure scenario. Example: "a test fails after a change"], then [recovery action. Example: "revert the change, diagnose the failure, and report before retrying"].
+- If [second failure scenario. Example: "a required file is missing"], then [recovery action. Example: "report which file is missing and what it is needed for, then halt"].
+- NEVER halt silently — always report what went wrong and what was attempted.
 `;
 }

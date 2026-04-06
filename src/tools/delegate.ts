@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { BackgroundManager } from "../background/manager";
 import { type BackgroundSdkOperations, createSdkRunner } from "../background/sdk-runner";
@@ -6,7 +7,10 @@ import { loadConfig } from "../config";
 import { openKernelDb } from "../kernel/database";
 import { makeRoutingDecision } from "../routing";
 import { getCategoryDefinition } from "../routing/categories";
+import { buildMultiSkillContext } from "../skills/adaptive-injector";
+import { loadAllSkills } from "../skills/loader";
 import { type Category, CategoryConfigSchema, CategorySchema } from "../types/routing";
+import { getGlobalConfigDir } from "../utils/paths";
 
 function buildDisplayText(input: {
 	readonly task: string;
@@ -96,9 +100,42 @@ function resolveRoutingDecision(
 
 let defaultDelegateManager: BackgroundManager | null = null;
 let delegateSdkOps: BackgroundSdkOperations | null = null;
+let skillCachePromise: Promise<ReadonlyMap<string, import("../skills/loader").LoadedSkill>> | null =
+	null;
 
 export function setDelegateSdkOperations(ops: BackgroundSdkOperations): void {
 	delegateSdkOps = ops;
+}
+
+function getSkillsPromise(): Promise<ReadonlyMap<string, import("../skills/loader").LoadedSkill>> {
+	if (!skillCachePromise) {
+		skillCachePromise = loadAllSkills(join(getGlobalConfigDir(), "skills")).catch((error) => {
+			skillCachePromise = null;
+			throw error;
+		});
+	}
+	return skillCachePromise;
+}
+
+async function buildDelegationSkillContext(skillNames: readonly string[]): Promise<string> {
+	if (skillNames.length === 0) return "";
+	try {
+		const allSkills = await getSkillsPromise();
+		if (allSkills.size === 0) return "";
+
+		const nameSet = new Set(skillNames);
+		const filtered = new Map<string, import("../skills/loader").LoadedSkill>();
+		for (const [name, skill] of allSkills) {
+			if (nameSet.has(name)) {
+				filtered.set(name, skill);
+			}
+		}
+		if (filtered.size === 0) return "";
+
+		return buildMultiSkillContext(filtered, 6000, "full", false);
+	} catch {
+		return "";
+	}
 }
 
 function getDelegateManager(db?: Database): BackgroundManager {
@@ -150,9 +187,12 @@ export async function delegateCore(
 	let taskId: string | undefined;
 
 	if (shouldSpawn) {
+		const skillContext = await buildDelegationSkillContext(routing.skills);
+		const enrichedDescription = skillContext ? `${task}${skillContext}` : task;
+
 		const manager = getDelegateManager(db);
 		const sessionId = options?.sessionId ?? "delegate-session";
-		taskId = manager.spawn(sessionId, task, {
+		taskId = manager.spawn(sessionId, enrichedDescription, {
 			category: routing.category,
 			agent: routing.agentId,
 			model: routing.modelGroup,

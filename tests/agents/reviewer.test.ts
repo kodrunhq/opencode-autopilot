@@ -11,7 +11,7 @@ describe("reviewer agent config", () => {
 		expect(reviewerAgent.description?.length).toBeGreaterThan(0);
 	});
 
-	test("has a production-ready prompt with embedded skill content", () => {
+	test("has a production-ready prompt", () => {
 		expect(typeof reviewerAgent.prompt).toBe("string");
 		expect(reviewerAgent.prompt?.length).toBeGreaterThanOrEqual(100);
 	});

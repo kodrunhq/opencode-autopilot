@@ -4,7 +4,7 @@ import { tool } from "@opencode-ai/plugin";
 import { generateAgentMarkdown } from "../templates/agent-template";
 import { ensureDir } from "../utils/fs-helpers";
 import { getGlobalConfigDir } from "../utils/paths";
-import { validateAssetName } from "../utils/validators";
+import { validateAgentPrompt, validateAssetName } from "../utils/validators";
 
 interface CreateAgentArgs {
 	readonly name: string;
@@ -46,7 +46,14 @@ export async function createAgentCore(args: CreateAgentArgs, baseDir: string): P
 		return `Error: Failed to write agent: ${message}`;
 	}
 
-	return `Agent '${args.name}' created at ${filePath}. Restart OpenCode to use it.`;
+	const promptBody = markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
+	const promptCheck = validateAgentPrompt(promptBody);
+	const qualityHints =
+		promptCheck.warnings.length > 0
+			? `\n\nPrompt quality hints:\n${promptCheck.warnings.map((w) => `- ${w}`).join("\n")}`
+			: "";
+
+	return `Agent '${args.name}' created at ${filePath}. Restart OpenCode to use it.${qualityHints}`;
 }
 
 export const ocCreateAgent = tool({

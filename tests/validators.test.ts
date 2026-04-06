@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
 	ASSET_NAME_REGEX,
 	BUILT_IN_COMMANDS,
+	validateAgentPrompt,
 	validateAssetName,
 	validateCommandName,
 } from "../src/utils/validators";
@@ -172,5 +173,206 @@ describe("validateCommandName", () => {
 		const invalid = validateCommandName("help");
 		expect(Object.isFrozen(valid)).toBe(true);
 		expect(Object.isFrozen(invalid)).toBe(true);
+	});
+});
+
+describe("validateAgentPrompt", () => {
+	const wellFormedPrompt = `You are a code reviewer.
+
+## Steps
+1. Read the diff.
+2. Identify issues.
+3. Report findings.
+
+## Constraints
+- DO focus on correctness.
+- DO NOT modify files.
+
+## Error Recovery
+- If diff is empty, report "no changes to review."
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+
+	it("accepts a well-formed prompt as valid", () => {
+		const result = validateAgentPrompt(wellFormedPrompt);
+		expect(result.valid).toBe(true);
+		expect(result.warnings).toHaveLength(0);
+	});
+
+	it("warns when prompt is too short", () => {
+		const result = validateAgentPrompt("You are a bot.");
+		expect(result.warnings).toContainEqual(expect.stringContaining("very short"));
+	});
+
+	it("marks short prompt without sections as invalid", () => {
+		const result = validateAgentPrompt("You are a bot.");
+		expect(result.valid).toBe(false);
+	});
+
+	it("warns when prompt lacks identity sentence", () => {
+		const prompt = `Do the thing.
+
+## Steps
+1. Step one.
+
+## Constraints
+- DO stuff.
+
+## Error Recovery
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		const result = validateAgentPrompt(prompt);
+		expect(result.warnings).toContainEqual(expect.stringContaining("identity sentence"));
+	});
+
+	it("warns when ## Steps section is missing", () => {
+		const prompt = `You are a helper.
+
+## Constraints
+- DO stuff.
+
+## Error Recovery
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		const result = validateAgentPrompt(prompt);
+		expect(result.warnings).toContainEqual(expect.stringContaining("Steps"));
+	});
+
+	it("warns when ## Constraints section is missing", () => {
+		const prompt = `You are a helper.
+
+## Steps
+1. Do work.
+
+## Error Recovery
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		const result = validateAgentPrompt(prompt);
+		expect(result.warnings).toContainEqual(expect.stringContaining("Constraints"));
+	});
+
+	it("warns when ## Error Recovery section is missing", () => {
+		const prompt = `You are a helper.
+
+## Steps
+1. Do work.
+
+## Constraints
+- DO stuff.`;
+		const result = validateAgentPrompt(prompt);
+		expect(result.warnings).toContainEqual(expect.stringContaining("Error Recovery"));
+	});
+
+	it("warns when NEVER halt silently is missing", () => {
+		const prompt = `You are a helper.
+
+## Steps
+1. Do work.
+
+## Constraints
+- DO stuff.
+
+## Error Recovery
+- Report errors.`;
+		const result = validateAgentPrompt(prompt);
+		expect(result.warnings).toContainEqual(expect.stringContaining("NEVER halt silently"));
+	});
+
+	it("accepts ## Instructions as alternative to ## Steps", () => {
+		const prompt = `You are a helper.
+
+## Instructions
+1. Do work.
+
+## Constraints
+- DO stuff.
+
+## Error Recovery
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		const result = validateAgentPrompt(prompt);
+		const stepsWarning = result.warnings.find((w) => w.includes("Steps"));
+		expect(stepsWarning).toBeUndefined();
+	});
+
+	it("returns frozen result", () => {
+		const result = validateAgentPrompt(wellFormedPrompt);
+		expect(Object.isFrozen(result)).toBe(true);
+		expect(Object.isFrozen(result.warnings)).toBe(true);
+	});
+
+	it("warns on unmodified template placeholders", () => {
+		const prompt = `You are a helper.
+
+## Instructions
+1. [First step — how the agent begins processing a task.]
+
+## Constraints
+- DO [primary expected behavior].
+
+## Error Recovery
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		const result = validateAgentPrompt(prompt);
+		expect(result.valid).toBe(false);
+		expect(result.warnings).toContainEqual(
+			expect.stringContaining("unmodified template placeholders"),
+		);
+	});
+
+	it("warns on TODO HTML comments from template and marks invalid", () => {
+		const prompt = `You are a helper.
+
+<!-- TODO: Replace the placeholder text -->
+
+## Instructions
+1. Do work.
+
+## Constraints
+- DO stuff.
+
+## Error Recovery
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		const result = validateAgentPrompt(prompt);
+		expect(result.valid).toBe(false);
+		expect(result.warnings).toContainEqual(expect.stringContaining("TODO comments"));
+	});
+
+	it("marks prompt with placeholders as invalid even with all sections present", () => {
+		const prompt = `You are a helper.
+
+## Instructions
+1. [Describe the agent's specialty.]
+
+## Constraints
+- DO stuff.
+
+## Error Recovery
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		const result = validateAgentPrompt(prompt);
+		expect(result.valid).toBe(false);
+	});
+
+	it("catches recovery action and Define your placeholder variants", () => {
+		const recoveryPrompt = `You are a helper.
+
+## Instructions
+1. Do work.
+
+## Constraints
+- DO stuff.
+
+## Error Recovery
+- If a test fails, [recovery action — revert].
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		expect(validateAgentPrompt(recoveryPrompt).valid).toBe(false);
+
+		const rolePrompt = `You are a helper.
+
+## Instructions
+1. Do work.
+
+## Constraints
+- DO stuff.
+
+[Define your agent's primary role, expertise, and scope.]
+
+## Error Recovery
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		expect(validateAgentPrompt(rolePrompt).valid).toBe(false);
 	});
 });
