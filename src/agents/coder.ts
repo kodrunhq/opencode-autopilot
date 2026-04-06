@@ -19,7 +19,7 @@ export const coderAgent: Readonly<AgentConfig> = Object.freeze({
 
 ## Constraints
 
-- ${skillConstraints(["TDD workflow", "coding standards"])}
+- ${skillConstraints(["tdd-workflow", "coding-standards"])}
 - ${HASHLINE_EDIT_PREFERENCE}
 - DO run tests after every code change using bash.
 - DO commit with descriptive messages (e.g., \`feat: implement [behavior]\`, \`fix: correct [behavior]\`).

@@ -99,7 +99,7 @@ export function validateAgentPrompt(prompt: string): PromptValidationResult {
 	}
 
 	const placeholderPattern =
-		/\[(?:Describe |First step|Core analysis|Validation |Final delivery|primary expected|second expected|primary restriction|second restriction|common failure|second failure)/;
+		/\[(?:Describe |First step|Core analysis|Validation |Final delivery|primary expected|second expected|primary restriction|second restriction|common failure|second failure|recovery action|Define your)/;
 	if (placeholderPattern.test(prompt)) {
 		warnings.push(
 			"Prompt contains unmodified template placeholders (text in [brackets]). Replace all placeholder text with real instructions.",
@@ -113,7 +113,11 @@ export function validateAgentPrompt(prompt: string): PromptValidationResult {
 		);
 	}
 
-	const valid = prompt.length >= 50 && /^## /m.test(prompt) && !placeholderPattern.test(prompt);
+	const valid =
+		prompt.length >= 50 &&
+		/^## /m.test(prompt) &&
+		!placeholderPattern.test(prompt) &&
+		!htmlCommentPattern.test(prompt);
 
 	return Object.freeze({ valid, warnings: Object.freeze(warnings) });
 }

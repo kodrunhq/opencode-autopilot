@@ -314,7 +314,7 @@ describe("validateAgentPrompt", () => {
 		);
 	});
 
-	it("warns on TODO HTML comments from template", () => {
+	it("warns on TODO HTML comments from template and marks invalid", () => {
 		const prompt = `You are a helper.
 
 <!-- TODO: Replace the placeholder text -->
@@ -328,6 +328,7 @@ describe("validateAgentPrompt", () => {
 ## Error Recovery
 - NEVER halt silently — always report what went wrong and what was attempted.`;
 		const result = validateAgentPrompt(prompt);
+		expect(result.valid).toBe(false);
 		expect(result.warnings).toContainEqual(expect.stringContaining("TODO comments"));
 	});
 
@@ -344,5 +345,34 @@ describe("validateAgentPrompt", () => {
 - NEVER halt silently — always report what went wrong and what was attempted.`;
 		const result = validateAgentPrompt(prompt);
 		expect(result.valid).toBe(false);
+	});
+
+	it("catches recovery action and Define your placeholder variants", () => {
+		const recoveryPrompt = `You are a helper.
+
+## Instructions
+1. Do work.
+
+## Constraints
+- DO stuff.
+
+## Error Recovery
+- If a test fails, [recovery action — revert].
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		expect(validateAgentPrompt(recoveryPrompt).valid).toBe(false);
+
+		const rolePrompt = `You are a helper.
+
+## Instructions
+1. Do work.
+
+## Constraints
+- DO stuff.
+
+[Define your agent's primary role, expertise, and scope.]
+
+## Error Recovery
+- NEVER halt silently — always report what went wrong and what was attempted.`;
+		expect(validateAgentPrompt(rolePrompt).valid).toBe(false);
 	});
 });

@@ -109,7 +109,10 @@ export function setDelegateSdkOperations(ops: BackgroundSdkOperations): void {
 
 function getSkillsPromise(): Promise<ReadonlyMap<string, import("../skills/loader").LoadedSkill>> {
 	if (!skillCachePromise) {
-		skillCachePromise = loadAllSkills(join(getGlobalConfigDir(), "skills"));
+		skillCachePromise = loadAllSkills(join(getGlobalConfigDir(), "skills")).catch((error) => {
+			skillCachePromise = null;
+			throw error;
+		});
 	}
 	return skillCachePromise;
 }

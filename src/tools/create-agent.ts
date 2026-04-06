@@ -46,7 +46,7 @@ export async function createAgentCore(args: CreateAgentArgs, baseDir: string): P
 		return `Error: Failed to write agent: ${message}`;
 	}
 
-	const promptBody = markdown.split("---\n").slice(2).join("---\n").trim();
+	const promptBody = markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
 	const promptCheck = validateAgentPrompt(promptBody);
 	const qualityHints =
 		promptCheck.warnings.length > 0

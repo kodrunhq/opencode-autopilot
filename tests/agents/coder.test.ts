@@ -18,12 +18,12 @@ describe("coder agent config", () => {
 
 	test("prompt references TDD workflow skill", () => {
 		const prompt = coderAgent.prompt ?? "";
-		expect(prompt).toContain("TDD workflow");
+		expect(prompt).toContain("tdd-workflow");
 	});
 
 	test("prompt references coding standards skill", () => {
 		const prompt = coderAgent.prompt ?? "";
-		expect(prompt).toContain("coding standards");
+		expect(prompt).toContain("coding-standards");
 	});
 
 	test("permissions: exact shape (edit, bash allowed; webfetch denied)", () => {

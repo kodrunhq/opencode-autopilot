@@ -46,10 +46,15 @@ export function createAgentSkillInjector(options: {
 		if (skillCache) return skillCache;
 
 		if (!cachePromise) {
-			cachePromise = loadAllSkills(join(options.baseDir, "skills")).then((skills) => {
-				skillCache = skills;
-				return skills;
-			});
+			cachePromise = loadAllSkills(join(options.baseDir, "skills"))
+				.then((skills) => {
+					skillCache = skills;
+					return skills;
+				})
+				.catch((error) => {
+					cachePromise = null;
+					throw error;
+				});
 		}
 
 		return cachePromise;
