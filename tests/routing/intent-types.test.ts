@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+	allIntentRoutings,
 	getIntentRouting,
-	INTENT_ROUTING_MAP,
+	getIntentTypes,
+	hasIntentRouting,
 	IntentClassificationSchema,
 	IntentRoutingSchema,
 	IntentTypeSchema,
@@ -135,72 +137,80 @@ describe("IntentRoutingSchema", () => {
 	});
 });
 
-describe("INTENT_ROUTING_MAP", () => {
+describe("intent routing lookup API", () => {
 	test("has an entry for every intent type", () => {
 		const allIntents = IntentTypeSchema.options;
 		for (const intent of allIntents) {
-			expect(INTENT_ROUTING_MAP.has(intent)).toBe(true);
+			expect(hasIntentRouting(intent)).toBe(true);
 		}
 	});
 
+	test("getIntentTypes returns all 9 intents", () => {
+		const types = getIntentTypes();
+		expect(types).toHaveLength(9);
+		expect(types).toContain("research");
+		expect(types).toContain("implementation");
+		expect(types).toContain("open_ended");
+	});
+
 	test("maps research to researcher without pipeline", () => {
-		const routing = INTENT_ROUTING_MAP.get("research");
-		expect(routing?.targetAgent).toBe("researcher");
-		expect(routing?.usePipeline).toBe(false);
+		const routing = getIntentRouting("research");
+		expect(routing.targetAgent).toBe("researcher");
+		expect(routing.usePipeline).toBe(false);
 	});
 
 	test("maps implementation to autopilot with pipeline", () => {
-		const routing = INTENT_ROUTING_MAP.get("implementation");
-		expect(routing?.targetAgent).toBe("autopilot");
-		expect(routing?.usePipeline).toBe(true);
+		const routing = getIntentRouting("implementation");
+		expect(routing.targetAgent).toBe("autopilot");
+		expect(routing.usePipeline).toBe(true);
 	});
 
 	test("maps fix to debugger without pipeline", () => {
-		const routing = INTENT_ROUTING_MAP.get("fix");
-		expect(routing?.targetAgent).toBe("debugger");
-		expect(routing?.usePipeline).toBe(false);
+		const routing = getIntentRouting("fix");
+		expect(routing.targetAgent).toBe("debugger");
+		expect(routing.usePipeline).toBe(false);
 	});
 
 	test("maps review to reviewer without pipeline", () => {
-		const routing = INTENT_ROUTING_MAP.get("review");
-		expect(routing?.targetAgent).toBe("reviewer");
-		expect(routing?.usePipeline).toBe(false);
+		const routing = getIntentRouting("review");
+		expect(routing.targetAgent).toBe("reviewer");
+		expect(routing.usePipeline).toBe(false);
 	});
 
 	test("maps planning to planner without pipeline", () => {
-		const routing = INTENT_ROUTING_MAP.get("planning");
-		expect(routing?.targetAgent).toBe("planner");
-		expect(routing?.usePipeline).toBe(false);
+		const routing = getIntentRouting("planning");
+		expect(routing.targetAgent).toBe("planner");
+		expect(routing.usePipeline).toBe(false);
 	});
 
 	test("maps quick to coder without pipeline", () => {
-		const routing = INTENT_ROUTING_MAP.get("quick");
-		expect(routing?.targetAgent).toBe("coder");
-		expect(routing?.usePipeline).toBe(false);
+		const routing = getIntentRouting("quick");
+		expect(routing.targetAgent).toBe("coder");
+		expect(routing.usePipeline).toBe(false);
 	});
 
 	test("maps investigation to researcher without pipeline", () => {
-		const routing = INTENT_ROUTING_MAP.get("investigation");
-		expect(routing?.targetAgent).toBe("researcher");
-		expect(routing?.usePipeline).toBe(false);
+		const routing = getIntentRouting("investigation");
+		expect(routing.targetAgent).toBe("researcher");
+		expect(routing.usePipeline).toBe(false);
 	});
 
 	test("maps evaluation to reviewer without pipeline", () => {
-		const routing = INTENT_ROUTING_MAP.get("evaluation");
-		expect(routing?.targetAgent).toBe("reviewer");
-		expect(routing?.usePipeline).toBe(false);
+		const routing = getIntentRouting("evaluation");
+		expect(routing.targetAgent).toBe("reviewer");
+		expect(routing.usePipeline).toBe(false);
 	});
 
 	test("CRITICAL 2: open_ended does NOT use pipeline", () => {
-		const routing = INTENT_ROUTING_MAP.get("open_ended");
-		expect(routing?.targetAgent).toBe("autopilot");
-		expect(routing?.usePipeline).toBe(false);
-		expect(routing?.behavior).toContain("Assess");
+		const routing = getIntentRouting("open_ended");
+		expect(routing.targetAgent).toBe("autopilot");
+		expect(routing.usePipeline).toBe(false);
+		expect(routing.behavior).toContain("Assess");
 	});
 
 	test("only implementation uses the full pipeline", () => {
 		const pipelineIntents: string[] = [];
-		for (const [intent, routing] of INTENT_ROUTING_MAP) {
+		for (const [intent, routing] of allIntentRoutings()) {
 			if (routing.usePipeline) {
 				pipelineIntents.push(intent);
 			}
@@ -209,9 +219,18 @@ describe("INTENT_ROUTING_MAP", () => {
 	});
 
 	test("every routing entry has a non-empty behavior string", () => {
-		for (const [_intent, routing] of INTENT_ROUTING_MAP) {
+		for (const [_intent, routing] of allIntentRoutings()) {
 			expect(routing.behavior.length).toBeGreaterThan(0);
 		}
+	});
+
+	test("allIntentRoutings returns all 9 entries", () => {
+		expect(allIntentRoutings()).toHaveLength(9);
+	});
+
+	test("routing entries are frozen (individual values immutable)", () => {
+		const routing = getIntentRouting("research");
+		expect(Object.isFrozen(routing)).toBe(true);
 	});
 });
 
@@ -222,17 +241,20 @@ describe("getIntentRouting", () => {
 		expect(routing.usePipeline).toBe(false);
 	});
 
-	test("returns same reference as INTENT_ROUTING_MAP", () => {
-		const fromMap = INTENT_ROUTING_MAP.get("research");
-		const fromFn = getIntentRouting("research");
-		expect(fromMap).toBeDefined();
-		if (fromMap) expect(fromFn).toBe(fromMap);
+	test("returns consistent results across calls", () => {
+		const first = getIntentRouting("research");
+		const second = getIntentRouting("research");
+		expect(first).toBe(second);
 	});
 
 	test("fallback routing does not use pipeline", () => {
-		// Force a fallback by casting — tests the defensive default
 		const routing = getIntentRouting("nonexistent" as "research");
 		expect(routing.usePipeline).toBe(false);
 		expect(routing.targetAgent).toBe("autopilot");
+	});
+
+	test("fallback routing is frozen", () => {
+		const routing = getIntentRouting("nonexistent" as "research");
+		expect(Object.isFrozen(routing)).toBe(true);
 	});
 });

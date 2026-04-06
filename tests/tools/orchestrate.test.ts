@@ -507,4 +507,31 @@ describe("active pipeline intent guard", () => {
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed.phase).toBe("CHALLENGE");
 	});
+
+	test("result-based resume with stray non-implementation intent is NOT rejected", async () => {
+		const first = JSON.parse(
+			await orchestrateCore({ idea: "build a widget", intent: "implementation" }, tempDir),
+		);
+		expect(first.action).toBe("dispatch");
+
+		const envelope = {
+			schemaVersion: 1,
+			resultId: "stray-intent-resume",
+			runId: first.runId,
+			phase: "RECON",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "research complete" },
+		};
+		const result = await orchestrateCore(
+			{ result: JSON.stringify(envelope), intent: "research" },
+			tempDir,
+		);
+		const parsed = JSON.parse(result);
+		expect(parsed.code).not.toBe("E_INTENT_NOT_IMPLEMENTATION");
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.phase).toBe("CHALLENGE");
+	});
 });

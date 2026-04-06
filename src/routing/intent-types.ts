@@ -121,18 +121,33 @@ const ROUTING_ENTRIES: ReadonlyArray<readonly [IntentType, IntentRouting]> = Obj
 	],
 ] as const);
 
-export const INTENT_ROUTING_MAP: ReadonlyMap<IntentType, Readonly<IntentRouting>> = Object.freeze(
-	new Map(ROUTING_ENTRIES),
+/** Internal lookup — not exported to prevent runtime mutation of Map internals. */
+const INTENT_ROUTING_MAP: ReadonlyMap<IntentType, Readonly<IntentRouting>> = new Map(
+	ROUTING_ENTRIES,
 );
 
+const FALLBACK_ROUTING: Readonly<IntentRouting> = Object.freeze({
+	targetAgent: "autopilot",
+	usePipeline: false,
+	behavior: "Assess the request and clarify before proceeding.",
+});
+
+/** All known intent types in the routing map. */
+export function getIntentTypes(): readonly IntentType[] {
+	return [...INTENT_ROUTING_MAP.keys()] as readonly IntentType[];
+}
+
+/** Look up the routing entry for a given intent. Returns a frozen fallback for unknown intents. */
 export function getIntentRouting(intent: IntentType): Readonly<IntentRouting> {
-	const routing = INTENT_ROUTING_MAP.get(intent);
-	if (!routing) {
-		return Object.freeze({
-			targetAgent: "autopilot",
-			usePipeline: false,
-			behavior: "Assess the request and clarify before proceeding.",
-		});
-	}
-	return routing;
+	return INTENT_ROUTING_MAP.get(intent) ?? FALLBACK_ROUTING;
+}
+
+/** Check whether a routing entry exists for the given intent. */
+export function hasIntentRouting(intent: IntentType): boolean {
+	return INTENT_ROUTING_MAP.has(intent);
+}
+
+/** Iterate over all intent→routing pairs. */
+export function allIntentRoutings(): ReadonlyArray<readonly [IntentType, Readonly<IntentRouting>]> {
+	return ROUTING_ENTRIES;
 }

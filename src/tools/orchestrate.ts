@@ -729,23 +729,27 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 
 		// State exists
 		if (state !== null) {
-			if (args.intent && args.intent !== "implementation") {
-				const routing = getIntentRouting(args.intent);
-				return JSON.stringify({
-					action: "error",
-					code: "E_INTENT_NOT_IMPLEMENTATION",
-					message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
-				});
-			}
+			// Result-based resumes are machine-driven continuations — skip intent guards.
+			// Human-initiated calls (idea or bare advance) still require intent classification.
+			if (!args.result) {
+				if (args.intent && args.intent !== "implementation") {
+					const routing = getIntentRouting(args.intent);
+					return JSON.stringify({
+						action: "error",
+						code: "E_INTENT_NOT_IMPLEMENTATION",
+						message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
+					});
+				}
 
-			// New user turn with idea on active pipeline requires intent classification
-			if (args.idea && !args.intent) {
-				return JSON.stringify({
-					action: "error",
-					code: "E_INTENT_REQUIRED",
-					message:
-						"A new idea on an active pipeline requires intent classification. Call oc_route first, then pass intent: 'implementation' to continue the pipeline with a new idea.",
-				});
+				// New user turn with idea on active pipeline requires intent classification
+				if (args.idea && !args.intent) {
+					return JSON.stringify({
+						action: "error",
+						code: "E_INTENT_REQUIRED",
+						message:
+							"A new idea on an active pipeline requires intent classification. Call oc_route first, then pass intent: 'implementation' to continue the pipeline with a new idea.",
+					});
+				}
 			}
 
 			let phaseHandlerContext: PhaseHandlerContext | undefined;

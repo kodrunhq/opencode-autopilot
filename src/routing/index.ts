@@ -3,8 +3,10 @@ export { classifyTask } from "./classifier";
 export { makeRoutingDecision } from "./engine";
 export type { IntentClassification, IntentRouting, IntentType } from "./intent-types";
 export {
+	allIntentRoutings,
 	getIntentRouting,
-	INTENT_ROUTING_MAP,
+	getIntentTypes,
+	hasIntentRouting,
 	IntentClassificationSchema,
 	IntentRoutingSchema,
 	IntentTypeSchema,
