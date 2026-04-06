@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.23.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.22.0...opencode-autopilot-v1.23.0) (2026-04-06)
+
+
+### Features
+
+* add intent-based routing with oc_route tool and Intent Gate autopilot prompt ([1efb80d](https://github.com/kodrunhq/opencode-autopilot/commit/1efb80d45ea6cb6e26ef8fcf2e746d495ce3faf1))
+* intent recognition and routing — route by intent, not always pipeline ([78c8df8](https://github.com/kodrunhq/opencode-autopilot/commit/78c8df89698efad89407ac1e924ff95772265de5))
+* **intent-routing:** add runtime intent guard to oc_orchestrate (v3) ([6b860fb](https://github.com/kodrunhq/opencode-autopilot/commit/6b860fbe3f1f67c59a5a89f689642456fc787135))
+* **intent-routing:** address Oracle verification feedback — v2 ([6b2c775](https://github.com/kodrunhq/opencode-autopilot/commit/6b2c775c2b204a7d4d3989eb5d0a55ae8aa29397))
+* **intent-routing:** enforce runtime intent guard + close Oracle v3 gaps (v4) ([ef7eb9c](https://github.com/kodrunhq/opencode-autopilot/commit/ef7eb9cf8c208b4d055978bdcf868f3c3b22f506))
+
+
+### Bug Fixes
+
+* **intent-routing:** close Oracle v4 gaps — active-run intent guard, text alignment, test accuracy (v5) ([b6da36e](https://github.com/kodrunhq/opencode-autopilot/commit/b6da36e760439cf10af66742920d9d299f9fe085))
+* **intent-routing:** freeze INTENT_ROUTING_MAP to match codebase immutability pattern (v6) ([c16c162](https://github.com/kodrunhq/opencode-autopilot/commit/c16c1626acc2c7f067b20bd37377832c0a2d6aca))
+* **intent-routing:** truly immutable routing map + skip intent guard on result resumes (v7) ([81f8e6a](https://github.com/kodrunhq/opencode-autopilot/commit/81f8e6a348bea718a2c7145965b3f9368a764f18))
+
 ## [1.22.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.21.0...opencode-autopilot-v1.22.0) (2026-04-06)
 
 
