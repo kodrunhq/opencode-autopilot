@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.21.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.20.0...opencode-autopilot-v1.21.0) (2026-04-06)
+
+
+### Features
+
+* complete agent quality overhaul — prompt modularity, skill injection, delegation path, and creation validation ([60d53ce](https://github.com/kodrunhq/opencode-autopilot/commit/60d53ce4af901d80756f9b6c7dfcadca0543bc5c))
+* complete plugin overhaul — agents, hooks, LSP, UX, and quality infrastructure ([4abbe19](https://github.com/kodrunhq/opencode-autopilot/commit/4abbe19d00a5903ac1d0b07a9efa1c88156fa431))
+
+
+### Bug Fixes
+
+* address 6 Copilot review comments — skill IDs, placeholder regex, cache retry, frontmatter parsing ([84d612c](https://github.com/kodrunhq/opencode-autopilot/commit/84d612c98a4ba6cc17b47ed8df19307ddd9eca47))
+
 ## [1.20.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.19.0...opencode-autopilot-v1.20.0) (2026-04-06)
 
 
