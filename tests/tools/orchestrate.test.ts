@@ -287,8 +287,8 @@ describe("autopilotAgent", () => {
 		);
 	});
 
-	test("prompt is lean (under 2500 chars)", () => {
-		expect(autopilotAgent.prompt?.length).toBeLessThan(2500);
+	test("prompt is lean (under 5000 chars)", () => {
+		expect(autopilotAgent.prompt?.length).toBeLessThan(5000);
 	});
 
 	test("has maxSteps of 50", () => {

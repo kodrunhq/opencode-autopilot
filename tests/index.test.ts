@@ -89,6 +89,7 @@ describe("plugin entry point", () => {
 			"oc_recover",
 			"oc_forensics",
 			"oc_review",
+			"oc_route",
 			"oc_logs",
 			"oc_loop",
 			"oc_session_stats",
@@ -102,7 +103,7 @@ describe("plugin entry point", () => {
 			"oc_summary",
 		];
 		expect(toolNames).toEqual([...expected].sort());
-		expect(toolNames).toHaveLength(33);
+		expect(toolNames).toHaveLength(34);
 	});
 
 	test("every registered tool has a valid execute function", async () => {
