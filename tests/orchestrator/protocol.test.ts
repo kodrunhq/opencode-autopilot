@@ -17,7 +17,9 @@ afterEach(async () => {
 
 describe("orchestrator protocol hardening", () => {
 	test("pending phase_output dispatch rejects review_findings envelope", async () => {
-		const first = JSON.parse(await orchestrateCore({ idea: "protocol mismatch" }, tempDir));
+		const first = JSON.parse(
+			await orchestrateCore({ idea: "protocol mismatch", intent: "implementation" }, tempDir),
+		);
 		const result = JSON.parse(
 			await orchestrateCore(
 				{

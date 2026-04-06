@@ -22,7 +22,10 @@ describe("Cross-feature integration: orchestrator + skills + memory", () => {
 	});
 
 	test("orchestrateCore with idea dispatches RECON with valid prompt", async () => {
-		const result = await orchestrateCore({ idea: "cross-feature integration test" }, tempDir);
+		const result = await orchestrateCore(
+			{ idea: "cross-feature integration test", intent: "implementation" },
+			tempDir,
+		);
 		const parsed = JSON.parse(result);
 
 		expect(parsed.action).toBe("dispatch");
@@ -48,7 +51,10 @@ describe("Cross-feature integration: orchestrator + skills + memory", () => {
 	});
 
 	test("combined enrichment does not corrupt dispatch JSON", async () => {
-		const result = await orchestrateCore({ idea: "integration test validation" }, tempDir);
+		const result = await orchestrateCore(
+			{ idea: "integration test validation", intent: "implementation" },
+			tempDir,
+		);
 		const parsed = JSON.parse(result);
 
 		// Core dispatch fields must all be present and valid

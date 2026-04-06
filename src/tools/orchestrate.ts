@@ -21,6 +21,7 @@ import {
 	updatePersistedState,
 } from "../orchestrator/state";
 import type { Phase, PipelineState } from "../orchestrator/types";
+import { getIntentRouting, type IntentType, IntentTypeSchema } from "../routing/intent-types";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
 import {
@@ -34,6 +35,7 @@ import { reviewCore } from "./review";
 interface OrchestrateArgs {
 	readonly idea?: string;
 	readonly result?: string;
+	readonly intent?: IntentType;
 }
 
 const ORCHESTRATE_ERROR_CODES = Object.freeze({
@@ -690,8 +692,25 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 			});
 		}
 
-		// No state but idea provided -> create initial state and dispatch RECON via handler
+		// No state but idea provided -> intent guard: require explicit intent classification
 		if (state === null && args.idea) {
+			if (!args.intent) {
+				return JSON.stringify({
+					action: "error",
+					code: "E_INTENT_REQUIRED",
+					message:
+						"Intent classification is required to start the pipeline. Call oc_route first to classify the user's intent, then pass intent: 'implementation' to oc_orchestrate.",
+				});
+			}
+			if (args.intent !== "implementation") {
+				const routing = getIntentRouting(args.intent);
+				return JSON.stringify({
+					action: "error",
+					code: "E_INTENT_NOT_IMPLEMENTATION",
+					message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
+				});
+			}
+
 			const newState = createInitialState(args.idea);
 			await saveState(newState, artifactDir);
 
@@ -710,6 +729,29 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 
 		// State exists
 		if (state !== null) {
+			// Result-based resumes are machine-driven continuations — skip intent guards.
+			// Human-initiated calls (idea or bare advance) still require intent classification.
+			if (!args.result) {
+				if (args.intent && args.intent !== "implementation") {
+					const routing = getIntentRouting(args.intent);
+					return JSON.stringify({
+						action: "error",
+						code: "E_INTENT_NOT_IMPLEMENTATION",
+						message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
+					});
+				}
+
+				// New user turn with idea on active pipeline requires intent classification
+				if (args.idea && !args.intent) {
+					return JSON.stringify({
+						action: "error",
+						code: "E_INTENT_REQUIRED",
+						message:
+							"A new idea on an active pipeline requires intent classification. Call oc_route first, then pass intent: 'implementation' to continue the pipeline with a new idea.",
+					});
+				}
+			}
+
 			let phaseHandlerContext: PhaseHandlerContext | undefined;
 			let handlerInputResult = args.result;
 
@@ -853,6 +895,9 @@ export const ocOrchestrate = tool({
 			.max(1_048_576)
 			.optional()
 			.describe("Result from previous agent to advance the pipeline"),
+		intent: IntentTypeSchema.optional().describe(
+			"Intent classification from oc_route. Required for new pipeline starts — must be 'implementation'. Non-implementation intents are rejected with routing guidance. Optional when resuming an existing pipeline with a result.",
+		),
 	},
 	async execute(args) {
 		return orchestrateCore(args, getProjectArtifactDir(process.cwd()));

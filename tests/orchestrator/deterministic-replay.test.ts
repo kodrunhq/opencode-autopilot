@@ -20,8 +20,12 @@ describe("deterministic replay", () => {
 	});
 
 	test("same envelope trace yields same final state", async () => {
-		const firstDispatchA = JSON.parse(await orchestrateCore({ idea: "build test app" }, tempDirA));
-		const firstDispatchB = JSON.parse(await orchestrateCore({ idea: "build test app" }, tempDirB));
+		const firstDispatchA = JSON.parse(
+			await orchestrateCore({ idea: "build test app", intent: "implementation" }, tempDirA),
+		);
+		const firstDispatchB = JSON.parse(
+			await orchestrateCore({ idea: "build test app", intent: "implementation" }, tempDirB),
+		);
 
 		const envelopeA = {
 			schemaVersion: 1,
@@ -55,7 +59,9 @@ describe("deterministic replay", () => {
 	});
 
 	test("duplicate result envelope is rejected deterministically", async () => {
-		const dispatch = JSON.parse(await orchestrateCore({ idea: "dupe test" }, tempDirA));
+		const dispatch = JSON.parse(
+			await orchestrateCore({ idea: "dupe test", intent: "implementation" }, tempDirA),
+		);
 		const envelope = {
 			schemaVersion: 1,
 			resultId: "dup-result",
@@ -79,7 +85,9 @@ describe("deterministic replay", () => {
 	});
 
 	test("unknown dispatch result is rejected", async () => {
-		const first = JSON.parse(await orchestrateCore({ idea: "unknown dispatch" }, tempDirA));
+		const first = JSON.parse(
+			await orchestrateCore({ idea: "unknown dispatch", intent: "implementation" }, tempDirA),
+		);
 		const unknown = JSON.stringify({
 			schemaVersion: 1,
 			resultId: "unknown-1",
@@ -97,7 +105,9 @@ describe("deterministic replay", () => {
 	});
 
 	test("phase mismatch result is rejected", async () => {
-		const first = JSON.parse(await orchestrateCore({ idea: "phase mismatch" }, tempDirA));
+		const first = JSON.parse(
+			await orchestrateCore({ idea: "phase mismatch", intent: "implementation" }, tempDirA),
+		);
 		const mismatch = JSON.stringify({
 			schemaVersion: 1,
 			resultId: "phase-mismatch-1",
@@ -115,7 +125,7 @@ describe("deterministic replay", () => {
 	});
 
 	test("runId mismatch yields stale result error", async () => {
-		await orchestrateCore({ idea: "stale run" }, tempDirA);
+		await orchestrateCore({ idea: "stale run", intent: "implementation" }, tempDirA);
 		const stale = JSON.stringify({
 			schemaVersion: 1,
 			resultId: "stale-1",

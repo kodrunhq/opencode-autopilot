@@ -35,7 +35,10 @@ afterEach(async () => {
 describe("orchestrateCore pipeline dispatch", () => {
 	test("with idea creates state and dispatches via handleRecon", async () => {
 		const { orchestrateCore } = await import("../src/tools/orchestrate");
-		const result = await orchestrateCore({ idea: "build a chat app" }, tempDir);
+		const result = await orchestrateCore(
+			{ idea: "build a chat app", intent: "implementation" },
+			tempDir,
+		);
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed.agent).toBe("oc-researcher");
@@ -290,7 +293,10 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 	test("_userProgress contains phase number and name for RECON dispatch", async () => {
 		const { orchestrateCore } = await import("../src/tools/orchestrate");
-		const result = await orchestrateCore({ idea: "build a chat app" }, tempDir);
+		const result = await orchestrateCore(
+			{ idea: "build a chat app", intent: "implementation" },
+			tempDir,
+		);
 		const parsed = JSON.parse(result);
 		expect(parsed._userProgress).toBeDefined();
 		expect(parsed._userProgress).toContain("[1/8]");
@@ -431,7 +437,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 	test("JSONL logging side-effect: orchestration.jsonl contains dispatch event", async () => {
 		const { orchestrateCore } = await import("../src/tools/orchestrate");
-		await orchestrateCore({ idea: "build a chat app" }, tempDir);
+		await orchestrateCore({ idea: "build a chat app", intent: "implementation" }, tempDir);
 
 		const logPath = join(tempDir, "orchestration.jsonl");
 		const content = await readFile(logPath, "utf-8");
@@ -482,7 +488,9 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 	test("returns duplicate error when replaying same result envelope", async () => {
 		const { orchestrateCore } = await import("../src/tools/orchestrate");
-		const first = JSON.parse(await orchestrateCore({ idea: "dup test" }, tempDir));
+		const first = JSON.parse(
+			await orchestrateCore({ idea: "dup test", intent: "implementation" }, tempDir),
+		);
 		const envelope = JSON.stringify({
 			schemaVersion: 1,
 			resultId: "dup-1",

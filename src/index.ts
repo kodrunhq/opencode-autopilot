@@ -81,6 +81,7 @@ import { ocPlan } from "./tools/plan";
 import { ocQuick } from "./tools/quick";
 import { ocRecover } from "./tools/recover";
 import { ocReview } from "./tools/review";
+import { ocRoute } from "./tools/route";
 import { ocSessionStats } from "./tools/session-stats";
 import { ocState } from "./tools/state";
 import { ocStocktake } from "./tools/stocktake";
@@ -477,6 +478,7 @@ const plugin: Plugin = async (input) => {
 		oc_forensics: ocForensics,
 		oc_hashline_edit: ocHashlineEdit,
 		oc_review: ocReview,
+		oc_route: ocRoute,
 		oc_logs: ocLogs,
 		oc_loop: ocLoop,
 		oc_session_stats: ocSessionStats,

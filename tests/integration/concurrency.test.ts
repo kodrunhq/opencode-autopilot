@@ -23,7 +23,10 @@ describe("Full Pipeline Concurrency", () => {
 	});
 
 	it("runs the full pipeline under concurrent load", async () => {
-		let resultStr = await orchestrateCore({ idea: "concurrency test" }, tempDir);
+		let resultStr = await orchestrateCore(
+			{ idea: "concurrency test", intent: "implementation" },
+			tempDir,
+		);
 		let result = JSON.parse(resultStr);
 
 		expect(result.action).toBe("dispatch");
