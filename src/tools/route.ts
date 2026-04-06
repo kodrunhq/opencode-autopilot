@@ -17,10 +17,12 @@ function buildInstruction(
 }
 
 function buildSecondaryInstruction(
-	_secondary: IntentType,
+	secondary: IntentType,
 	secondaryRouting: Readonly<{ targetAgent: string; usePipeline: boolean; behavior: string }>,
 ): string {
-	return `After completing the primary intent, follow up with: ${secondaryRouting.behavior} (via ${secondaryRouting.targetAgent})`;
+	const intentHint =
+		secondary === "implementation" ? ' (pass intent: "implementation" to oc_orchestrate)' : "";
+	return `After completing the primary intent, follow up with: ${secondaryRouting.behavior} (via ${secondaryRouting.targetAgent})${intentHint}`;
 }
 
 export function routeCore(args: {

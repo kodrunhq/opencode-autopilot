@@ -207,6 +207,20 @@ describe("routeCore multi-intent (CRITICAL 1)", () => {
 		expect(result.secondaryTargetAgent).toBe("autopilot");
 		expect(result.secondaryUsePipeline).toBe(true);
 		expect(result.secondaryInstruction).toBeDefined();
+		expect(result.secondaryInstruction).toContain('intent: "implementation"');
+	});
+
+	test("secondary non-implementation intent omits intent hint", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "research",
+				secondaryIntent: "fix",
+				reasoning: "User wants to research then fix",
+				verbalization: "I detect research+fix intent",
+			}),
+		);
+		expect(result.secondaryInstruction).toBeDefined();
+		expect(result.secondaryInstruction).not.toContain('intent: "implementation"');
 	});
 
 	test("supports combined review+fix intent", () => {

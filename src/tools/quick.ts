@@ -24,6 +24,10 @@ interface QuickArgs {
  * Core logic for the /oc-quick command.
  * Creates a pipeline state that starts at PLAN (skipping discovery phases),
  * then delegates to orchestrateCore to continue the pipeline.
+ *
+ * Note: oc_quick intentionally bypasses intent routing. The /oc-quick command
+ * is an explicit user directive to run a simplified pipeline, so intent
+ * classification is redundant — the user already chose "quick pipeline".
  */
 export async function quickCore(args: QuickArgs, artifactDir: string): Promise<string> {
 	// 1. Validate idea

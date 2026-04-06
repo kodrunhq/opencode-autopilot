@@ -169,8 +169,6 @@ describe("autopilot prompt — Oracle-identified gaps", () => {
 	});
 
 	test("prompt warns about non-implementation intent on active pipelines", () => {
-		expect(prompt).toContain(
-			"rejects non-implementation intents at runtime even on active pipelines",
-		);
+		expect(prompt).toContain("rejects non-implementation intents at runtime");
 	});
 });

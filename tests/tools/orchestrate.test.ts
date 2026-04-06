@@ -456,27 +456,33 @@ describe("active pipeline intent guard", () => {
 		expect(parsed.message).toContain("researcher");
 	});
 
-	test("allows implementation intent to resume active pipeline", async () => {
+	test("allows implementation intent on active pipeline (passes intent guards)", async () => {
 		const first = JSON.parse(
 			await orchestrateCore({ idea: "build a widget", intent: "implementation" }, tempDir),
 		);
 		expect(first.action).toBe("dispatch");
 
-		const envelope = {
-			schemaVersion: 1,
-			resultId: "active-guard-resume",
-			runId: first.runId,
-			phase: "RECON",
-			dispatchId: first.dispatchId,
-			agent: first.agent,
-			kind: "phase_output",
-			taskId: null,
-			payload: { text: "research done" },
-		};
-		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
+		const result = await orchestrateCore(
+			{ idea: "actually build a better widget", intent: "implementation" },
+			tempDir,
+		);
 		const parsed = JSON.parse(result);
-		expect(parsed.action).toBe("dispatch");
-		expect(parsed.phase).toBe("CHALLENGE");
+		expect(parsed.code).not.toBe("E_INTENT_REQUIRED");
+		expect(parsed.code).not.toBe("E_INTENT_NOT_IMPLEMENTATION");
+	});
+
+	test("rejects new idea without intent on active pipeline", async () => {
+		const first = JSON.parse(
+			await orchestrateCore({ idea: "build a widget", intent: "implementation" }, tempDir),
+		);
+		expect(first.action).toBe("dispatch");
+
+		// Send a new idea WITHOUT intent on active pipeline — should be rejected
+		const result = await orchestrateCore({ idea: "do something else" }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.code).toBe("E_INTENT_REQUIRED");
+		expect(parsed.message).toContain("intent classification");
 	});
 
 	test("result-based resume with no intent passes through (intent not checked on result)", async () => {

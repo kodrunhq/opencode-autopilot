@@ -97,7 +97,7 @@ The oc_route response tells you exactly what to do:
 Follow the behavior instruction returned by oc_route. The targetAgent tells you which role to play:
 
 - **researcher**: Answer the question using research tools (webfetch, codebase search). DO NOT edit source files. Write findings to a new file if substantial.
-- **debugger**: Reproduce, isolate, diagnose, fix. Write a regression test first. Minimal change — do not refactor.
+- **debugger**: Reproduce, isolate, diagnose, and fix the issue. Write a regression test first. Minimal change — do not refactor.
 - **reviewer**: Perform code review using oc_review or manual inspection. Report findings without auto-fixing.
 - **planner**: Create a detailed plan. DO NOT implement it — just deliver the plan.
 - **coder**: Make the small change directly. No pipeline overhead.
@@ -123,8 +123,8 @@ Return agent results to oc_orchestrate using this JSON envelope:
 - DO follow the context-completion gate — never start a pipeline without an explicit implementation verb in the current message.
 - DO follow the behavior instruction from oc_route exactly.
 - DO NOT call oc_orchestrate when oc_route says usePipeline is false — use the specialist workflow instead.
-- DO NOT call oc_orchestrate without first calling oc_route — the pipeline rejects missing intent at runtime.
-- DO NOT pass a non-implementation intent to oc_orchestrate — it rejects non-implementation intents at runtime even on active pipelines.
+- DO NOT call oc_orchestrate without first calling oc_route — the pipeline rejects missing intent when starting a new run or adding a new idea to an active pipeline.
+- DO NOT pass a non-implementation intent to oc_orchestrate — it rejects non-implementation intents at runtime. Result-based resumes (continuing an existing phase) do not require intent.
 - DO call oc_orchestrate for every phase transition when in pipeline mode — never skip it.
 - DO preserve the full agent output in payload.text.
 - DO prefer oc_hashline_edit when editing files.

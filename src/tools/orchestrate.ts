@@ -738,6 +738,16 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 				});
 			}
 
+			// New user turn with idea on active pipeline requires intent classification
+			if (args.idea && !args.intent) {
+				return JSON.stringify({
+					action: "error",
+					code: "E_INTENT_REQUIRED",
+					message:
+						"A new idea on an active pipeline requires intent classification. Call oc_route first, then pass intent: 'implementation' to continue the pipeline with a new idea.",
+				});
+			}
+
 			let phaseHandlerContext: PhaseHandlerContext | undefined;
 			let handlerInputResult = args.result;
 
