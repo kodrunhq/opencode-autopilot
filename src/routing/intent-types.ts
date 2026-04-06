@@ -121,8 +121,8 @@ const ROUTING_ENTRIES: ReadonlyArray<readonly [IntentType, IntentRouting]> = Obj
 	],
 ] as const);
 
-export const INTENT_ROUTING_MAP: ReadonlyMap<IntentType, Readonly<IntentRouting>> = new Map(
-	ROUTING_ENTRIES,
+export const INTENT_ROUTING_MAP: ReadonlyMap<IntentType, Readonly<IntentRouting>> = Object.freeze(
+	new Map(ROUTING_ENTRIES),
 );
 
 export function getIntentRouting(intent: IntentType): Readonly<IntentRouting> {
