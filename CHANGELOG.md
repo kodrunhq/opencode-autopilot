@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.22.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.21.0...opencode-autopilot-v1.22.0) (2026-04-06)
+
+
+### Features
+
+* add GitHub Release local-plugin bundle for corporate environments ([ce7fc3f](https://github.com/kodrunhq/opencode-autopilot/commit/ce7fc3fe843bd4025b93e47f49985da64f40df22))
+* add GitHub Release local-plugin bundle for corporate environments ([056c098](https://github.com/kodrunhq/opencode-autopilot/commit/056c0983329349496ac67a14977779a496d15c40))
+
+
+### Bug Fixes
+
+* address 3 Copilot review comments — version parsing, checksum verification, hard-fail on missing tools ([d2e0df2](https://github.com/kodrunhq/opencode-autopilot/commit/d2e0df276ce5ae987134356f156638e3d66073d2))
+
 ## [1.21.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.20.0...opencode-autopilot-v1.21.0) (2026-04-06)
 
 
