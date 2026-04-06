@@ -165,6 +165,31 @@ describe("configure-tui createSearchSource", () => {
 		expect(results.length).toBe(0);
 	});
 
+	test("returns empty when only primary model exists (preflight zero-candidate)", async () => {
+		const singleModel: readonly DiscoveredModel[] = [
+			{ id: "anthropic/claude-opus-4-6", provider: "anthropic", model: "claude-opus-4-6" },
+		];
+		const exclude = new Set(["anthropic/claude-opus-4-6"]);
+		const source = createSearchSource(singleModel, exclude);
+		const results = await source(undefined);
+		expect(results.length).toBe(0);
+	});
+
+	test("hasFallbackCandidates check: false when only primary model exists", () => {
+		const singleModel: readonly DiscoveredModel[] = [
+			{ id: "anthropic/claude-opus-4-6", provider: "anthropic", model: "claude-opus-4-6" },
+		];
+		const primary = "anthropic/claude-opus-4-6";
+		const hasFallbackCandidates = singleModel.some((m) => m.id !== primary);
+		expect(hasFallbackCandidates).toBe(false);
+	});
+
+	test("hasFallbackCandidates check: true when multiple models exist", () => {
+		const primary = "anthropic/claude-opus-4-6";
+		const hasFallbackCandidates = MODELS.some((m) => m.id !== primary);
+		expect(hasFallbackCandidates).toBe(true);
+	});
+
 	test("choice objects contain name, value, and description", async () => {
 		const source = createSearchSource(MODELS);
 		const results = await source(undefined);

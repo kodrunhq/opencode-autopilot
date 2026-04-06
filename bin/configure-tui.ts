@@ -122,6 +122,16 @@ async function selectFallbacksViaSearch(
 	const excluded = new Set<string>([primary]);
 
 	while (true) {
+		const available = models.filter((m) => !excluded.has(m.id));
+		if (available.length === 0) {
+			if (selected.length === 0) {
+				console.log(`  ${dim("No other models available for fallbacks.")}`);
+			} else {
+				console.log(`  ${dim("No more models available.")}`);
+			}
+			break;
+		}
+
 		const orderLabel =
 			selected.length === 0
 				? "1st"
@@ -144,13 +154,6 @@ async function selectFallbacksViaSearch(
 		selected.push(fallback);
 		excluded.add(fallback);
 		console.log(`  ${green("+")} ${cyan(fallback)}`);
-
-		// Check if any selectable models remain before offering to add more
-		const remaining = models.filter((m) => !excluded.has(m.id));
-		if (remaining.length === 0) {
-			console.log(`  ${dim("No more models available.")}`);
-			break;
-		}
 
 		const addMore = await confirm({
 			message: "Add another fallback?",
@@ -225,15 +228,20 @@ async function configureGroup(
 		pageSize: 15,
 	});
 
-	// Fallback models — searchable select loop
-	const wantFallbacks = await confirm({
-		message: "Add fallback models? (recommended for resilience)",
-		default: true,
-	});
-
 	let fallbacks: string[] = [];
-	if (wantFallbacks) {
-		fallbacks = await selectFallbacksViaSearch(models, primary, def.label);
+	const hasFallbackCandidates = models.some((m) => m.id !== primary);
+
+	if (hasFallbackCandidates) {
+		const wantFallbacks = await confirm({
+			message: "Add fallback models? (recommended for resilience)",
+			default: true,
+		});
+
+		if (wantFallbacks) {
+			fallbacks = await selectFallbacksViaSearch(models, primary, def.label);
+		}
+	} else {
+		console.log(`  ${dim("No other models available for fallbacks.")}`);
 	}
 
 	const assignment: GroupModelAssignment = Object.freeze({
