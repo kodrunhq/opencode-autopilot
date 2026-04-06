@@ -5,4 +5,6 @@ export * from "./progress";
 export * from "./registry";
 export * from "./session-summary";
 export * from "./task-status";
+export * from "./task-toast-manager";
+export * from "./task-toast-types";
 export * from "./types";

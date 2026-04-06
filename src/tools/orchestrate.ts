@@ -28,7 +28,7 @@ import {
 	getProjectArtifactDir,
 	getProjectRootFromArtifactDir,
 } from "../utils/paths";
-import { getNotificationManager, getProgressTracker } from "../ux/registry";
+import { getNotificationManager, getProgressTracker, getTaskToastManager } from "../ux/registry";
 import { reviewCore } from "./review";
 
 interface OrchestrateArgs {
@@ -326,6 +326,14 @@ function buildUserProgress(state: PipelineState, label?: string, attempt?: numbe
 	return `${baseProgress}${label ? ` — ${label}` : ""}${att}`;
 }
 
+function formatElapsed(issuedAt: string): string {
+	const ms = Date.now() - Date.parse(issuedAt);
+	const seconds = Math.floor(ms / 1000);
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
+	return `${minutes}m ${seconds % 60}s`;
+}
+
 /** Per-phase dispatch limits. BUILD is high because of multi-task waves. */
 const MAX_PHASE_DISPATCHES: Readonly<Record<string, number>> = Object.freeze({
 	RECON: 3,
@@ -452,6 +460,12 @@ async function processHandlerResult(
 					200,
 				),
 			);
+			getTaskToastManager()?.addTask({
+				id: pendingEntry.dispatchId,
+				description: normalizedResult.progress ?? phase,
+				agent: normalizedResult.agent ?? "unknown",
+				isBackground: false,
+			});
 			const tracker = getProgressTracker();
 			if (tracker) {
 				tracker.startPhase(phase, 1);
@@ -621,6 +635,14 @@ async function processHandlerResult(
 				phase: currentState.currentPhase,
 				action: "complete",
 			});
+
+			for (const pending of currentState.pendingDispatches) {
+				getTaskToastManager()?.showCompletionToast({
+					id: pending.dispatchId,
+					description: `${pending.phase}: ${pending.agent}`,
+					duration: formatElapsed(pending.issuedAt),
+				});
+			}
 
 			void getNotificationManager()?.success(
 				"Phase complete",
