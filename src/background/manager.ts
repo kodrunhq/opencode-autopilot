@@ -90,7 +90,7 @@ export class BackgroundManager {
 			category: options.category,
 			agent: options.agent,
 			model: options.model,
-			priority: options.priority ?? PRIORITY.NORMAL,
+			priority: options.priority ?? 50,
 		});
 		this.dependencyTracker.register(task.id, {
 			parentId: options.parentId,

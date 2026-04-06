@@ -1,10 +1,10 @@
 const STUCK_KEYWORDS = Object.freeze([
-	"I apologize",
-	"Let me try again",
-	"I'm unable to",
-	"I cannot",
-	"As an AI",
-	"I don't have access",
+	"i apologize",
+	"let me try again",
+	"i'm unable to",
+	"i cannot",
+	"as an ai",
+	"i don't have access",
 ]);
 
 const MAX_TRACKED_CALLS = 5;
@@ -58,8 +58,9 @@ function countTrailingRepeatedCalls(calls: readonly TrackedToolCall[]): number {
 }
 
 function countMatchedKeywords(output: string): number {
+	const lowerOutput = output.toLowerCase();
 	return STUCK_KEYWORDS.reduce((matchCount, keyword) => {
-		return output.includes(keyword) ? matchCount + 1 : matchCount;
+		return lowerOutput.includes(keyword) ? matchCount + 1 : matchCount;
 	}, 0);
 }
 

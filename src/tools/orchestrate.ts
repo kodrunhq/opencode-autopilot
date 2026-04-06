@@ -644,10 +644,6 @@ async function processHandlerResult(
 				});
 			}
 
-			void getNotificationManager()?.success(
-				"Phase complete",
-				`${currentState.currentPhase} finished.`,
-			);
 			getProgressTracker()?.complete();
 
 			const nextPhase = getNextPhase(currentState.currentPhase);

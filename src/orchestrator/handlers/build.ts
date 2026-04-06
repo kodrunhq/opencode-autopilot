@@ -19,6 +19,19 @@ import {
 import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
 
+/**
+ * Coerce a raw taskId (number, string, or null) to a numeric Task.id.
+ * Handles: number → keep (including 0), numeric string → Number(), else → null.
+ */
+function coerceTaskId(raw: unknown): number | null {
+	if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+	if (typeof raw === "string") {
+		const parsed = Number(raw);
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+	return null;
+}
+
 const cloneBranchLifecycle = (bl: BranchLifecycle) => ({ ...bl, tasksPushed: [...bl.tasksPushed] });
 export const handleBuild: PhaseHandler = async (
 	state,
@@ -192,12 +205,7 @@ export const handleBuild: PhaseHandler = async (
 	const hasTypedContext = context !== undefined;
 	const isTaskCompletion = hasTypedContext && context.envelope.kind === "task_completion";
 	const rawTaskId = isTaskCompletion ? context.envelope.taskId : buildProgress.currentTask;
-	const taskToComplete =
-		typeof rawTaskId === "number"
-			? rawTaskId
-			: typeof rawTaskId === "string"
-				? Number(rawTaskId) || null
-				: null;
+	const taskToComplete = coerceTaskId(rawTaskId);
 
 	if (resultText && !buildProgress.reviewPending && taskToComplete === null) {
 		return Object.freeze({

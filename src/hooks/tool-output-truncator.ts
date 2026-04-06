@@ -24,7 +24,9 @@ export function createToolOutputTruncatorHandler(options: { readonly maxOutputLe
 			if (_output.output.length <= maxOutputLength) return;
 
 			const originalLength = _output.output.length;
-			_output.output = `${_output.output.slice(0, maxOutputLength)}\n\n[Output truncated from ${originalLength} to ${maxOutputLength} characters]`;
+			const suffix = `\n\n[Output truncated from ${originalLength} to ${maxOutputLength} characters]`;
+			const contentBudget = Math.max(0, maxOutputLength - suffix.length);
+			_output.output = `${_output.output.slice(0, contentBudget)}${suffix}`;
 		} catch {}
 	};
 }
