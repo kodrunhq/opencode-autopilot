@@ -259,7 +259,10 @@ async function configureGroup(
 
 // ── Main configure flow ────────────────────────────────────────────
 
-export async function runConfigure(configPath: string = CONFIG_PATH): Promise<void> {
+export async function runConfigure(
+	configPath: string = CONFIG_PATH,
+	groupFilter?: GroupId,
+): Promise<void> {
 	console.log("");
 	console.log(bold("opencode-autopilot configure"));
 	console.log("────────────────────────────");
@@ -285,6 +288,58 @@ export async function runConfigure(configPath: string = CONFIG_PATH): Promise<vo
 
 	// 2. Load existing config
 	const existingConfig = await loadConfig(configPath);
+
+	if (groupFilter) {
+		if (!ALL_GROUP_IDS.includes(groupFilter)) {
+			console.log(
+				`  ${red("✗")} Unknown group "${groupFilter}". Valid groups: ${ALL_GROUP_IDS.join(", ")}`,
+			);
+			process.exit(1);
+		}
+
+		const baseConfig = existingConfig ?? createDefaultConfig();
+		const assignments: Record<string, GroupModelAssignment> = { ...baseConfig.groups } as Record<
+			string,
+			GroupModelAssignment
+		>;
+
+		console.log(`  Configuring group: ${bold(GROUP_DEFINITIONS[groupFilter].label)}`);
+		console.log("");
+
+		assignments[groupFilter] = await configureGroup(groupFilter, models, assignments);
+		showDiversityWarnings(assignments);
+
+		console.log("");
+		const doCommit = await confirm({
+			message: "Save this configuration?",
+			default: true,
+		});
+
+		if (!doCommit) {
+			console.log("  Configuration discarded.");
+			return;
+		}
+
+		const groupsRecord: Record<string, { primary: string; fallbacks: string[] }> = {};
+		for (const [key, val] of Object.entries(assignments)) {
+			const assignment = val as GroupModelAssignment;
+			groupsRecord[key] = { primary: assignment.primary, fallbacks: [...assignment.fallbacks] };
+		}
+
+		const newConfig = {
+			...baseConfig,
+			version: 7 as const,
+			configured: baseConfig.configured || Object.keys(groupsRecord).length > 0,
+			groups: groupsRecord,
+			overrides: baseConfig.overrides ?? {},
+		};
+
+		await saveConfig(newConfig, configPath);
+		console.log(`  ${green("✓")} Configuration saved`);
+		console.log("");
+		return;
+	}
+
 	if (existingConfig?.configured) {
 		console.log(`  ${yellow("⚠")} Existing configuration found — this will overwrite it`);
 		const proceed = await confirm({

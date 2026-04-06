@@ -398,6 +398,16 @@ describe("buildAdaptiveSkillContext", () => {
 			expect(Array.isArray(PHASE_SKILL_MAP[phase])).toBe(true);
 		}
 	});
+
+	it("plan-writing skill is only mapped to PLAN phase", () => {
+		for (const [phase, skills] of Object.entries(PHASE_SKILL_MAP)) {
+			if (phase === "PLAN") {
+				expect(skills).toContain("plan-writing");
+			} else {
+				expect(skills).not.toContain("plan-writing");
+			}
+		}
+	});
 });
 
 describe("MCP config gating", () => {
