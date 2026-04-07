@@ -845,6 +845,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 								failedPhase,
 								failedAgent,
 								decision.errorCategory,
+								dispatchError,
 							);
 
 							logOrchestrationEvent(artifactDir, {

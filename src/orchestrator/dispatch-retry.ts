@@ -204,6 +204,31 @@ export function decideRetry(
 	};
 	const action = getStrategy(classification.category)(mockState);
 
+	const RETRYABLE_STRATEGIES = new Set([
+		"retry",
+		"fallback_model",
+		"compact_and_retry",
+		"reduce_context",
+	]);
+
+	if (!RETRYABLE_STRATEGIES.has(action.strategy)) {
+		logger.info("Strategy does not support dispatch retry", {
+			dispatchId,
+			retryKey: key,
+			phase,
+			agent,
+			category: classification.category,
+			strategy: action.strategy,
+		});
+		return Object.freeze({
+			shouldRetry: false,
+			backoffMs: 0,
+			useFallbackModel: false,
+			errorCategory: classification.category,
+			reasoning: `Strategy "${action.strategy}" does not support retry for ${classification.category}`,
+		});
+	}
+
 	const useFallback =
 		action.strategy === "fallback_model" || (action.strategy === "retry" && attempts > 0);
 
@@ -236,6 +261,7 @@ export function recordRetryAttempt(
 	phase: string,
 	agent: string,
 	errorCategory: ErrorCategory,
+	errorText: string | null = null,
 ): void {
 	const key = buildRetryKey(phase, agent);
 	const existing = retryStates.get(key);
@@ -245,7 +271,7 @@ export function recordRetryAttempt(
 		agent,
 		attempts: (existing?.attempts ?? 0) + 1,
 		maxAttempts: existing?.maxAttempts ?? 2,
-		lastError: null,
+		lastError: errorText,
 		lastCategory: errorCategory,
 	});
 	retryStates.set(key, nextState);
