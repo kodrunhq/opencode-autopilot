@@ -8,7 +8,11 @@ import { pipelineStateSchema } from "../../src/orchestrator/schemas";
 import { saveState, updatePersistedState } from "../../src/orchestrator/state";
 import type { PipelineState } from "../../src/orchestrator/types";
 import { computeLineHash, hashlineEditCore } from "../../src/tools/hashline-edit";
-import { buildMergeTransform } from "../../src/tools/orchestrate";
+import {
+	buildMergeTransform,
+	isStaleDispatch,
+	prepareStateForBuildRerun,
+} from "../../src/tools/orchestrate";
 
 function makeBuildState(
 	tasks: Array<{
@@ -489,5 +493,97 @@ describe("parallel BUILD integration", () => {
 		expect(final.tasks.find((t) => t.id === 2)?.status).toBe("DONE");
 		expect(final.tasks.find((t) => t.id === 3)?.status).toBe("PENDING");
 		expect(final.buildProgress.currentTasks).toEqual([]);
+	});
+
+	test("prepareStateForBuildRerun sets reviewPending when wave is complete", () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
+				{ id: 2, title: "Task B", status: "DONE", wave: 1 },
+				{ id: 3, title: "Task C", status: "PENDING", wave: 2 },
+			],
+			{ currentWave: 1, currentTasks: [] },
+		);
+
+		const prepared = prepareStateForBuildRerun(state);
+		expect(prepared.buildProgress.reviewPending).toBe(true);
+	});
+
+	test("prepareStateForBuildRerun does not set reviewPending when wave is incomplete", () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
+				{ id: 2, title: "Task B", status: "IN_PROGRESS", wave: 1 },
+				{ id: 3, title: "Task C", status: "PENDING", wave: 2 },
+			],
+			{ currentWave: 1, currentTasks: [2] },
+		);
+
+		const prepared = prepareStateForBuildRerun(state);
+		expect(prepared.buildProgress.reviewPending).toBe(false);
+	});
+
+	test("isStaleDispatch detects duplicate single dispatch", () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
+				{ id: 6, title: "Task F", status: "IN_PROGRESS", wave: 1 },
+				{ id: 7, title: "Task G", status: "PENDING", wave: 1 },
+			],
+			{ currentWave: 1, currentTasks: [6] },
+		);
+
+		const staleResult = {
+			action: "dispatch" as const,
+			agent: "oc-implementer",
+			prompt: "do stuff",
+			taskId: 6,
+			phase: "BUILD",
+		};
+
+		expect(isStaleDispatch(staleResult, state)).toBe(true);
+	});
+
+	test("isStaleDispatch returns false for fresh dispatch", () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
+				{ id: 6, title: "Task F", status: "IN_PROGRESS", wave: 1 },
+				{ id: 7, title: "Task G", status: "PENDING", wave: 1 },
+			],
+			{ currentWave: 1, currentTasks: [6] },
+		);
+
+		const freshResult = {
+			action: "dispatch" as const,
+			agent: "oc-implementer",
+			prompt: "do stuff",
+			taskId: 7,
+			phase: "BUILD",
+		};
+
+		expect(isStaleDispatch(freshResult, state)).toBe(false);
+	});
+
+	test("isStaleDispatch detects duplicate dispatch_multi", () => {
+		const state = makeBuildState(
+			[
+				{ id: 5, title: "Task E", status: "IN_PROGRESS", wave: 1 },
+				{ id: 6, title: "Task F", status: "IN_PROGRESS", wave: 1 },
+				{ id: 7, title: "Task G", status: "PENDING", wave: 1 },
+			],
+			{ currentWave: 1, currentTasks: [5, 6] },
+		);
+
+		const staleMulti = {
+			action: "dispatch_multi" as const,
+			agents: [
+				{ agent: "oc-implementer", prompt: "do 5", taskId: 5 },
+				{ agent: "oc-implementer", prompt: "do 6", taskId: 6 },
+			],
+			phase: "BUILD",
+		};
+
+		expect(isStaleDispatch(staleMulti, state)).toBe(true);
 	});
 });

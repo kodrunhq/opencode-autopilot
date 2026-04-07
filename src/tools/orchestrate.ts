@@ -13,12 +13,14 @@ import {
 	sleep,
 } from "../orchestrator/dispatch-retry";
 import { enrichErrorMessage } from "../orchestrator/error-context";
+import { isWaveComplete } from "../orchestrator/handlers/build-utils";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
 import type { DispatchResult, PhaseHandlerContext } from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
 import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
+import { groupByWave } from "../orchestrator/plan";
 import { getPhaseProgressString } from "../orchestrator/progress";
 import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
 import {
@@ -520,6 +522,64 @@ async function checkCircuitBreaker(
 }
 
 /**
+ * Detect whether a dispatch/dispatch_multi targets task IDs that are already
+ * IN_PROGRESS in the current (merged) state — a sign that a concurrent sibling
+ * already dispatched the same task. Returns true when all dispatched task IDs
+ * were already IN_PROGRESS, meaning the entire dispatch is stale.
+ */
+export function isStaleDispatch(
+	result: DispatchResult,
+	currentState: Readonly<PipelineState>,
+): boolean {
+	if (currentState.currentPhase !== "BUILD") return false;
+
+	const dispatchedTaskIds: number[] = [];
+	if (result.action === "dispatch" && result.taskId != null) {
+		const id = typeof result.taskId === "string" ? Number(result.taskId) : result.taskId;
+		if (Number.isFinite(id)) dispatchedTaskIds.push(id);
+	} else if (result.action === "dispatch_multi" && result.agents) {
+		for (const entry of result.agents) {
+			if (entry.taskId != null) {
+				const id = typeof entry.taskId === "string" ? Number(entry.taskId) : entry.taskId;
+				if (Number.isFinite(id)) dispatchedTaskIds.push(id);
+			}
+		}
+	}
+
+	if (dispatchedTaskIds.length === 0) return false;
+
+	const inProgressIds = new Set(
+		currentState.tasks.filter((t) => t.status === "IN_PROGRESS").map((t) => t.id),
+	);
+
+	return dispatchedTaskIds.every((id) => inProgressIds.has(id));
+}
+
+/**
+ * When the stale-pending re-evaluation needs to re-invoke the BUILD handler,
+ * ensure that a just-completed wave gets its mandatory review. After concurrent
+ * merges, the handler's original E_BUILD_RESULT_PENDING saw siblings still
+ * in-progress — but after the merge, the wave may be fully complete. Setting
+ * reviewPending=true lets the existing `reviewPending && !resultText` path in
+ * build.ts dispatch the reviewer correctly.
+ */
+export function prepareStateForBuildRerun(currentState: PipelineState): PipelineState {
+	const wave = currentState.buildProgress.currentWave;
+	if (wave == null) return currentState;
+
+	const waveMap = groupByWave(currentState.tasks);
+	if (isWaveComplete(waveMap, wave)) {
+		return patchState(currentState, {
+			buildProgress: {
+				...currentState.buildProgress,
+				reviewPending: true,
+			},
+		});
+	}
+	return currentState;
+}
+
+/**
  * Process a handler's DispatchResult, handling complete/dispatch/dispatch_multi/error.
  * On complete, advances the phase and invokes the next handler.
  */
@@ -537,11 +597,29 @@ async function processHandlerResult(
 	// decision may be stale — all tasks might already be DONE after the merge.
 	// Re-run the BUILD handler against the fresh merged state to pick up wave
 	// completion, review dispatch, or next-wave advancement.
+	// prepareStateForBuildRerun sets reviewPending=true when the wave is now
+	// fully complete, so the handler dispatches a mandatory review rather than
+	// skipping to the next wave.
 	if (
 		normalizedResult.action === "error" &&
 		normalizedResult.code === "E_BUILD_RESULT_PENDING" &&
 		currentState.buildProgress.currentTasks.length === 0 &&
 		currentState.currentPhase === "BUILD"
+	) {
+		const stateForRerun = prepareStateForBuildRerun(currentState);
+		const freshHandler = PHASE_HANDLERS.BUILD;
+		const freshResult = await freshHandler(stateForRerun, artifactDir, undefined, undefined);
+		return processHandlerResult(freshResult, stateForRerun, artifactDir);
+	}
+
+	// When concurrent completions both try to replenish the same pending task,
+	// the merged state already has that task IN_PROGRESS from the sibling's
+	// dispatch. Re-invoke BUILD against the fresh state so it picks the correct
+	// next pending task (or waits if the cap is full).
+	if (
+		(normalizedResult.action === "dispatch" || normalizedResult.action === "dispatch_multi") &&
+		currentState.currentPhase === "BUILD" &&
+		isStaleDispatch(normalizedResult, currentState)
 	) {
 		const freshHandler = PHASE_HANDLERS.BUILD;
 		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
