@@ -143,8 +143,10 @@ export async function buildParallelDispatch(
 	artifactDir: string,
 	runId?: string,
 	maxParallel: number = DEFAULT_MAX_PARALLEL_TASKS,
+	currentInProgressCount = 0,
 ): Promise<DispatchResult> {
-	const tasksToDispatch = pendingTasks.slice(0, maxParallel);
+	const remainingSlots = Math.max(1, maxParallel - currentInProgressCount);
+	const tasksToDispatch = pendingTasks.slice(0, remainingSlots);
 	const taskIds = tasksToDispatch.map((t) => t.id);
 
 	if (tasksToDispatch.length === 1) {

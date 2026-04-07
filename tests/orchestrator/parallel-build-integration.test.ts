@@ -224,6 +224,158 @@ describe("parallel BUILD integration", () => {
 		);
 	});
 
+	test("replenishment respects maxParallel cap with in-progress siblings", async () => {
+		// 8 tasks, cap 5 → initial dispatch sends 5, leaving 3 pending.
+		// Task 1 completes → 4 still in progress, 3 pending.
+		// Replenishment should dispatch only 1 (5 - 4 = 1 remaining slot),
+		// NOT 3 (which would exceed the cap).
+		const allTasks = Array.from({ length: 8 }, (_, index) => ({
+			id: index + 1,
+			title: `Task ${index + 1}`,
+			status: (index < 5 ? "IN_PROGRESS" : "PENDING") as "IN_PROGRESS" | "PENDING",
+			wave: 1,
+			depends_on: [] as number[],
+			attempt: 0,
+			strike: 0,
+		}));
+
+		const state = makeBuildState(allTasks, {
+			currentTask: 1,
+			currentTasks: [1, 2, 3, 4, 5],
+			currentWave: 1,
+		});
+
+		// Task 1 completes successfully
+		const result = await handleBuild(state, tempDir, undefined, {
+			envelope: {
+				schemaVersion: 1,
+				resultId: "r-replenish",
+				runId: "run-1",
+				phase: "BUILD",
+				dispatchId: "d-replenish",
+				agent: "oc-implementer",
+				kind: "task_completion",
+				taskId: 1,
+				payload: { text: "task 1 done" },
+			},
+		});
+
+		// Should dispatch exactly 1 task (task 6) to fill the slot freed by task 1
+		expect(result.action).toBe("dispatch");
+		expect(result.taskId).toBe(6);
+
+		const updatedTasks = result._stateUpdates?.tasks ?? [];
+		const inProgressCount = updatedTasks.filter((t) => t.status === "IN_PROGRESS").length;
+		// 4 original (2-5) + 1 newly dispatched (6) = 5, never exceeds maxParallel
+		expect(inProgressCount).toBe(5);
+		expect(updatedTasks.find((t) => t.id === 1)?.status).toBe("DONE");
+		expect(updatedTasks.find((t) => t.id === 6)?.status).toBe("IN_PROGRESS");
+		expect(updatedTasks.find((t) => t.id === 7)?.status).toBe("PENDING");
+		expect(updatedTasks.find((t) => t.id === 8)?.status).toBe("PENDING");
+	});
+
+	test("replenishment dispatches multiple when multiple slots free", async () => {
+		// 8 tasks, cap 5 → 3 in-progress (3-5), 3 pending (6-8), 2 done (1-2)
+		// 2 slots free → should dispatch exactly 2 tasks
+		const allTasks = [
+			{
+				id: 1,
+				title: "Task 1",
+				status: "DONE" as const,
+				wave: 1,
+				depends_on: [] as number[],
+				attempt: 0,
+				strike: 0,
+			},
+			{
+				id: 2,
+				title: "Task 2",
+				status: "DONE" as const,
+				wave: 1,
+				depends_on: [] as number[],
+				attempt: 0,
+				strike: 0,
+			},
+			{
+				id: 3,
+				title: "Task 3",
+				status: "IN_PROGRESS" as const,
+				wave: 1,
+				depends_on: [] as number[],
+				attempt: 0,
+				strike: 0,
+			},
+			{
+				id: 4,
+				title: "Task 4",
+				status: "IN_PROGRESS" as const,
+				wave: 1,
+				depends_on: [] as number[],
+				attempt: 0,
+				strike: 0,
+			},
+			{
+				id: 5,
+				title: "Task 5",
+				status: "IN_PROGRESS" as const,
+				wave: 1,
+				depends_on: [] as number[],
+				attempt: 0,
+				strike: 0,
+			},
+			{
+				id: 6,
+				title: "Task 6",
+				status: "PENDING" as const,
+				wave: 1,
+				depends_on: [] as number[],
+				attempt: 0,
+				strike: 0,
+			},
+			{
+				id: 7,
+				title: "Task 7",
+				status: "PENDING" as const,
+				wave: 1,
+				depends_on: [] as number[],
+				attempt: 0,
+				strike: 0,
+			},
+			{
+				id: 8,
+				title: "Task 8",
+				status: "PENDING" as const,
+				wave: 1,
+				depends_on: [] as number[],
+				attempt: 0,
+				strike: 0,
+			},
+		];
+
+		const pendingTasks = allTasks.filter((t) => t.status === "PENDING");
+		const result = await buildParallelDispatch(
+			pendingTasks,
+			1,
+			allTasks,
+			{
+				currentTask: 2,
+				currentTasks: [3, 4, 5],
+				currentWave: 1,
+				attemptCount: 0,
+				strikeCount: 0,
+				reviewPending: false,
+			},
+			tempDir,
+			"run-1",
+			5,
+			3, // 3 in-progress → only 2 slots available
+		);
+
+		expect(result.action).toBe("dispatch_multi");
+		expect(result.agents).toHaveLength(2);
+		expect(result.agents?.map((a) => a.taskId)).toEqual([6, 7]);
+	});
+
 	test("failed task marked FAILED not DONE", async () => {
 		const state = makeBuildState([{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 }], {
 			currentTask: null,

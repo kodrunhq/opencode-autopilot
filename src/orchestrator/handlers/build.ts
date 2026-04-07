@@ -191,6 +191,7 @@ export const handleBuild: PhaseHandler = async (
 				artifactDir,
 				state.runId,
 				maxParallel,
+				inProgressTasks.length,
 			);
 		}
 
@@ -258,6 +259,7 @@ export const handleBuild: PhaseHandler = async (
 		}
 
 		const pendingInWave = findPendingTasks(waveMap, currentWave);
+		const inProgressInWave = findInProgressTasks(waveMap, currentWave);
 		if (pendingInWave.length > 0) {
 			const updatedProgressForDispatch = {
 				...buildProgress,
@@ -271,6 +273,7 @@ export const handleBuild: PhaseHandler = async (
 				artifactDir,
 				state.runId,
 				maxParallel,
+				inProgressInWave.length,
 			);
 			return Object.freeze({
 				...dispatchResult,
@@ -281,7 +284,6 @@ export const handleBuild: PhaseHandler = async (
 			} satisfies DispatchResult);
 		}
 
-		const inProgressInWave = findInProgressTasks(waveMap, currentWave);
 		if (inProgressInWave.length > 0) {
 			return buildPendingResultError(currentWave, inProgressInWave, buildProgress, updatedTasks);
 		}
@@ -327,6 +329,7 @@ export const handleBuild: PhaseHandler = async (
 		artifactDir,
 		state.runId,
 		maxParallel,
+		inProgressTasks.length,
 	);
 	return Object.freeze({
 		...initialDispatch,

@@ -12,9 +12,11 @@ export const ocImplementerAgent: Readonly<AgentConfig> = Object.freeze({
 Multiple tasks in the same wave may execute concurrently. When working in parallel:
 - ALWAYS use oc_hashline_edit for file edits — it detects concurrent modifications via LINE#HASH validation and rejects stale edits safely.
 - DO NOT run branch-wide operations (formatting, linting the entire repo, full test suite) — these are deferred to the wave review gate after all parallel tasks complete.
-- DO NOT run git pull --rebase while other tasks are pushing — only pull before your first commit.
+- DO NOT commit or push during parallel execution — only make file changes and run task-scoped tests. The orchestrator handles commit/push after the entire wave completes and passes review.
+- DO NOT run git pull --rebase while other tasks are running.
 - Run ONLY task-scoped tests (the specific test file for your task), not the full suite.
 - If oc_hashline_edit rejects an edit due to a hash mismatch, re-read the file to get fresh anchors and retry.
+- When you are the ONLY task in the wave (no parallel siblings), you may commit and push normally.
 
 ## Steps
 
