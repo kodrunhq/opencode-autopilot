@@ -64,10 +64,14 @@ export function markTasksInProgress(
 	return tasks.map((t) => (idSet.has(t.id) ? { ...t, status: "IN_PROGRESS" as const } : t));
 }
 
-export async function buildTaskPrompt(task: Task, artifactDir: string): Promise<string> {
-	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.json");
-	const planFallbackRef = getArtifactRef(artifactDir, "PLAN", "tasks.md");
-	const designRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
+export async function buildTaskPrompt(
+	task: Task,
+	artifactDir: string,
+	runId?: string,
+): Promise<string> {
+	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.json", runId);
+	const planFallbackRef = getArtifactRef(artifactDir, "PLAN", "tasks.md", runId);
+	const designRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md", runId);
 	const planPath = (await fileExists(planRef)) ? planRef : planFallbackRef;
 	return [
 		`Implement task ${task.id}: ${task.title}.`,

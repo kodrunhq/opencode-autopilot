@@ -178,7 +178,7 @@ export const handleBuild: PhaseHandler = async (
 
 		if (pendingTasks.length > 0) {
 			const task = pendingTasks[0];
-			const prompt = await buildTaskPrompt(task, artifactDir);
+			const prompt = await buildTaskPrompt(task, artifactDir, state.runId);
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.BUILD,
@@ -257,7 +257,7 @@ export const handleBuild: PhaseHandler = async (
 		const pendingInWave = findPendingTasks(waveMap, currentWave);
 		if (pendingInWave.length > 0) {
 			const next = pendingInWave[0];
-			const prompt = await buildTaskPrompt(next, artifactDir);
+			const prompt = await buildTaskPrompt(next, artifactDir, state.runId);
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.BUILD,
@@ -316,7 +316,7 @@ export const handleBuild: PhaseHandler = async (
 	}
 
 	const task = pendingTasks[0];
-	const prompt = await buildTaskPrompt(task, artifactDir);
+	const prompt = await buildTaskPrompt(task, artifactDir, state.runId);
 	return Object.freeze({
 		action: "dispatch",
 		agent: AGENT_NAMES.BUILD,
