@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.26.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.26.0...opencode-autopilot-v1.26.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* address PR review — pruneOldLogs safety, dedup key domain, hard cap eviction, rateLimit validation, flaky test ([353567e](https://github.com/kodrunhq/opencode-autopilot/commit/353567e5edc2d032c2480c8de4662aa902185aa8))
+* audit stabilization release — defensive coercion, smart memory, run-scoped artifacts ([77bd899](https://github.com/kodrunhq/opencode-autopilot/commit/77bd899355df21326a20c7181dcf7f4b425346b2))
+* audit stabilization release — defensive coercion, smart memory, run-scoped artifacts, abort cleanup ([0d28eae](https://github.com/kodrunhq/opencode-autopilot/commit/0d28eae71e6d83fc31abc349ec528e2fb7b5fc59)), closes [#88](https://github.com/kodrunhq/opencode-autopilot/issues/88)
+* eliminate test mock leakage from abort-review-cleanup ([0f1570f](https://github.com/kodrunhq/opencode-autopilot/commit/0f1570f8fee7efae9ac9b7be73754c87acc4b124))
+* pass runId to buildTaskPrompt for run-scoped artifact paths ([9f708f2](https://github.com/kodrunhq/opencode-autopilot/commit/9f708f26c951d888c82e4444beba4d1470a8dfee))
+* reset dedup cache in orchestration-logger tests to prevent cross-test contamination ([8fd7cdc](https://github.com/kodrunhq/opencode-autopilot/commit/8fd7cdce16969614b8f7bd3713813a5991a6981d))
+
 ## [1.26.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.25.0...opencode-autopilot-v1.26.0) (2026-04-07)
 
 
