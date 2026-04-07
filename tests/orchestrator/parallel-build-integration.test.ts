@@ -525,7 +525,8 @@ describe("parallel BUILD integration", () => {
 	});
 
 	test("isStaleDispatch detects duplicate single dispatch", () => {
-		const state = makeBuildState(
+		// Pre-handler state: task 6 already IN_PROGRESS (dispatched by sibling)
+		const preHandlerState = makeBuildState(
 			[
 				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
 				{ id: 6, title: "Task F", status: "IN_PROGRESS", wave: 1 },
@@ -542,12 +543,12 @@ describe("parallel BUILD integration", () => {
 			phase: "BUILD",
 		};
 
-		// No ownDispatchIds — simulates a sibling observer
-		expect(isStaleDispatch(staleResult, state)).toBe(true);
+		expect(isStaleDispatch(staleResult, preHandlerState)).toBe(true);
 	});
 
 	test("isStaleDispatch returns false for fresh dispatch", () => {
-		const state = makeBuildState(
+		// Pre-handler state: task 7 is PENDING, so dispatching it is fresh
+		const preHandlerState = makeBuildState(
 			[
 				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
 				{ id: 6, title: "Task F", status: "IN_PROGRESS", wave: 1 },
@@ -564,11 +565,12 @@ describe("parallel BUILD integration", () => {
 			phase: "BUILD",
 		};
 
-		expect(isStaleDispatch(freshResult, state)).toBe(false);
+		expect(isStaleDispatch(freshResult, preHandlerState)).toBe(false);
 	});
 
 	test("isStaleDispatch detects duplicate dispatch_multi", () => {
-		const state = makeBuildState(
+		// Pre-handler state: tasks 5 and 6 already IN_PROGRESS from sibling
+		const preHandlerState = makeBuildState(
 			[
 				{ id: 5, title: "Task E", status: "IN_PROGRESS", wave: 1 },
 				{ id: 6, title: "Task F", status: "IN_PROGRESS", wave: 1 },
@@ -586,59 +588,11 @@ describe("parallel BUILD integration", () => {
 			phase: "BUILD",
 		};
 
-		expect(isStaleDispatch(staleMulti, state)).toBe(true);
+		expect(isStaleDispatch(staleMulti, preHandlerState)).toBe(true);
 	});
 
-	test("isStaleDispatch excludes own dispatch IDs — no false positive after applyStateUpdates", () => {
-		// Scenario: handler A dispatches task 7. applyStateUpdates merges A's
-		// _stateUpdates, marking task 7 as IN_PROGRESS in currentState. Without
-		// ownDispatchIds, isStaleDispatch would see task 7 as already IN_PROGRESS
-		// and incorrectly flag it as stale.
-		const mergedState = makeBuildState(
-			[
-				{ id: 5, title: "Task E", status: "IN_PROGRESS", wave: 1 },
-				{ id: 6, title: "Task F", status: "DONE", wave: 1 },
-				{ id: 7, title: "Task G", status: "IN_PROGRESS", wave: 1 },
-			],
-			{ currentWave: 1, currentTasks: [5, 7] },
-		);
-
-		const dispatchResult = {
-			action: "dispatch" as const,
-			agent: "oc-implementer",
-			prompt: "implement task 7",
-			taskId: 7,
-			phase: "BUILD",
-		};
-
-		const ownIds = new Set(extractDispatchTaskIds(dispatchResult));
-
-		// Without ownDispatchIds: task 7 is IN_PROGRESS → would return true (false positive)
-		expect(isStaleDispatch(dispatchResult, mergedState)).toBe(true);
-		// With ownDispatchIds: task 7 excluded → only task 5 (sibling) checked → not stale
-		expect(isStaleDispatch(dispatchResult, mergedState, ownIds)).toBe(false);
-	});
-
-	test("isStaleDispatch detects stale when sibling already dispatched same task", () => {
-		// Scenario: sibling handler B already dispatched task 7 (merged via
-		// buildMergeTransform). Handler A also wants to dispatch task 7.
-		// After applyStateUpdates, currentState shows task 7 as IN_PROGRESS
-		// from B's dispatch. A's ownDispatchIds contains {7}, but since B set
-		// it first, the sibling check should still detect the duplicate.
-		//
-		// Simulate: before A's _stateUpdates, task 7 was already IN_PROGRESS
-		// from B's merge. A then also marks task 7 IN_PROGRESS (no-op).
-		// ownDispatchIds = {7}. After excluding own IDs, task 7 is removed
-		// from the check — but task 7 was also IN_PROGRESS before A's update.
-		// We need the pre-handler snapshot to detect this.
-
-		// In practice, processHandlerResult uses buildMergeTransform, which
-		// only applies changes THIS handler made. If B already set task 7 to
-		// IN_PROGRESS, A's merge sees it as unchanged (same status), so
-		// buildMergeTransform doesn't double-apply. The key: if task 7 was
-		// PENDING in A's pre-handler state but IN_PROGRESS in merged state,
-		// that IN_PROGRESS came from B. Let's verify via buildMergeTransform.
-
+	test("isStaleDispatch detects sibling duplicate after applyStateUpdates merge", () => {
+		// Given: handler A's pre-handler state has task 7 as PENDING
 		const preHandlerState = makeBuildState(
 			[
 				{ id: 5, title: "Task E", status: "IN_PROGRESS", wave: 1 },
@@ -648,8 +602,8 @@ describe("parallel BUILD integration", () => {
 			{ currentWave: 1, currentTasks: [5] },
 		);
 
-		// B's dispatch already merged — task 7 is now IN_PROGRESS on disk
-		const diskState = makeBuildState(
+		// When: sibling B dispatched task 7 first → merged into disk state
+		const diskStateAfterSibling = makeBuildState(
 			[
 				{ id: 5, title: "Task E", status: "IN_PROGRESS", wave: 1 },
 				{ id: 6, title: "Task F", status: "DONE", wave: 1 },
@@ -658,7 +612,7 @@ describe("parallel BUILD integration", () => {
 			{ currentWave: 1, currentTasks: [5, 7] },
 		);
 
-		// A's handler also decided to dispatch task 7 (stale decision)
+		// Handler A also wants to dispatch task 7 (stale decision)
 		const handlerAUpdates = {
 			tasks: [
 				{
@@ -699,16 +653,15 @@ describe("parallel BUILD integration", () => {
 			},
 		};
 
-		// buildMergeTransform diffs A's updates vs preHandlerState.
-		// Task 7: pre=PENDING, update=IN_PROGRESS → changed. Task 5: same. Task 6: same.
+		// buildMergeTransform diffs A's updates vs preHandlerState
+		// Task 7: pre=PENDING, update=IN_PROGRESS → changed by A
 		const transform = buildMergeTransform(
 			handlerAUpdates as Partial<PipelineState>,
 			preHandlerState,
 		);
-		// Apply against diskState (where B already set task 7 to IN_PROGRESS)
-		const mergedState = transform(diskState);
+		const mergedState = transform(diskStateAfterSibling);
 
-		// Task 7 should be IN_PROGRESS (from both A and B — no conflict, same status)
+		// Task 7 is IN_PROGRESS in merged state (from both A and B)
 		expect(mergedState.tasks.find((t) => t.id === 7)?.status).toBe("IN_PROGRESS");
 
 		const dispatchResult = {
@@ -719,14 +672,47 @@ describe("parallel BUILD integration", () => {
 			phase: "BUILD",
 		};
 
-		const ownIds = new Set(extractDispatchTaskIds(dispatchResult));
+		// Then: isStaleDispatch uses preHandlerState where task 7 was PENDING
+		// → not stale from A's perspective (A legitimately dispatched it)
+		expect(isStaleDispatch(dispatchResult, preHandlerState)).toBe(false);
 
-		// With ownDispatchIds={7}: task 7 is excluded from sibling check.
-		// But task 7 WAS set to IN_PROGRESS by sibling B. Since A also claims
-		// it as own, the dispatch goes through — the dedup relies on
-		// buildMergeTransform preserving the first writer's state. This is
-		// acceptable because the implementer handles duplicate dispatchIds
-		// idempotently (E_DUPLICATE_RESULT on second completion).
-		expect(isStaleDispatch(dispatchResult, mergedState, ownIds)).toBe(false);
+		// But if sibling B's handler also had task 7 as IN_PROGRESS in its
+		// pre-handler state (because A dispatched first), B would see it as stale
+		const preHandlerStateForB = makeBuildState(
+			[
+				{ id: 5, title: "Task E", status: "IN_PROGRESS", wave: 1 },
+				{ id: 6, title: "Task F", status: "DONE", wave: 1 },
+				{ id: 7, title: "Task G", status: "IN_PROGRESS", wave: 1 },
+			],
+			{ currentWave: 1, currentTasks: [5, 7] },
+		);
+		expect(isStaleDispatch(dispatchResult, preHandlerStateForB)).toBe(true);
+	});
+
+	test("extractDispatchTaskIds extracts IDs from dispatch and dispatch_multi", () => {
+		const single = {
+			action: "dispatch" as const,
+			agent: "oc-implementer",
+			prompt: "do",
+			taskId: 3,
+			phase: "BUILD",
+		};
+		expect(extractDispatchTaskIds(single)).toEqual([3]);
+
+		const multi = {
+			action: "dispatch_multi" as const,
+			agents: [
+				{ agent: "oc-implementer", prompt: "do 1", taskId: 1 },
+				{ agent: "oc-implementer", prompt: "do 2", taskId: 2 },
+			],
+			phase: "BUILD",
+		};
+		expect(extractDispatchTaskIds(multi)).toEqual([1, 2]);
+
+		const noTask = {
+			action: "complete" as const,
+			phase: "BUILD",
+		};
+		expect(extractDispatchTaskIds(noTask)).toEqual([]);
 	});
 });

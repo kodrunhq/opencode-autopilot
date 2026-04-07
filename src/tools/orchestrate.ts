@@ -541,32 +541,28 @@ export function extractDispatchTaskIds(result: DispatchResult): readonly number[
 }
 
 /**
- * Detect whether a dispatch/dispatch_multi targets task IDs that are already
- * IN_PROGRESS in the merged state from a concurrent sibling — meaning this
- * handler's dispatch is a duplicate. Compares against `mergedState` (post-
- * applyStateUpdates) but excludes `ownDispatchIds` so this handler's own
- * newly-dispatched tasks don't trigger a false positive.
+ * Detect whether a dispatch/dispatch_multi targets task IDs that a concurrent
+ * sibling already dispatched. Compares against `preHandlerState` — the state
+ * snapshot BEFORE this handler ran. If a task ID was already IN_PROGRESS in
+ * the pre-handler state, it was dispatched by a sibling (since this handler
+ * hasn't acted yet at that point). Returns true when ALL dispatched task IDs
+ * were already IN_PROGRESS before this handler, meaning the entire dispatch
+ * is a duplicate.
  */
 export function isStaleDispatch(
 	result: DispatchResult,
-	mergedState: Readonly<PipelineState>,
-	ownDispatchIds?: ReadonlySet<number>,
+	preHandlerState: Readonly<PipelineState>,
 ): boolean {
-	if (mergedState.currentPhase !== "BUILD") return false;
+	if (preHandlerState.currentPhase !== "BUILD") return false;
 
 	const dispatchedTaskIds = extractDispatchTaskIds(result);
 	if (dispatchedTaskIds.length === 0) return false;
 
-	// IN_PROGRESS IDs in merged state, excluding this handler's own dispatches.
-	// What remains are IDs set to IN_PROGRESS by a concurrent sibling.
-	const siblingInProgressIds = new Set(
-		mergedState.tasks
-			.filter((t) => t.status === "IN_PROGRESS")
-			.map((t) => t.id)
-			.filter((id) => !ownDispatchIds?.has(id)),
+	const alreadyInProgress = new Set(
+		preHandlerState.tasks.filter((t) => t.status === "IN_PROGRESS").map((t) => t.id),
 	);
 
-	return dispatchedTaskIds.every((id) => siblingInProgressIds.has(id));
+	return dispatchedTaskIds.every((id) => alreadyInProgress.has(id));
 }
 
 /**
@@ -635,20 +631,13 @@ async function processHandlerResult(
 	}
 
 	// When concurrent completions both try to replenish the same pending task,
-	// the merged state already has that task IN_PROGRESS from the sibling's
-	// dispatch. Re-invoke BUILD against the fresh state so it picks the correct
-	// next pending task (or waits if the cap is full).
-	// Compare against `currentState` (post-merge) with `ownDispatchIds` excluded
-	// so this handler's own dispatches don't false-positive, but sibling dispatches
-	// merged by applyStateUpdates are visible.
+	// the pre-handler state already has that task IN_PROGRESS from a sibling's
+	// dispatch. Re-invoke BUILD against the fresh merged state so it picks the
+	// correct next pending task (or waits if the cap is full).
 	if (
 		(normalizedResult.action === "dispatch" || normalizedResult.action === "dispatch_multi") &&
-		currentState.currentPhase === "BUILD" &&
-		isStaleDispatch(
-			normalizedResult,
-			currentState,
-			new Set(extractDispatchTaskIds(normalizedResult)),
-		)
+		state.currentPhase === "BUILD" &&
+		isStaleDispatch(normalizedResult, state)
 	) {
 		const freshHandler = PHASE_HANDLERS.BUILD;
 		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
