@@ -54,6 +54,7 @@ export function buildPendingResultError(
 				...buildProgress,
 				currentWave: wave,
 				currentTask: buildProgress.currentTask ?? inProgressTasks[0]?.id ?? null,
+				currentTasks: [...taskIds],
 			},
 		},
 	} satisfies DispatchResult);
@@ -90,12 +91,24 @@ export function markTaskDone(tasks: readonly Task[], taskId: number): readonly T
 	return tasks.map((t) => (t.id === taskId ? { ...t, status: "DONE" as const } : t));
 }
 
+export function markTaskFailed(tasks: readonly Task[], taskId: number): readonly Task[] {
+	return tasks.map((t) => (t.id === taskId ? { ...t, status: "FAILED" as const } : t));
+}
+
+/**
+ * Detect whether a result string is a dispatch failure summary
+ * (produced by `buildFailureSummary` when retries are exhausted).
+ */
+export function isDispatchFailure(resultText: string): boolean {
+	return resultText.trimStart().startsWith("DISPATCH_FAILED:");
+}
+
 export function isWaveComplete(
 	waveMap: ReadonlyMap<number, readonly Task[]>,
 	wave: number,
 ): boolean {
 	const tasks = waveMap.get(wave) ?? [];
-	return tasks.every((t) => t.status === "DONE");
+	return tasks.every((t) => t.status === "DONE" || t.status === "FAILED");
 }
 
 export function hasCriticalFindings(resultStr: string): boolean {

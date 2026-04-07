@@ -1,3 +1,4 @@
+import { loadConfig } from "../../config";
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
@@ -7,13 +8,16 @@ import { initBranchLifecycle, recordTaskPush } from "./branch-pr";
 import {
 	buildParallelDispatch,
 	buildPendingResultError,
+	DEFAULT_MAX_PARALLEL_TASKS,
 	findCurrentWave,
 	findInProgressTasks,
 	findPendingTasks,
 	hasCriticalFindings,
+	isDispatchFailure,
 	isWaveComplete,
 	MAX_STRIKES,
 	markTaskDone,
+	markTaskFailed,
 } from "./build-utils";
 import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
@@ -40,6 +44,8 @@ export const handleBuild: PhaseHandler = async (
 ) => {
 	const { tasks, buildProgress } = state;
 	const resultText = context?.envelope.payload.text ?? result;
+	const config = await loadConfig();
+	const maxParallel = config?.orchestrator?.maxParallelTasks ?? DEFAULT_MAX_PARALLEL_TASKS;
 	const initialBranchLifecycle =
 		state.branchLifecycle ??
 		initBranchLifecycle({
@@ -184,6 +190,7 @@ export const handleBuild: PhaseHandler = async (
 				updatedProgress,
 				artifactDir,
 				state.runId,
+				maxParallel,
 			);
 		}
 
@@ -219,11 +226,13 @@ export const handleBuild: PhaseHandler = async (
 			} satisfies DispatchResult);
 		}
 
-		const updatedTasks = markTaskDone(effectiveTasks, taskToComplete);
-		const updatedBranchLifecycle = recordTaskPush(
-			initialBranchLifecycle,
-			taskToComplete.toString(),
-		);
+		const taskFailed = isDispatchFailure(resultText);
+		const updatedTasks = taskFailed
+			? markTaskFailed(effectiveTasks, taskToComplete)
+			: markTaskDone(effectiveTasks, taskToComplete);
+		const updatedBranchLifecycle = taskFailed
+			? initialBranchLifecycle
+			: recordTaskPush(initialBranchLifecycle, taskToComplete.toString());
 		const waveMap = groupByWave(updatedTasks);
 		const currentWave = buildProgress.currentWave ?? 1;
 
@@ -261,6 +270,7 @@ export const handleBuild: PhaseHandler = async (
 				updatedProgressForDispatch,
 				artifactDir,
 				state.runId,
+				maxParallel,
 			);
 			return Object.freeze({
 				...dispatchResult,
@@ -316,6 +326,7 @@ export const handleBuild: PhaseHandler = async (
 		buildProgress,
 		artifactDir,
 		state.runId,
+		maxParallel,
 	);
 	return Object.freeze({
 		...initialDispatch,

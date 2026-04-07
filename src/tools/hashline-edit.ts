@@ -97,6 +97,22 @@ function toLineArray(lines: string | readonly string[] | null): readonly string[
 	return lines;
 }
 
+// --- Per-file lock to prevent concurrent read-validate-write races ---
+
+const fileLocks = new Map<string, Promise<unknown>>();
+
+function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<T> {
+	const prev = fileLocks.get(filePath) ?? Promise.resolve();
+	const next = prev.then(fn, fn);
+	fileLocks.set(filePath, next);
+	next.finally(() => {
+		if (fileLocks.get(filePath) === next) {
+			fileLocks.delete(filePath);
+		}
+	});
+	return next;
+}
+
 // --- Core function ---
 
 export async function hashlineEditCore(args: HashlineEditArgs): Promise<string> {
@@ -110,6 +126,13 @@ export async function hashlineEditCore(args: HashlineEditArgs): Promise<string> 
 		return "Applied 0 edit(s) — no changes made.";
 	}
 
+	return withFileLock(resolved, () => hashlineEditLocked(resolved, args.edits));
+}
+
+async function hashlineEditLocked(
+	resolved: string,
+	edits: readonly HashlineEdit[],
+): Promise<string> {
 	let raw: string;
 	try {
 		raw = await readFile(resolved, "utf-8");
@@ -137,7 +160,7 @@ export async function hashlineEditCore(args: HashlineEditArgs): Promise<string> 
 
 	const errors: string[] = [];
 
-	for (const edit of args.edits) {
+	for (const edit of edits) {
 		const parsed = parseAnchor(edit.pos);
 		if ("error" in parsed) {
 			errors.push(parsed.error);

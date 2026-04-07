@@ -1,5 +1,10 @@
 import type { BranchLifecycle } from "../types";
 
+// ADR: Worktrees deferred. Parallel BUILD execution uses dispatch_multi on a
+// single branch rather than per-task worktrees. The worktreePath field and
+// recordWorktreePath utility are retained for future multi-branch support
+// but are not invoked at runtime. See PR #90 for rationale.
+
 export interface BranchPrUpdateInput {
 	readonly runId: string;
 	readonly taskId: string;
