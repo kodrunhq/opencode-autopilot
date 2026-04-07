@@ -26,6 +26,7 @@ export const forensicEventTypeSchema = z.enum([
 export const forensicEventDomainSchema = z.enum([
 	"session",
 	"orchestrator",
+	"fallback",
 	"contract",
 	"system",
 	"review",

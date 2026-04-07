@@ -33,3 +33,17 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 .claude/worktrees/
+
+# Feedback/testing sessions
+feedback_sessions/
+
+# Local autopilot artifacts
+.opencode-autopilot/
+.sisyphus/
+
+# Scratch files
+failed_subtask.md
+last_session.md
+last_version_feedback.md
+supermemory/
+claude-supermemory/

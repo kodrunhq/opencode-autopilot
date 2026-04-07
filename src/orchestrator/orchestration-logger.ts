@@ -7,7 +7,13 @@ const logger = getLogger("orchestrator", "orchestration-logger");
 export interface OrchestrationEvent {
 	readonly timestamp: string;
 	readonly phase: string;
-	readonly action: "dispatch" | "dispatch_multi" | "complete" | "error" | "loop_detected";
+	readonly action:
+		| "dispatch"
+		| "dispatch_multi"
+		| "complete"
+		| "error"
+		| "interrupted"
+		| "loop_detected";
 	readonly agent?: string;
 	readonly promptLength?: number;
 	readonly attempt?: number;
@@ -24,6 +30,7 @@ function resolveOperation(event: OrchestrationEvent): string {
 	if (event.action === "dispatch") return "dispatch";
 	if (event.action === "dispatch_multi") return "dispatch_multi";
 	if (event.action === "complete") return "complete";
+	if (event.action === "interrupted") return "interrupted";
 	if (event.action === "loop_detected") return "loop_detected";
 	if (event.action === "error" && event.code?.startsWith("E_")) return "warning";
 	return "error";

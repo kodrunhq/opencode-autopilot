@@ -124,13 +124,13 @@ function buildTasksArtifactFromLegacyTasks(tasks: readonly Task[]) {
 	});
 }
 
-export const handlePlan: PhaseHandler = async (_state, artifactDir, result?) => {
+export const handlePlan: PhaseHandler = async (state, artifactDir, result?) => {
 	// When result is provided, the planner has completed writing tasks
 	// Load them from tasks.json (canonical) and populate state.tasks.
 	// Fall back to tasks.md for compatibility with legacy planners.
 	if (result) {
-		const tasksJsonPath = getArtifactRef(artifactDir, "PLAN", "tasks.json");
-		const tasksPath = getArtifactRef(artifactDir, "PLAN", "tasks.md");
+		const tasksJsonPath = getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId);
+		const tasksPath = getArtifactRef(artifactDir, "PLAN", "tasks.md", state.runId);
 		try {
 			let loadedTasks: Task[];
 			let usedLegacyMarkdown = false;
@@ -199,9 +199,9 @@ export const handlePlan: PhaseHandler = async (_state, artifactDir, result?) => 
 		}
 	}
 
-	const architectRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
-	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
-	const tasksPath = getArtifactRef(artifactDir, "PLAN", "tasks.json");
+	const architectRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md", state.runId);
+	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId);
+	const tasksPath = getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId);
 
 	const prompt = [
 		"Read the architecture design at",

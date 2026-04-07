@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createMemoryCaptureHandler } from "../../src/memory/capture";
 import { initMemoryDb } from "../../src/memory/database";
+import { getPhaseDir } from "../../src/orchestrator/artifacts";
 import { orchestrateCore } from "../../src/tools/orchestrate";
 
 describe("Full Pipeline Concurrency", () => {
@@ -70,7 +71,7 @@ describe("Full Pipeline Concurrency", () => {
 			const currentPhase = result.phase;
 
 			if (currentPhase) {
-				const phaseDir = join(tempDir, "phases", currentPhase);
+				const phaseDir = getPhaseDir(tempDir, currentPhase, result.runId);
 				try {
 					await mkdir(phaseDir, { recursive: true });
 				} catch (_e) {}

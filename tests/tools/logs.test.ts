@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createForensicEvent } from "../../src/observability/forensic-log";
+import { createForensicEvent, resetDedupCache } from "../../src/observability/forensic-log";
 import { logsCore } from "../../src/tools/logs";
 import { writeForensicSession } from "../observability/test-helpers";
 
@@ -11,6 +11,7 @@ describe("oc_logs tool", () => {
 	let testDir: string;
 
 	beforeEach(async () => {
+		resetDedupCache();
 		testDir = join(tmpdir(), `logs-test-${randomBytes(8).toString("hex")}`);
 		await mkdir(testDir, { recursive: true });
 	});

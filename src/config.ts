@@ -96,6 +96,13 @@ export const memoryConfigSchema = z.object({
 
 export const memoryDefaults = memoryConfigSchema.parse({});
 
+export const notificationsConfigSchema = z.object({
+	desktop: z.boolean().default(true),
+	rateLimit: z.number().default(5000),
+});
+
+export const notificationsDefaults = notificationsConfigSchema.parse({});
+
 // --- V4 sub-schemas ---
 
 const groupModelAssignmentSchema = z.object({
@@ -198,6 +205,7 @@ const pluginConfigSchemaV7 = z
 		confidence: confidenceConfigSchema.default(confidenceDefaults),
 		fallback: fallbackConfigSchemaV6.default(fallbackDefaultsV6),
 		memory: memoryConfigSchema.default(memoryDefaults),
+		notifications: notificationsConfigSchema.optional().default(notificationsDefaults),
 		background: backgroundConfigSchema.default(backgroundDefaults),
 		autonomy: z
 			.object({
@@ -325,6 +333,7 @@ function migrateV5toV6(v5Config: PluginConfigV5): PluginConfigV6 {
 }
 
 export const v7ConfigDefaults = {
+	notifications: notificationsDefaults,
 	background: backgroundDefaults,
 	autonomy: {
 		enabled: false,
@@ -346,6 +355,7 @@ export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
 		confidence: v6Config.confidence,
 		fallback: v6Config.fallback,
 		memory: v6Config.memory,
+		notifications: notificationsDefaults,
 		background: backgroundDefaults,
 		autonomy: {
 			enabled: false,
@@ -454,6 +464,7 @@ export function createDefaultConfig(): PluginConfig {
 		confidence: confidenceDefaults,
 		fallback: fallbackDefaultsV6,
 		memory: memoryDefaults,
+		notifications: notificationsDefaults,
 		background: backgroundDefaults,
 		autonomy: {
 			enabled: false,

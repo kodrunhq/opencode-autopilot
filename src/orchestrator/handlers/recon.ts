@@ -18,7 +18,7 @@ export async function handleRecon(
 	_context?: PhaseHandlerContext,
 ): Promise<DispatchResult> {
 	if (result) {
-		const artifactPath = getArtifactRef(artifactDir, "RECON", "report.md");
+		const artifactPath = getArtifactRef(artifactDir, "RECON", "report.md", state.runId);
 		if (!(await fileExists(artifactPath))) {
 			logger.warn("RECON result received but artifact not found", {
 				operation: "phase_transition",
@@ -38,8 +38,8 @@ export async function handleRecon(
 		});
 	}
 
-	await ensurePhaseDir(artifactDir, "RECON");
-	const outputPath = getArtifactRef(artifactDir, "RECON", "report.md");
+	await ensurePhaseDir(artifactDir, "RECON", state.runId);
+	const outputPath = getArtifactRef(artifactDir, "RECON", "report.md", state.runId);
 
 	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
 

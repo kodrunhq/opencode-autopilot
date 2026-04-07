@@ -2,7 +2,7 @@ import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
 import { getLoopController } from "./autonomy";
 import { createLoopInjector } from "./autonomy/injector";
-import { isFirstLoad, loadConfig } from "./config";
+import { isFirstLoad, loadConfig, notificationsDefaults } from "./config";
 import { createCompactionHandler, createContextInjector } from "./context";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
@@ -189,7 +189,9 @@ const plugin: Plugin = async (input) => {
 	registerNotificationManager(notificationManager);
 	registerProgressTracker(progressTracker);
 
-	const taskToastManager = new TaskToastManager(notificationManager);
+	const taskToastManager = new TaskToastManager(notificationManager, {
+		desktopNotifications: config?.notifications ?? notificationsDefaults,
+	});
 	registerTaskToastManager(taskToastManager);
 
 	// --- Fallback subsystem initialization ---

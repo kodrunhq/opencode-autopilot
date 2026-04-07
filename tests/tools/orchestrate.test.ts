@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { autopilotAgent } from "../../src/agents/autopilot";
 import { loadLatestPipelineStateFromKernel } from "../../src/kernel/repository";
+import { resetDedupCache } from "../../src/observability/forensic-log";
+import { getPhaseDir } from "../../src/orchestrator/artifacts";
 import { clearAllRetryState, recordRetryAttempt } from "../../src/orchestrator/dispatch-retry";
 import { createInitialState, loadState, saveState } from "../../src/orchestrator/state";
 import { orchestrateCore } from "../../src/tools/orchestrate";
@@ -13,6 +15,7 @@ let tempDir: string;
 
 beforeEach(async () => {
 	tempDir = await mkdtemp(join(tmpdir(), "orchestrate-tool-test-"));
+	resetDedupCache();
 });
 
 afterEach(async () => {
@@ -60,8 +63,9 @@ describe("orchestrateCore", () => {
 			taskId: null,
 			payload: { text: "research done" },
 		};
-		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
-		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
+		const reconDir = getPhaseDir(tempDir, "RECON", first.runId);
+		await mkdir(reconDir, { recursive: true });
+		await writeFile(join(reconDir, "report.md"), "# Report\ntest report");
 		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("dispatch");
@@ -353,8 +357,9 @@ describe("orchestrateCore", () => {
 			taskId: null,
 			payload: { text: "research complete" },
 		};
-		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
-		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
+		const reconDir = getPhaseDir(tempDir, "RECON", first.runId);
+		await mkdir(reconDir, { recursive: true });
+		await writeFile(join(reconDir, "report.md"), "# Report\ntest report");
 		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("dispatch");
@@ -508,8 +513,9 @@ describe("active pipeline intent guard", () => {
 			taskId: null,
 			payload: { text: "done" },
 		};
-		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
-		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
+		const reconDir = getPhaseDir(tempDir, "RECON", first.runId);
+		await mkdir(reconDir, { recursive: true });
+		await writeFile(join(reconDir, "report.md"), "# Report\ntest report");
 		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("dispatch");
@@ -533,8 +539,9 @@ describe("active pipeline intent guard", () => {
 			taskId: null,
 			payload: { text: "research complete" },
 		};
-		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
-		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
+		const reconDir = getPhaseDir(tempDir, "RECON", first.runId);
+		await mkdir(reconDir, { recursive: true });
+		await writeFile(join(reconDir, "report.md"), "# Report\ntest report");
 		const result = await orchestrateCore(
 			{ result: JSON.stringify(envelope), intent: "research" },
 			tempDir,

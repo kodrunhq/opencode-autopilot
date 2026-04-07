@@ -6,11 +6,13 @@ import {
 	createForensicSink,
 	createForensicSinkForArtifactDir,
 } from "../../src/logging/forensic-writer";
+import { resetDedupCache } from "../../src/observability/forensic-log";
 
 describe("ForensicWriter", () => {
 	let tempDir: string;
 
 	beforeEach(() => {
+		resetDedupCache();
 		tempDir = join(
 			tmpdir(),
 			`forensic-writer-${Date.now()}-${Math.random().toString(36).slice(2)}`,

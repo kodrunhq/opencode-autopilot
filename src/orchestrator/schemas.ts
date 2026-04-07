@@ -94,7 +94,7 @@ export const branchLifecycleSchema = z.object({
 
 export const pipelineStateSchema = z.object({
 	schemaVersion: z.literal(2),
-	status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"]),
+	status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED", "INTERRUPTED"]),
 	runId: z.string().max(128).default("legacy-run"),
 	stateRevision: z.number().int().min(0).default(0),
 	idea: z.string().max(4096),

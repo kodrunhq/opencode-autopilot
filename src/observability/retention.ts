@@ -1,7 +1,7 @@
 import { readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { isEnoentError } from "../utils/fs-helpers";
-import { getGlobalConfigDir } from "../utils/paths";
+import { getProjectArtifactDir } from "../utils/paths";
 
 const DEFAULT_RETENTION_DAYS = 30;
 
@@ -25,7 +25,7 @@ interface PruneResult {
  * @returns Count of pruned files
  */
 export async function pruneOldLogs(options?: PruneOptions): Promise<PruneResult> {
-	const logsDir = options?.logsDir ?? join(getGlobalConfigDir(), "projects");
+	const logsDir = options?.logsDir ?? getProjectArtifactDir(process.cwd());
 	const retentionDays = options?.retentionDays ?? DEFAULT_RETENTION_DAYS;
 	const threshold = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
 

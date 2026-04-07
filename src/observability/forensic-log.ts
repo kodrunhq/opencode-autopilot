@@ -8,8 +8,12 @@ import { forensicEventSchema } from "./forensic-schemas";
 import type { ForensicEvent, ForensicEventDomain, ForensicEventType } from "./forensic-types";
 
 const FORENSIC_LOG_FILE = "orchestration.jsonl";
+const FORENSIC_DEDUP_WINDOW_MS = 1_000;
+const FORENSIC_DEDUP_PRUNE_AFTER_MS = 10_000;
+const FORENSIC_DEDUP_MAX_ENTRIES = 1_000;
 let forensicWriteWarned = false;
 let forensicMirrorWarned = false;
+const forensicDedupCache = new Map<string, number>();
 
 interface ForensicEventInput {
 	readonly timestamp?: string;
@@ -37,6 +41,53 @@ function redactMessage(message: string | null | undefined): string | null {
 
 function toProjectRootFromArtifactDir(artifactDir: string): string {
 	return basename(artifactDir) === ".opencode-autopilot" ? dirname(artifactDir) : artifactDir;
+}
+
+function buildDedupKey(
+	type: ForensicEventType,
+	phase?: string | null,
+	agent?: string | null,
+	sessionId?: string | null,
+): string {
+	return `${type}:${phase ?? ""}:${agent ?? ""}:${sessionId ?? ""}`;
+}
+
+function pruneDedupCache(now: number): void {
+	if (forensicDedupCache.size <= FORENSIC_DEDUP_MAX_ENTRIES) {
+		return;
+	}
+
+	for (const [key, timestamp] of forensicDedupCache) {
+		if (now - timestamp > FORENSIC_DEDUP_PRUNE_AFTER_MS) {
+			forensicDedupCache.delete(key);
+		}
+	}
+}
+
+export function resetDedupCache(): void {
+	forensicDedupCache.clear();
+}
+
+export function getDedupCacheSize(): number {
+	return forensicDedupCache.size;
+}
+
+export function isDuplicateEvent(
+	type: ForensicEventType,
+	phase?: string | null,
+	agent?: string | null,
+	sessionId?: string | null,
+): boolean {
+	const now = Date.now();
+	const key = buildDedupKey(type, phase, agent, sessionId);
+	const lastSeen = forensicDedupCache.get(key);
+	if (lastSeen != null && now - lastSeen < FORENSIC_DEDUP_WINDOW_MS) {
+		return true;
+	}
+
+	forensicDedupCache.set(key, now);
+	pruneDedupCache(now);
+	return false;
 }
 
 function appendValidatedForensicEvent(artifactDir: string, event: ForensicEvent): void {
@@ -88,6 +139,10 @@ export function createForensicEvent(input: ForensicEventInput): ForensicEvent {
 
 export function appendForensicEvent(projectRoot: string, event: ForensicEventInput): void {
 	try {
+		if (isDuplicateEvent(event.type, event.phase, event.agent, event.sessionId)) {
+			return;
+		}
+
 		const validated = createForensicEvent(event);
 		const artifactDir = getProjectArtifactDir(projectRoot);
 		appendValidatedForensicEvent(artifactDir, validated);
@@ -104,6 +159,10 @@ export function appendForensicEventForArtifactDir(
 	event: Omit<ForensicEventInput, "projectRoot">,
 ): void {
 	try {
+		if (isDuplicateEvent(event.type, event.phase, event.agent, event.sessionId)) {
+			return;
+		}
+
 		const validated = createForensicEvent({
 			...event,
 			projectRoot: toProjectRootFromArtifactDir(artifactDir),

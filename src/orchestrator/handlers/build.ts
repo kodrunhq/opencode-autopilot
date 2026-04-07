@@ -124,7 +124,7 @@ export const handleBuild: PhaseHandler = async (
 			const prompt = [
 				`CRITICAL review findings detected. Fix the following issues:`,
 				safeResult,
-				`Reference ${getArtifactRef(artifactDir, "PLAN", "tasks.json")} for context.`,
+				`Reference ${getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId)} for context.`,
 			].join(" ");
 
 			return Object.freeze({
