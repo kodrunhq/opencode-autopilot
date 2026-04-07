@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { resetDedupCache } from "../../src/observability/forensic-log";
 import {
 	logOrchestrationEvent,
 	type OrchestrationEvent,
@@ -10,6 +11,7 @@ import {
 let tempDir: string;
 
 beforeEach(async () => {
+	resetDedupCache();
 	tempDir = await mkdtemp(join(tmpdir(), "orch-logger-test-"));
 });
 
