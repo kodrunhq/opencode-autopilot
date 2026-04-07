@@ -198,6 +198,7 @@ describe("buildProgressSchema", () => {
 		const result = buildProgressSchema.parse({});
 		expect(result).toEqual({
 			currentTask: null,
+			currentTasks: [],
 			currentWave: null,
 			attemptCount: 0,
 			strikeCount: 0,
@@ -268,6 +269,7 @@ describe("pipelineStateSchema with buildProgress", () => {
 		const result = pipelineStateSchema.parse(state);
 		expect(result.buildProgress).toEqual({
 			currentTask: null,
+			currentTasks: [],
 			currentWave: null,
 			attemptCount: 0,
 			strikeCount: 0,

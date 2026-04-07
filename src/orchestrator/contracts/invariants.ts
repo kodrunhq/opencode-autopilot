@@ -85,6 +85,15 @@ export function validateStateInvariants(
 		});
 	}
 
+	for (const taskId of state.buildProgress.currentTasks) {
+		if (!buildTaskExists(state, taskId)) {
+			violations.push({
+				code: "E_INVARIANT_BUILD_TASK",
+				message: `buildProgress.currentTasks references unknown task ${taskId}`,
+			});
+		}
+	}
+
 	if (state.buildProgress.reviewPending && state.currentPhase !== "BUILD") {
 		violations.push({
 			code: "E_INVARIANT_REVIEW_PHASE",

@@ -176,6 +176,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 			],
 			buildProgress: {
 				currentTask: null,
+				currentTasks: [],
 				currentWave: null,
 				attemptCount: 0,
 				strikeCount: 0,
@@ -193,9 +194,9 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
-		expect(parsed.action).toBe("dispatch");
-		expect(parsed.taskId).toBe(1);
-		expect(parsed.agent).toBe(AGENT_NAMES.BUILD);
+		expect(parsed.action).toBe("dispatch_multi");
+		expect(parsed.agents).toHaveLength(2);
+		expect(parsed.agents[0].agent).toBe(AGENT_NAMES.BUILD);
 	});
 
 	test("BUILD phase with reviewPending triggers reviewCore directly", async () => {
@@ -218,6 +219,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 			],
 			buildProgress: {
 				currentTask: null,
+				currentTasks: [],
 				currentWave: 1,
 				attemptCount: 0,
 				strikeCount: 0,
@@ -372,6 +374,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 			],
 			buildProgress: {
 				currentTask: null,
+				currentTasks: [],
 				currentWave: null,
 				attemptCount: 0,
 				strikeCount: 0,
@@ -389,7 +392,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
-		expect(parsed.action).toBe("dispatch");
+		expect(parsed.action).toBe("dispatch_multi");
 		expect(parsed._userProgress).toBeDefined();
 		expect(parsed._userProgress).toContain("[6/8]");
 	});
@@ -413,6 +416,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 			],
 			buildProgress: {
 				currentTask: 1,
+				currentTasks: [1],
 				currentWave: 1,
 				attemptCount: 0,
 				strikeCount: 0,
@@ -519,6 +523,64 @@ describe("orchestrateCore pipeline dispatch", () => {
 		const second = JSON.parse(await orchestrateCore({ result: envelope }, tempDir));
 		expect(second.action).toBe("error");
 		expect(second.code).toBe("E_DUPLICATE_RESULT");
+	});
+
+	test("PLAN completion populates tasks from empty state", async () => {
+		const { orchestrateCore } = await import("../src/tools/orchestrate");
+		const state = createInitialState("test idea");
+		const planState = {
+			...state,
+			currentPhase: "PLAN" as Phase,
+			tasks: [],
+			phases: state.phases.map((p) =>
+				["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE"].includes(p.name)
+					? { ...p, status: "DONE" as const }
+					: p.name === "PLAN"
+						? { ...p, status: "IN_PROGRESS" as const }
+						: p,
+			),
+		};
+		await saveState(planState, tempDir);
+
+		const first = JSON.parse(await orchestrateCore({}, tempDir));
+		expect(first.action).toBe("dispatch");
+		expect(first.agent).toBe("oc-planner");
+
+		const planDir = getPhaseDir(tempDir, "PLAN", first.runId);
+		await mkdir(planDir, { recursive: true });
+		await writeFile(
+			join(planDir, "tasks.json"),
+			JSON.stringify({
+				schemaVersion: 1,
+				tasks: [
+					{ taskId: "W1-T01", title: "Setup DB", wave: 1, depends_on: [] },
+					{ taskId: "W1-T02", title: "Create API", wave: 1, depends_on: [] },
+					{ taskId: "W2-T01", title: "Add tests", wave: 2, depends_on: [] },
+				],
+			}),
+		);
+
+		const envelope = JSON.stringify({
+			schemaVersion: 1,
+			resultId: "plan-done-1",
+			runId: first.runId,
+			phase: "PLAN",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "planning complete" },
+		});
+		const result = await orchestrateCore({ result: envelope }, tempDir);
+		const parsed = JSON.parse(result);
+
+		expect(parsed.phase).toBe("BUILD");
+		const stateRaw = await readFile(join(tempDir, "state.json"), "utf-8");
+		const finalState = JSON.parse(stateRaw);
+		expect(finalState.tasks).toHaveLength(3);
+		expect(finalState.tasks[0].title).toBe("Setup DB");
+		expect(finalState.tasks[1].title).toBe("Create API");
+		expect(finalState.tasks[2].title).toBe("Add tests");
 	});
 });
 

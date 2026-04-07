@@ -1,9 +1,47 @@
 import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
-import type { BuildProgress, Task } from "../types";
+import type { BranchLifecycle, BuildProgress, Task } from "../types";
 import type { DispatchResult } from "./types";
+import { AGENT_NAMES } from "./types";
+
+export const cloneBranchLifecycle = (bl: BranchLifecycle) => ({
+	...bl,
+	tasksPushed: [...bl.tasksPushed],
+});
+
+export function buildPendingResultWithLifecycle(
+	wave: number,
+	inProgressTasks: readonly Task[],
+	buildProgress: Readonly<BuildProgress>,
+	lifecycle: BranchLifecycle,
+	updatedTasks?: readonly Task[],
+): DispatchResult {
+	const pendingResult = buildPendingResultError(wave, inProgressTasks, buildProgress, updatedTasks);
+	return Object.freeze({
+		...pendingResult,
+		_stateUpdates: {
+			...pendingResult._stateUpdates,
+			branchLifecycle: cloneBranchLifecycle(lifecycle),
+		},
+	} satisfies DispatchResult);
+}
+
+export function mergeDispatchWithLifecycle(
+	dispatchResult: DispatchResult,
+	lifecycle: BranchLifecycle,
+): DispatchResult {
+	return Object.freeze({
+		...dispatchResult,
+		_stateUpdates: {
+			...dispatchResult._stateUpdates,
+			branchLifecycle: cloneBranchLifecycle(lifecycle),
+		},
+	} satisfies DispatchResult);
+}
 
 const MAX_STRIKES = 3;
+
+const DEFAULT_MAX_PARALLEL_TASKS = 5;
 
 export function findCurrentWave(waveMap: ReadonlyMap<number, readonly Task[]>): number | null {
 	const sortedWaves = [...waveMap.keys()].sort((a, b) => a - b);
@@ -51,6 +89,7 @@ export function buildPendingResultError(
 				...buildProgress,
 				currentWave: wave,
 				currentTask: buildProgress.currentTask ?? inProgressTasks[0]?.id ?? null,
+				currentTasks: [...taskIds],
 			},
 		},
 	} satisfies DispatchResult);
@@ -68,12 +107,14 @@ export async function buildTaskPrompt(
 	task: Task,
 	artifactDir: string,
 	runId?: string,
+	mode: "PARALLEL" | "SOLO" = "SOLO",
 ): Promise<string> {
 	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.json", runId);
 	const planFallbackRef = getArtifactRef(artifactDir, "PLAN", "tasks.md", runId);
 	const designRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md", runId);
 	const planPath = (await fileExists(planRef)) ? planRef : planFallbackRef;
 	return [
+		`[EXECUTION MODE: ${mode}]`,
 		`Implement task ${task.id}: ${task.title}.`,
 		`Reference the plan at ${planPath}`,
 		`and architecture at ${designRef}.`,
@@ -87,12 +128,24 @@ export function markTaskDone(tasks: readonly Task[], taskId: number): readonly T
 	return tasks.map((t) => (t.id === taskId ? { ...t, status: "DONE" as const } : t));
 }
 
+export function markTaskFailed(tasks: readonly Task[], taskId: number): readonly Task[] {
+	return tasks.map((t) => (t.id === taskId ? { ...t, status: "FAILED" as const } : t));
+}
+
+/**
+ * Detect whether a result string is a dispatch failure summary
+ * (produced by `buildFailureSummary` when retries are exhausted).
+ */
+export function isDispatchFailure(resultText: string): boolean {
+	return resultText.trimStart().startsWith("DISPATCH_FAILED:");
+}
+
 export function isWaveComplete(
 	waveMap: ReadonlyMap<number, readonly Task[]>,
 	wave: number,
 ): boolean {
 	const tasks = waveMap.get(wave) ?? [];
-	return tasks.every((t) => t.status === "DONE");
+	return tasks.every((t) => t.status === "DONE" || t.status === "FAILED");
 }
 
 export function hasCriticalFindings(resultStr: string): boolean {
@@ -119,4 +172,80 @@ export function hasCriticalFindings(resultStr: string): boolean {
 	}
 }
 
-export { MAX_STRIKES };
+export async function buildParallelDispatch(
+	pendingTasks: readonly Task[],
+	wave: number,
+	effectiveTasks: readonly Task[],
+	buildProgress: Readonly<BuildProgress>,
+	artifactDir: string,
+	runId?: string,
+	maxParallel: number = DEFAULT_MAX_PARALLEL_TASKS,
+	currentInProgressCount = 0,
+): Promise<DispatchResult> {
+	const remainingSlots = Math.max(0, maxParallel - currentInProgressCount);
+
+	if (remainingSlots === 0) {
+		// Cap is full — return pending result so caller waits for in-progress tasks to finish.
+		const inProgressTasks = effectiveTasks.filter((t) => t.status === "IN_PROGRESS");
+		return buildPendingResultError(wave, inProgressTasks, buildProgress, effectiveTasks);
+	}
+
+	const tasksToDispatch = pendingTasks.slice(0, remainingSlots);
+	const taskIds = tasksToDispatch.map((t) => t.id);
+	const isParallel = currentInProgressCount > 0 || tasksToDispatch.length > 1;
+	const mode = isParallel ? ("PARALLEL" as const) : ("SOLO" as const);
+	const updatedTaskList = markTasksInProgress(effectiveTasks, taskIds);
+	const allInProgressIds = updatedTaskList
+		.filter((t) => t.status === "IN_PROGRESS")
+		.map((t) => t.id);
+
+	if (tasksToDispatch.length === 1) {
+		const task = tasksToDispatch[0];
+		const prompt = await buildTaskPrompt(task, artifactDir, runId, mode);
+		return Object.freeze({
+			action: "dispatch",
+			agent: AGENT_NAMES.BUILD,
+			prompt,
+			phase: "BUILD",
+			resultKind: "task_completion",
+			taskId: task.id,
+			progress: `Wave ${wave} — task ${task.id}`,
+			_stateUpdates: {
+				tasks: [...updatedTaskList],
+				buildProgress: {
+					...buildProgress,
+					currentTask: task.id,
+					currentTasks: [...allInProgressIds],
+					currentWave: wave,
+				},
+			},
+		} satisfies DispatchResult);
+	}
+
+	const agents = await Promise.all(
+		tasksToDispatch.map(async (task) => ({
+			agent: AGENT_NAMES.BUILD,
+			prompt: await buildTaskPrompt(task, artifactDir, runId, mode),
+			taskId: task.id,
+			resultKind: "task_completion" as const,
+		})),
+	);
+
+	return Object.freeze({
+		action: "dispatch_multi",
+		agents,
+		phase: "BUILD",
+		progress: `Wave ${wave} — parallel tasks [${taskIds.join(", ")}]`,
+		_stateUpdates: {
+			tasks: [...updatedTaskList],
+			buildProgress: {
+				...buildProgress,
+				currentTask: taskIds[0],
+				currentTasks: [...allInProgressIds],
+				currentWave: wave,
+			},
+		},
+	} satisfies DispatchResult);
+}
+
+export { DEFAULT_MAX_PARALLEL_TASKS, MAX_STRIKES };

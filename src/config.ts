@@ -49,6 +49,7 @@ export const orchestratorConfigSchema = z.object({
 	autonomy: z.enum(["full", "supervised", "manual"]).default("full"),
 	strictness: z.enum(["strict", "normal", "lenient"]).default("normal"),
 	phases: phasesConfigSchema.default(phasesConfigSchema.parse({})),
+	maxParallelTasks: z.number().int().min(1).max(10).default(5),
 });
 
 export const confidenceConfigSchema = z.object({

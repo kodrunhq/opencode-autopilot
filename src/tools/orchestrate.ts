@@ -13,12 +13,14 @@ import {
 	sleep,
 } from "../orchestrator/dispatch-retry";
 import { enrichErrorMessage } from "../orchestrator/error-context";
+import { isWaveComplete } from "../orchestrator/handlers/build-utils";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
 import type { DispatchResult, PhaseHandlerContext } from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
 import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
+import { groupByWave } from "../orchestrator/plan";
 import { getPhaseProgressString } from "../orchestrator/progress";
 import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
 import {
@@ -294,19 +296,156 @@ export async function handleAbortCleanup(
 }
 
 /**
- * Apply state updates from a DispatchResult if present, then save.
- * Returns the updated state.
+ * Result of buildMergeTransform: the transform function plus metadata about
+ * task IDs where this handler's PENDING→IN_PROGRESS change was redundant
+ * because the disk state already had the task as IN_PROGRESS (sibling race).
  */
+export interface MergeTransformResult {
+	readonly transform: (current: Readonly<PipelineState>) => PipelineState;
+	/** Task IDs where our change was redundant — a sibling already dispatched them. */
+	readonly redundantTaskIds: ReadonlySet<number>;
+}
+
+/**
+ * Builds a conflict-safe transform that merges task status changes by ID
+ * into the latest persisted state. On conflict retry, `current` is freshly
+ * loaded from disk — this ensures concurrent completions (task 1→DONE,
+ * task 2→DONE) both survive rather than one overwriting the other.
+ *
+ * `preHandlerState` is the state snapshot before the handler ran. By diffing
+ * `updates.tasks` against it, we identify which tasks THIS handler actually
+ * changed and apply only those to the (possibly refreshed) `current`.
+ *
+ * Also tracks "redundant" task dispatches: when this handler changed a task
+ * PENDING→IN_PROGRESS but the disk already had it as IN_PROGRESS (from a
+ * sibling's concurrent dispatch). The redundantTaskIds set is populated
+ * during transform execution and used by stale dispatch detection.
+ *
+ * branchLifecycle.tasksPushed is merged additively: new entries from this
+ * handler are unioned with the current disk state, preventing concurrent
+ * completions from overwriting each other's push history.
+ */
+export function buildMergeTransform(
+	updates: Partial<PipelineState>,
+	preHandlerState?: Readonly<PipelineState>,
+): MergeTransformResult {
+	const changedTaskIds: ReadonlySet<number> | null = (() => {
+		if (!updates.tasks) return null;
+		if (!preHandlerState) {
+			return new Set(updates.tasks.map((t) => t.id));
+		}
+		const preMap = new Map(preHandlerState.tasks.map((t) => [t.id, t]));
+		const ids = new Set<number>();
+		for (const updated of updates.tasks) {
+			const pre = preMap.get(updated.id);
+			if (!pre || pre.status !== updated.status) {
+				ids.add(updated.id);
+			}
+		}
+		return ids;
+	})();
+
+	const taskChanges = updates.tasks ? new Map(updates.tasks.map((t) => [t.id, t])) : null;
+
+	// Identify tasks this handler moved PENDING→IN_PROGRESS (dispatch candidates)
+	const dispatchedByThisHandler: ReadonlySet<number> = (() => {
+		if (!preHandlerState || !updates.tasks) return new Set<number>();
+		const preMap = new Map(preHandlerState.tasks.map((t) => [t.id, t]));
+		const ids = new Set<number>();
+		for (const updated of updates.tasks) {
+			const pre = preMap.get(updated.id);
+			if (pre && pre.status === "PENDING" && updated.status === "IN_PROGRESS") {
+				ids.add(updated.id);
+			}
+		}
+		return ids;
+	})();
+
+	// Compute new branchLifecycle.tasksPushed entries added by this handler
+	const newTasksPushed: readonly string[] = (() => {
+		if (!preHandlerState || !updates.branchLifecycle?.tasksPushed) return [];
+		const prePushed = new Set(preHandlerState.branchLifecycle?.tasksPushed ?? []);
+		return updates.branchLifecycle.tasksPushed.filter((id) => !prePushed.has(id));
+	})();
+
+	// Mutable set populated during transform execution on each conflict retry
+	const redundantTaskIds = new Set<number>();
+
+	const transform = (current: Readonly<PipelineState>): PipelineState => {
+		// Merge branchLifecycle.tasksPushed additively — even when this handler added
+		// no new push IDs, we must preserve current.branchLifecycle.tasksPushed so a
+		// stale updates.branchLifecycle doesn't overwrite sibling pushes.
+		const mergedUpdates = { ...updates };
+		if (updates.branchLifecycle && current.branchLifecycle) {
+			const currentPushed = new Set(current.branchLifecycle.tasksPushed);
+			const additionalPushed = newTasksPushed.filter((id) => !currentPushed.has(id));
+			mergedUpdates.branchLifecycle = {
+				...updates.branchLifecycle,
+				tasksPushed: [...current.branchLifecycle.tasksPushed, ...additionalPushed],
+			};
+		}
+
+		if (!taskChanges || !changedTaskIds) {
+			return patchState(current, mergedUpdates);
+		}
+
+		// Clear and repopulate redundant set on each retry
+		redundantTaskIds.clear();
+
+		const mergedTasks = current.tasks.map((currentTask) => {
+			if (!changedTaskIds.has(currentTask.id)) return currentTask;
+			const change = taskChanges.get(currentTask.id);
+			if (!change) return currentTask;
+
+			// Detect redundant dispatch: this handler moved task PENDING→IN_PROGRESS
+			// but disk already has it as IN_PROGRESS (sibling dispatched first)
+			if (dispatchedByThisHandler.has(currentTask.id) && currentTask.status === "IN_PROGRESS") {
+				redundantTaskIds.add(currentTask.id);
+			}
+
+			return { ...currentTask, ...change };
+		});
+
+		const inProgressIds = mergedTasks.filter((t) => t.status === "IN_PROGRESS").map((t) => t.id);
+		const mergedBuildProgress = mergedUpdates.buildProgress
+			? { ...mergedUpdates.buildProgress, currentTasks: inProgressIds }
+			: undefined;
+
+		return patchState(current, {
+			...mergedUpdates,
+			tasks: mergedTasks,
+			...(mergedBuildProgress ? { buildProgress: mergedBuildProgress } : {}),
+		});
+	};
+
+	return { transform, redundantTaskIds };
+}
+
+interface ApplyStateResult {
+	readonly state: PipelineState;
+	readonly redundantTaskIds: ReadonlySet<number>;
+}
+
 async function applyStateUpdates(
 	state: Readonly<PipelineState>,
 	handlerResult: DispatchResult,
 	artifactDir: string,
-): Promise<PipelineState> {
+): Promise<ApplyStateResult> {
 	const updates = handlerResult._stateUpdates;
-	if (updates) {
-		return updatePersistedState(artifactDir, state, (current) => patchState(current, updates));
+	if (!updates) {
+		return { state, redundantTaskIds: new Set<number>() };
 	}
-	return state;
+
+	if (handlerResult.phase === "BUILD") {
+		const { transform, redundantTaskIds } = buildMergeTransform(updates, state);
+		const merged = await updatePersistedState(artifactDir, state, transform);
+		return { state: merged, redundantTaskIds };
+	}
+
+	const merged = await updatePersistedState(artifactDir, state, (current) =>
+		patchState(current, updates),
+	);
+	return { state: merged, redundantTaskIds: new Set<number>() };
 }
 
 /**
@@ -464,6 +603,79 @@ async function checkCircuitBreaker(
 }
 
 /**
+ * Extract task IDs being dispatched from a DispatchResult.
+ */
+export function extractDispatchTaskIds(result: DispatchResult): readonly number[] {
+	const ids: number[] = [];
+	if (result.action === "dispatch" && result.taskId != null) {
+		const id = typeof result.taskId === "string" ? Number(result.taskId) : result.taskId;
+		if (Number.isFinite(id)) ids.push(id);
+	} else if (result.action === "dispatch_multi" && result.agents) {
+		for (const entry of result.agents) {
+			if (entry.taskId != null) {
+				const id = typeof entry.taskId === "string" ? Number(entry.taskId) : entry.taskId;
+				if (Number.isFinite(id)) ids.push(id);
+			}
+		}
+	}
+	return ids;
+}
+
+/**
+ * Detect whether a dispatch/dispatch_multi targets task IDs that a concurrent
+ * sibling already dispatched. Compares against `preHandlerState` — the state
+ * snapshot BEFORE this handler ran. If a task ID was already IN_PROGRESS in
+ * the pre-handler state, it was dispatched by a sibling (since this handler
+ * hasn't acted yet at that point). Returns true when ALL dispatched task IDs
+ * were already IN_PROGRESS before this handler, meaning the entire dispatch
+ * is a duplicate.
+ */
+export function isStaleDispatch(
+	result: DispatchResult,
+	preHandlerState: Readonly<PipelineState>,
+	redundantTaskIds?: ReadonlySet<number>,
+): boolean {
+	if (preHandlerState.currentPhase !== "BUILD") return false;
+
+	const dispatchedTaskIds = extractDispatchTaskIds(result);
+	if (dispatchedTaskIds.length === 0) return false;
+
+	const alreadyInProgress = new Set(
+		preHandlerState.tasks.filter((t) => t.status === "IN_PROGRESS").map((t) => t.id),
+	);
+
+	// Stale if ALL dispatched IDs were either already IN_PROGRESS in pre-handler
+	// state OR detected as redundant during merge (sibling same-snapshot race)
+	return dispatchedTaskIds.every(
+		(id) => alreadyInProgress.has(id) || (redundantTaskIds?.has(id) ?? false),
+	);
+}
+
+/**
+ * When the stale-pending re-evaluation needs to re-invoke the BUILD handler,
+ * ensure that a just-completed wave gets its mandatory review. After concurrent
+ * merges, the handler's original E_BUILD_RESULT_PENDING saw siblings still
+ * in-progress — but after the merge, the wave may be fully complete. Setting
+ * reviewPending=true lets the existing `reviewPending && !resultText` path in
+ * build.ts dispatch the reviewer correctly.
+ */
+export function prepareStateForBuildRerun(currentState: PipelineState): PipelineState {
+	const wave = currentState.buildProgress.currentWave;
+	if (wave == null) return currentState;
+
+	const waveMap = groupByWave(currentState.tasks);
+	if (isWaveComplete(waveMap, wave)) {
+		return patchState(currentState, {
+			buildProgress: {
+				...currentState.buildProgress,
+				reviewPending: true,
+			},
+		});
+	}
+	return currentState;
+}
+
+/**
  * Process a handler's DispatchResult, handling complete/dispatch/dispatch_multi/error.
  * On complete, advances the phase and invokes the next handler.
  */
@@ -475,7 +687,53 @@ async function processHandlerResult(
 	const normalizedResult = ensureDispatchIdentity(handlerResult, state);
 
 	// Apply state updates from handler if present
-	let currentState = await applyStateUpdates(state, normalizedResult, artifactDir);
+	const { state: mergedState, redundantTaskIds } = await applyStateUpdates(
+		state,
+		normalizedResult,
+		artifactDir,
+	);
+	let currentState = mergedState;
+
+	// When concurrent task completions merge, the handler's E_BUILD_RESULT_PENDING
+	// decision may be stale — all tasks might already be DONE after the merge.
+	// Re-run the BUILD handler against the fresh merged state to pick up wave
+	// completion, review dispatch, or next-wave advancement.
+	// prepareStateForBuildRerun sets reviewPending=true when the wave is now
+	// fully complete, so the handler dispatches a mandatory review rather than
+	// skipping to the next wave. We persist this to disk so the reviewer result
+	// later finds reviewPending=true.
+	if (
+		normalizedResult.action === "error" &&
+		normalizedResult.code === "E_BUILD_RESULT_PENDING" &&
+		currentState.buildProgress.currentTasks.length === 0 &&
+		currentState.currentPhase === "BUILD"
+	) {
+		const stateForRerun = prepareStateForBuildRerun(currentState);
+		if (stateForRerun !== currentState) {
+			currentState = await updatePersistedState(artifactDir, currentState, (current) =>
+				patchState(current, {
+					buildProgress: { ...current.buildProgress, reviewPending: true },
+				}),
+			);
+		}
+		const freshHandler = PHASE_HANDLERS.BUILD;
+		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
+		return processHandlerResult(freshResult, currentState, artifactDir);
+	}
+
+	// When concurrent completions both try to replenish the same pending task,
+	// the pre-handler state already has that task IN_PROGRESS from a sibling's
+	// dispatch. Re-invoke BUILD against the fresh merged state so it picks the
+	// correct next pending task (or waits if the cap is full).
+	if (
+		(normalizedResult.action === "dispatch" || normalizedResult.action === "dispatch_multi") &&
+		state.currentPhase === "BUILD" &&
+		isStaleDispatch(normalizedResult, state, redundantTaskIds)
+	) {
+		const freshHandler = PHASE_HANDLERS.BUILD;
+		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
+		return processHandlerResult(freshResult, currentState, artifactDir);
+	}
 
 	switch (normalizedResult.action) {
 		case "error": {

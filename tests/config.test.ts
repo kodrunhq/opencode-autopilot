@@ -859,6 +859,7 @@ describe("v7 config schema", () => {
 					ship: true,
 					retrospective: true,
 				},
+				maxParallelTasks: 5,
 			},
 			confidence: {
 				enabled: true,

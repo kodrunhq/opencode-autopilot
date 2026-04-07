@@ -174,6 +174,7 @@ describe("handleBuild", () => {
 			tasks: tasks.map((t) => ({ ...t, depends_on: [], attempt: 0, strike: 0 })),
 			buildProgress: {
 				currentTask: null,
+				currentTasks: [],
 				currentWave: null,
 				attemptCount: 0,
 				strikeCount: 0,
@@ -218,7 +219,7 @@ describe("handleBuild", () => {
 		expect(result.taskId).toBe(2);
 	});
 
-	test("multiple tasks in same wave dispatches one task at a time", async () => {
+	test("multiple tasks in same wave dispatches them in parallel", async () => {
 		const state = makeBuildState([
 			{ id: 1, title: "Task A", status: "PENDING", wave: 1 },
 			{ id: 2, title: "Task B", status: "PENDING", wave: 1 },
@@ -226,16 +227,17 @@ describe("handleBuild", () => {
 		]);
 		const result = await handleBuild(state, "/tmp/artifacts");
 
-		expect(result.action).toBe("dispatch");
-		expect(result.taskId).toBe(1);
+		expect(result.action).toBe("dispatch_multi");
+		expect(result.agents).toHaveLength(2);
 		expect(result._stateUpdates?.buildProgress?.currentTask).toBe(1);
+		expect(result._stateUpdates?.buildProgress?.currentTasks).toEqual([1, 2]);
 		const updatedTasks = result._stateUpdates?.tasks as
 			| Array<{ id: number; status: string }>
 			| undefined;
 		expect(updatedTasks).toBeDefined();
 		if (updatedTasks) {
 			expect(updatedTasks.find((t) => t.id === 1)?.status).toBe("IN_PROGRESS");
-			expect(updatedTasks.find((t) => t.id === 2)?.status).toBe("PENDING");
+			expect(updatedTasks.find((t) => t.id === 2)?.status).toBe("IN_PROGRESS");
 			expect(updatedTasks.find((t) => t.id === 3)?.status).toBe("PENDING");
 		}
 	});
@@ -391,7 +393,7 @@ describe("handleBuild", () => {
 		expect(result.code).toBe("E_BUILD_TASK_ID_REQUIRED");
 	});
 
-	test("review completion with more tasks remaining dispatches next task sequentially", async () => {
+	test("review completion with more tasks remaining dispatches next wave in parallel", async () => {
 		const state = makeBuildState(
 			[
 				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
@@ -402,15 +404,16 @@ describe("handleBuild", () => {
 		);
 		const result = await handleBuild(state, "/tmp/artifacts", '{"severity":"LOW"}');
 
-		expect(result.action).toBe("dispatch");
-		expect(result.taskId).toBe(2);
+		expect(result.action).toBe("dispatch_multi");
+		expect(result.agents).toHaveLength(2);
+		expect(result._stateUpdates?.buildProgress?.currentTasks).toEqual([2, 3]);
 		const updatedTasks = result._stateUpdates?.tasks as
 			| Array<{ id: number; status: string }>
 			| undefined;
 		expect(updatedTasks).toBeDefined();
 		if (updatedTasks) {
 			expect(updatedTasks.find((t) => t.id === 2)?.status).toBe("IN_PROGRESS");
-			expect(updatedTasks.find((t) => t.id === 3)?.status).toBe("PENDING");
+			expect(updatedTasks.find((t) => t.id === 3)?.status).toBe("IN_PROGRESS");
 		}
 	});
 
