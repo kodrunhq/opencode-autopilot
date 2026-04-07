@@ -294,8 +294,64 @@ export async function handleAbortCleanup(
 }
 
 /**
+ * Builds a conflict-safe transform that merges task status changes by ID
+ * into the latest persisted state. On conflict retry, `current` is freshly
+ * loaded from disk — this ensures concurrent completions (task 1→DONE,
+ * task 2→DONE) both survive rather than one overwriting the other.
+ *
+ * `preHandlerState` is the state snapshot before the handler ran. By diffing
+ * `updates.tasks` against it, we identify which tasks THIS handler actually
+ * changed and apply only those to the (possibly refreshed) `current`.
+ */
+export function buildMergeTransform(
+	updates: Partial<PipelineState>,
+	preHandlerState?: Readonly<PipelineState>,
+): (current: Readonly<PipelineState>) => PipelineState {
+	const changedTaskIds: ReadonlySet<number> | null = (() => {
+		if (!updates.tasks) return null;
+		if (!preHandlerState) {
+			return new Set(updates.tasks.map((t) => t.id));
+		}
+		const preMap = new Map(preHandlerState.tasks.map((t) => [t.id, t]));
+		const ids = new Set<number>();
+		for (const updated of updates.tasks) {
+			const pre = preMap.get(updated.id);
+			if (!pre || pre.status !== updated.status) {
+				ids.add(updated.id);
+			}
+		}
+		return ids;
+	})();
+
+	const taskChanges = updates.tasks ? new Map(updates.tasks.map((t) => [t.id, t])) : null;
+
+	return (current: Readonly<PipelineState>): PipelineState => {
+		if (!taskChanges || !changedTaskIds) {
+			return patchState(current, updates);
+		}
+
+		const mergedTasks = current.tasks.map((currentTask) => {
+			if (!changedTaskIds.has(currentTask.id)) return currentTask;
+			const change = taskChanges.get(currentTask.id);
+			return change ? { ...currentTask, ...change } : currentTask;
+		});
+
+		const inProgressIds = mergedTasks.filter((t) => t.status === "IN_PROGRESS").map((t) => t.id);
+		const mergedBuildProgress = updates.buildProgress
+			? { ...updates.buildProgress, currentTasks: inProgressIds }
+			: undefined;
+
+		return patchState(current, {
+			...updates,
+			tasks: mergedTasks,
+			...(mergedBuildProgress ? { buildProgress: mergedBuildProgress } : {}),
+		});
+	};
+}
+
+/**
  * Apply state updates from a DispatchResult if present, then save.
- * Returns the updated state.
+ * Uses merge-by-task-ID to handle concurrent parallel task completions.
  */
 async function applyStateUpdates(
 	state: Readonly<PipelineState>,
@@ -304,7 +360,7 @@ async function applyStateUpdates(
 ): Promise<PipelineState> {
 	const updates = handlerResult._stateUpdates;
 	if (updates) {
-		return updatePersistedState(artifactDir, state, (current) => patchState(current, updates));
+		return updatePersistedState(artifactDir, state, buildMergeTransform(updates, state));
 	}
 	return state;
 }

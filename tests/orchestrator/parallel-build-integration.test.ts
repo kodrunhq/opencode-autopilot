@@ -5,8 +5,10 @@ import { join } from "node:path";
 import { handleBuild } from "../../src/orchestrator/handlers/build";
 import { buildParallelDispatch } from "../../src/orchestrator/handlers/build-utils";
 import { pipelineStateSchema } from "../../src/orchestrator/schemas";
+import { saveState, updatePersistedState } from "../../src/orchestrator/state";
 import type { PipelineState } from "../../src/orchestrator/types";
 import { computeLineHash, hashlineEditCore } from "../../src/tools/hashline-edit";
+import { buildMergeTransform } from "../../src/tools/orchestrate";
 
 function makeBuildState(
 	tasks: Array<{
@@ -447,5 +449,45 @@ describe("parallel BUILD integration", () => {
 		expect(result.agent).toBe("oc-reviewer");
 		expect(result._stateUpdates?.tasks?.find((task) => task.id === 1)?.status).toBe("FAILED");
 		expect(result._stateUpdates?.buildProgress?.reviewPending).toBe(true);
+	});
+
+	test("concurrent task completions do not overwrite each other", async () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 },
+				{ id: 2, title: "Task B", status: "IN_PROGRESS", wave: 1 },
+				{ id: 3, title: "Task C", status: "PENDING", wave: 2 },
+			],
+			{ currentTask: 1, currentTasks: [1, 2], currentWave: 1 },
+		);
+
+		await saveState(state, tempDir);
+
+		const task1Updates: Partial<PipelineState> = {
+			tasks: state.tasks.map((t) => (t.id === 1 ? { ...t, status: "DONE" as const } : t)),
+			buildProgress: {
+				...state.buildProgress,
+				currentTasks: [2],
+			},
+		};
+
+		const task2Updates: Partial<PipelineState> = {
+			tasks: state.tasks.map((t) => (t.id === 2 ? { ...t, status: "DONE" as const } : t)),
+			buildProgress: {
+				...state.buildProgress,
+				currentTasks: [1],
+			},
+		};
+
+		const [result1, result2] = await Promise.all([
+			updatePersistedState(tempDir, state, buildMergeTransform(task1Updates, state)),
+			updatePersistedState(tempDir, state, buildMergeTransform(task2Updates, state)),
+		]);
+
+		const final = result1.stateRevision > result2.stateRevision ? result1 : result2;
+		expect(final.tasks.find((t) => t.id === 1)?.status).toBe("DONE");
+		expect(final.tasks.find((t) => t.id === 2)?.status).toBe("DONE");
+		expect(final.tasks.find((t) => t.id === 3)?.status).toBe("PENDING");
+		expect(final.buildProgress.currentTasks).toEqual([]);
 	});
 });
