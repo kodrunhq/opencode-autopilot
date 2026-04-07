@@ -37,6 +37,7 @@ export function createForensicSinkForArtifactDir(artifactDir: string): LogSink {
 			if (
 				domain === "session" ||
 				domain === "orchestrator" ||
+				domain === "fallback" ||
 				domain === "contract" ||
 				domain === "system" ||
 				domain === "review"
@@ -109,6 +110,7 @@ export function createForensicSink(projectRoot: string): LogSink {
 			if (
 				domain === "session" ||
 				domain === "orchestrator" ||
+				domain === "fallback" ||
 				domain === "contract" ||
 				domain === "system" ||
 				domain === "review"

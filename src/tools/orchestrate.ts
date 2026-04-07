@@ -39,7 +39,7 @@ import {
 	getProjectRootFromArtifactDir,
 } from "../utils/paths";
 import { getNotificationManager, getProgressTracker, getTaskToastManager } from "../ux/registry";
-import { reviewCore } from "./review";
+import { clearReviewState, reviewCore } from "./review";
 
 interface OrchestrateArgs {
 	readonly idea?: string;
@@ -230,6 +230,67 @@ function parseErrorCode(error: unknown): { readonly code: string; readonly messa
 		return { code: ORCHESTRATE_ERROR_CODES.INVALID_RESULT, message };
 	}
 	return { code: maybeCode, message: rest.length > 0 ? rest : message };
+}
+
+export function isAbortError(error: unknown): boolean {
+	if (!(error instanceof Error)) {
+		return false;
+	}
+
+	if (error.name === "AbortError") {
+		return true;
+	}
+
+	const normalizedMessage = error.message.toLowerCase();
+	return ["abort", "cancel", "interrupt", "signal"].some((term) =>
+		normalizedMessage.includes(term),
+	);
+}
+
+/**
+ * Handle abort/interrupt cleanup: persist INTERRUPTED status, clear review state,
+ * and log the interruption. Best-effort — failures are swallowed so the original
+ * AbortError propagates cleanly.
+ *
+ * Exported for direct unit testing without needing module-level mocks on shared modules.
+ */
+export async function handleAbortCleanup(
+	artifactDir: string,
+	initialMessage: string,
+): Promise<{ readonly safeMessage: string }> {
+	let safeMessage = initialMessage;
+	try {
+		const currentState = await loadState(artifactDir);
+		const timestamp = new Date().toISOString();
+		const phase = currentState?.currentPhase ?? "UNKNOWN";
+
+		if (currentState?.currentPhase) {
+			safeMessage = enrichErrorMessage(safeMessage, currentState);
+			await updatePersistedState(artifactDir, currentState, (latest) =>
+				patchState(latest, {
+					status: "INTERRUPTED" as const,
+					pendingDispatches: [],
+				}),
+			);
+		}
+
+		try {
+			await clearReviewState(artifactDir);
+		} catch {}
+
+		logOrchestrationEvent(artifactDir, {
+			timestamp,
+			phase,
+			action: "interrupted",
+			message: safeMessage,
+		});
+	} catch (persistError: unknown) {
+		if (isStateConflictError(persistError)) {
+			// Swallow conflict after retry exhaustion — original error takes priority
+		}
+		// Swallow save errors — original error takes priority
+	}
+	return { safeMessage };
 }
 
 /**
@@ -944,6 +1005,15 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 		const message = error instanceof Error ? error.message : String(error);
 		const parsedErr = parseErrorCode(error);
 		let safeMessage = message.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 4096);
+
+		if (isAbortError(error)) {
+			const result = await handleAbortCleanup(artifactDir, safeMessage);
+			return JSON.stringify({
+				action: "error",
+				code: "E_INTERRUPTED",
+				message: result.safeMessage,
+			});
+		}
 
 		// Persist failure metadata for forensics (best-effort)
 		try {

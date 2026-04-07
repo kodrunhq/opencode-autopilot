@@ -1,9 +1,22 @@
 import { readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { isEnoentError } from "../utils/fs-helpers";
-import { getGlobalConfigDir } from "../utils/paths";
+import { getProjectArtifactDir } from "../utils/paths";
 
 const DEFAULT_RETENTION_DAYS = 30;
+
+/**
+ * File extensions considered safe to prune.
+ * Everything else (state.json, .db, phase artifacts) is left untouched.
+ */
+const LOG_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".jsonl", ".log"]);
+
+function isLogFile(filename: string): boolean {
+	for (const ext of LOG_FILE_EXTENSIONS) {
+		if (filename.endsWith(ext)) return true;
+	}
+	return false;
+}
 
 interface PruneOptions {
 	readonly logsDir?: string;
@@ -25,7 +38,7 @@ interface PruneResult {
  * @returns Count of pruned files
  */
 export async function pruneOldLogs(options?: PruneOptions): Promise<PruneResult> {
-	const logsDir = options?.logsDir ?? join(getGlobalConfigDir(), "projects");
+	const logsDir = options?.logsDir ?? getProjectArtifactDir(process.cwd());
 	const retentionDays = options?.retentionDays ?? DEFAULT_RETENTION_DAYS;
 	const threshold = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
 
@@ -40,6 +53,8 @@ export async function pruneOldLogs(options?: PruneOptions): Promise<PruneResult>
 	let pruned = 0;
 
 	for (const entry of entries) {
+		if (!isLogFile(entry)) continue;
+
 		const filePath = join(logsDir, entry);
 		try {
 			const fileStat = await stat(filePath);

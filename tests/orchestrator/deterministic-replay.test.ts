@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { getPhaseDir } from "../../src/orchestrator/artifacts";
 import { replayEnvelopes } from "../../src/orchestrator/replay";
 import { orchestrateCore } from "../../src/tools/orchestrate";
 
@@ -45,10 +46,12 @@ describe("deterministic replay", () => {
 			dispatchId: firstDispatchB.dispatchId,
 		} as const;
 
-		await mkdir(join(tempDirA, "phases", "RECON"), { recursive: true });
-		await writeFile(join(tempDirA, "phases", "RECON", "report.md"), "# Report\ntest report");
-		await mkdir(join(tempDirB, "phases", "RECON"), { recursive: true });
-		await writeFile(join(tempDirB, "phases", "RECON", "report.md"), "# Report\ntest report");
+		const reconDirA = getPhaseDir(tempDirA, "RECON", firstDispatchA.runId);
+		await mkdir(reconDirA, { recursive: true });
+		await writeFile(join(reconDirA, "report.md"), "# Report\ntest report");
+		const reconDirB = getPhaseDir(tempDirB, "RECON", firstDispatchB.runId);
+		await mkdir(reconDirB, { recursive: true });
+		await writeFile(join(reconDirB, "report.md"), "# Report\ntest report");
 
 		await replayEnvelopes(tempDirA, [envelopeA]);
 		await replayEnvelopes(tempDirB, [envelopeB]);
@@ -78,8 +81,9 @@ describe("deterministic replay", () => {
 			taskId: null,
 			payload: { text: "done" },
 		} as const;
-		await mkdir(join(tempDirA, "phases", "RECON"), { recursive: true });
-		await writeFile(join(tempDirA, "phases", "RECON", "report.md"), "# Report\ntest report");
+		const reconDir = getPhaseDir(tempDirA, "RECON", dispatch.runId);
+		await mkdir(reconDir, { recursive: true });
+		await writeFile(join(reconDir, "report.md"), "# Report\ntest report");
 
 		const first = JSON.parse(await orchestrateCore({ result: JSON.stringify(envelope) }, tempDirA));
 		expect(first.action).toBe("dispatch");

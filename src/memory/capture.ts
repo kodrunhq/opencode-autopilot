@@ -4,6 +4,7 @@ import { getLogger } from "../logging/domains";
 import { resolveProjectIdentity } from "../projects/resolve";
 import * as captureUtils from "./capture-utils";
 import { pruneStaleObservations } from "./decay";
+import { saveMemory } from "./memories";
 import { insertObservation, upsertProject } from "./repository";
 import type { ObservationType } from "./types";
 
@@ -163,14 +164,40 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 	};
 }
 
-export function createMemoryChatMessageHandler(_deps: MemoryCaptureDeps) {
+export function createMemoryChatMessageHandler(deps: MemoryCaptureDeps) {
 	return async (
-		_input: { readonly sessionID: string },
-		_output: { readonly parts: unknown[] },
+		input: { readonly sessionID: string },
+		output: { readonly parts: unknown[] },
 	): Promise<void> => {
-		// V2: Chat-level preference extraction is handled by oc_memory_save tool.
-		// The regex-based extraction that lived here produced low-quality results.
-		// This handler is kept as a no-op for backward compatibility with the hook registration.
+		if (!Array.isArray(output.parts) || output.parts.length === 0) {
+			return;
+		}
+
+		try {
+			const db = deps.getDb();
+			const project = await resolveProjectIdentity(deps.projectRoot, { db });
+			const extractedMemories = [
+				...captureUtils.extractToolDecisions(output.parts),
+				...captureUtils.extractExplicitPreferences(output.parts),
+			].slice(0, 3);
+
+			for (const extracted of extractedMemories) {
+				try {
+					saveMemory(
+						{
+							kind: extracted.kind,
+							content: extracted.content,
+							summary: extracted.summary,
+							scope: "project",
+							projectId: project.id,
+							sourceSession: input.sessionID,
+							confidence: extracted.confidence,
+						},
+						db,
+					);
+				} catch {}
+			}
+		} catch {}
 	};
 }
 

@@ -4,6 +4,20 @@ import { planTasksArtifactSchema } from "../../src/orchestrator/contracts/phase-
 import { resultEnvelopeSchema } from "../../src/orchestrator/contracts/result-envelope";
 
 describe("resultEnvelopeSchema", () => {
+	const createRawEnvelope = (overrides: Record<string, unknown> = {}): string =>
+		JSON.stringify({
+			schemaVersion: 1,
+			resultId: "r-1",
+			runId: "run-1",
+			phase: "PLAN",
+			dispatchId: "d-1",
+			agent: "oc-planner",
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "ok" },
+			...overrides,
+		});
+
 	test("accepts valid envelope", () => {
 		const envelope = resultEnvelopeSchema.parse({
 			schemaVersion: 1,
@@ -58,6 +72,85 @@ describe("resultEnvelopeSchema", () => {
 			parseTypedResultEnvelope("plain text", {
 				runId: "run-1",
 				phase: "RECON",
+				fallbackDispatchId: "d-legacy",
+			}),
+		).toThrow("typed result envelope JSON object");
+	});
+
+	test("preserves valid string taskId", () => {
+		const result = parseTypedResultEnvelope(
+			createRawEnvelope({ taskId: "ses_298545d9affe38RXR7CXIgtSrH" }),
+			{ runId: "run-1", phase: "PLAN", fallbackDispatchId: "d-legacy" },
+		);
+
+		expect(result.envelope.taskId).toBe("ses_298545d9affe38RXR7CXIgtSrH");
+	});
+
+	test("coerces stringified numeric taskId to number", () => {
+		const result = parseTypedResultEnvelope(createRawEnvelope({ taskId: "42" }), {
+			runId: "run-1",
+			phase: "PLAN",
+			fallbackDispatchId: "d-legacy",
+		});
+
+		expect(result.envelope.taskId).toBe(42);
+	});
+
+	test("defaults missing schemaVersion and agent", () => {
+		const result = parseTypedResultEnvelope(
+			createRawEnvelope({ schemaVersion: undefined, agent: undefined }),
+			{ runId: "run-1", phase: "PLAN", fallbackDispatchId: "d-legacy" },
+		);
+
+		expect(result.envelope.schemaVersion).toBe(1);
+		expect(result.envelope.agent).toBeNull();
+	});
+
+	test("defaults missing taskId to null", () => {
+		const result = parseTypedResultEnvelope(createRawEnvelope({ taskId: undefined }), {
+			runId: "run-1",
+			phase: "PLAN",
+			fallbackDispatchId: "d-legacy",
+		});
+
+		expect(result.envelope.taskId).toBeNull();
+	});
+
+	test("wraps string payload as text", () => {
+		const result = parseTypedResultEnvelope(createRawEnvelope({ payload: "hello" }), {
+			runId: "run-1",
+			phase: "PLAN",
+			fallbackDispatchId: "d-legacy",
+		});
+
+		expect(result.envelope.payload.text).toBe("hello");
+	});
+
+	test("defaults missing payload text to empty string", () => {
+		const result = parseTypedResultEnvelope(createRawEnvelope({ payload: {} }), {
+			runId: "run-1",
+			phase: "PLAN",
+			fallbackDispatchId: "d-legacy",
+		});
+
+		expect(result.envelope.payload.text).toBe("");
+	});
+
+	test("empty string payload still throws invalid result", () => {
+		expect(() =>
+			parseTypedResultEnvelope("", {
+				runId: "run-1",
+				phase: "PLAN",
+				fallbackDispatchId: "d-legacy",
+			}),
+		).toThrow("E_INVALID_RESULT");
+	});
+
+	test("non-object json input is rejected as invalid typed envelope", () => {
+		expect(() =>
+			parseTypedResultEnvelope(JSON.stringify("plain text"), {
+				runId: "run-1",
+				phase: "PLAN",
 				fallbackDispatchId: "d-legacy",
 			}),
 		).toThrow("typed result envelope JSON object");

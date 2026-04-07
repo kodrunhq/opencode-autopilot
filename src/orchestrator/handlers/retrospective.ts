@@ -56,7 +56,7 @@ function parseAndValidateLessons(raw: string): {
 	return { valid: Object.freeze(validated), parseError: false };
 }
 
-export const handleRetrospective: PhaseHandler = async (_state, artifactDir, result?) => {
+export const handleRetrospective: PhaseHandler = async (state, artifactDir, result?) => {
 	if (result) {
 		const { valid, parseError } = parseAndValidateLessons(result);
 
@@ -113,7 +113,7 @@ export const handleRetrospective: PhaseHandler = async (_state, artifactDir, res
 	const artifactRefs = Object.entries(PHASE_ARTIFACTS)
 		.filter(([phase, files]) => files.length > 0 && phase !== "RETROSPECTIVE")
 		.flatMap(([phase, files]) =>
-			files.map((file) => getArtifactRef(artifactDir, phase as Phase, file)),
+			files.map((file) => getArtifactRef(artifactDir, phase as Phase, file, state.runId)),
 		);
 
 	const prompt = [

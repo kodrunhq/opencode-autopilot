@@ -18,7 +18,7 @@ export async function handleChallenge(
 	_context?: PhaseHandlerContext,
 ): Promise<DispatchResult> {
 	if (result) {
-		const artifactPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
+		const artifactPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId);
 		if (!(await fileExists(artifactPath))) {
 			logger.warn("CHALLENGE result received but artifact not found", {
 				operation: "phase_transition",
@@ -38,9 +38,9 @@ export async function handleChallenge(
 		});
 	}
 
-	await ensurePhaseDir(artifactDir, "CHALLENGE");
-	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md");
-	const outputPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
+	await ensurePhaseDir(artifactDir, "CHALLENGE", state.runId);
+	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md", state.runId);
+	const outputPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId);
 
 	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
 

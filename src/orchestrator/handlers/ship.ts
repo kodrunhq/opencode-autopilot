@@ -24,12 +24,16 @@ function buildPrInstructions(state: Parameters<PhaseHandler>[0]): string {
 
 export const handleShip: PhaseHandler = async (state, artifactDir, result?) => {
 	if (result) {
-		const shipDir = getPhaseDir(artifactDir, "SHIP");
+		const shipDir = getPhaseDir(artifactDir, "SHIP", state.runId);
 		const walkthroughExists = await fileExists(
-			getArtifactRef(artifactDir, "SHIP", "walkthrough.md"),
+			getArtifactRef(artifactDir, "SHIP", "walkthrough.md", state.runId),
 		);
-		const changelogExists = await fileExists(getArtifactRef(artifactDir, "SHIP", "changelog.md"));
-		const decisionsExists = await fileExists(getArtifactRef(artifactDir, "SHIP", "decisions.md"));
+		const changelogExists = await fileExists(
+			getArtifactRef(artifactDir, "SHIP", "changelog.md", state.runId),
+		);
+		const decisionsExists = await fileExists(
+			getArtifactRef(artifactDir, "SHIP", "decisions.md", state.runId),
+		);
 		if (!walkthroughExists && !changelogExists && !decisionsExists) {
 			return Object.freeze({
 				action: "error",
@@ -45,13 +49,13 @@ export const handleShip: PhaseHandler = async (state, artifactDir, result?) => {
 		} satisfies DispatchResult);
 	}
 
-	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md");
-	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
-	const architectRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md");
-	const tasksJsonRef = getArtifactRef(artifactDir, "PLAN", "tasks.json");
-	const tasksMarkdownRef = getArtifactRef(artifactDir, "PLAN", "tasks.md");
+	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md", state.runId);
+	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId);
+	const architectRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md", state.runId);
+	const tasksJsonRef = getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId);
+	const tasksMarkdownRef = getArtifactRef(artifactDir, "PLAN", "tasks.md", state.runId);
 	const planRef = (await fileExists(tasksJsonRef)) ? tasksJsonRef : tasksMarkdownRef;
-	const shipDir = getPhaseDir(artifactDir, "SHIP");
+	const shipDir = getPhaseDir(artifactDir, "SHIP", state.runId);
 
 	const prInstructions = buildPrInstructions(state);
 

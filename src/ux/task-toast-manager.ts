@@ -1,12 +1,37 @@
+import { detectPlatform, sendSessionNotification } from "../hooks/session-notification-sender";
+import { getLogger } from "../logging/domains";
 import type { NotificationManager } from "./notifications";
 import type { ModelFallbackInfo, TaskToastStatus, TrackedTask } from "./task-toast-types";
+
+const logger = getLogger("ux", "task-toast-manager");
+
+export interface TaskToastDesktopNotificationsConfig {
+	readonly desktop: boolean;
+	readonly rateLimit: number;
+}
+
+export interface TaskToastManagerOptions {
+	readonly desktopNotifications?: TaskToastDesktopNotificationsConfig;
+	readonly notificationPlatform?: ReturnType<typeof detectPlatform>;
+	readonly notificationSender?: typeof sendSessionNotification;
+}
 
 export class TaskToastManager {
 	private readonly tasks = new Map<string, TrackedTask>();
 	private readonly notifications: NotificationManager;
+	private readonly desktopNotifications: TaskToastDesktopNotificationsConfig;
+	private readonly notificationPlatform: ReturnType<typeof detectPlatform>;
+	private readonly notificationSender: typeof sendSessionNotification;
+	private lastDesktopNotificationAt = 0;
 
-	constructor(notifications: NotificationManager) {
+	constructor(notifications: NotificationManager, options: TaskToastManagerOptions = {}) {
 		this.notifications = notifications;
+		this.desktopNotifications = Object.freeze({
+			desktop: options.desktopNotifications?.desktop ?? false,
+			rateLimit: options.desktopNotifications?.rateLimit ?? 5000,
+		});
+		this.notificationPlatform = options.notificationPlatform ?? detectPlatform();
+		this.notificationSender = options.notificationSender ?? sendSessionNotification;
 	}
 
 	addTask(task: {
@@ -70,6 +95,31 @@ export class TaskToastManager {
 		}
 
 		void this.notifications.success("Task Completed", message, 5000);
+		void this.sendDesktopCompletionNotification(message);
+	}
+
+	private async sendDesktopCompletionNotification(message: string): Promise<void> {
+		if (!this.desktopNotifications.desktop) {
+			return;
+		}
+
+		const now = Date.now();
+		if (now - this.lastDesktopNotificationAt < this.desktopNotifications.rateLimit) {
+			logger.debug("Skipped rate-limited desktop task notification", {
+				rateLimitMs: this.desktopNotifications.rateLimit,
+			});
+			return;
+		}
+
+		this.lastDesktopNotificationAt = now;
+
+		try {
+			await this.notificationSender(this.notificationPlatform, "Task Completed", message);
+		} catch (error: unknown) {
+			logger.debug("Desktop task notification failed", {
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
 	}
 
 	getRunningTasks(): readonly TrackedTask[] {

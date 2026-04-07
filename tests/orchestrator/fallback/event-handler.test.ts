@@ -1,7 +1,14 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { FallbackConfig } from "../../../src/orchestrator/fallback/fallback-config";
 import type { FallbackManager } from "../../../src/orchestrator/fallback/fallback-manager";
 import type { FallbackPlan, FallbackState } from "../../../src/orchestrator/fallback/types";
+
+const appendForensicEventMock = mock(() => {});
+
+mock.module("../../../src/observability/forensic-log", () => ({
+	appendForensicEvent: appendForensicEventMock,
+	appendForensicEventForArtifactDir: appendForensicEventMock,
+}));
 
 // Minimal mock for FallbackManager
 function createMockManager() {
@@ -399,6 +406,120 @@ describe("createEventHandler", () => {
 		// Should release retry lock
 		const releaseCall = mockManager.calls.find((c) => c.method === "releaseRetryLock");
 		expect(releaseCall).toBeDefined();
+	});
+
+	test("session.error with plan logs forensic model switch event", async () => {
+		appendForensicEventMock.mockClear();
+		const plan: FallbackPlan = {
+			failedModel: "anthropic/claude-sonnet-4-5",
+			newModel: "openai/gpt-5",
+			newFallbackIndex: 0,
+			reason: "rate_limit",
+		};
+
+		mockManager.states.set("sess-2", {
+			originalModel: "anthropic/claude-sonnet-4-5",
+			currentModel: "anthropic/claude-sonnet-4-5",
+			fallbackIndex: -1,
+			failedModels: new Map(),
+			attemptCount: 0,
+		});
+
+		mockManager.handleError = (sessionID: string, error: unknown, errorModel?: string) => {
+			mockManager.calls.push({ method: "handleError", args: [sessionID, error, errorModel] });
+			return plan;
+		};
+
+		const handler = createEventHandler({
+			manager: mockManager as unknown as FallbackManager,
+			sdk: mockSdk,
+			config: defaultConfig,
+		});
+
+		await handler({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "sess-2",
+					error: { message: "rate limit", status: 429 },
+					model: "anthropic/claude-sonnet-4-5",
+				},
+			},
+		});
+
+		expect(appendForensicEventMock).toHaveBeenCalledTimes(1);
+		expect(appendForensicEventMock).toHaveBeenCalledWith(process.cwd(), {
+			projectRoot: process.cwd(),
+			domain: "fallback",
+			type: "model_switch",
+			sessionId: "sess-2",
+			code: "FALLBACK_SUCCESS",
+			message: "Switched from anthropic/claude-sonnet-4-5 to openai/gpt-5: rate_limit",
+			payload: {
+				failedModel: "anthropic/claude-sonnet-4-5",
+				newModel: "openai/gpt-5",
+				reason: "rate_limit",
+			},
+		});
+	});
+
+	test("session.error logs forensic replay failure event when dispatch fails", async () => {
+		appendForensicEventMock.mockClear();
+		const plan: FallbackPlan = {
+			failedModel: "anthropic/claude-sonnet-4-5",
+			newModel: "openai/gpt-5",
+			newFallbackIndex: 0,
+			reason: "rate_limit",
+		};
+
+		mockManager.states.set("sess-3", {
+			originalModel: "anthropic/claude-sonnet-4-5",
+			currentModel: "anthropic/claude-sonnet-4-5",
+			fallbackIndex: -1,
+			failedModels: new Map(),
+			attemptCount: 0,
+		});
+
+		mockManager.handleError = (sessionID: string, error: unknown, errorModel?: string) => {
+			mockManager.calls.push({ method: "handleError", args: [sessionID, error, errorModel] });
+			return plan;
+		};
+
+		mockSdk.promptAsync = async () => {
+			throw new Error("replay failed");
+		};
+
+		const handler = createEventHandler({
+			manager: mockManager as unknown as FallbackManager,
+			sdk: mockSdk,
+			config: defaultConfig,
+		});
+
+		await handler({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "sess-3",
+					error: { message: "rate limit", status: 429 },
+					model: "anthropic/claude-sonnet-4-5",
+				},
+			},
+		});
+
+		expect(appendForensicEventMock).toHaveBeenCalledTimes(1);
+		expect(appendForensicEventMock).toHaveBeenCalledWith(process.cwd(), {
+			projectRoot: process.cwd(),
+			domain: "fallback",
+			type: "error",
+			sessionId: "sess-3",
+			code: "FALLBACK_REPLAY_FAILED",
+			message: "Fallback replay failed: replay failed",
+			payload: {
+				failedModel: "anthropic/claude-sonnet-4-5",
+				newModel: "openai/gpt-5",
+				reason: "rate_limit",
+			},
+		});
 	});
 
 	test("session.created with model and timeout > 0 starts TTFT timeout", async () => {

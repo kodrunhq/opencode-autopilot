@@ -1,4 +1,5 @@
 import { getLogger } from "../../logging/domains";
+import { appendForensicEvent } from "../../observability/forensic-log";
 import type { FallbackConfig } from "./fallback-config";
 import type { FallbackManager } from "./fallback-manager";
 import { replayWithDegradation } from "./message-replay";
@@ -271,6 +272,21 @@ async function handleFallbackError(
 			await sdk.promptAsync(sessionID, parsedModel, replayedParts);
 			// Mark awaiting result inside dispatch block — only when prompt was sent
 			manager.markAwaitingResult(sessionID);
+			try {
+				appendForensicEvent(process.cwd(), {
+					projectRoot: process.cwd(),
+					domain: "fallback",
+					type: "model_switch",
+					sessionId: sessionID,
+					code: "FALLBACK_SUCCESS",
+					message: `Switched from ${plan.failedModel} to ${plan.newModel}: ${plan.reason}`,
+					payload: {
+						failedModel: plan.failedModel,
+						newModel: plan.newModel,
+						reason: plan.reason,
+					},
+				});
+			} catch {}
 		}
 
 		// Release lock after dispatch (or skip if model unparseable)
@@ -285,6 +301,21 @@ async function handleFallbackError(
 			reason: plan.reason,
 			error: error instanceof Error ? error.message : String(error),
 		});
+		try {
+			appendForensicEvent(process.cwd(), {
+				projectRoot: process.cwd(),
+				domain: "fallback",
+				type: "error",
+				sessionId: sessionID,
+				code: "FALLBACK_REPLAY_FAILED",
+				message: `Fallback replay failed: ${error instanceof Error ? error.message : String(error)}`,
+				payload: {
+					failedModel: plan.failedModel,
+					newModel: plan.newModel,
+					reason: plan.reason,
+				},
+			});
+		} catch {}
 		manager.releaseRetryLock(sessionID);
 	}
 }

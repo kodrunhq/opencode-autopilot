@@ -153,7 +153,7 @@ async function saveReviewState(state: ReviewState, artifactDir: string): Promise
 /**
  * Delete review state file (pipeline complete or error cleanup).
  */
-async function clearReviewState(artifactDir: string): Promise<void> {
+export async function clearReviewState(artifactDir: string): Promise<void> {
 	clearActiveReviewStateInKernel(artifactDir);
 	const statePath = join(artifactDir, STATE_FILE);
 	try {

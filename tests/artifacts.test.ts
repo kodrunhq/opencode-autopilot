@@ -3,6 +3,7 @@ import {
 	ensurePhaseDir,
 	getArtifactRef,
 	getPhaseDir,
+	listRuns,
 	PHASE_ARTIFACTS,
 } from "../src/orchestrator/artifacts";
 import type { DispatchResult } from "../src/orchestrator/handlers/types";
@@ -17,6 +18,20 @@ describe("getPhaseDir", () => {
 	test("returns correct path for BUILD phase", () => {
 		expect(getPhaseDir("/tmp/project/.opencode-autopilot", "BUILD")).toBe(
 			"/tmp/project/.opencode-autopilot/phases/BUILD",
+		);
+	});
+
+	test("returns flat path when runId is undefined", () => {
+		expect(getPhaseDir("./artifacts", "RECON")).toBe("artifacts/phases/RECON");
+	});
+
+	test("returns flat path when runId is legacy-run", () => {
+		expect(getPhaseDir("./artifacts", "RECON", "legacy-run")).toBe("artifacts/phases/RECON");
+	});
+
+	test("returns run-scoped path with real runId", () => {
+		expect(getPhaseDir("./artifacts", "RECON", "run_abc123")).toBe(
+			"artifacts/phases/run_abc123/RECON",
 		);
 	});
 });
@@ -40,6 +55,18 @@ describe("getArtifactRef", () => {
 		const checkPath = `${getPhaseDir(artifactDir, "ARCHITECT")}/design.md`;
 		expect(ref).toBe(checkPath);
 	});
+
+	test("returns run-scoped artifact path", () => {
+		expect(getArtifactRef("/project/.oca", "RECON", "report.md", "run_abc123")).toBe(
+			"/project/.oca/phases/run_abc123/RECON/report.md",
+		);
+	});
+
+	test("returns flat artifact path for legacy-run", () => {
+		expect(getArtifactRef("/project/.oca", "RECON", "report.md", "legacy-run")).toBe(
+			"/project/.oca/phases/RECON/report.md",
+		);
+	});
 });
 
 describe("ensurePhaseDir", () => {
@@ -50,6 +77,31 @@ describe("ensurePhaseDir", () => {
 		// Verify directory was created
 		const { existsSync } = await import("node:fs");
 		expect(existsSync(result)).toBe(true);
+	});
+
+	test("creates run-scoped directory", async () => {
+		const tmpDir = `/tmp/test-artifacts-runscoped-${Date.now()}`;
+		const result = await ensurePhaseDir(tmpDir, "RECON", "run_abc123");
+		expect(result).toBe(`${tmpDir}/phases/run_abc123/RECON`);
+		const { existsSync } = await import("node:fs");
+		expect(existsSync(result)).toBe(true);
+	});
+});
+
+describe("listRuns", () => {
+	test("returns empty array when phases dir does not exist", async () => {
+		const runs = await listRuns("/nonexistent/path");
+		expect(runs).toEqual([]);
+	});
+
+	test("returns run IDs from phases directory", async () => {
+		const tmpDir = `/tmp/test-listruns-${Date.now()}`;
+		const { mkdirSync } = await import("node:fs");
+		mkdirSync(`${tmpDir}/phases/run_aaa`, { recursive: true });
+		mkdirSync(`${tmpDir}/phases/run_bbb`, { recursive: true });
+		mkdirSync(`${tmpDir}/phases/RECON`, { recursive: true });
+		const runs = await listRuns(tmpDir);
+		expect(runs).toEqual(["run_aaa", "run_bbb"]);
 	});
 });
 
@@ -187,6 +239,20 @@ describe("pipelineStateSchema with buildProgress", () => {
 		};
 		const result = pipelineStateSchema.parse(state);
 		expect(result.buildProgress.currentTask).toBe(1);
+	});
+
+	test("accepts INTERRUPTED status", () => {
+		const state = {
+			schemaVersion: 2,
+			status: "INTERRUPTED",
+			idea: "Test idea",
+			currentPhase: "BUILD",
+			startedAt: "2026-01-01T00:00:00Z",
+			lastUpdatedAt: "2026-01-01T00:00:00Z",
+			phases: [],
+		};
+		const result = pipelineStateSchema.parse(state);
+		expect(result.status).toBe("INTERRUPTED");
 	});
 
 	test("defaults buildProgress when omitted", () => {

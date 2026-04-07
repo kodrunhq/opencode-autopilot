@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createForensicEvent } from "../../src/observability/forensic-log";
+import { createForensicEvent, resetDedupCache } from "../../src/observability/forensic-log";
 import { writeSessionLog } from "../../src/observability/log-writer";
 
 function makeEvents(projectRoot: string, sessionId: string) {
@@ -64,6 +64,7 @@ describe("writeSessionLog", () => {
 	let artifactDir: string;
 
 	beforeEach(async () => {
+		resetDedupCache();
 		projectRoot = join(tmpdir(), `log-writer-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 		artifactDir = join(projectRoot, ".opencode-autopilot");
 		await mkdir(artifactDir, { recursive: true });

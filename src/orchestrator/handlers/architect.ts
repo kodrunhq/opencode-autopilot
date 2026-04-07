@@ -32,7 +32,7 @@ export async function handleArchitect(
 	// _result is received from the orchestrator but completion is determined by
 	// artifact existence (design.md/critique.md), not by result truthiness.
 	// This preserves the three-step arena flow: proposals → critic → complete.
-	const phaseDir = getPhaseDir(artifactDir, "ARCHITECT");
+	const phaseDir = getPhaseDir(artifactDir, "ARCHITECT", state.runId);
 	const critiqueExists = await fileExists(join(phaseDir, "critique.md"));
 	const designExists = await fileExists(join(phaseDir, "design.md"));
 
@@ -50,7 +50,7 @@ export async function handleArchitect(
 
 	// Determine expected proposal count BEFORE checking existence
 	// so we can verify ALL proposals were written, not just one
-	await ensurePhaseDir(artifactDir, "ARCHITECT");
+	await ensurePhaseDir(artifactDir, "ARCHITECT", state.runId);
 	const reconEntries = filterByPhase(state.confidence, "RECON");
 	const depth = getMemoryTunedDepth(reconEntries, getProjectRootFromArtifactDir(artifactDir));
 
@@ -70,9 +70,9 @@ export async function handleArchitect(
 				resultKind: "phase_output",
 				prompt: [
 					`Review architecture proposals in ${proposalsDir}/`,
-					`Read ${getArtifactRef(artifactDir, "RECON", "report.md")} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md")} for context.`,
+					`Read ${getArtifactRef(artifactDir, "RECON", "report.md", state.runId)} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId)} for context.`,
 					"",
-					`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md")}`,
+					`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md", state.runId)}`,
 					"",
 					"Your critique MUST contain:",
 					"",
@@ -110,9 +110,9 @@ export async function handleArchitect(
 				resultKind: "phase_output",
 				prompt: [
 					`Review architecture proposals in ${proposalsDir}/`,
-					`Read ${getArtifactRef(artifactDir, "RECON", "report.md")} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md")} for context.`,
+					`Read ${getArtifactRef(artifactDir, "RECON", "report.md", state.runId)} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId)} for context.`,
 					"",
-					`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md")}`,
+					`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md", state.runId)}`,
 					"",
 					"Your critique MUST contain:",
 					"",
@@ -143,8 +143,8 @@ export async function handleArchitect(
 	}
 
 	// Step 1: Dispatch architect(s) based on confidence depth
-	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md");
-	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
+	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md", state.runId);
+	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId);
 	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
 
 	if (depth === 1) {
@@ -157,7 +157,7 @@ export async function handleArchitect(
 				"",
 				`Design architecture for: ${safeIdea}`,
 				"",
-				`Write design to ${getArtifactRef(artifactDir, "ARCHITECT", "design.md")}`,
+				`Write design to ${getArtifactRef(artifactDir, "ARCHITECT", "design.md", state.runId)}`,
 				"",
 				"Your design document MUST contain these sections:",
 				"",

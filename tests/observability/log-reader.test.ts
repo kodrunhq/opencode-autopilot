@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createForensicEvent } from "../../src/observability/forensic-log";
+import { createForensicEvent, resetDedupCache } from "../../src/observability/forensic-log";
 import {
 	listSessionLogs,
 	readLatestSessionLog,
@@ -46,6 +46,7 @@ describe("log-reader", () => {
 	let projectRoot: string;
 
 	beforeEach(async () => {
+		resetDedupCache();
 		projectRoot = join(tmpdir(), `log-reader-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 		await mkdir(join(projectRoot, ".opencode-autopilot"), { recursive: true });
 	});

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import {
 	buildFailureSummary,
 	buildRetryKey,
@@ -550,12 +551,13 @@ describe("handler artifact contracts (Fix 3)", () => {
 
 	test("SHIP returns complete when only decisions.md exists", async () => {
 		const fs = await import("node:fs/promises");
+		const { getPhaseDir } = await import("../../src/orchestrator/artifacts");
 		const tmpDir = `/tmp/test-ship-decisions-${Date.now()}`;
-		await fs.mkdir(`${tmpDir}/phases/SHIP`, { recursive: true });
-		await fs.writeFile(`${tmpDir}/phases/SHIP/decisions.md`, "# Decisions\nContent");
-
 		const { handleShip } = await import("../../src/orchestrator/handlers/ship");
 		const state = makeMinimalState("SHIP");
+		const shipDir = getPhaseDir(tmpDir, "SHIP", state.runId);
+		await fs.mkdir(shipDir, { recursive: true });
+		await fs.writeFile(join(shipDir, "decisions.md"), "# Decisions\nContent");
 		const result = await handleShip(state, tmpDir, "agent output");
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("SHIP");
@@ -579,14 +581,10 @@ describe("ARCHITECT partial failure (Fix 4)", () => {
 		const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
 		const { join } = await import("node:path");
 		const { tmpdir } = await import("node:os");
+		const { getPhaseDir } = await import("../../src/orchestrator/artifacts");
 		const { handleArchitect } = await import("../../src/orchestrator/handlers/architect");
 
 		const artifactDir = await mkdtemp(join(tmpdir(), "architect-test-"));
-		const proposalsDir = join(artifactDir, "phases", "ARCHITECT", "proposals");
-		await mkdir(proposalsDir, { recursive: true });
-
-		await writeFile(join(proposalsDir, "proposal-A.md"), "# Proposal A\nContent here");
-
 		const state = makeMinimalState("ARCHITECT", {
 			confidence: [
 				{
@@ -598,6 +596,9 @@ describe("ARCHITECT partial failure (Fix 4)", () => {
 				},
 			],
 		});
+		const proposalsDir = join(getPhaseDir(artifactDir, "ARCHITECT", state.runId), "proposals");
+		await mkdir(proposalsDir, { recursive: true });
+		await writeFile(join(proposalsDir, "proposal-A.md"), "# Proposal A\nContent here");
 
 		const result = await handleArchitect(state, artifactDir);
 
@@ -616,16 +617,10 @@ describe("ARCHITECT partial failure (Fix 4)", () => {
 		const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
 		const { join } = await import("node:path");
 		const { tmpdir } = await import("node:os");
+		const { getPhaseDir } = await import("../../src/orchestrator/artifacts");
 		const { handleArchitect } = await import("../../src/orchestrator/handlers/architect");
 
 		const artifactDir = await mkdtemp(join(tmpdir(), "architect-test-full-"));
-		const proposalsDir = join(artifactDir, "phases", "ARCHITECT", "proposals");
-		await mkdir(proposalsDir, { recursive: true });
-
-		await writeFile(join(proposalsDir, "proposal-A.md"), "# Proposal A");
-		await writeFile(join(proposalsDir, "proposal-B.md"), "# Proposal B");
-		await writeFile(join(proposalsDir, "proposal-C.md"), "# Proposal C");
-
 		const state = makeMinimalState("ARCHITECT", {
 			confidence: [
 				{
@@ -637,6 +632,11 @@ describe("ARCHITECT partial failure (Fix 4)", () => {
 				},
 			],
 		});
+		const proposalsDir = join(getPhaseDir(artifactDir, "ARCHITECT", state.runId), "proposals");
+		await mkdir(proposalsDir, { recursive: true });
+		await writeFile(join(proposalsDir, "proposal-A.md"), "# Proposal A");
+		await writeFile(join(proposalsDir, "proposal-B.md"), "# Proposal B");
+		await writeFile(join(proposalsDir, "proposal-C.md"), "# Proposal C");
 
 		const result = await handleArchitect(state, artifactDir);
 
@@ -653,14 +653,14 @@ describe("ARCHITECT partial failure (Fix 4)", () => {
 		const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
 		const { join } = await import("node:path");
 		const { tmpdir } = await import("node:os");
+		const { getPhaseDir } = await import("../../src/orchestrator/artifacts");
 		const { handleArchitect } = await import("../../src/orchestrator/handlers/architect");
 
 		const artifactDir = await mkdtemp(join(tmpdir(), "architect-test-design-"));
-		const architectDir = join(artifactDir, "phases", "ARCHITECT");
+		const state = makeMinimalState("ARCHITECT");
+		const architectDir = getPhaseDir(artifactDir, "ARCHITECT", state.runId);
 		await mkdir(architectDir, { recursive: true });
 		await writeFile(join(architectDir, "design.md"), "# Final Design");
-
-		const state = makeMinimalState("ARCHITECT");
 		const result = await handleArchitect(state, artifactDir);
 
 		expect(result.action).toBe("complete");
