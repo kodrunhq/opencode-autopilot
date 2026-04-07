@@ -599,7 +599,8 @@ async function processHandlerResult(
 	// completion, review dispatch, or next-wave advancement.
 	// prepareStateForBuildRerun sets reviewPending=true when the wave is now
 	// fully complete, so the handler dispatches a mandatory review rather than
-	// skipping to the next wave.
+	// skipping to the next wave. We persist this to disk so the reviewer result
+	// later finds reviewPending=true.
 	if (
 		normalizedResult.action === "error" &&
 		normalizedResult.code === "E_BUILD_RESULT_PENDING" &&
@@ -607,19 +608,28 @@ async function processHandlerResult(
 		currentState.currentPhase === "BUILD"
 	) {
 		const stateForRerun = prepareStateForBuildRerun(currentState);
+		if (stateForRerun !== currentState) {
+			currentState = await updatePersistedState(artifactDir, currentState, (current) =>
+				patchState(current, {
+					buildProgress: { ...current.buildProgress, reviewPending: true },
+				}),
+			);
+		}
 		const freshHandler = PHASE_HANDLERS.BUILD;
-		const freshResult = await freshHandler(stateForRerun, artifactDir, undefined, undefined);
-		return processHandlerResult(freshResult, stateForRerun, artifactDir);
+		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
+		return processHandlerResult(freshResult, currentState, artifactDir);
 	}
 
 	// When concurrent completions both try to replenish the same pending task,
 	// the merged state already has that task IN_PROGRESS from the sibling's
 	// dispatch. Re-invoke BUILD against the fresh state so it picks the correct
 	// next pending task (or waits if the cap is full).
+	// Compare against `state` (pre-update) not `currentState` (post-update),
+	// because applyStateUpdates already marked this handler's own tasks IN_PROGRESS.
 	if (
 		(normalizedResult.action === "dispatch" || normalizedResult.action === "dispatch_multi") &&
-		currentState.currentPhase === "BUILD" &&
-		isStaleDispatch(normalizedResult, currentState)
+		state.currentPhase === "BUILD" &&
+		isStaleDispatch(normalizedResult, state)
 	) {
 		const freshHandler = PHASE_HANDLERS.BUILD;
 		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
