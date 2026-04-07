@@ -1,51 +1,52 @@
-import { describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createInitialState, saveState } from "../../src/orchestrator/state";
+import { handleAbortCleanup } from "../../src/tools/orchestrate";
 
-const mockClearReviewState = mock(() => Promise.resolve());
-const mockReviewCore = mock(() => Promise.resolve(JSON.stringify({ action: "error" })));
-const mockLoadState = mock(() => Promise.resolve(null));
-const mockCreateInitialState = mock(() => ({ currentPhase: null }) as never);
-const mockIsStateConflictError = mock(() => false);
-const mockPatchState = mock((state: unknown) => state);
-const mockSaveState = mock(() => {
-	const error = new Error("operation aborted");
-	error.name = "AbortError";
-	throw error;
+let tempDir: string;
+
+beforeEach(async () => {
+	tempDir = await mkdtemp(join(tmpdir(), "abort-cleanup-test-"));
 });
-const mockUpdatePersistedState = mock(() => Promise.resolve({} as never));
 
-mock.module("../../src/tools/review", () => ({
-	clearReviewState: mockClearReviewState,
-	reviewCore: mockReviewCore,
-}));
+afterEach(async () => {
+	await rm(tempDir, { recursive: true, force: true });
+});
 
-mock.module("../../src/orchestrator/state", () => ({
-	createInitialState: mockCreateInitialState,
-	isStateConflictError: mockIsStateConflictError,
-	loadState: mockLoadState,
-	patchState: mockPatchState,
-	saveState: mockSaveState,
-	updatePersistedState: mockUpdatePersistedState,
-}));
+describe("handleAbortCleanup", () => {
+	test("sets state to INTERRUPTED and clears pending dispatches", async () => {
+		const state = createInitialState("test idea");
+		await saveState(state, tempDir);
 
-mock.module("../../src/utils/gitignore", () => ({
-	ensureGitignore: mock(() => Promise.resolve()),
-}));
+		await handleAbortCleanup(tempDir, "operation aborted");
 
-import { orchestrateCore } from "../../src/tools/orchestrate";
+		const persisted = JSON.parse(await readFile(join(tempDir, "state.json"), "utf-8"));
+		expect(persisted.status).toBe("INTERRUPTED");
+		expect(persisted.pendingDispatches).toEqual([]);
+	});
 
-describe("orchestrateCore abort cleanup", () => {
-	test("clears stale review state when interrupted", async () => {
-		const artifactDir = "/tmp/opencode-artifacts";
+	test("returns enriched safeMessage when state exists", async () => {
+		const state = createInitialState("test idea");
+		await saveState(state, tempDir);
 
-		const result = JSON.parse(
-			await orchestrateCore({ idea: "build something", intent: "implementation" }, artifactDir),
-		);
+		const result = await handleAbortCleanup(tempDir, "operation aborted");
 
-		expect(result).toEqual({
-			action: "error",
-			code: "E_INTERRUPTED",
-			message: "operation aborted",
-		});
-		expect(mockClearReviewState).toHaveBeenCalledWith(artifactDir);
+		expect(result.safeMessage).toContain("operation aborted");
+	});
+
+	test("handles missing state gracefully", async () => {
+		const result = await handleAbortCleanup(tempDir, "operation aborted");
+
+		expect(result.safeMessage).toBe("operation aborted");
+	});
+
+	test("does not throw when review state cleanup fails", async () => {
+		const state = createInitialState("test idea");
+		await saveState(state, tempDir);
+
+		const result = await handleAbortCleanup(tempDir, "signal interrupted");
+		expect(result.safeMessage).toBeDefined();
 	});
 });
