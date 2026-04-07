@@ -485,8 +485,8 @@ describe("parallel BUILD integration", () => {
 		};
 
 		const [result1, result2] = await Promise.all([
-			updatePersistedState(tempDir, state, buildMergeTransform(task1Updates, state)),
-			updatePersistedState(tempDir, state, buildMergeTransform(task2Updates, state)),
+			updatePersistedState(tempDir, state, buildMergeTransform(task1Updates, state).transform),
+			updatePersistedState(tempDir, state, buildMergeTransform(task2Updates, state).transform),
 		]);
 
 		const final = result1.stateRevision > result2.stateRevision ? result1 : result2;
@@ -655,7 +655,7 @@ describe("parallel BUILD integration", () => {
 
 		// buildMergeTransform diffs A's updates vs preHandlerState
 		// Task 7: pre=PENDING, update=IN_PROGRESS → changed by A
-		const transform = buildMergeTransform(
+		const { transform, redundantTaskIds } = buildMergeTransform(
 			handlerAUpdates as Partial<PipelineState>,
 			preHandlerState,
 		);
@@ -663,6 +663,8 @@ describe("parallel BUILD integration", () => {
 
 		// Task 7 is IN_PROGRESS in merged state (from both A and B)
 		expect(mergedState.tasks.find((t) => t.id === 7)?.status).toBe("IN_PROGRESS");
+		// Task 7 was detected as redundant (disk already had it IN_PROGRESS)
+		expect(redundantTaskIds.has(7)).toBe(true);
 
 		const dispatchResult = {
 			action: "dispatch" as const,
@@ -687,6 +689,79 @@ describe("parallel BUILD integration", () => {
 			{ currentWave: 1, currentTasks: [5, 7] },
 		);
 		expect(isStaleDispatch(dispatchResult, preHandlerStateForB)).toBe(true);
+	});
+
+	test("isStaleDispatch detects same-snapshot race via redundantTaskIds", () => {
+		const preHandlerState = makeBuildState(
+			[
+				{ id: 5, title: "Task E", status: "IN_PROGRESS", wave: 1 },
+				{ id: 6, title: "Task F", status: "DONE", wave: 1 },
+				{ id: 7, title: "Task G", status: "PENDING", wave: 1 },
+			],
+			{ currentWave: 1, currentTasks: [5] },
+		);
+
+		const dispatchResult = {
+			action: "dispatch" as const,
+			agent: "oc-implementer",
+			prompt: "implement task 7",
+			taskId: 7,
+			phase: "BUILD",
+		};
+
+		// Without redundantTaskIds: task 7 was PENDING in preHandlerState → not stale
+		expect(isStaleDispatch(dispatchResult, preHandlerState)).toBe(false);
+
+		// With redundantTaskIds containing task 7 (sibling detected during merge): stale
+		const redundant = new Set([7]);
+		expect(isStaleDispatch(dispatchResult, preHandlerState, redundant)).toBe(true);
+	});
+
+	test("buildMergeTransform merges branchLifecycle.tasksPushed additively", () => {
+		const baseState = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 },
+				{ id: 2, title: "Task B", status: "IN_PROGRESS", wave: 1 },
+			],
+			{ currentWave: 1, currentTasks: [1, 2] },
+		);
+		const lifecycle = {
+			currentBranch: "feat/test",
+			baseBranch: "main",
+			tasksPushed: [] as string[],
+			prNumber: null,
+			prUrl: null,
+			worktreePath: null,
+			createdAt: null,
+			lastPushedAt: null,
+		};
+		const state: PipelineState = { ...baseState, branchLifecycle: lifecycle };
+
+		const handlerAUpdates: Partial<PipelineState> = {
+			tasks: state.tasks.map((t) => (t.id === 1 ? { ...t, status: "DONE" as const } : t)),
+			branchLifecycle: {
+				...lifecycle,
+				tasksPushed: ["task-1-branch"],
+			},
+		};
+
+		const handlerBUpdates: Partial<PipelineState> = {
+			tasks: state.tasks.map((t) => (t.id === 2 ? { ...t, status: "DONE" as const } : t)),
+			branchLifecycle: {
+				...lifecycle,
+				tasksPushed: ["task-2-branch"],
+			},
+		};
+
+		const { transform: transformA } = buildMergeTransform(handlerAUpdates, state);
+		const afterA = transformA(state);
+		expect(afterA.branchLifecycle?.tasksPushed).toContain("task-1-branch");
+
+		const { transform: transformB } = buildMergeTransform(handlerBUpdates, state);
+		const afterBoth = transformB(afterA);
+
+		expect(afterBoth.branchLifecycle?.tasksPushed).toContain("task-1-branch");
+		expect(afterBoth.branchLifecycle?.tasksPushed).toContain("task-2-branch");
 	});
 
 	test("extractDispatchTaskIds extracts IDs from dispatch and dispatch_multi", () => {
