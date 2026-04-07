@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.27.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.26.1...opencode-autopilot-v1.27.0) (2026-04-07)
+
+
+### Features
+
+* parallel task execution in BUILD phase via dispatch_multi ([6646194](https://github.com/kodrunhq/opencode-autopilot/commit/66461947fd450ffa68bc3f589b13ba7f87a873ce))
+* parallel task execution in BUILD phase via dispatch_multi ([8f7c9be](https://github.com/kodrunhq/opencode-autopilot/commit/8f7c9be5d4a8a666fcb48745bb7c8c74e3603c94))
+
+
+### Bug Fixes
+
+* add missing currentTasks and maxParallelTasks to test fixtures for tsc ([3f94a8e](https://github.com/kodrunhq/opencode-autopilot/commit/3f94a8eb2a516344b520cc2b437e7a64c7e7c1c0))
+* address Oracle verification findings and add integration tests ([335ab9d](https://github.com/kodrunhq/opencode-autopilot/commit/335ab9d215c4f8fccbc9347f1e9b077ac3e385f3))
+* detect same-snapshot dispatch race and merge branchLifecycle additively ([adeacd3](https://github.com/kodrunhq/opencode-autopilot/commit/adeacd3d2e42041b8d46247e7ab1dfb80f9280eb))
+* enforce maxParallel cap on replenishment and defer git ops in parallel tasks ([80f92eb](https://github.com/kodrunhq/opencode-autopilot/commit/80f92eba7c2c26909ae28b7bcc8f2f82ab394785))
+* ensure mandatory wave review on stale-pending rerun and detect stale concurrent dispatches ([c2c24bc](https://github.com/kodrunhq/opencode-autopilot/commit/c2c24bc16e9024ef461a6f864debcbdb365a291a))
+* gate buildMergeTransform to BUILD phase only, preserve PLAN task population ([b4f7262](https://github.com/kodrunhq/opencode-autopilot/commit/b4f7262080129072a1983d68e494df172c2e88bc))
+* isStaleDispatch uses pre-handler state to detect sibling dispatches ([f46ba09](https://github.com/kodrunhq/opencode-autopilot/commit/f46ba097064172a6adf74e2a195a24e296a3dded))
+* make implementer prompt internally consistent for parallel vs solo execution ([78cf8ae](https://github.com/kodrunhq/opencode-autopilot/commit/78cf8aebf3117d1f76785e8825575e866cf2c5b8))
+* merge concurrent task state updates by ID to prevent overwrites ([6e46c04](https://github.com/kodrunhq/opencode-autopilot/commit/6e46c046e559b35247e5e560eadb345b38e72c76))
+* persist reviewPending to disk and check stale dispatch against pre-update state ([c84cdf9](https://github.com/kodrunhq/opencode-autopilot/commit/c84cdf92aeb015f62f2c391040fdf3e07d02efee))
+* preserve branchLifecycle in merge transform and pending-result paths ([796ef18](https://github.com/kodrunhq/opencode-autopilot/commit/796ef18be9420bda1a5b4daa42f807d523da6bcf))
+* prevent oversubscription when parallel task cap is full ([2573834](https://github.com/kodrunhq/opencode-autopilot/commit/257383454a6cd01a3a0ea8c73d0cdc3f900bacfa))
+* re-run BUILD handler when concurrent merges resolve stale E_BUILD_RESULT_PENDING ([96dcd23](https://github.com/kodrunhq/opencode-autopilot/commit/96dcd23411412b251901dadb8cff883b1b01c9cb))
+* stale dispatch detection compares merged state excluding own dispatch IDs ([22341d6](https://github.com/kodrunhq/opencode-autopilot/commit/22341d68754332bad4609569858eb4b3742d5337))
+* track all in-progress tasks in currentTasks and wire explicit execution mode ([133c385](https://github.com/kodrunhq/opencode-autopilot/commit/133c38530cc9df00cd8c8197b2a725267c1b483a))
+
 ## [1.26.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.26.0...opencode-autopilot-v1.26.1) (2026-04-07)
 
 
