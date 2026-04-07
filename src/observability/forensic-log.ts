@@ -45,11 +45,12 @@ function toProjectRootFromArtifactDir(artifactDir: string): string {
 
 function buildDedupKey(
 	type: ForensicEventType,
+	domain?: ForensicEventDomain | null,
 	phase?: string | null,
 	agent?: string | null,
 	sessionId?: string | null,
 ): string {
-	return `${type}:${phase ?? ""}:${agent ?? ""}:${sessionId ?? ""}`;
+	return `${type}:${domain ?? ""}:${phase ?? ""}:${agent ?? ""}:${sessionId ?? ""}`;
 }
 
 function pruneDedupCache(now: number): void {
@@ -57,9 +58,21 @@ function pruneDedupCache(now: number): void {
 		return;
 	}
 
+	// First pass: evict entries older than the prune threshold
 	for (const [key, timestamp] of forensicDedupCache) {
 		if (now - timestamp > FORENSIC_DEDUP_PRUNE_AFTER_MS) {
 			forensicDedupCache.delete(key);
+		}
+	}
+
+	// Hard cap: if still over limit, evict oldest by insertion order (Map iterates in insertion order)
+	if (forensicDedupCache.size > FORENSIC_DEDUP_MAX_ENTRIES) {
+		const excess = forensicDedupCache.size - FORENSIC_DEDUP_MAX_ENTRIES;
+		let evicted = 0;
+		for (const key of forensicDedupCache.keys()) {
+			if (evicted >= excess) break;
+			forensicDedupCache.delete(key);
+			evicted++;
 		}
 	}
 }
@@ -74,12 +87,13 @@ export function getDedupCacheSize(): number {
 
 export function isDuplicateEvent(
 	type: ForensicEventType,
+	domain?: ForensicEventDomain | null,
 	phase?: string | null,
 	agent?: string | null,
 	sessionId?: string | null,
 ): boolean {
 	const now = Date.now();
-	const key = buildDedupKey(type, phase, agent, sessionId);
+	const key = buildDedupKey(type, domain, phase, agent, sessionId);
 	const lastSeen = forensicDedupCache.get(key);
 	if (lastSeen != null && now - lastSeen < FORENSIC_DEDUP_WINDOW_MS) {
 		return true;
@@ -139,7 +153,7 @@ export function createForensicEvent(input: ForensicEventInput): ForensicEvent {
 
 export function appendForensicEvent(projectRoot: string, event: ForensicEventInput): void {
 	try {
-		if (isDuplicateEvent(event.type, event.phase, event.agent, event.sessionId)) {
+		if (isDuplicateEvent(event.type, event.domain, event.phase, event.agent, event.sessionId)) {
 			return;
 		}
 
@@ -159,7 +173,7 @@ export function appendForensicEventForArtifactDir(
 	event: Omit<ForensicEventInput, "projectRoot">,
 ): void {
 	try {
-		if (isDuplicateEvent(event.type, event.phase, event.agent, event.sessionId)) {
+		if (isDuplicateEvent(event.type, event.domain, event.phase, event.agent, event.sessionId)) {
 			return;
 		}
 

@@ -98,7 +98,7 @@ export const memoryDefaults = memoryConfigSchema.parse({});
 
 export const notificationsConfigSchema = z.object({
 	desktop: z.boolean().default(true),
-	rateLimit: z.number().default(5000),
+	rateLimit: z.number().int().min(0).finite().default(5000),
 });
 
 export const notificationsDefaults = notificationsConfigSchema.parse({});

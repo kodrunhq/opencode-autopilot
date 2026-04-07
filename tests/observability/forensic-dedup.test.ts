@@ -49,6 +49,9 @@ describe("forensic event deduplication", () => {
 	});
 
 	test("allows same event after 1s", async () => {
+		let now = 1_000_000;
+		Date.now = mock(() => now);
+
 		const event = {
 			projectRoot,
 			domain: "session" as const,
@@ -59,7 +62,7 @@ describe("forensic event deduplication", () => {
 		};
 
 		appendForensicEvent(projectRoot, event);
-		await new Promise((resolve) => setTimeout(resolve, 1100));
+		now += 1_100;
 		appendForensicEvent(projectRoot, event);
 
 		const content = await readFile(join(artifactDir, "orchestration.jsonl"), "utf-8");
@@ -94,12 +97,12 @@ describe("forensic event deduplication", () => {
 
 		for (let index = 0; index < 1_001; index += 1) {
 			now = 1_000_000 + index;
-			const result = isDuplicateEvent("fallback", `BUILD-${index}`, "oc-implementer");
+			const result = isDuplicateEvent("fallback", "session", `BUILD-${index}`, "oc-implementer");
 			expect(result).toBe(false);
 		}
 
 		now = 1_012_500;
-		const pruned = isDuplicateEvent("fallback", "BUILD-final", "oc-implementer");
+		const pruned = isDuplicateEvent("fallback", "session", "BUILD-final", "oc-implementer");
 		expect(pruned).toBe(false);
 		expect(getDedupCacheSize()).toBe(1);
 	});
