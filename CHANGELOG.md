@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.25.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.24.0...opencode-autopilot-v1.25.0) (2026-04-07)
+
+
+### Features
+
+* add dispatch-level failure detection, retry engine, granular CLI config, and improved prompts ([6926e0f](https://github.com/kodrunhq/opencode-autopilot/commit/6926e0f0161b15f5cae01ad36686cfa45ac1df23))
+* dispatch-level failure detection, retry engine, granular CLI config, and improved prompts ([817c1a4](https://github.com/kodrunhq/opencode-autopilot/commit/817c1a45ed2e4496274fe09bf6efc0e34aba4c82))
+
+
+### Bug Fixes
+
+* address 7 Oracle-identified pipeline reliability bugs ([4623173](https://github.com/kodrunhq/opencode-autopilot/commit/4623173b00d58537cbb100b481b7ed5d08862349))
+* resolve 3 remaining Oracle-rejected issues (clear-before-read, SHIP decisions.md, stale API) ([dbd7142](https://github.com/kodrunhq/opencode-autopilot/commit/dbd7142aec4f640ee212d24a16fb6155acc112af))
+* respect non-retryable strategies in decideRetry and propagate errorText to retry state ([00761f7](https://github.com/kodrunhq/opencode-autopilot/commit/00761f77b3dc23a65a99415b048d62ea50a2aa83))
+
 ## [1.24.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.23.0...opencode-autopilot-v1.24.0) (2026-04-06)
 
 
