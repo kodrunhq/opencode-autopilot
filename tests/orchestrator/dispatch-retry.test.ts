@@ -3,7 +3,6 @@ import {
 	buildFailureSummary,
 	buildRetryKey,
 	clearAllRetryState,
-	clearRetryState,
 	clearRetryStateByKey,
 	decideRetry,
 	detectDispatchFailure,
@@ -292,11 +291,11 @@ describe("retry state management", () => {
 		expect(state?.lastCategory).toBe("service_unavailable");
 	});
 
-	test("clearRetryState with phase+agent removes composite-keyed state", () => {
+	test("clearRetryStateByKey removes specific phase:agent composite-keyed state", () => {
 		recordRetryAttempt("dispatch-c", "RECON", "oc-researcher", "rate_limit");
 		recordRetryAttempt("dispatch-d", "BUILD", "oc-implementer", "timeout");
 
-		clearRetryState("dispatch-c", "RECON", "oc-researcher");
+		clearRetryStateByKey("RECON", "oc-researcher");
 
 		expect(getRetryStateByKey("RECON", "oc-researcher")).toBeNull();
 		expect(getRetryStateByKey("BUILD", "oc-implementer")).not.toBeNull();
@@ -538,13 +537,30 @@ describe("handler artifact contracts (Fix 3)", () => {
 		expect(result.agent).toBe("oc-challenger");
 	});
 
-	test("SHIP returns error when neither walkthrough.md nor changelog.md exist", async () => {
+	test("SHIP returns error when neither walkthrough.md, changelog.md, nor decisions.md exist", async () => {
 		const { handleShip } = await import("../../src/orchestrator/handlers/ship");
 		const state = makeMinimalState("SHIP");
 		const result = await handleShip(state, "/tmp/nonexistent-artifacts-ship", "agent output");
 		expect(result.action).toBe("error");
 		expect(result.phase).toBe("SHIP");
 		expect(result.message).toContain("walkthrough.md");
+		expect(result.message).toContain("decisions.md");
+		expect(result.message).toContain("changelog.md");
+	});
+
+	test("SHIP returns complete when only decisions.md exists", async () => {
+		const fs = await import("node:fs/promises");
+		const tmpDir = `/tmp/test-ship-decisions-${Date.now()}`;
+		await fs.mkdir(`${tmpDir}/phases/SHIP`, { recursive: true });
+		await fs.writeFile(`${tmpDir}/phases/SHIP/decisions.md`, "# Decisions\nContent");
+
+		const { handleShip } = await import("../../src/orchestrator/handlers/ship");
+		const state = makeMinimalState("SHIP");
+		const result = await handleShip(state, tmpDir, "agent output");
+		expect(result.action).toBe("complete");
+		expect(result.phase).toBe("SHIP");
+
+		await fs.rm(tmpDir, { recursive: true, force: true });
 	});
 
 	test("SHIP returns dispatch when no result yet", async () => {
@@ -652,6 +668,100 @@ describe("ARCHITECT partial failure (Fix 4)", () => {
 
 		const { rm } = await import("node:fs/promises");
 		await rm(artifactDir, { recursive: true, force: true });
+	});
+});
+
+// ── Orchestration-level retry integration (Fix 6 + Fix 7) ───────
+
+describe("orchestration-level retry integration", () => {
+	test("read-before-clear: getRetryStateByKey returns state before clearRetryStateByKey", () => {
+		recordRetryAttempt("d-1", "BUILD", "oc-implementer", "rate_limit");
+		recordRetryAttempt("d-2", "BUILD", "oc-implementer", "rate_limit");
+		recordRetryAttempt("d-3", "BUILD", "oc-implementer", "service_unavailable");
+
+		// Simulate the corrected orchestrate.ts pattern: read THEN clear
+		const retryState = getRetryStateByKey("BUILD", "oc-implementer");
+		const actualAttempts = retryState?.attempts ?? 1;
+		clearRetryStateByKey("BUILD", "oc-implementer");
+
+		expect(actualAttempts).toBe(3);
+		expect(getRetryStateByKey("BUILD", "oc-implementer")).toBeNull();
+	});
+
+	test("clear-before-read bug: clearing first loses attempt count", () => {
+		recordRetryAttempt("d-1", "RECON", "oc-researcher", "timeout");
+		recordRetryAttempt("d-2", "RECON", "oc-researcher", "timeout");
+
+		// Simulate the OLD broken pattern: clear THEN read
+		clearRetryStateByKey("RECON", "oc-researcher");
+		const retryState = getRetryStateByKey("RECON", "oc-researcher");
+		const buggyAttempts = retryState?.attempts ?? 1;
+
+		// This proves the bug: attempts falls back to 1 instead of 2
+		expect(buggyAttempts).toBe(1);
+	});
+
+	test("failure summary reflects true retry count from read-before-clear", () => {
+		recordRetryAttempt("d-1", "SHIP", "oc-shipper", "rate_limit");
+		recordRetryAttempt("d-2", "SHIP", "oc-shipper", "service_unavailable");
+		recordRetryAttempt("d-3", "SHIP", "oc-shipper", "timeout");
+
+		// Correct pattern: read first
+		const retryState = getRetryStateByKey("SHIP", "oc-shipper");
+		const actualAttempts = retryState?.attempts ?? 1;
+		clearRetryStateByKey("SHIP", "oc-shipper");
+
+		const summary = buildFailureSummary(
+			"d-3",
+			"SHIP",
+			"oc-shipper",
+			"request timed out",
+			"timeout",
+			actualAttempts,
+		);
+
+		expect(summary).toContain("Attempts: 3");
+		expect(summary).not.toContain("Attempts: 1");
+	});
+
+	test("backoff sleep awaits before retry (integration smoke test)", async () => {
+		const decision = decideRetry("d-1", "RECON", "oc-researcher", "rate limit exceeded");
+		expect(decision.shouldRetry).toBe(true);
+		expect(decision.backoffMs).toBeGreaterThan(0);
+
+		const start = Date.now();
+		await sleep(decision.backoffMs);
+		const elapsed = Date.now() - start;
+
+		// Backoff was actually awaited (at least 80% of declared ms)
+		expect(elapsed).toBeGreaterThanOrEqual(decision.backoffMs * 0.8);
+	});
+
+	test("exhausted retries produce correct summary with all fields", () => {
+		recordRetryAttempt("d-1", "ARCHITECT", "oc-architect", "service_unavailable");
+		recordRetryAttempt("d-2", "ARCHITECT", "oc-architect", "timeout");
+
+		const decision = decideRetry("d-3", "ARCHITECT", "oc-architect", "503 bad gateway", 2);
+		expect(decision.shouldRetry).toBe(false);
+
+		const retryState = getRetryStateByKey("ARCHITECT", "oc-architect");
+		const actualAttempts = retryState?.attempts ?? 1;
+		clearRetryStateByKey("ARCHITECT", "oc-architect");
+
+		const summary = buildFailureSummary(
+			"d-3",
+			"ARCHITECT",
+			"oc-architect",
+			"503 bad gateway",
+			decision.errorCategory,
+			actualAttempts,
+		);
+
+		expect(summary).toContain("DISPATCH_FAILED");
+		expect(summary).toContain("ARCHITECT");
+		expect(summary).toContain("oc-architect");
+		expect(summary).toContain("Attempts: 2");
+		expect(summary).toContain("503 bad gateway");
 	});
 });
 

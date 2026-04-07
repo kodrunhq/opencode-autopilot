@@ -29,11 +29,12 @@ export const handleShip: PhaseHandler = async (state, artifactDir, result?) => {
 			getArtifactRef(artifactDir, "SHIP", "walkthrough.md"),
 		);
 		const changelogExists = await fileExists(getArtifactRef(artifactDir, "SHIP", "changelog.md"));
-		if (!walkthroughExists && !changelogExists) {
+		const decisionsExists = await fileExists(getArtifactRef(artifactDir, "SHIP", "decisions.md"));
+		if (!walkthroughExists && !changelogExists && !decisionsExists) {
 			return Object.freeze({
 				action: "error",
 				phase: "SHIP",
-				message: `SHIP agent returned a result but did not write required artifacts in ${shipDir}. At least walkthrough.md or changelog.md must exist.`,
+				message: `SHIP agent returned a result but did not write required artifacts in ${shipDir}. At least one of walkthrough.md, decisions.md, or changelog.md must exist.`,
 			} satisfies DispatchResult);
 		}
 		return Object.freeze({

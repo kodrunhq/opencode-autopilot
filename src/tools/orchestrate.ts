@@ -877,14 +877,14 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 							}
 						}
 
+						// Read retry state BEFORE clearing — otherwise attempts is always lost
+						const retryState = getRetryStateByKey(failedPhase, failedAgent);
+						const actualAttempts = retryState?.attempts ?? 1;
 						clearRetryStateByKey(failedPhase, failedAgent);
 
 						state = await updatePersistedState(artifactDir, state, (current) =>
 							applyResultEnvelope(current, parsed.envelope),
 						);
-
-						const retryState = getRetryStateByKey(failedPhase, failedAgent);
-						const actualAttempts = retryState?.attempts ?? 1;
 						const failureSummary = buildFailureSummary(
 							failedDispatchId,
 							failedPhase,

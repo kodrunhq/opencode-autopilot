@@ -251,14 +251,6 @@ export function recordRetryAttempt(
 	retryStates.set(key, nextState);
 }
 
-export function clearRetryState(dispatchId: string, phase?: string, agent?: string): void {
-	if (phase && agent) {
-		retryStates.delete(buildRetryKey(phase, agent));
-	} else {
-		retryStates.delete(dispatchId);
-	}
-}
-
 export function clearRetryStateByKey(phase: string, agent: string): void {
 	retryStates.delete(buildRetryKey(phase, agent));
 }
