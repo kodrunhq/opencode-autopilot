@@ -2,8 +2,11 @@ import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
 import type { BuildProgress, Task } from "../types";
 import type { DispatchResult } from "./types";
+import { AGENT_NAMES } from "./types";
 
 const MAX_STRIKES = 3;
+
+const DEFAULT_MAX_PARALLEL_TASKS = 5;
 
 export function findCurrentWave(waveMap: ReadonlyMap<number, readonly Task[]>): number | null {
 	const sortedWaves = [...waveMap.keys()].sort((a, b) => a - b);
@@ -119,4 +122,65 @@ export function hasCriticalFindings(resultStr: string): boolean {
 	}
 }
 
-export { MAX_STRIKES };
+export async function buildParallelDispatch(
+	pendingTasks: readonly Task[],
+	wave: number,
+	effectiveTasks: readonly Task[],
+	buildProgress: Readonly<BuildProgress>,
+	artifactDir: string,
+	runId?: string,
+	maxParallel: number = DEFAULT_MAX_PARALLEL_TASKS,
+): Promise<DispatchResult> {
+	const tasksToDispatch = pendingTasks.slice(0, maxParallel);
+	const taskIds = tasksToDispatch.map((t) => t.id);
+
+	if (tasksToDispatch.length === 1) {
+		const task = tasksToDispatch[0];
+		const prompt = await buildTaskPrompt(task, artifactDir, runId);
+		return Object.freeze({
+			action: "dispatch",
+			agent: AGENT_NAMES.BUILD,
+			prompt,
+			phase: "BUILD",
+			resultKind: "task_completion",
+			taskId: task.id,
+			progress: `Wave ${wave} — task ${task.id}`,
+			_stateUpdates: {
+				tasks: [...markTasksInProgress(effectiveTasks, [task.id])],
+				buildProgress: {
+					...buildProgress,
+					currentTask: task.id,
+					currentTasks: [task.id],
+					currentWave: wave,
+				},
+			},
+		} satisfies DispatchResult);
+	}
+
+	const agents = await Promise.all(
+		tasksToDispatch.map(async (task) => ({
+			agent: AGENT_NAMES.BUILD,
+			prompt: await buildTaskPrompt(task, artifactDir, runId),
+			taskId: task.id,
+			resultKind: "task_completion" as const,
+		})),
+	);
+
+	return Object.freeze({
+		action: "dispatch_multi",
+		agents,
+		phase: "BUILD",
+		progress: `Wave ${wave} — parallel tasks [${taskIds.join(", ")}]`,
+		_stateUpdates: {
+			tasks: [...markTasksInProgress(effectiveTasks, taskIds)],
+			buildProgress: {
+				...buildProgress,
+				currentTask: taskIds[0],
+				currentTasks: [...taskIds],
+				currentWave: wave,
+			},
+		},
+	} satisfies DispatchResult);
+}
+
+export { DEFAULT_MAX_PARALLEL_TASKS, MAX_STRIKES };

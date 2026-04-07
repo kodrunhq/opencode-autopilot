@@ -5,8 +5,8 @@ import type { BranchLifecycle } from "../types";
 import { assignWaves } from "../wave-assigner";
 import { initBranchLifecycle, recordTaskPush } from "./branch-pr";
 import {
+	buildParallelDispatch,
 	buildPendingResultError,
-	buildTaskPrompt,
 	findCurrentWave,
 	findInProgressTasks,
 	findPendingTasks,
@@ -14,7 +14,6 @@ import {
 	isWaveComplete,
 	MAX_STRIKES,
 	markTaskDone,
-	markTasksInProgress,
 } from "./build-utils";
 import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
@@ -158,6 +157,7 @@ export const handleBuild: PhaseHandler = async (
 					buildProgress: {
 						...buildProgress,
 						currentTask: null,
+						currentTasks: [],
 						reviewPending: false,
 					},
 				},
@@ -177,21 +177,14 @@ export const handleBuild: PhaseHandler = async (
 		}
 
 		if (pendingTasks.length > 0) {
-			const task = pendingTasks[0];
-			const prompt = await buildTaskPrompt(task, artifactDir, state.runId);
-			return Object.freeze({
-				action: "dispatch",
-				agent: AGENT_NAMES.BUILD,
-				prompt,
-				phase: "BUILD",
-				resultKind: "task_completion",
-				taskId: task.id,
-				progress: `Wave ${nextWave} — task ${task.id}`,
-				_stateUpdates: {
-					tasks: [...markTasksInProgress(effectiveTasks, [task.id])],
-					buildProgress: { ...updatedProgress, currentTask: task.id },
-				},
-			} satisfies DispatchResult);
+			return buildParallelDispatch(
+				pendingTasks,
+				nextWave,
+				effectiveTasks,
+				updatedProgress,
+				artifactDir,
+				state.runId,
+			);
 		}
 
 		return Object.freeze({
@@ -248,6 +241,7 @@ export const handleBuild: PhaseHandler = async (
 					buildProgress: {
 						...buildProgress,
 						currentTask: taskToComplete,
+						currentTasks: [],
 						reviewPending: true,
 					},
 				},
@@ -256,23 +250,23 @@ export const handleBuild: PhaseHandler = async (
 
 		const pendingInWave = findPendingTasks(waveMap, currentWave);
 		if (pendingInWave.length > 0) {
-			const next = pendingInWave[0];
-			const prompt = await buildTaskPrompt(next, artifactDir, state.runId);
+			const updatedProgressForDispatch = {
+				...buildProgress,
+				currentWave,
+			};
+			const dispatchResult = await buildParallelDispatch(
+				pendingInWave,
+				currentWave,
+				updatedTasks,
+				updatedProgressForDispatch,
+				artifactDir,
+				state.runId,
+			);
 			return Object.freeze({
-				action: "dispatch",
-				agent: AGENT_NAMES.BUILD,
-				prompt,
-				phase: "BUILD",
-				resultKind: "task_completion",
-				taskId: next.id,
-				progress: `Wave ${currentWave} — task ${next.id}`,
+				...dispatchResult,
 				_stateUpdates: {
-					tasks: [...markTasksInProgress(updatedTasks, [next.id])],
+					...dispatchResult._stateUpdates,
 					branchLifecycle: cloneBranchLifecycle(updatedBranchLifecycle),
-					buildProgress: {
-						...buildProgress,
-						currentTask: next.id,
-					},
 				},
 			} satisfies DispatchResult);
 		}
@@ -315,24 +309,19 @@ export const handleBuild: PhaseHandler = async (
 		} satisfies DispatchResult);
 	}
 
-	const task = pendingTasks[0];
-	const prompt = await buildTaskPrompt(task, artifactDir, state.runId);
+	const initialDispatch = await buildParallelDispatch(
+		pendingTasks,
+		currentWave,
+		effectiveTasks,
+		buildProgress,
+		artifactDir,
+		state.runId,
+	);
 	return Object.freeze({
-		action: "dispatch",
-		agent: AGENT_NAMES.BUILD,
-		prompt,
-		phase: "BUILD",
-		resultKind: "task_completion",
-		taskId: task.id,
-		progress: `Wave ${currentWave} — task ${task.id}`,
+		...initialDispatch,
 		_stateUpdates: {
 			...(branchLifecycleUpdates ?? {}),
-			tasks: [...markTasksInProgress(effectiveTasks, [task.id])],
-			buildProgress: {
-				...buildProgress,
-				currentTask: task.id,
-				currentWave,
-			},
+			...initialDispatch._stateUpdates,
 		},
 	} satisfies DispatchResult);
 };

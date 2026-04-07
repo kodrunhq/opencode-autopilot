@@ -49,6 +49,7 @@ export const taskSchema = z.object({
 
 export const buildProgressSchema = z.object({
 	currentTask: z.number().nullable().default(null),
+	currentTasks: z.array(z.number()).default([]),
 	currentWave: z.number().nullable().default(null),
 	attemptCount: z.number().default(0),
 	strikeCount: z.number().default(0),
@@ -109,6 +110,7 @@ export const pipelineStateSchema = z.object({
 	exploreTriggered: z.boolean().default(false),
 	buildProgress: buildProgressSchema.default({
 		currentTask: null,
+		currentTasks: [],
 		currentWave: null,
 		attemptCount: 0,
 		strikeCount: 0,

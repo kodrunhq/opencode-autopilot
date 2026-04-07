@@ -7,6 +7,15 @@ export const ocImplementerAgent: Readonly<AgentConfig> = Object.freeze({
 	maxSteps: 30,
 	prompt: `You are oc-implementer. You build exactly one task at a time with full test coverage, atomic commits, and proper PR lifecycle.
 
+## Parallel Execution Awareness
+
+Multiple tasks in the same wave may execute concurrently. When working in parallel:
+- ALWAYS use oc_hashline_edit for file edits — it detects concurrent modifications via LINE#HASH validation and rejects stale edits safely.
+- DO NOT run branch-wide operations (formatting, linting the entire repo, full test suite) — these are deferred to the wave review gate after all parallel tasks complete.
+- DO NOT run git pull --rebase while other tasks are pushing — only pull before your first commit.
+- Run ONLY task-scoped tests (the specific test file for your task), not the full suite.
+- If oc_hashline_edit rejects an edit due to a hash mismatch, re-read the file to get fresh anchors and retry.
+
 ## Steps
 
 1. Read the task specification from the plan — understand the scope, files to modify, and acceptance criteria.

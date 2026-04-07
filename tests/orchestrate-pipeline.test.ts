@@ -176,6 +176,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 			],
 			buildProgress: {
 				currentTask: null,
+				currentTasks: [],
 				currentWave: null,
 				attemptCount: 0,
 				strikeCount: 0,
@@ -193,9 +194,9 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
-		expect(parsed.action).toBe("dispatch");
-		expect(parsed.taskId).toBe(1);
-		expect(parsed.agent).toBe(AGENT_NAMES.BUILD);
+		expect(parsed.action).toBe("dispatch_multi");
+		expect(parsed.agents).toHaveLength(2);
+		expect(parsed.agents[0].agent).toBe(AGENT_NAMES.BUILD);
 	});
 
 	test("BUILD phase with reviewPending triggers reviewCore directly", async () => {
@@ -218,6 +219,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 			],
 			buildProgress: {
 				currentTask: null,
+				currentTasks: [],
 				currentWave: 1,
 				attemptCount: 0,
 				strikeCount: 0,
@@ -372,6 +374,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 			],
 			buildProgress: {
 				currentTask: null,
+				currentTasks: [],
 				currentWave: null,
 				attemptCount: 0,
 				strikeCount: 0,
@@ -389,7 +392,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 
 		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
-		expect(parsed.action).toBe("dispatch");
+		expect(parsed.action).toBe("dispatch_multi");
 		expect(parsed._userProgress).toBeDefined();
 		expect(parsed._userProgress).toContain("[6/8]");
 	});
@@ -413,6 +416,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 			],
 			buildProgress: {
 				currentTask: 1,
+				currentTasks: [1],
 				currentWave: 1,
 				attemptCount: 0,
 				strikeCount: 0,

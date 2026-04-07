@@ -153,7 +153,7 @@ describe("deterministic replay", () => {
 		expect(result.code).toBe("E_STALE_RESULT");
 	});
 
-	test("sequential BUILD result updates mark the current task done and dispatch the next one", async () => {
+	test("parallel BUILD dispatches both wave-1 tasks, then completes them individually", async () => {
 		const now = new Date().toISOString();
 		const customState = {
 			schemaVersion: 2,
@@ -200,6 +200,7 @@ describe("deterministic replay", () => {
 			exploreTriggered: false,
 			buildProgress: {
 				currentTask: null,
+				currentTasks: [],
 				currentWave: null,
 				attemptCount: 0,
 				strikeCount: 0,
@@ -213,25 +214,27 @@ describe("deterministic replay", () => {
 
 		await Bun.write(join(tempDirA, "state.json"), JSON.stringify(customState, null, 2));
 		const dispatch = JSON.parse(await orchestrateCore({}, tempDirA));
-		expect(dispatch.action).toBe("dispatch");
-		expect(dispatch.taskId).toBe(1);
+		// Both wave-1 tasks dispatched in parallel
+		expect(dispatch.action).toBe("dispatch_multi");
+		expect(dispatch.agents).toHaveLength(2);
 
+		// Complete task 1 — task 2 still in-progress, so handler signals pending result
 		const resultTask1 = {
 			schemaVersion: 1,
 			resultId: "build-1",
 			runId: dispatch.runId,
 			phase: "BUILD",
-			dispatchId: dispatch.dispatchId,
-			agent: dispatch.agent,
+			dispatchId: dispatch.agents[0].dispatchId,
+			agent: dispatch.agents[0].agent,
 			kind: "task_completion",
 			taskId: 1,
 			payload: { text: "task 1 done" },
 		};
-		const secondDispatch = JSON.parse(
+		const afterTask1 = JSON.parse(
 			await orchestrateCore({ result: JSON.stringify(resultTask1) }, tempDirA),
 		);
-		expect(secondDispatch.action).toBe("dispatch");
-		expect(secondDispatch.taskId).toBe(2);
+		// Task 2 is still in-progress — handler returns pending-result error
+		expect(afterTask1.code).toBe("E_BUILD_RESULT_PENDING");
 
 		const stateAfterFirst = JSON.parse(await readFile(join(tempDirA, "state.json"), "utf-8"));
 		expect(
@@ -241,13 +244,14 @@ describe("deterministic replay", () => {
 			stateAfterFirst.tasks.find((t: { id: number; status: string }) => t.id === 2).status,
 		).toBe("IN_PROGRESS");
 
+		// Complete task 2 — wave is now complete, triggers review dispatch
 		const resultTask2 = {
 			schemaVersion: 1,
 			resultId: "build-2",
-			runId: secondDispatch.runId,
+			runId: dispatch.runId,
 			phase: "BUILD",
-			dispatchId: secondDispatch.dispatchId,
-			agent: secondDispatch.agent,
+			dispatchId: dispatch.agents[1].dispatchId,
+			agent: dispatch.agents[1].agent,
 			kind: "task_completion",
 			taskId: 2,
 			payload: { text: "task 2 done" },
