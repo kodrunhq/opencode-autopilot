@@ -61,6 +61,7 @@ describe("orchestrator protocol hardening", () => {
 			],
 			buildProgress: {
 				currentTask: 1,
+				currentTasks: [1],
 				currentWave: 1,
 				attemptCount: 0,
 				strikeCount: 0,

@@ -787,6 +787,7 @@ function makeMinimalState(
 		exploreTriggered: false,
 		buildProgress: {
 			currentTask: null,
+			currentTasks: [],
 			currentWave: null,
 			attemptCount: 0,
 			strikeCount: 0,

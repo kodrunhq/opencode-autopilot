@@ -44,6 +44,7 @@ describe("enrichErrorMessage", () => {
 			currentPhase: "BUILD",
 			buildProgress: {
 				currentTask: 7,
+				currentTasks: [7],
 				currentWave: 2,
 				attemptCount: 0,
 				strikeCount: 0,
