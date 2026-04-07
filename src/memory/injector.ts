@@ -105,3 +105,19 @@ export function createMemoryInjector(config: MemoryInjectorConfig) {
 export function invalidateMemoryCache(injector: ReturnType<typeof createMemoryInjector>): void {
 	injector.invalidateCache();
 }
+
+let activeMemoryInjector: ReturnType<typeof createMemoryInjector> | null = null;
+
+export function setActiveMemoryInjector(injector: ReturnType<typeof createMemoryInjector>): void {
+	activeMemoryInjector = injector;
+}
+
+export function resetActiveMemoryInjector(): void {
+	activeMemoryInjector = null;
+}
+
+export function notifyMemoryChanged(): void {
+	if (activeMemoryInjector) {
+		activeMemoryInjector.invalidateCache();
+	}
+}

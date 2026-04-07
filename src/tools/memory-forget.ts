@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { tool } from "@opencode-ai/plugin";
 import { getMemoryDb } from "../memory/database";
+import { notifyMemoryChanged } from "../memory/injector";
 import { forgetMemory, getMemoryById } from "../memory/memories";
 
 interface MemoryForgetArgs {
@@ -33,6 +34,8 @@ export function memoryForgetCore(
 		}
 
 		const forgotten = forgetMemory(args.textId, resolvedDb);
+
+		notifyMemoryChanged();
 
 		return {
 			ok: true,

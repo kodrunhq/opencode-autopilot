@@ -8,7 +8,14 @@ export * from "./constants";
 export { closeMemoryDb, getMemoryDb, initMemoryDb } from "./database";
 export { computeRelevanceScore, pruneStaleObservations } from "./decay";
 export { computeBigramOverlap, findDuplicateCandidate, normalizeContent } from "./dedup";
-export { createMemoryInjector, invalidateMemoryCache, type MemoryInjectorConfig } from "./injector";
+export {
+	createMemoryInjector,
+	invalidateMemoryCache,
+	type MemoryInjectorConfig,
+	notifyMemoryChanged,
+	resetActiveMemoryInjector,
+	setActiveMemoryInjector,
+} from "./injector";
 export {
 	forgetMemory,
 	getActiveMemories,

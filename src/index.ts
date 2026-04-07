@@ -29,6 +29,7 @@ import {
 	createMemoryInjector,
 	getMemoryDb,
 	migratePreferencesToMemories,
+	setActiveMemoryInjector,
 } from "./memory";
 import { ContextMonitor } from "./observability/context-monitor";
 import {
@@ -366,6 +367,10 @@ const plugin: Plugin = async (input) => {
 				getDb: () => getMemoryDb(),
 			})
 		: null;
+
+	if (memoryInjector) {
+		setActiveMemoryInjector(memoryInjector);
+	}
 
 	if (memoryConfig.enabled) {
 		try {

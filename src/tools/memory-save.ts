@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { tool } from "@opencode-ai/plugin";
 import { getMemoryDb } from "../memory/database";
+import { notifyMemoryChanged } from "../memory/injector";
 import { saveMemory } from "../memory/memories";
 import type { MemoryKind, MemoryScope } from "../memory/types";
 import { resolveProjectIdentitySync } from "../projects/resolve";
@@ -59,6 +60,8 @@ export function memorySaveCore(
 			},
 			resolvedDb,
 		);
+
+		notifyMemoryChanged();
 
 		return {
 			ok: true,

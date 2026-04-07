@@ -199,7 +199,7 @@ Memory injection is designed to never block or crash the session. All injection 
 
 ### Caching
 
-Memory context is retrieved once per session and cached by session ID. The cache is invalidated when a new memory is saved (via `invalidateMemoryCache`).
+Memory context is retrieved once per session and cached by session ID. The cache is invalidated when a memory is saved or forgotten (via `notifyMemoryChanged`).
 
 ## V1 Backward Compatibility
 
