@@ -145,7 +145,14 @@ export async function buildParallelDispatch(
 	maxParallel: number = DEFAULT_MAX_PARALLEL_TASKS,
 	currentInProgressCount = 0,
 ): Promise<DispatchResult> {
-	const remainingSlots = Math.max(1, maxParallel - currentInProgressCount);
+	const remainingSlots = Math.max(0, maxParallel - currentInProgressCount);
+
+	if (remainingSlots === 0) {
+		// Cap is full — return pending result so caller waits for in-progress tasks to finish.
+		const inProgressTasks = effectiveTasks.filter((t) => t.status === "IN_PROGRESS");
+		return buildPendingResultError(wave, inProgressTasks, buildProgress, effectiveTasks);
+	}
+
 	const tasksToDispatch = pendingTasks.slice(0, remainingSlots);
 	const taskIds = tasksToDispatch.map((t) => t.id);
 

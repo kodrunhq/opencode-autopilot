@@ -376,6 +376,47 @@ describe("parallel BUILD integration", () => {
 		expect(result.agents?.map((a) => a.taskId)).toEqual([6, 7]);
 	});
 
+	test("no dispatch when currentInProgressCount equals maxParallel", async () => {
+		// 8 tasks, cap 5 → 5 in-progress, 3 pending.
+		// Cap is already full → buildParallelDispatch should return a pending result,
+		// NOT dispatch any new tasks.
+		const allTasks = Array.from({ length: 8 }, (_, index) => ({
+			id: index + 1,
+			title: `Task ${index + 1}`,
+			status: (index < 5 ? "IN_PROGRESS" : "PENDING") as "IN_PROGRESS" | "PENDING",
+			wave: 1,
+			depends_on: [] as number[],
+			attempt: 0,
+			strike: 0,
+		}));
+
+		const pendingTasks = allTasks.filter((t) => t.status === "PENDING");
+		const result = await buildParallelDispatch(
+			pendingTasks,
+			1,
+			allTasks,
+			{
+				currentTask: 1,
+				currentTasks: [1, 2, 3, 4, 5],
+				currentWave: 1,
+				attemptCount: 0,
+				strikeCount: 0,
+				reviewPending: false,
+			},
+			tempDir,
+			"run-1",
+			5,
+			5, // 5 in-progress === maxParallel of 5 → 0 remaining slots
+		);
+
+		expect(result.action).toBe("error");
+		expect(result.code).toBe("E_BUILD_RESULT_PENDING");
+		expect(result._stateUpdates?.buildProgress?.currentTasks).toEqual([1, 2, 3, 4, 5]);
+		// No new tasks should be marked IN_PROGRESS
+		expect(result._stateUpdates?.tasks?.filter((t) => t.status === "IN_PROGRESS")).toHaveLength(5);
+		expect(result._stateUpdates?.tasks?.find((t) => t.id === 6)?.status).toBe("PENDING");
+	});
+
 	test("failed task marked FAILED not DONE", async () => {
 		const state = makeBuildState([{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 }], {
 			currentTask: null,
