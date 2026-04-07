@@ -1,22 +1,26 @@
 /**
  * Provenance-first memory retrieval.
  *
- * Injects bounded memory context from explicit, inspectable sources:
- * - confirmed project and global preferences
- * - recent project lessons
- * - recent failure-avoidance notes from error observations
+ * V2 retrieval uses the new `memories` table (tool-curated, AI-extracted).
+ * V1 retrieval (legacy) uses observations/preferences/lessons tables.
  *
- * Generic observations remain queryable for inspection, but are no longer the
- * primary injected memory contract.
+ * Both are exported. The injector switches to V2 when memories exist,
+ * falling back to V1 for backward compatibility.
  *
  * @module
  */
 
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../logging/domains";
-import { CHARS_PER_TOKEN, DEFAULT_INJECTION_BUDGET } from "./constants";
+import {
+	CHARS_PER_TOKEN,
+	DEFAULT_INJECTION_BUDGET,
+	KIND_WEIGHTS,
+	type MEMORY_KINDS,
+} from "./constants";
 import { getMemoryDb } from "./database";
 import { computeRelevanceScore } from "./decay";
+import { getActiveMemories } from "./memories";
 import {
 	getConfirmedPreferencesForProject,
 	getProjectByPath,
@@ -24,7 +28,7 @@ import {
 	listRelevantLessons,
 	updateAccessCount,
 } from "./repository";
-import type { Observation, Preference } from "./types";
+import type { Memory, Observation, Preference } from "./types";
 
 const logger = getLogger("memory", "retrieval");
 
@@ -202,6 +206,177 @@ export function retrieveMemoryContext(
 			logger.warn("access count update failed", { error: String(err) });
 		}
 	}
+
+	return context;
+}
+
+// ---------------------------------------------------------------------------
+// V2 retrieval — memories table
+// ---------------------------------------------------------------------------
+
+const MEMORY_INSTRUCTIONS_BLOCK = `
+### Memory Instructions
+You may save new memories using \`oc_memory_save\` when:
+- The user states a preference or correction
+- A decision is made about architecture, tooling, or workflow
+- You discover a project fact (tech stack, conventions, structure)
+- A mistake is identified that should be avoided in future
+- The user establishes a workflow rule ("always do X before Y")
+- The user explicitly says "remember this" or similar
+Do NOT save trivial or transient information.
+`.trim();
+
+type MemoryKindKey = (typeof MEMORY_KINDS)[number];
+
+const KIND_DISPLAY_ORDER: readonly MemoryKindKey[] = [
+	"mistake",
+	"workflow_rule",
+	"decision",
+	"preference",
+	"project_fact",
+] as const;
+
+const KIND_LABELS: Readonly<Record<MemoryKindKey, string>> = {
+	preference: "Preferences",
+	decision: "Decisions",
+	project_fact: "Project Facts",
+	mistake: "Mistakes to Avoid",
+	workflow_rule: "Workflow Rules",
+};
+
+function sortMemoriesByWeight(memories: readonly Memory[]): readonly Memory[] {
+	return [...memories].sort((a, b) => {
+		const wa = KIND_WEIGHTS[a.kind as MemoryKindKey] ?? 1;
+		const wb = KIND_WEIGHTS[b.kind as MemoryKindKey] ?? 1;
+		if (wb !== wa) return wb - wa;
+		return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
+	});
+}
+
+function groupByKind(memories: readonly Memory[]): ReadonlyMap<MemoryKindKey, readonly Memory[]> {
+	const map = new Map<MemoryKindKey, Memory[]>();
+	for (const mem of memories) {
+		const kind = mem.kind as MemoryKindKey;
+		const existing = map.get(kind);
+		if (existing) {
+			existing.push(mem);
+		} else {
+			map.set(kind, [mem]);
+		}
+	}
+	return map;
+}
+
+interface BuildMemoryContextV2Options {
+	readonly projectName: string;
+	readonly lastSessionDate: string | null;
+	readonly projectMemories: readonly Memory[];
+	readonly userMemories: readonly Memory[];
+	readonly tokenBudget?: number;
+}
+
+export function buildMemoryContextV2(options: BuildMemoryContextV2Options): string {
+	const {
+		projectName,
+		lastSessionDate,
+		projectMemories,
+		userMemories,
+		tokenBudget = DEFAULT_INJECTION_BUDGET,
+	} = options;
+
+	const allMemories = [...projectMemories, ...userMemories];
+	if (allMemories.length === 0) {
+		return MEMORY_INSTRUCTIONS_BLOCK;
+	}
+
+	const charBudget = tokenBudget * CHARS_PER_TOKEN;
+	let totalChars = 0;
+	const parts: string[] = [];
+
+	const header = `## Memory (auto-injected)\n**Project:** ${projectName}\n**Last session:** ${lastSessionDate ?? "first session"}\n`;
+	if (header.length > charBudget) {
+		return MEMORY_INSTRUCTIONS_BLOCK;
+	}
+	parts.push(header);
+	totalChars += header.length;
+
+	const sorted = sortMemoriesByWeight(allMemories);
+	const grouped = groupByKind(sorted);
+
+	for (const kind of KIND_DISPLAY_ORDER) {
+		const mems = grouped.get(kind);
+		if (!mems || mems.length === 0) continue;
+
+		const label = KIND_LABELS[kind];
+		let section = `\n### ${label}\n`;
+		for (const mem of mems) {
+			const scope = mem.scope === "user" ? " _(user-wide)_" : "";
+			const line = `- ${mem.summary}${scope}\n`;
+			section += line;
+		}
+
+		if (totalChars + section.length > charBudget) break;
+		parts.push(section);
+		totalChars += section.length;
+	}
+
+	const instrLen = MEMORY_INSTRUCTIONS_BLOCK.length + 2;
+	if (totalChars + instrLen <= charBudget) {
+		parts.push(`\n${MEMORY_INSTRUCTIONS_BLOCK}\n`);
+	}
+
+	const result = parts.join("");
+	return result.length > charBudget ? result.slice(0, charBudget) : result;
+}
+
+function bumpAccessCounts(memories: readonly Memory[], db: Database): void {
+	if (memories.length === 0) return;
+	try {
+		const now = new Date().toISOString();
+		db.run("BEGIN");
+		const stmt = db.prepare(
+			"UPDATE memories SET access_count = access_count + 1, last_accessed = ? WHERE id = ?",
+		);
+		for (const mem of memories) {
+			if (mem.id !== undefined) {
+				stmt.run(now, mem.id);
+			}
+		}
+		db.run("COMMIT");
+	} catch (err) {
+		logger.warn("V2 access count update failed", { error: String(err) });
+		try {
+			db.run("ROLLBACK");
+		} catch {
+			// ignore rollback failure
+		}
+	}
+}
+
+export function retrieveMemoryContextV2(
+	projectPath: string,
+	tokenBudget?: number,
+	db?: Database,
+): string {
+	const resolvedDb = db ?? getMemoryDb();
+	const project = getProjectByPath(projectPath, resolvedDb);
+	const projectId = project?.id ?? null;
+	const projectName = project?.name ?? projectPath.split("/").pop() ?? "unknown";
+	const lastSessionDate = project?.lastUpdated ?? null;
+
+	const projectMemories = getActiveMemories(projectId, 50, resolvedDb);
+	const userMemories = projectId !== null ? getActiveMemories(null, 50, resolvedDb) : [];
+	const allMemories = [...projectMemories, ...userMemories];
+
+	const context = buildMemoryContextV2({
+		projectName,
+		lastSessionDate,
+		projectMemories,
+		userMemories,
+		tokenBudget,
+	});
+
+	bumpAccessCounts(allMemories, resolvedDb);
 
 	return context;
 }
