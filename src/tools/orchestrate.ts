@@ -533,6 +533,21 @@ async function processHandlerResult(
 	// Apply state updates from handler if present
 	let currentState = await applyStateUpdates(state, normalizedResult, artifactDir);
 
+	// When concurrent task completions merge, the handler's E_BUILD_RESULT_PENDING
+	// decision may be stale — all tasks might already be DONE after the merge.
+	// Re-run the BUILD handler against the fresh merged state to pick up wave
+	// completion, review dispatch, or next-wave advancement.
+	if (
+		normalizedResult.action === "error" &&
+		normalizedResult.code === "E_BUILD_RESULT_PENDING" &&
+		currentState.buildProgress.currentTasks.length === 0 &&
+		currentState.currentPhase === "BUILD"
+	) {
+		const freshHandler = PHASE_HANDLERS.BUILD;
+		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
+		return processHandlerResult(freshResult, currentState, artifactDir);
+	}
+
 	switch (normalizedResult.action) {
 		case "error": {
 			const codePrefix = normalizedResult.code ? `${normalizedResult.code}: ` : "";
