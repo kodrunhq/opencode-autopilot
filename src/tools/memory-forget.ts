@@ -6,7 +6,6 @@ import { forgetMemory, getMemoryById } from "../memory/memories";
 
 interface MemoryForgetArgs {
 	readonly textId: string;
-	readonly reason?: string;
 }
 
 export function memoryForgetCore(
@@ -63,11 +62,6 @@ export const ocMemoryForget = tool({
 			.string()
 			.min(1)
 			.describe("The text_id of the memory to forget (from search results)"),
-		reason: tool.schema
-			.string()
-			.max(500)
-			.optional()
-			.describe("Why this memory should be forgotten"),
 	},
 	async execute(args) {
 		return JSON.stringify(memoryForgetCore(args), null, 2);

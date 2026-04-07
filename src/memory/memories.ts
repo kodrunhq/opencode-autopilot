@@ -388,6 +388,14 @@ export function getMemoryById(textId: string, db?: Database): Memory | null {
 
 export function migratePreferencesToMemories(db?: Database): { migrated: number; skipped: number } {
 	const d = resolveDb(db);
+
+	const marker = d.query("SELECT value FROM memory_meta WHERE key = 'v1_migration_done'").get() as {
+		value: string;
+	} | null;
+	if (marker) {
+		return { migrated: 0, skipped: 0 };
+	}
+
 	const rows = d
 		.query(
 			`SELECT key, value, scope, project_id, source_session, confidence, status, created_at, last_updated
@@ -422,6 +430,10 @@ export function migratePreferencesToMemories(db?: Database): { migrated: number;
 		);
 		migrated += 1;
 	}
+
+	d.run("INSERT OR REPLACE INTO memory_meta (key, value) VALUES ('v1_migration_done', ?)", [
+		new Date().toISOString(),
+	]);
 
 	return { migrated, skipped };
 }

@@ -180,7 +180,9 @@ export function initMemoryDb(database: Database): void {
 		VALUES('delete', old.id, old.content, old.summary, old.tags);
 	END`);
 
-	database.run(`CREATE TRIGGER IF NOT EXISTS mem_au AFTER UPDATE ON memories BEGIN
+	database.run(`CREATE TRIGGER IF NOT EXISTS mem_au AFTER UPDATE ON memories
+		WHEN old.content != new.content OR old.summary != new.summary OR old.tags IS NOT new.tags
+	BEGIN
 		INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags)
 		VALUES('delete', old.id, old.content, old.summary, old.tags);
 		INSERT INTO memories_fts(rowid, content, summary, tags)
@@ -194,6 +196,11 @@ export function initMemoryDb(database: Database): void {
 	database.run(
 		`CREATE INDEX IF NOT EXISTS idx_memory_evidence_memory ON memory_evidence(memory_id)`,
 	);
+
+	database.run(`CREATE TABLE IF NOT EXISTS memory_meta (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	)`);
 }
 
 /**
