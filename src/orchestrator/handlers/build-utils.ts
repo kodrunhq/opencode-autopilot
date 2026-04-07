@@ -72,12 +72,14 @@ export async function buildTaskPrompt(
 	task: Task,
 	artifactDir: string,
 	runId?: string,
+	mode: "PARALLEL" | "SOLO" = "SOLO",
 ): Promise<string> {
 	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.json", runId);
 	const planFallbackRef = getArtifactRef(artifactDir, "PLAN", "tasks.md", runId);
 	const designRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md", runId);
 	const planPath = (await fileExists(planRef)) ? planRef : planFallbackRef;
 	return [
+		`[EXECUTION MODE: ${mode}]`,
 		`Implement task ${task.id}: ${task.title}.`,
 		`Reference the plan at ${planPath}`,
 		`and architecture at ${designRef}.`,
@@ -155,10 +157,16 @@ export async function buildParallelDispatch(
 
 	const tasksToDispatch = pendingTasks.slice(0, remainingSlots);
 	const taskIds = tasksToDispatch.map((t) => t.id);
+	const isParallel = currentInProgressCount > 0 || tasksToDispatch.length > 1;
+	const mode = isParallel ? ("PARALLEL" as const) : ("SOLO" as const);
+	const updatedTaskList = markTasksInProgress(effectiveTasks, taskIds);
+	const allInProgressIds = updatedTaskList
+		.filter((t) => t.status === "IN_PROGRESS")
+		.map((t) => t.id);
 
 	if (tasksToDispatch.length === 1) {
 		const task = tasksToDispatch[0];
-		const prompt = await buildTaskPrompt(task, artifactDir, runId);
+		const prompt = await buildTaskPrompt(task, artifactDir, runId, mode);
 		return Object.freeze({
 			action: "dispatch",
 			agent: AGENT_NAMES.BUILD,
@@ -168,11 +176,11 @@ export async function buildParallelDispatch(
 			taskId: task.id,
 			progress: `Wave ${wave} — task ${task.id}`,
 			_stateUpdates: {
-				tasks: [...markTasksInProgress(effectiveTasks, [task.id])],
+				tasks: [...updatedTaskList],
 				buildProgress: {
 					...buildProgress,
 					currentTask: task.id,
-					currentTasks: [task.id],
+					currentTasks: [...allInProgressIds],
 					currentWave: wave,
 				},
 			},
@@ -182,7 +190,7 @@ export async function buildParallelDispatch(
 	const agents = await Promise.all(
 		tasksToDispatch.map(async (task) => ({
 			agent: AGENT_NAMES.BUILD,
-			prompt: await buildTaskPrompt(task, artifactDir, runId),
+			prompt: await buildTaskPrompt(task, artifactDir, runId, mode),
 			taskId: task.id,
 			resultKind: "task_completion" as const,
 		})),
@@ -194,11 +202,11 @@ export async function buildParallelDispatch(
 		phase: "BUILD",
 		progress: `Wave ${wave} — parallel tasks [${taskIds.join(", ")}]`,
 		_stateUpdates: {
-			tasks: [...markTasksInProgress(effectiveTasks, taskIds)],
+			tasks: [...updatedTaskList],
 			buildProgress: {
 				...buildProgress,
 				currentTask: taskIds[0],
-				currentTasks: [...taskIds],
+				currentTasks: [...allInProgressIds],
 				currentWave: wave,
 			},
 		},

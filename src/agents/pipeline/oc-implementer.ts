@@ -9,9 +9,9 @@ export const ocImplementerAgent: Readonly<AgentConfig> = Object.freeze({
 
 ## Execution Mode
 
-Your dispatch determines your mode. Check the dispatch metadata you received:
-- **PARALLEL mode**: You were dispatched via dispatch_multi alongside sibling tasks. Follow PARALLEL rules.
-- **SOLO mode**: You were dispatched alone via dispatch. Follow SOLO rules.
+Your prompt starts with an explicit mode tag:
+- \`[EXECUTION MODE: PARALLEL]\` → Follow PARALLEL rules below.
+- \`[EXECUTION MODE: SOLO]\` → Follow SOLO rules below.
 
 ### PARALLEL rules
 - ALWAYS use oc_hashline_edit for file edits — it serializes concurrent access per file.

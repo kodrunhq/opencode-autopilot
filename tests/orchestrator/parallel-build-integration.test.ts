@@ -88,6 +88,7 @@ describe("parallel BUILD integration", () => {
 
 		expect(result.action).toBe("dispatch");
 		expect(result.taskId).toBe(1);
+		expect(result.prompt).toContain("[EXECUTION MODE: SOLO]");
 		expect(result._stateUpdates?.buildProgress?.currentTasks).toEqual([1]);
 		expect(
 			result._stateUpdates?.tasks?.filter((task) => task.status === "IN_PROGRESS"),
@@ -127,6 +128,7 @@ describe("parallel BUILD integration", () => {
 		expect(result.action).toBe("dispatch_multi");
 		expect(result.agents).toHaveLength(5);
 		expect(result.agents?.map((agent) => agent.taskId)).toEqual([1, 2, 3, 4, 5]);
+		expect(result.agents?.[0].prompt).toContain("[EXECUTION MODE: PARALLEL]");
 		expect(result._stateUpdates?.buildProgress?.currentTasks).toEqual([1, 2, 3, 4, 5]);
 		expect(
 			result._stateUpdates?.tasks?.filter((task) => task.status === "IN_PROGRESS"),
@@ -263,6 +265,7 @@ describe("parallel BUILD integration", () => {
 		// Should dispatch exactly 1 task (task 6) to fill the slot freed by task 1
 		expect(result.action).toBe("dispatch");
 		expect(result.taskId).toBe(6);
+		expect(result.prompt).toContain("[EXECUTION MODE: PARALLEL]");
 
 		const updatedTasks = result._stateUpdates?.tasks ?? [];
 		const inProgressCount = updatedTasks.filter((t) => t.status === "IN_PROGRESS").length;
@@ -272,6 +275,7 @@ describe("parallel BUILD integration", () => {
 		expect(updatedTasks.find((t) => t.id === 6)?.status).toBe("IN_PROGRESS");
 		expect(updatedTasks.find((t) => t.id === 7)?.status).toBe("PENDING");
 		expect(updatedTasks.find((t) => t.id === 8)?.status).toBe("PENDING");
+		expect(result._stateUpdates?.buildProgress?.currentTasks).toEqual([2, 3, 4, 5, 6]);
 	});
 
 	test("replenishment dispatches multiple when multiple slots free", async () => {
