@@ -432,12 +432,20 @@ async function applyStateUpdates(
 	artifactDir: string,
 ): Promise<ApplyStateResult> {
 	const updates = handlerResult._stateUpdates;
-	if (updates) {
+	if (!updates) {
+		return { state, redundantTaskIds: new Set<number>() };
+	}
+
+	if (handlerResult.phase === "BUILD") {
 		const { transform, redundantTaskIds } = buildMergeTransform(updates, state);
 		const merged = await updatePersistedState(artifactDir, state, transform);
 		return { state: merged, redundantTaskIds };
 	}
-	return { state, redundantTaskIds: new Set<number>() };
+
+	const merged = await updatePersistedState(artifactDir, state, (current) =>
+		patchState(current, updates),
+	);
+	return { state: merged, redundantTaskIds: new Set<number>() };
 }
 
 /**
