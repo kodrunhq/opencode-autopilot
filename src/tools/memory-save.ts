@@ -30,6 +30,7 @@ export function memorySaveCore(
 	args: MemorySaveArgs,
 	projectRoot: string,
 	db?: Database,
+	sessionId?: string,
 ): { ok: boolean; memory?: Record<string, unknown>; error?: string } {
 	try {
 		const resolvedDb = db ?? getMemoryDb();
@@ -53,7 +54,7 @@ export function memorySaveCore(
 				tags: args.tags ?? [],
 				scope,
 				projectId,
-				sourceSession: null,
+				sourceSession: sessionId ?? null,
 				confidence: undefined,
 			},
 			resolvedDb,
@@ -105,7 +106,11 @@ export const ocMemorySave = tool({
 			.default("user")
 			.describe("Scope: project (specific to current project) or user (applies globally)"),
 	},
-	async execute(args) {
-		return JSON.stringify(memorySaveCore(args, process.cwd()), null, 2);
+	async execute(args, context) {
+		return JSON.stringify(
+			memorySaveCore(args, process.cwd(), undefined, context.sessionID),
+			null,
+			2,
+		);
 	},
 });

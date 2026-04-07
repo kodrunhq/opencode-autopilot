@@ -35,12 +35,12 @@ interface InjectorOutput {
 	system: string[];
 }
 
-function hasActiveMemories(db: Database): boolean {
+function hasMemoriesTable(db: Database): boolean {
 	try {
-		const row = db.query("SELECT COUNT(*) as cnt FROM memories WHERE status = 'active'").get() as {
-			cnt: number;
-		} | null;
-		return (row?.cnt ?? 0) > 0;
+		const row = db
+			.query("SELECT name FROM sqlite_master WHERE type='table' AND name='memories'")
+			.get() as { name: string } | null;
+		return row !== null;
 	} catch {
 		return false;
 	}
@@ -68,8 +68,16 @@ export function createMemoryInjector(config: MemoryInjectorConfig) {
 			const db = config.getDb();
 			let context: string;
 
-			if (hasActiveMemories(db)) {
+			if (hasMemoriesTable(db)) {
 				context = retrieveMemoryContextV2(config.projectRoot, config.tokenBudget, db);
+				if (context.length === 0) {
+					context = retrieveMemoryContext(
+						config.projectRoot,
+						config.tokenBudget,
+						db,
+						config.halfLifeDays,
+					);
+				}
 			} else {
 				context = retrieveMemoryContext(
 					config.projectRoot,

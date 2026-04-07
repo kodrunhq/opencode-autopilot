@@ -128,8 +128,8 @@ function createEvidence(
 	});
 }
 
-function insertEvidence(evidence: MemoryEvidence, db: Database): void {
-	db.run(
+function insertEvidence(evidence: MemoryEvidence, db: Database): boolean {
+	const result = db.run(
 		`INSERT OR IGNORE INTO memory_evidence (
 			id,
 			memory_id,
@@ -149,6 +149,7 @@ function insertEvidence(evidence: MemoryEvidence, db: Database): void {
 			evidence.createdAt,
 		],
 	);
+	return result.changes > 0;
 }
 
 function normalizeScope(projectId: string | null, scope?: MemoryScope): MemoryScope {
@@ -188,25 +189,34 @@ export function saveMemory(input: SaveMemoryInput, db?: Database): Memory {
 			sourceSession: input.sourceSession ?? null,
 		});
 
-	const duplicate = findDuplicateCandidate(validated.content, validated.projectId, d);
+	const duplicate = findDuplicateCandidate(
+		validated.content,
+		validated.projectId,
+		validated.kind,
+		d,
+	);
 	if (duplicate) {
 		const merged = mergeIntoExisting(duplicate, validated.content, validated.confidence, d);
 		if (merged.id === undefined) {
 			throw new Error("Merged memory is missing an id");
 		}
+		const mergedId = merged.id;
 
 		const evidence = createEvidence(
-			merged.id,
+			mergedId,
 			validated.content,
 			validated.sourceSession,
 			validated.confidence,
 			now,
 		);
 		withTransaction(d, () => {
-			insertEvidence(evidence, d);
+			const inserted = insertEvidence(evidence, d);
+			if (inserted) {
+				d.run("UPDATE memories SET evidence_count = evidence_count + 1 WHERE id = ?", [mergedId]);
+			}
 		});
 
-		const reloaded = getMemoryByNumericId(merged.id, d);
+		const reloaded = getMemoryByNumericId(mergedId, d);
 		if (reloaded === null) {
 			throw new Error(`Failed to reload memory: ${merged.id}`);
 		}
@@ -392,7 +402,7 @@ export function migratePreferencesToMemories(db?: Database): { migrated: number;
 
 	for (const row of rows) {
 		const content = `${row.key}: ${row.value}`;
-		const duplicate = findDuplicateCandidate(content, row.project_id, d);
+		const duplicate = findDuplicateCandidate(content, row.project_id, "preference", d);
 		if (duplicate) {
 			skipped += 1;
 			continue;

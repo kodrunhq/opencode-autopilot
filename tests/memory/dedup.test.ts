@@ -150,6 +150,7 @@ describe("dedup", () => {
 			const candidate = findDuplicateCandidate(
 				"Use bun test for this project before every commit",
 				null,
+				undefined,
 				db,
 			);
 
@@ -159,7 +160,9 @@ describe("dedup", () => {
 		test("returns null when overlap is below the threshold", () => {
 			insertMemory({ content: "Use bun test for this project before each commit" });
 
-			expect(findDuplicateCandidate("Deploy the release after manual QA", null, db)).toBeNull();
+			expect(
+				findDuplicateCandidate("Deploy the release after manual QA", null, undefined, db),
+			).toBeNull();
 		});
 
 		test("respects project scope", () => {
@@ -189,6 +192,7 @@ describe("dedup", () => {
 			const candidate = findDuplicateCandidate(
 				"Use bun test for this project before every commit",
 				"proj-1",
+				undefined,
 				db,
 			);
 
@@ -196,15 +200,49 @@ describe("dedup", () => {
 			expect(candidate?.projectId).toBe("proj-1");
 		});
 
+		test("filters by kind when provided", () => {
+			insertMemory({
+				textId: "mem-decision",
+				kind: "decision",
+				content: "Use bun test for this project before each commit",
+			});
+			insertMemory({
+				textId: "mem-workflow",
+				kind: "workflow_rule",
+				content: "Use bun test for this project before each commit",
+			});
+
+			const withKind = findDuplicateCandidate(
+				"Use bun test for this project before every commit",
+				null,
+				"decision",
+				db,
+			);
+			expect(withKind?.kind).toBe("decision");
+
+			const withoutKind = findDuplicateCandidate(
+				"Use bun test for this project before every commit",
+				null,
+				undefined,
+				db,
+			);
+			expect(withoutKind).not.toBeNull();
+		});
+
 		test("returns null for an empty database", () => {
 			expect(
-				findDuplicateCandidate("Use bun test for this project before each commit", null, db),
+				findDuplicateCandidate(
+					"Use bun test for this project before each commit",
+					null,
+					undefined,
+					db,
+				),
 			).toBeNull();
 		});
 	});
 
 	describe("mergeIntoExisting", () => {
-		test("bumps evidence count, raises confidence, and updates timestamp", () => {
+		test("raises confidence, updates content and timestamp, but does not bump evidence count", () => {
 			const existing = insertMemory({
 				confidence: 0.6,
 				evidenceCount: 2,
@@ -218,7 +256,7 @@ describe("dedup", () => {
 				db,
 			);
 
-			expect(merged.evidenceCount).toBe(3);
+			expect(merged.evidenceCount).toBe(2);
 			expect(merged.confidence).toBe(0.9);
 			expect(merged.lastUpdated).not.toBe("2026-01-01T00:00:00Z");
 
@@ -231,7 +269,7 @@ describe("dedup", () => {
 			};
 
 			expect(stored.confidence).toBe(0.9);
-			expect(stored.evidence_count).toBe(3);
+			expect(stored.evidence_count).toBe(2);
 			expect(stored.last_updated).toBe(merged.lastUpdated);
 		});
 

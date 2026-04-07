@@ -110,6 +110,47 @@ describe("memorySaveCore", () => {
 		expect(result.ok).toBe(true);
 		expect(result.memory?.kind).toBe("mistake");
 	});
+
+	test("passes sessionId through as sourceSession", () => {
+		const result = memorySaveCore(
+			{
+				kind: "preference",
+				content: "User prefers dark mode in all editors",
+				summary: "Dark mode preference",
+				scope: "user",
+			},
+			"/tmp/project",
+			db,
+			"sess-test-123",
+		);
+
+		expect(result.ok).toBe(true);
+
+		const row = db
+			.query("SELECT source_session FROM memories WHERE text_id = ?")
+			.get(result.memory?.textId as string) as { source_session: string | null } | null;
+		expect(row?.source_session).toBe("sess-test-123");
+	});
+
+	test("sourceSession defaults to null when sessionId not provided", () => {
+		const result = memorySaveCore(
+			{
+				kind: "preference",
+				content: "User prefers light mode in all editors",
+				summary: "Light mode preference",
+				scope: "user",
+			},
+			"/tmp/project",
+			db,
+		);
+
+		expect(result.ok).toBe(true);
+
+		const row = db
+			.query("SELECT source_session FROM memories WHERE text_id = ?")
+			.get(result.memory?.textId as string) as { source_session: string | null } | null;
+		expect(row?.source_session).toBeNull();
+	});
 });
 
 describe("ocMemorySave tool", () => {

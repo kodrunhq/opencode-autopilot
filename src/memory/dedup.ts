@@ -131,6 +131,7 @@ export function computeBigramOverlap(a: string, b: string): number {
 export function findDuplicateCandidate(
 	content: string,
 	projectId: string | null,
+	kind?: string,
 	db?: Database,
 ): Memory | null {
 	const normalizedContent = normalizeContent(content);
@@ -139,6 +140,11 @@ export function findDuplicateCandidate(
 	}
 
 	const d = resolveDb(db);
+
+	const kindClause = kind ? " AND kind = ?" : "";
+	const baseParams: Array<string> = [];
+	if (kind) baseParams.push(kind);
+
 	const rows = (
 		projectId === null
 			? d
@@ -146,19 +152,19 @@ export function findDuplicateCandidate(
 						`SELECT *
 					 FROM memories
 					 WHERE status = 'active'
-					   AND project_id IS NULL
+					   AND project_id IS NULL${kindClause}
 					 ORDER BY last_updated DESC, id DESC`,
 					)
-					.all()
+					.all(...baseParams)
 			: d
 					.query(
 						`SELECT *
 					 FROM memories
 					 WHERE status = 'active'
-					   AND project_id = ?
+					   AND project_id = ?${kindClause}
 					 ORDER BY last_updated DESC, id DESC`,
 					)
-					.all(projectId)
+					.all(projectId, ...baseParams)
 	) as MemoryRow[];
 
 	for (const row of rows) {
@@ -197,14 +203,13 @@ export function mergeIntoExisting(
 		const currentMemory = rowToMemory(currentRow);
 		const updatedContent = selectMergedContent(currentMemory.content, newContent);
 		const updatedConfidence = Math.max(currentMemory.confidence, newConfidence);
-		const updatedEvidenceCount = currentMemory.evidenceCount + 1;
 		const updatedLastUpdated = new Date().toISOString();
 
 		d.run(
 			`UPDATE memories
-			 SET content = ?, confidence = ?, evidence_count = ?, last_updated = ?
+			 SET content = ?, confidence = ?, last_updated = ?
 			 WHERE id = ?`,
-			[updatedContent, updatedConfidence, updatedEvidenceCount, updatedLastUpdated, currentRow.id],
+			[updatedContent, updatedConfidence, updatedLastUpdated, currentRow.id],
 		);
 
 		const updatedRow = d
