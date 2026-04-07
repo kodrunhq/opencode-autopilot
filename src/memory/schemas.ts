@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { projectRecordSchema } from "../projects/schemas";
-import { OBSERVATION_TYPES } from "./constants";
+import {
+	MAX_MEMORY_CONTENT_LENGTH,
+	MAX_MEMORY_SUMMARY_LENGTH,
+	MAX_MEMORY_TAGS,
+	MEMORY_KINDS,
+	MEMORY_SCOPES,
+	MEMORY_STATUSES,
+	OBSERVATION_TYPES,
+} from "./constants";
 
 export const observationTypeSchema = z.enum(OBSERVATION_TYPES);
 
@@ -63,4 +71,52 @@ export const preferenceEvidenceSchema = z.object({
 	confidence: z.number().min(0).max(1).default(0.5),
 	confirmed: z.boolean().default(false),
 	createdAt: z.string(),
+});
+
+export const memoryKindSchema = z.enum(MEMORY_KINDS);
+
+export const memoryScopeSchema = z.enum(MEMORY_SCOPES);
+
+export const memoryStatusSchema = z.enum(MEMORY_STATUSES);
+
+export const memoryTagsSchema = z.array(z.string().min(1).max(50)).max(MAX_MEMORY_TAGS).default([]);
+
+export const memorySchema = z.object({
+	id: z.number().int().optional(),
+	textId: z.string().min(1),
+	projectId: z.string().nullable().default(null),
+	kind: memoryKindSchema,
+	scope: memoryScopeSchema,
+	content: z.string().min(1).max(MAX_MEMORY_CONTENT_LENGTH),
+	summary: z.string().min(1).max(MAX_MEMORY_SUMMARY_LENGTH),
+	reasoning: z.string().nullable().default(null),
+	confidence: z.number().min(0).max(1).default(0.8),
+	evidenceCount: z.number().int().min(0).default(1),
+	tags: memoryTagsSchema,
+	sourceSession: z.string().nullable().default(null),
+	status: memoryStatusSchema.default("active"),
+	supersedesMemoryId: z.string().nullable().default(null),
+	accessCount: z.number().int().min(0).default(0),
+	createdAt: z.string(),
+	lastUpdated: z.string(),
+	lastAccessed: z.string(),
+});
+
+export const memoryEvidenceSchema = z.object({
+	id: z.string().min(1),
+	memoryId: z.number().int(),
+	sessionId: z.string().nullable().default(null),
+	statement: z.string().min(1).max(4000),
+	statementHash: z.string().min(1).max(128),
+	confidence: z.number().min(0).max(1).default(0.8),
+	createdAt: z.string(),
+});
+
+export const memorySaveInputSchema = z.object({
+	kind: memoryKindSchema,
+	content: z.string().min(1).max(MAX_MEMORY_CONTENT_LENGTH),
+	summary: z.string().min(1).max(MAX_MEMORY_SUMMARY_LENGTH),
+	reasoning: z.string().nullable().optional(),
+	tags: memoryTagsSchema.optional(),
+	scope: memoryScopeSchema.optional(),
 });

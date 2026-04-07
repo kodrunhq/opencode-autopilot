@@ -129,6 +129,71 @@ export function initMemoryDb(database: Database): void {
 
 	database.run(`CREATE INDEX IF NOT EXISTS idx_observations_project ON observations(project_id)`);
 	database.run(`CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type)`);
+
+	database.run(`CREATE TABLE IF NOT EXISTS memories (
+		id INTEGER PRIMARY KEY,
+		text_id TEXT UNIQUE NOT NULL,
+		project_id TEXT,
+		kind TEXT NOT NULL CHECK(kind IN ('preference','decision','project_fact','mistake','workflow_rule')),
+		scope TEXT NOT NULL CHECK(scope IN ('project','user')),
+		content TEXT NOT NULL,
+		summary TEXT NOT NULL,
+		reasoning TEXT,
+		confidence REAL NOT NULL DEFAULT 0.8,
+		evidence_count INTEGER NOT NULL DEFAULT 1,
+		tags TEXT,
+		source_session TEXT,
+		status TEXT NOT NULL CHECK(status IN ('active','superseded','rejected')) DEFAULT 'active',
+		supersedes_memory_id TEXT,
+		access_count INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL,
+		last_updated TEXT NOT NULL,
+		last_accessed TEXT NOT NULL,
+		FOREIGN KEY (project_id) REFERENCES projects(id)
+	)`);
+
+	database.run(`CREATE TABLE IF NOT EXISTS memory_evidence (
+		id TEXT PRIMARY KEY,
+		memory_id INTEGER NOT NULL,
+		session_id TEXT,
+		statement TEXT NOT NULL,
+		statement_hash TEXT NOT NULL,
+		confidence REAL NOT NULL DEFAULT 0.8,
+		created_at TEXT NOT NULL,
+		FOREIGN KEY (memory_id) REFERENCES memories(id) ON DELETE CASCADE,
+		UNIQUE(memory_id, statement_hash)
+	)`);
+
+	database.run(`CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+		content, summary, tags,
+		content=memories,
+		content_rowid=id
+	)`);
+
+	database.run(`CREATE TRIGGER IF NOT EXISTS mem_ai AFTER INSERT ON memories BEGIN
+		INSERT INTO memories_fts(rowid, content, summary, tags)
+		VALUES (new.id, new.content, new.summary, new.tags);
+	END`);
+
+	database.run(`CREATE TRIGGER IF NOT EXISTS mem_ad AFTER DELETE ON memories BEGIN
+		INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags)
+		VALUES('delete', old.id, old.content, old.summary, old.tags);
+	END`);
+
+	database.run(`CREATE TRIGGER IF NOT EXISTS mem_au AFTER UPDATE ON memories BEGIN
+		INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags)
+		VALUES('delete', old.id, old.content, old.summary, old.tags);
+		INSERT INTO memories_fts(rowid, content, summary, tags)
+		VALUES (new.id, new.content, new.summary, new.tags);
+	END`);
+
+	database.run(`CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project_id, status)`);
+	database.run(`CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories(kind, status)`);
+	database.run(`CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status)`);
+	database.run(`CREATE INDEX IF NOT EXISTS idx_memories_text_id ON memories(text_id)`);
+	database.run(
+		`CREATE INDEX IF NOT EXISTS idx_memory_evidence_memory ON memory_evidence(memory_id)`,
+	);
 }
 
 /**
