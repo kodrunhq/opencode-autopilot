@@ -45,7 +45,6 @@ describe("createMemoryCaptureHandler", () => {
 				},
 			});
 
-			// Verify project was upserted
 			const project = db.query("SELECT * FROM projects").get() as Record<string, unknown>;
 			expect(project).not.toBeNull();
 			expect(project.name).toBe("my-project");
@@ -56,7 +55,6 @@ describe("createMemoryCaptureHandler", () => {
 		it("extracts error observation", async () => {
 			const handler = createMemoryCaptureHandler(createTestDeps(db));
 
-			// First create a session
 			await handler({
 				event: {
 					type: "session.created",
@@ -66,7 +64,6 @@ describe("createMemoryCaptureHandler", () => {
 				},
 			});
 
-			// Then send an error
 			await handler({
 				event: {
 					type: "session.error",
@@ -101,7 +98,6 @@ describe("createMemoryCaptureHandler", () => {
 				},
 			});
 
-			// This should be ignored - no observation created
 			await handler({
 				event: {
 					type: "tool_complete",
@@ -143,7 +139,7 @@ describe("createMemoryCaptureHandler", () => {
 			expect(count.cnt).toBe(0);
 		});
 
-		it("ignores session_start-like events (session.idle, session.compacted)", async () => {
+		it("ignores session.idle and session.compacted events", async () => {
 			const handler = createMemoryCaptureHandler(createTestDeps(db));
 
 			await handler({
@@ -185,7 +181,6 @@ describe("createMemoryCaptureHandler", () => {
 				},
 			});
 
-			// Trigger session.deleted — should not throw
 			await handler({
 				event: {
 					type: "session.deleted",
@@ -193,10 +188,8 @@ describe("createMemoryCaptureHandler", () => {
 				},
 			});
 
-			// Wait a tick for the deferred prune
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			// Verify handler resets state (no errors on subsequent calls)
 			expect(true).toBe(true);
 		});
 	});
@@ -212,7 +205,6 @@ describe("createMemoryCaptureHandler", () => {
 				},
 			});
 
-			// Simulate a decision-bearing event
 			await handler({
 				event: {
 					type: "app.decision",
@@ -268,31 +260,35 @@ describe("createMemoryCaptureHandler", () => {
 		});
 	});
 
-	describe("explicit preference capture", () => {
-		it("extracts explicit preference statements conservatively", () => {
-			const candidates = memoryCaptureInternals.extractExplicitPreferenceCandidates([
-				{
-					type: "text",
-					content:
-						"Please use small diffs in this repo. Always run tests after non-trivial changes.",
-				},
-			]);
-
-			expect(candidates).toHaveLength(2);
-			expect(candidates[0]?.scope).toBe("project");
-			expect(candidates[0]?.value).toContain("small diffs");
-			expect(candidates[1]?.value).toContain("tests after non-trivial changes");
+	describe("capture-utils", () => {
+		it("extractSessionId extracts from properties.sessionID", () => {
+			expect(memoryCaptureInternals.extractSessionId({ sessionID: "abc" })).toBe("abc");
 		});
 
-		it("ignores non-explicit text", () => {
-			const candidates = memoryCaptureInternals.extractExplicitPreferenceCandidates([
-				{ type: "text", content: "Can you help investigate this bug?" },
-			]);
-
-			expect(candidates).toEqual([]);
+		it("extractSessionId extracts from properties.info.id", () => {
+			expect(memoryCaptureInternals.extractSessionId({ info: { id: "xyz" } })).toBe("xyz");
 		});
 
-		it("stores explicit preferences with evidence from chat.message parts", async () => {
+		it("extractSessionId returns undefined for missing id", () => {
+			expect(memoryCaptureInternals.extractSessionId({})).toBeUndefined();
+		});
+
+		it("truncate shortens long strings", () => {
+			expect(memoryCaptureInternals.truncate("hello world", 5)).toBe("hello");
+		});
+
+		it("truncate preserves short strings", () => {
+			expect(memoryCaptureInternals.truncate("hi", 10)).toBe("hi");
+		});
+	});
+
+	describe("chat message handler (V2 no-op)", () => {
+		it("returns a function", () => {
+			const handler = createMemoryChatMessageHandler(createTestDeps(db));
+			expect(typeof handler).toBe("function");
+		});
+
+		it("does not create any preference records", async () => {
 			const handler = createMemoryChatMessageHandler(createTestDeps(db));
 
 			await handler(
@@ -305,21 +301,10 @@ describe("createMemoryCaptureHandler", () => {
 				},
 			);
 
-			const prefs = db
-				.query("SELECT key, value, scope, project_id FROM preference_records ORDER BY key ASC")
-				.all() as Array<Record<string, unknown>>;
-			expect(prefs).toHaveLength(2);
-			expect(prefs[0]?.scope).toBe("project");
-			expect(prefs[0]?.project_id).not.toBeNull();
-
-			const evidence = db
-				.query(
-					"SELECT statement, confirmed, session_id FROM preference_evidence ORDER BY statement ASC",
-				)
-				.all() as Array<Record<string, unknown>>;
-			expect(evidence).toHaveLength(2);
-			expect(evidence[0]?.confirmed).toBe(1);
-			expect(evidence[0]?.session_id).toBe("sess-123");
+			const prefs = db.query("SELECT COUNT(*) as cnt FROM preference_records").get() as {
+				cnt: number;
+			};
+			expect(prefs.cnt).toBe(0);
 		});
 	});
 });
