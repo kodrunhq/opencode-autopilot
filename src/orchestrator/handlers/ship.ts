@@ -24,6 +24,19 @@ function buildPrInstructions(state: Parameters<PhaseHandler>[0]): string {
 
 export const handleShip: PhaseHandler = async (state, artifactDir, result?) => {
 	if (result) {
+		const shipDir = getPhaseDir(artifactDir, "SHIP");
+		const walkthroughExists = await fileExists(
+			getArtifactRef(artifactDir, "SHIP", "walkthrough.md"),
+		);
+		const changelogExists = await fileExists(getArtifactRef(artifactDir, "SHIP", "changelog.md"));
+		const decisionsExists = await fileExists(getArtifactRef(artifactDir, "SHIP", "decisions.md"));
+		if (!walkthroughExists && !changelogExists && !decisionsExists) {
+			return Object.freeze({
+				action: "error",
+				phase: "SHIP",
+				message: `SHIP agent returned a result but did not write required artifacts in ${shipDir}. At least one of walkthrough.md, decisions.md, or changelog.md must exist.`,
+			} satisfies DispatchResult);
+		}
 		return Object.freeze({
 			action: "complete",
 			resultKind: "phase_output",

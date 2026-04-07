@@ -18,13 +18,17 @@ export async function handleChallenge(
 	_context?: PhaseHandlerContext,
 ): Promise<DispatchResult> {
 	if (result) {
-		// Warn if artifact wasn't written (best-effort — still complete the phase)
 		const artifactPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
 		if (!(await fileExists(artifactPath))) {
-			logger.warn("CHALLENGE completed but artifact not found", {
+			logger.warn("CHALLENGE result received but artifact not found", {
 				operation: "phase_transition",
 				phase: "CHALLENGE",
 				artifactPath,
+			});
+			return Object.freeze({
+				action: "error" as const,
+				phase: "CHALLENGE",
+				message: `CHALLENGE agent returned a result but did not write the required artifact: ${artifactPath}. The agent must write brief.md before the phase can complete.`,
 			});
 		}
 		return Object.freeze({
@@ -46,9 +50,29 @@ export async function handleChallenge(
 		resultKind: "phase_output",
 		prompt: [
 			`Read ${reconRef} for research context.`,
+			"",
 			`Original idea: ${safeIdea}`,
-			`Propose up to 3 enhancements. Write ambitious brief to ${outputPath}`,
-			`For each: name, user value, complexity (LOW/MEDIUM/HIGH), accept/reject rationale.`,
+			"",
+			`Write an enhancement brief to ${outputPath} containing up to 3 proposed enhancements.`,
+			"",
+			"For EACH enhancement, include these fields:",
+			"",
+			"### Enhancement N: <Name>",
+			"- **User Value**: What concrete problem does this solve or what capability does it unlock?",
+			"- **Complexity**: LOW / MEDIUM / HIGH",
+			"- **Dependencies**: What must exist first? (prior phases, external APIs, infra)",
+			"- **Risk**: What could go wrong and how to mitigate it",
+			"- **Accept/Reject**: ACCEPT or REJECT with one-sentence rationale",
+			"",
+			"After listing all enhancements, add a summary section:",
+			"",
+			"## Recommendation",
+			"- Which enhancements should proceed and in what priority order",
+			"- Combined complexity impact on the original idea",
+			"- Any enhancements that conflict with each other",
+			"",
+			"Be ambitious but grounded — enhancements should be achievable",
+			"within the scope of the original idea, not scope-doubling tangents.",
 		].join("\n"),
 		phase: "CHALLENGE",
 		progress: "Dispatching challenger for product enhancements",

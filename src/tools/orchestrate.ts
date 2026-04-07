@@ -3,6 +3,15 @@ import { tool } from "@opencode-ai/plugin";
 import { getLogger } from "../logging/domains";
 import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
+import {
+	buildFailureSummary,
+	clearRetryStateByKey,
+	decideRetry,
+	detectDispatchFailure,
+	getRetryStateByKey,
+	recordRetryAttempt,
+	sleep,
+} from "../orchestrator/dispatch-retry";
 import { enrichErrorMessage } from "../orchestrator/error-context";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
 import type { DispatchResult, PhaseHandlerContext } from "../orchestrator/handlers/types";
@@ -806,15 +815,101 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 						return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg);
 					}
 
-					const nextState = await updatePersistedState(artifactDir, state, (current) =>
-						applyResultEnvelope(current, parsed.envelope),
-					);
-					state = nextState;
+					const payloadText = parsed.envelope.payload.text;
+					const dispatchError = detectDispatchFailure(payloadText);
 
-					phaseHandlerContext = {
-						envelope: parsed.envelope,
-					};
-					handlerInputResult = parsed.envelope.payload.text;
+					if (dispatchError !== null) {
+						const failedDispatchId = parsed.envelope.dispatchId;
+						const failedPhase = parsed.envelope.phase;
+						const failedAgent = parsed.envelope.agent ?? "unknown";
+
+						logOrchestrationEvent(artifactDir, {
+							timestamp: new Date().toISOString(),
+							phase: failedPhase,
+							action: "error",
+							agent: failedAgent,
+							dispatchId: failedDispatchId,
+							message: `Dispatch failure detected: ${dispatchError.slice(0, 300)}`,
+						});
+
+						void getNotificationManager()?.warn(
+							"Subtask failed",
+							`${failedAgent} in ${failedPhase}: ${dispatchError.slice(0, 100)}`,
+						);
+
+						const decision = decideRetry(failedDispatchId, failedPhase, failedAgent, dispatchError);
+
+						if (decision.shouldRetry) {
+							recordRetryAttempt(
+								failedDispatchId,
+								failedPhase,
+								failedAgent,
+								decision.errorCategory,
+								dispatchError,
+							);
+
+							logOrchestrationEvent(artifactDir, {
+								timestamp: new Date().toISOString(),
+								phase: failedPhase,
+								action: "dispatch",
+								agent: failedAgent,
+								dispatchId: failedDispatchId,
+								message: `Retrying dispatch: ${decision.reasoning}`,
+								payload: {
+									retryBackoffMs: decision.backoffMs,
+									useFallbackModel: decision.useFallbackModel,
+									errorCategory: decision.errorCategory,
+								},
+							});
+
+							// Apply backoff delay before retry
+							if (decision.backoffMs > 0) {
+								await sleep(decision.backoffMs);
+							}
+
+							state = await updatePersistedState(artifactDir, state, (current) =>
+								applyResultEnvelope(current, parsed.envelope),
+							);
+
+							if (state.currentPhase !== null) {
+								const retryHandler = PHASE_HANDLERS[state.currentPhase];
+								const retryResult = await retryHandler(state, artifactDir, undefined, undefined);
+								return processHandlerResult(retryResult, state, artifactDir);
+							}
+						}
+
+						// Read retry state BEFORE clearing — otherwise attempts is always lost
+						const retryState = getRetryStateByKey(failedPhase, failedAgent);
+						const actualAttempts = retryState?.attempts ?? 1;
+						clearRetryStateByKey(failedPhase, failedAgent);
+
+						state = await updatePersistedState(artifactDir, state, (current) =>
+							applyResultEnvelope(current, parsed.envelope),
+						);
+						const failureSummary = buildFailureSummary(
+							failedDispatchId,
+							failedPhase,
+							failedAgent,
+							dispatchError,
+							decision.errorCategory,
+							actualAttempts,
+						);
+
+						phaseHandlerContext = { envelope: parsed.envelope };
+						handlerInputResult = failureSummary;
+					} else {
+						clearRetryStateByKey(parsed.envelope.phase, parsed.envelope.agent ?? "unknown");
+
+						const nextState = await updatePersistedState(artifactDir, state, (current) =>
+							applyResultEnvelope(current, parsed.envelope),
+						);
+						state = nextState;
+
+						phaseHandlerContext = {
+							envelope: parsed.envelope,
+						};
+						handlerInputResult = parsed.envelope.payload.text;
+					}
 				} catch (error: unknown) {
 					const parsedErr = parseErrorCode(error);
 					logOrchestrationEvent(artifactDir, {

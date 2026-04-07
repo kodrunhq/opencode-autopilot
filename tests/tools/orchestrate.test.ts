@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { autopilotAgent } from "../../src/agents/autopilot";
 import { loadLatestPipelineStateFromKernel } from "../../src/kernel/repository";
+import { clearAllRetryState, recordRetryAttempt } from "../../src/orchestrator/dispatch-retry";
 import { createInitialState, loadState, saveState } from "../../src/orchestrator/state";
 import { orchestrateCore } from "../../src/tools/orchestrate";
 import { routeCore } from "../../src/tools/route";
@@ -15,6 +16,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+	clearAllRetryState();
 	await rm(tempDir, { recursive: true, force: true });
 });
 
@@ -58,6 +60,8 @@ describe("orchestrateCore", () => {
 			taskId: null,
 			payload: { text: "research done" },
 		};
+		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
+		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
 		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("dispatch");
@@ -349,6 +353,8 @@ describe("orchestrateCore", () => {
 			taskId: null,
 			payload: { text: "research complete" },
 		};
+		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
+		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
 		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("dispatch");
@@ -502,6 +508,8 @@ describe("active pipeline intent guard", () => {
 			taskId: null,
 			payload: { text: "done" },
 		};
+		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
+		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
 		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		expect(parsed.action).toBe("dispatch");
@@ -525,6 +533,8 @@ describe("active pipeline intent guard", () => {
 			taskId: null,
 			payload: { text: "research complete" },
 		};
+		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
+		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
 		const result = await orchestrateCore(
 			{ result: JSON.stringify(envelope), intent: "research" },
 			tempDir,
@@ -533,5 +543,47 @@ describe("active pipeline intent guard", () => {
 		expect(parsed.code).not.toBe("E_INTENT_NOT_IMPLEMENTATION");
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed.phase).toBe("CHALLENGE");
+	});
+});
+
+describe("orchestrateCore retry exhaustion", () => {
+	test("returns handler error after retry limit is exhausted via real orchestrateCore path", async () => {
+		// 1. Start a pipeline — get RECON dispatch
+		const first = JSON.parse(
+			await orchestrateCore({ idea: "retry exhaustion test", intent: "implementation" }, tempDir),
+		);
+		expect(first.action).toBe("dispatch");
+		expect(first.phase).toBe("RECON");
+		expect(first.agent).toBe("oc-researcher");
+
+		// 2. Pre-seed retry state so attempts == maxRetries (default 2).
+		//    This makes decideRetry() return shouldRetry: false on the next failure.
+		recordRetryAttempt(first.dispatchId, "RECON", "oc-researcher", "rate_limit");
+		recordRetryAttempt(first.dispatchId, "RECON", "oc-researcher", "rate_limit");
+
+		// 3. Submit a result envelope whose payload triggers detectDispatchFailure.
+		//    Do NOT create report.md — the RECON handler should surface an error
+		//    because the artifact is missing after the failure summary is passed in.
+		const errorEnvelope = {
+			schemaVersion: 1,
+			resultId: "retry-exhaust-1",
+			runId: first.runId,
+			phase: "RECON",
+			dispatchId: first.dispatchId,
+			agent: "oc-researcher",
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "rate limit exceeded" },
+		};
+		const result = await orchestrateCore({ result: JSON.stringify(errorEnvelope) }, tempDir);
+		const parsed = JSON.parse(result);
+
+		// 4. The RECON handler receives the failure summary as its result input,
+		//    sees that report.md doesn't exist, and returns action: "error".
+		expect(parsed.action).toBe("error");
+
+		// 5. Verify the orchestration log captured the dispatch failure event.
+		const logRaw = await readFile(join(tempDir, "orchestration.jsonl"), "utf-8");
+		expect(logRaw).toContain("Dispatch failure detected");
 	});
 });

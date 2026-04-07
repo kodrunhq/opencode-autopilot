@@ -75,12 +75,34 @@ describe("handleShip", () => {
 		expect(result.phase).toBe("SHIP");
 	});
 
-	test("returns complete when result provided", async () => {
+	test("returns error when no SHIP artifacts exist after result", async () => {
+		const fs = await import("node:fs/promises");
+		const tmpDir = `/tmp/test-ship-error-${Date.now()}`;
+		await fs.mkdir(`${tmpDir}/phases/SHIP`, { recursive: true });
+
 		const state = makeState({ currentPhase: "SHIP" });
-		const result = await handleShip(state, "/tmp/artifacts", "shipped");
+		const result = await handleShip(state, tmpDir, "shipped");
+
+		expect(result.action).toBe("error");
+		expect(result.phase).toBe("SHIP");
+		expect(result.message).toContain("walkthrough.md");
+		expect(result.message).toContain("decisions.md");
+		expect(result.message).toContain("changelog.md");
+		await fs.rm(tmpDir, { recursive: true, force: true });
+	});
+
+	test("returns complete when walkthrough.md exists after result", async () => {
+		const fs = await import("node:fs/promises");
+		const tmpDir = `/tmp/test-ship-complete-${Date.now()}`;
+		await fs.mkdir(`${tmpDir}/phases/SHIP`, { recursive: true });
+		await fs.writeFile(`${tmpDir}/phases/SHIP/walkthrough.md`, "# Walkthrough\nContent");
+
+		const state = makeState({ currentPhase: "SHIP" });
+		const result = await handleShip(state, tmpDir, "shipped");
 
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("SHIP");
+		await fs.rm(tmpDir, { recursive: true, force: true });
 	});
 });
 

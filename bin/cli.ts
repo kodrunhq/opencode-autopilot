@@ -318,7 +318,11 @@ function printUsage(): void {
 	console.log("  inspect     Read-only inspection of projects, runs, events, and memory");
 	console.log("");
 	console.log("Options:");
-	console.log("  --help, -h  Show this help message");
+	console.log("  --help, -h             Show this help message");
+	console.log("");
+	console.log("Configure options:");
+	console.log("  --group <groupId>      Configure a single agent group only");
+	console.log(`                         Valid groups: ${ALL_GROUP_IDS.join(", ")}`);
 	console.log("");
 }
 
@@ -332,9 +336,13 @@ if (import.meta.main) {
 		case "install":
 			await runInstall({ noTui: args.includes("--no-tui") });
 			break;
-		case "configure":
-			await runConfigure();
+		case "configure": {
+			const groupIdx = args.indexOf("--group");
+			const groupFilter =
+				groupIdx >= 0 && args[groupIdx + 1] ? (args[groupIdx + 1] as GroupId) : undefined;
+			await runConfigure(CONFIG_PATH, groupFilter);
 			break;
+		}
 		case "doctor":
 			await runDoctor();
 			break;

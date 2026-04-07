@@ -215,4 +215,9 @@ describe("configure-tui CLI integration", () => {
 		expect(typeof mod.createSearchSource).toBe("function");
 		expect(typeof mod.groupByProvider).toBe("function");
 	});
+
+	test("runConfigure accepts optional groupFilter parameter", async () => {
+		const mod = await import("../../bin/configure-tui");
+		expect(mod.runConfigure.length).toBeLessThanOrEqual(2);
+	});
 });

@@ -77,6 +77,10 @@ describe("Full Pipeline Concurrency", () => {
 
 				if (currentPhase === "ARCHITECT") {
 					await writeFile(join(phaseDir, "design.md"), "test design");
+				} else if (currentPhase === "RECON") {
+					await writeFile(join(phaseDir, "report.md"), "# Report\ntest report");
+				} else if (currentPhase === "CHALLENGE") {
+					await writeFile(join(phaseDir, "brief.md"), "# Brief\ntest brief");
 				} else if (currentPhase === "PLAN") {
 					await writeFile(
 						join(phaseDir, "tasks.json"),
@@ -86,6 +90,8 @@ describe("Full Pipeline Concurrency", () => {
 						}),
 					);
 					await writeFile(join(phaseDir, "tasks.md"), "test tasks");
+				} else if (currentPhase === "SHIP") {
+					await writeFile(join(phaseDir, "walkthrough.md"), "# Walkthrough\ntest walkthrough");
 				} else if (currentPhase === "BUILD") {
 				}
 			}
