@@ -18,13 +18,17 @@ export async function handleRecon(
 	_context?: PhaseHandlerContext,
 ): Promise<DispatchResult> {
 	if (result) {
-		// Warn if artifact wasn't written (best-effort — still complete the phase)
 		const artifactPath = getArtifactRef(artifactDir, "RECON", "report.md");
 		if (!(await fileExists(artifactPath))) {
-			logger.warn("RECON completed but artifact not found", {
+			logger.warn("RECON result received but artifact not found", {
 				operation: "phase_transition",
 				phase: "RECON",
 				artifactPath,
+			});
+			return Object.freeze({
+				action: "error" as const,
+				phase: "RECON",
+				message: `RECON agent returned a result but did not write the required artifact: ${artifactPath}. The agent must write report.md before the phase can complete.`,
 			});
 		}
 		return Object.freeze({

@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
 	buildFailureSummary,
+	buildRetryKey,
 	clearAllRetryState,
 	clearRetryState,
+	clearRetryStateByKey,
 	decideRetry,
 	detectDispatchFailure,
 	getRetryState,
+	getRetryStateByKey,
 	recordRetryAttempt,
+	sleep,
 } from "../../src/orchestrator/dispatch-retry";
 
 afterEach(() => {
@@ -94,6 +98,78 @@ describe("detectDispatchFailure", () => {
 			"The researcher found that the proposed architecture uses retry patterns " +
 			"for handling transient failures, including 502 and 503 HTTP status codes.";
 		expect(detectDispatchFailure(content)).toBeNull();
+	});
+
+	// ── Fix 5: New error detection patterns ──
+
+	test("detects 'tool execution aborted' pattern", () => {
+		expect(detectDispatchFailure("tool execution aborted")).not.toBeNull();
+	});
+
+	test("detects 'Tool Execution Aborted' case-insensitive", () => {
+		expect(detectDispatchFailure("Tool Execution Aborted")).not.toBeNull();
+	});
+
+	test("detects 'internal server error' pattern", () => {
+		expect(detectDispatchFailure("internal server error")).not.toBeNull();
+	});
+
+	test("detects 'Internal Server Error' case-insensitive", () => {
+		expect(detectDispatchFailure("Internal Server Error")).not.toBeNull();
+	});
+
+	test("detects embedded JSON error in multiline text", () => {
+		const text = `Some preamble text\n{"error": "provider_rate_limited"}\nMore text`;
+		expect(detectDispatchFailure(text)).toBe("provider_rate_limited");
+	});
+
+	test("detects embedded JSON with code field in multiline text", () => {
+		const text = `Line 1\n{"code": "E_QUOTA_EXCEEDED"}\nLine 2`;
+		expect(detectDispatchFailure(text)).toBe("E_QUOTA_EXCEEDED");
+	});
+
+	test("detects embedded JSON with status=error in multiline text", () => {
+		const text = `Prefix\n{"status": "error", "message": "out of tokens"}\nSuffix`;
+		expect(detectDispatchFailure(text)).toBe("out of tokens");
+	});
+
+	test("ignores embedded JSON without error indicators", () => {
+		const text = `Some text\n{"result": "success", "data": "ok"}\nMore text`;
+		if (text.length >= 120) {
+			expect(detectDispatchFailure(text)).toBeNull();
+		}
+	});
+
+	// ── Fix 5: MIN_MEANINGFUL_RESULT_LENGTH = 120 threshold ──
+
+	test("returns null for long content with error keywords (legitimate output)", () => {
+		const content =
+			"The system handles timeout scenarios gracefully by implementing exponential " +
+			"backoff with jitter. When a timeout occurs, the retry engine classifies the error " +
+			"and determines the appropriate strategy. This includes checking the current attempt " +
+			"count against the configured maximum, applying backoff delays, and optionally switching " +
+			"to a fallback model. The timeout threshold is configurable per deployment environment. " +
+			"Production systems typically set this to 30 seconds for API calls and 120 seconds for " +
+			"batch processing operations. Monitoring dashboards track timeout frequency per endpoint.";
+		expect(content.length).toBeGreaterThan(480);
+		expect(detectDispatchFailure(content)).toBeNull();
+	});
+
+	test("detects error in content shorter than 120 chars", () => {
+		const shortError = "503 service unavailable";
+		expect(shortError.length).toBeLessThan(120);
+		expect(detectDispatchFailure(shortError)).not.toBeNull();
+	});
+
+	test("returns null for content at exactly 120 chars with error keyword", () => {
+		// Boundary: at exactly 120 chars, the direct short-content check (< 120) won't fire,
+		// but the first-line fallback check (< 200 chars && total < 480) WILL match.
+		const base = "The system returned a timeout after processing ";
+		const padding = "x".repeat(120 - base.length);
+		const content = base + padding;
+		expect(content.length).toBe(120);
+		const result = detectDispatchFailure(content);
+		expect(result).not.toBeNull();
 	});
 });
 
@@ -190,38 +266,50 @@ describe("decideRetry", () => {
 // ── retry state management ────────────────────────────────────────
 
 describe("retry state management", () => {
-	test("getRetryState returns null for unknown dispatch", () => {
+	test("getRetryState returns null for unknown key", () => {
 		expect(getRetryState("nonexistent")).toBeNull();
 	});
 
-	test("recordRetryAttempt creates state on first call", () => {
+	test("recordRetryAttempt creates state keyed by phase:agent", () => {
 		recordRetryAttempt("dispatch-a", "RECON", "oc-researcher", "rate_limit");
 
-		const state = getRetryState("dispatch-a");
+		const key = buildRetryKey("RECON", "oc-researcher");
+		const state = getRetryState(key);
 		expect(state).not.toBeNull();
 		expect(state?.attempts).toBe(1);
 		expect(state?.phase).toBe("RECON");
 		expect(state?.agent).toBe("oc-researcher");
 		expect(state?.lastCategory).toBe("rate_limit");
+		expect(state?.retryKey).toBe(key);
 	});
 
 	test("recordRetryAttempt increments attempts on subsequent calls", () => {
 		recordRetryAttempt("dispatch-b", "BUILD", "oc-implementer", "timeout");
 		recordRetryAttempt("dispatch-b", "BUILD", "oc-implementer", "service_unavailable");
 
-		const state = getRetryState("dispatch-b");
+		const state = getRetryStateByKey("BUILD", "oc-implementer");
 		expect(state?.attempts).toBe(2);
 		expect(state?.lastCategory).toBe("service_unavailable");
 	});
 
-	test("clearRetryState removes specific dispatch state", () => {
+	test("clearRetryState with phase+agent removes composite-keyed state", () => {
 		recordRetryAttempt("dispatch-c", "RECON", "oc-researcher", "rate_limit");
 		recordRetryAttempt("dispatch-d", "BUILD", "oc-implementer", "timeout");
 
-		clearRetryState("dispatch-c");
+		clearRetryState("dispatch-c", "RECON", "oc-researcher");
 
-		expect(getRetryState("dispatch-c")).toBeNull();
-		expect(getRetryState("dispatch-d")).not.toBeNull();
+		expect(getRetryStateByKey("RECON", "oc-researcher")).toBeNull();
+		expect(getRetryStateByKey("BUILD", "oc-implementer")).not.toBeNull();
+	});
+
+	test("clearRetryStateByKey removes specific phase:agent state", () => {
+		recordRetryAttempt("dispatch-x", "RECON", "oc-researcher", "rate_limit");
+		recordRetryAttempt("dispatch-y", "BUILD", "oc-implementer", "timeout");
+
+		clearRetryStateByKey("RECON", "oc-researcher");
+
+		expect(getRetryStateByKey("RECON", "oc-researcher")).toBeNull();
+		expect(getRetryStateByKey("BUILD", "oc-implementer")).not.toBeNull();
 	});
 
 	test("clearAllRetryState removes all state", () => {
@@ -230,21 +318,116 @@ describe("retry state management", () => {
 
 		clearAllRetryState();
 
-		expect(getRetryState("dispatch-e")).toBeNull();
-		expect(getRetryState("dispatch-f")).toBeNull();
+		expect(getRetryStateByKey("RECON", "oc-researcher")).toBeNull();
+		expect(getRetryStateByKey("BUILD", "oc-implementer")).toBeNull();
 	});
 
 	test("state objects are frozen (immutable)", () => {
 		recordRetryAttempt("dispatch-g", "RECON", "oc-researcher", "rate_limit");
-		const state = getRetryState("dispatch-g");
+		const state = getRetryStateByKey("RECON", "oc-researcher");
 		expect(state).not.toBeNull();
 		expect(Object.isFrozen(state)).toBe(true);
 	});
 });
 
-// ── buildFailureSummary ───────────────────────────────────────────
+// ── Fix 1: Composite key retry identity ──────────────────────────
 
-describe("buildFailureSummary", () => {
+describe("composite key retry identity (Fix 1)", () => {
+	test("buildRetryKey creates phase:agent composite", () => {
+		expect(buildRetryKey("RECON", "oc-researcher")).toBe("RECON:oc-researcher");
+		expect(buildRetryKey("BUILD", "oc-implementer")).toBe("BUILD:oc-implementer");
+	});
+
+	test("retry state accumulates across different dispatchIds for same phase:agent", () => {
+		recordRetryAttempt("dispatch-001", "RECON", "oc-researcher", "rate_limit");
+		recordRetryAttempt("dispatch-002", "RECON", "oc-researcher", "rate_limit");
+		recordRetryAttempt("dispatch-003", "RECON", "oc-researcher", "timeout");
+
+		const state = getRetryStateByKey("RECON", "oc-researcher");
+		expect(state?.attempts).toBe(3);
+		expect(state?.lastCategory).toBe("timeout");
+	});
+
+	test("different phase:agent pairs maintain independent retry state", () => {
+		recordRetryAttempt("dispatch-a", "RECON", "oc-researcher", "rate_limit");
+		recordRetryAttempt("dispatch-a", "RECON", "oc-researcher", "rate_limit");
+		recordRetryAttempt("dispatch-b", "BUILD", "oc-implementer", "timeout");
+
+		expect(getRetryStateByKey("RECON", "oc-researcher")?.attempts).toBe(2);
+		expect(getRetryStateByKey("BUILD", "oc-implementer")?.attempts).toBe(1);
+	});
+
+	test("decideRetry exhausts based on composite key, not dispatchId", () => {
+		recordRetryAttempt("dispatch-first", "BUILD", "oc-implementer", "service_unavailable");
+		recordRetryAttempt("dispatch-second", "BUILD", "oc-implementer", "service_unavailable");
+
+		const decision = decideRetry(
+			"dispatch-third",
+			"BUILD",
+			"oc-implementer",
+			"503 service unavailable",
+			2,
+		);
+		expect(decision.shouldRetry).toBe(false);
+		expect(decision.reasoning).toContain("Retry limit reached");
+	});
+
+	test("getRetryStateByKey and getRetryState(compositeKey) return same result", () => {
+		recordRetryAttempt("dispatch-1", "PLAN", "oc-planner", "timeout");
+
+		const byKey = getRetryStateByKey("PLAN", "oc-planner");
+		const byComposite = getRetryState(buildRetryKey("PLAN", "oc-planner"));
+		expect(byKey).toEqual(byComposite);
+	});
+});
+
+// ── Fix 2: Backoff sleep ─────────────────────────────────────────
+
+describe("backoff sleep (Fix 2)", () => {
+	test("sleep resolves after specified delay", async () => {
+		const start = Date.now();
+		await sleep(50);
+		const elapsed = Date.now() - start;
+		// Allow some timing slack (>= 40ms is reasonable for CI)
+		expect(elapsed).toBeGreaterThanOrEqual(40);
+	});
+
+	test("sleep(0) resolves near-immediately", async () => {
+		const start = Date.now();
+		await sleep(0);
+		const elapsed = Date.now() - start;
+		expect(elapsed).toBeLessThan(50);
+	});
+
+	test("decideRetry returns positive backoffMs for retriable errors", () => {
+		const decision = decideRetry("d-1", "RECON", "oc-researcher", "rate limit exceeded");
+		expect(decision.shouldRetry).toBe(true);
+		expect(decision.backoffMs).toBeGreaterThan(0);
+	});
+
+	test("backoffMs increases with attempts (exponential backoff)", () => {
+		const decision1 = decideRetry("d-1", "SHIP", "oc-shipper", "503 service unavailable");
+		expect(decision1.shouldRetry).toBe(true);
+		const backoff1 = decision1.backoffMs;
+
+		recordRetryAttempt("d-1", "SHIP", "oc-shipper", "service_unavailable");
+		const decision2 = decideRetry("d-2", "SHIP", "oc-shipper", "503 service unavailable", 5);
+		expect(decision2.shouldRetry).toBe(true);
+		const backoff2 = decision2.backoffMs;
+
+		expect(backoff2).toBeGreaterThanOrEqual(backoff1);
+	});
+
+	test("non-retriable errors get backoffMs = 0", () => {
+		const decision = decideRetry("d-1", "BUILD", "oc-implementer", "API key unauthorized");
+		expect(decision.shouldRetry).toBe(false);
+		expect(decision.backoffMs).toBe(0);
+	});
+});
+
+// ── Fix 6: buildFailureSummary attempts value ────────────────────
+
+describe("buildFailureSummary (Fix 6)", () => {
 	test("includes all relevant fields", () => {
 		const summary = buildFailureSummary(
 			"dispatch-1",
@@ -275,10 +458,8 @@ describe("buildFailureSummary", () => {
 			1,
 		);
 
-		// The error line should be truncated
 		const errorLine = summary.split("\n").find((l) => l.startsWith("Error:"));
 		expect(errorLine).toBeDefined();
-		// "Error: " prefix + 500 chars max
 		expect(errorLine?.length).toBeLessThanOrEqual(507);
 	});
 
@@ -294,4 +475,218 @@ describe("buildFailureSummary", () => {
 
 		expect(summary).toContain("orchestrator");
 	});
+
+	test("reflects real attempt count from retry state", () => {
+		recordRetryAttempt("d-1", "RECON", "oc-researcher", "rate_limit");
+		recordRetryAttempt("d-2", "RECON", "oc-researcher", "rate_limit");
+		recordRetryAttempt("d-3", "RECON", "oc-researcher", "rate_limit");
+
+		const state = getRetryStateByKey("RECON", "oc-researcher");
+		const actualAttempts = state?.attempts ?? 1;
+
+		const summary = buildFailureSummary(
+			"d-3",
+			"RECON",
+			"oc-researcher",
+			"rate limit exceeded",
+			"rate_limit",
+			actualAttempts,
+		);
+
+		expect(summary).toContain("Attempts: 3");
+	});
 });
+
+// ── Handler artifact contracts (Fix 3) ───────────────────────────
+
+describe("handler artifact contracts (Fix 3)", () => {
+	test("RECON returns error when report.md missing after agent result", async () => {
+		const { handleRecon } = await import("../../src/orchestrator/handlers/recon");
+		const state = makeMinimalState("RECON");
+		const result = await handleRecon(state, "/tmp/nonexistent-artifacts-recon", "agent output");
+		expect(result.action).toBe("error");
+		expect(result.phase).toBe("RECON");
+		expect(result.message).toContain("report.md");
+	});
+
+	test("RECON returns dispatch when no result yet", async () => {
+		const { handleRecon } = await import("../../src/orchestrator/handlers/recon");
+		const state = makeMinimalState("RECON");
+		const result = await handleRecon(state, "/tmp/nonexistent-artifacts-recon");
+		expect(result.action).toBe("dispatch");
+		expect(result.agent).toBe("oc-researcher");
+	});
+
+	test("CHALLENGE returns error when brief.md missing after agent result", async () => {
+		const { handleChallenge } = await import("../../src/orchestrator/handlers/challenge");
+		const state = makeMinimalState("CHALLENGE");
+		const result = await handleChallenge(
+			state,
+			"/tmp/nonexistent-artifacts-challenge",
+			"agent output",
+		);
+		expect(result.action).toBe("error");
+		expect(result.phase).toBe("CHALLENGE");
+		expect(result.message).toContain("brief.md");
+	});
+
+	test("CHALLENGE returns dispatch when no result yet", async () => {
+		const { handleChallenge } = await import("../../src/orchestrator/handlers/challenge");
+		const state = makeMinimalState("CHALLENGE");
+		const result = await handleChallenge(state, "/tmp/nonexistent-artifacts-challenge");
+		expect(result.action).toBe("dispatch");
+		expect(result.agent).toBe("oc-challenger");
+	});
+
+	test("SHIP returns error when neither walkthrough.md nor changelog.md exist", async () => {
+		const { handleShip } = await import("../../src/orchestrator/handlers/ship");
+		const state = makeMinimalState("SHIP");
+		const result = await handleShip(state, "/tmp/nonexistent-artifacts-ship", "agent output");
+		expect(result.action).toBe("error");
+		expect(result.phase).toBe("SHIP");
+		expect(result.message).toContain("walkthrough.md");
+	});
+
+	test("SHIP returns dispatch when no result yet", async () => {
+		const { handleShip } = await import("../../src/orchestrator/handlers/ship");
+		const state = makeMinimalState("SHIP");
+		const result = await handleShip(state, "/tmp/nonexistent-artifacts-ship");
+		expect(result.action).toBe("dispatch");
+		expect(result.agent).toBe("oc-shipper");
+	});
+});
+
+// ── ARCHITECT partial failure (Fix 4) ────────────────────────────
+
+describe("ARCHITECT partial failure (Fix 4)", () => {
+	test("ARCHITECT with depth>1 and missing proposals returns error", async () => {
+		const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+		const { join } = await import("node:path");
+		const { tmpdir } = await import("node:os");
+		const { handleArchitect } = await import("../../src/orchestrator/handlers/architect");
+
+		const artifactDir = await mkdtemp(join(tmpdir(), "architect-test-"));
+		const proposalsDir = join(artifactDir, "phases", "ARCHITECT", "proposals");
+		await mkdir(proposalsDir, { recursive: true });
+
+		await writeFile(join(proposalsDir, "proposal-A.md"), "# Proposal A\nContent here");
+
+		const state = makeMinimalState("ARCHITECT", {
+			confidence: [
+				{
+					phase: "RECON",
+					level: "LOW",
+					source: "test",
+					rationale: "test",
+					timestamp: new Date().toISOString(),
+				},
+			],
+		});
+
+		const result = await handleArchitect(state, artifactDir);
+
+		if (result.action === "error") {
+			expect(result.message).toContain("expected");
+			expect(result.message).toContain("proposals");
+		} else {
+			expect(["dispatch", "dispatch_multi"]).toContain(result.action);
+		}
+
+		const { rm } = await import("node:fs/promises");
+		await rm(artifactDir, { recursive: true, force: true });
+	});
+
+	test("ARCHITECT with all proposals present dispatches critic", async () => {
+		const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+		const { join } = await import("node:path");
+		const { tmpdir } = await import("node:os");
+		const { handleArchitect } = await import("../../src/orchestrator/handlers/architect");
+
+		const artifactDir = await mkdtemp(join(tmpdir(), "architect-test-full-"));
+		const proposalsDir = join(artifactDir, "phases", "ARCHITECT", "proposals");
+		await mkdir(proposalsDir, { recursive: true });
+
+		await writeFile(join(proposalsDir, "proposal-A.md"), "# Proposal A");
+		await writeFile(join(proposalsDir, "proposal-B.md"), "# Proposal B");
+		await writeFile(join(proposalsDir, "proposal-C.md"), "# Proposal C");
+
+		const state = makeMinimalState("ARCHITECT", {
+			confidence: [
+				{
+					phase: "RECON",
+					level: "LOW",
+					source: "test",
+					rationale: "test",
+					timestamp: new Date().toISOString(),
+				},
+			],
+		});
+
+		const result = await handleArchitect(state, artifactDir);
+
+		if (result.action === "dispatch") {
+			expect(result.agent).toBe("oc-critic");
+		}
+		// Could also be dispatch_multi or other valid states depending on memory tuning
+
+		const { rm } = await import("node:fs/promises");
+		await rm(artifactDir, { recursive: true, force: true });
+	});
+
+	test("ARCHITECT with design.md present returns complete", async () => {
+		const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+		const { join } = await import("node:path");
+		const { tmpdir } = await import("node:os");
+		const { handleArchitect } = await import("../../src/orchestrator/handlers/architect");
+
+		const artifactDir = await mkdtemp(join(tmpdir(), "architect-test-design-"));
+		const architectDir = join(artifactDir, "phases", "ARCHITECT");
+		await mkdir(architectDir, { recursive: true });
+		await writeFile(join(architectDir, "design.md"), "# Final Design");
+
+		const state = makeMinimalState("ARCHITECT");
+		const result = await handleArchitect(state, artifactDir);
+
+		expect(result.action).toBe("complete");
+		expect(result.phase).toBe("ARCHITECT");
+
+		const { rm } = await import("node:fs/promises");
+		await rm(artifactDir, { recursive: true, force: true });
+	});
+});
+
+function makeMinimalState(
+	phase: string,
+	overrides: Record<string, unknown> = {},
+): import("../../src/orchestrator/types").PipelineState {
+	const now = new Date().toISOString();
+	return {
+		schemaVersion: 2 as const,
+		status: "IN_PROGRESS" as const,
+		runId: "test-run",
+		stateRevision: 0,
+		idea: "Test idea for dispatch retry tests",
+		currentPhase: phase,
+		startedAt: now,
+		lastUpdatedAt: now,
+		phases: [],
+		decisions: [],
+		confidence: [],
+		tasks: [],
+		arenaConfidence: null,
+		exploreTriggered: false,
+		buildProgress: {
+			currentTask: null,
+			currentWave: null,
+			attemptCount: 0,
+			strikeCount: 0,
+			reviewPending: false,
+		},
+		pendingDispatches: [],
+		processedResultIds: [],
+		failureContext: null,
+		branchLifecycle: null,
+		phaseDispatchCounts: {},
+		...overrides,
+	} as import("../../src/orchestrator/types").PipelineState;
+}

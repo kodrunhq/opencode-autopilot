@@ -68,11 +68,18 @@ describe("handleRecon", () => {
 
 	test("returns complete when result is provided", async () => {
 		const { handleRecon } = await import("../src/orchestrator/handlers/recon");
+		const fs = await import("node:fs/promises");
+		const tmpDir = `/tmp/test-recon-complete-${Date.now()}`;
+		const artifactPath = `${tmpDir}/phases/RECON/report.md`;
+		await fs.mkdir(`${tmpDir}/phases/RECON`, { recursive: true });
+		await fs.writeFile(artifactPath, "# Report\nContent");
+
 		const state = makeState();
-		const result = await handleRecon(state, "/tmp/test-artifacts", "done");
+		const result = await handleRecon(state, tmpDir, "done");
 
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("RECON");
+		await fs.rm(tmpDir, { recursive: true, force: true });
 	});
 
 	test("returned DispatchResult is frozen", async () => {
@@ -105,11 +112,18 @@ describe("handleChallenge", () => {
 
 	test("returns complete when result is provided", async () => {
 		const { handleChallenge } = await import("../src/orchestrator/handlers/challenge");
+		const fs = await import("node:fs/promises");
+		const tmpDir = `/tmp/test-challenge-complete-${Date.now()}`;
+		const artifactPath = `${tmpDir}/phases/CHALLENGE/brief.md`;
+		await fs.mkdir(`${tmpDir}/phases/CHALLENGE`, { recursive: true });
+		await fs.writeFile(artifactPath, "# Brief\nContent");
+
 		const state = makeState({ currentPhase: "CHALLENGE" });
-		const result = await handleChallenge(state, "/tmp/test-artifacts", "done");
+		const result = await handleChallenge(state, tmpDir, "done");
 
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("CHALLENGE");
+		await fs.rm(tmpDir, { recursive: true, force: true });
 	});
 
 	test("returned DispatchResult is frozen", async () => {

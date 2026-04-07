@@ -76,11 +76,18 @@ describe("handleShip", () => {
 	});
 
 	test("returns complete when result provided", async () => {
+		const fs = await import("node:fs/promises");
+		const tmpDir = `/tmp/test-ship-complete-${Date.now()}`;
+		const artifactPath = `${tmpDir}/phases/SHIP/walkthrough.md`;
+		await fs.mkdir(`${tmpDir}/phases/SHIP`, { recursive: true });
+		await fs.writeFile(artifactPath, "# Walkthrough\nContent");
+
 		const state = makeState({ currentPhase: "SHIP" });
-		const result = await handleShip(state, "/tmp/artifacts", "shipped");
+		const result = await handleShip(state, tmpDir, "shipped");
 
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("SHIP");
+		await fs.rm(tmpDir, { recursive: true, force: true });
 	});
 });
 

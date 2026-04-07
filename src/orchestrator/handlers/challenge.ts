@@ -18,13 +18,17 @@ export async function handleChallenge(
 	_context?: PhaseHandlerContext,
 ): Promise<DispatchResult> {
 	if (result) {
-		// Warn if artifact wasn't written (best-effort — still complete the phase)
 		const artifactPath = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
 		if (!(await fileExists(artifactPath))) {
-			logger.warn("CHALLENGE completed but artifact not found", {
+			logger.warn("CHALLENGE result received but artifact not found", {
 				operation: "phase_transition",
 				phase: "CHALLENGE",
 				artifactPath,
+			});
+			return Object.freeze({
+				action: "error" as const,
+				phase: "CHALLENGE",
+				message: `CHALLENGE agent returned a result but did not write the required artifact: ${artifactPath}. The agent must write brief.md before the phase can complete.`,
 			});
 		}
 		return Object.freeze({

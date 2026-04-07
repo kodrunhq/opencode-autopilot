@@ -5,10 +5,12 @@ import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-resul
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
 import {
 	buildFailureSummary,
-	clearRetryState,
+	clearRetryStateByKey,
 	decideRetry,
 	detectDispatchFailure,
+	getRetryStateByKey,
 	recordRetryAttempt,
+	sleep,
 } from "../orchestrator/dispatch-retry";
 import { enrichErrorMessage } from "../orchestrator/error-context";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
@@ -859,6 +861,11 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 								},
 							});
 
+							// Apply backoff delay before retry
+							if (decision.backoffMs > 0) {
+								await sleep(decision.backoffMs);
+							}
+
 							state = await updatePersistedState(artifactDir, state, (current) =>
 								applyResultEnvelope(current, parsed.envelope),
 							);
@@ -870,26 +877,27 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 							}
 						}
 
-						clearRetryState(failedDispatchId);
+						clearRetryStateByKey(failedPhase, failedAgent);
 
 						state = await updatePersistedState(artifactDir, state, (current) =>
 							applyResultEnvelope(current, parsed.envelope),
 						);
 
-						const retryState = decision.shouldRetry ? 0 : 1;
+						const retryState = getRetryStateByKey(failedPhase, failedAgent);
+						const actualAttempts = retryState?.attempts ?? 1;
 						const failureSummary = buildFailureSummary(
 							failedDispatchId,
 							failedPhase,
 							failedAgent,
 							dispatchError,
 							decision.errorCategory,
-							retryState,
+							actualAttempts,
 						);
 
 						phaseHandlerContext = { envelope: parsed.envelope };
 						handlerInputResult = failureSummary;
 					} else {
-						clearRetryState(parsed.envelope.dispatchId);
+						clearRetryStateByKey(parsed.envelope.phase, parsed.envelope.agent ?? "unknown");
 
 						const nextState = await updatePersistedState(artifactDir, state, (current) =>
 							applyResultEnvelope(current, parsed.envelope),

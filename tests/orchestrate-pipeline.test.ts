@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AGENT_NAMES } from "../src/orchestrator/handlers/types";
@@ -68,6 +68,8 @@ describe("orchestrateCore pipeline dispatch", () => {
 			taskId: null,
 			payload: { text: "recon findings complete" },
 		};
+		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
+		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
 
 		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
@@ -106,6 +108,8 @@ describe("orchestrateCore pipeline dispatch", () => {
 			taskId: null,
 			payload: { text: "challenge done" },
 		};
+		await mkdir(join(tempDir, "phases", "CHALLENGE"), { recursive: true });
+		await writeFile(join(tempDir, "phases", "CHALLENGE", "brief.md"), "# Brief\ntest brief");
 		const result = await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir);
 		const parsed = JSON.parse(result);
 		// CHALLENGE handler with result -> complete -> advance to ARCHITECT
@@ -502,6 +506,8 @@ describe("orchestrateCore pipeline dispatch", () => {
 			taskId: null,
 			payload: { text: "done" },
 		});
+		await mkdir(join(tempDir, "phases", "RECON"), { recursive: true });
+		await writeFile(join(tempDir, "phases", "RECON", "report.md"), "# Report\ntest report");
 
 		await orchestrateCore({ result: envelope }, tempDir);
 		const second = JSON.parse(await orchestrateCore({ result: envelope }, tempDir));

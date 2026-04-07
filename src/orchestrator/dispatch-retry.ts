@@ -4,6 +4,10 @@
  * Classifies errors from subtask results, decides retry vs fallback,
  * and tracks per-dispatch retry state. Reuses recovery/classifier.ts
  * for error classification and recovery/strategies.ts for strategy selection.
+ *
+ * Retry state is keyed by `{phase}:{agent}` composite key, NOT by dispatchId.
+ * This ensures attempt history persists across redispatches (which create
+ * new dispatchIds), so retry limits are actually enforced.
  */
 
 import { getLogger } from "../logging/domains";
@@ -12,6 +16,10 @@ import { getStrategy } from "../recovery/strategies";
 import type { ErrorCategory } from "../types/recovery";
 
 const logger = getLogger("orchestrator", "dispatch-retry");
+
+export function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /** Regex patterns matching provider/transport errors embedded in result text. */
 const DISPATCH_ERROR_PATTERNS: readonly RegExp[] = Object.freeze([
@@ -28,14 +36,16 @@ const DISPATCH_ERROR_PATTERNS: readonly RegExp[] = Object.freeze([
 	/\bservice\s+unavailable\b/i,
 	/\boverloaded\b/i,
 	/\bE_INVALID_RESULT\b/,
+	/\btool\s+execution\s+aborted\b/i,
+	/\binternal\s+server\s+error\b/i,
 ]);
 
 // Results shorter than this with an error pattern are almost certainly failures,
 // not real agent output that happens to mention an error.
-const MIN_MEANINGFUL_RESULT_LENGTH = 50;
+const MIN_MEANINGFUL_RESULT_LENGTH = 120;
 
 export interface DispatchRetryState {
-	readonly dispatchId: string;
+	readonly retryKey: string;
 	readonly phase: string;
 	readonly agent: string;
 	readonly attempts: number;
@@ -52,6 +62,10 @@ export interface DispatchRetryDecision {
 	readonly reasoning: string;
 }
 
+export function buildRetryKey(phase: string, agent: string): string {
+	return `${phase}:${agent}`;
+}
+
 const retryStates = new Map<string, DispatchRetryState>();
 
 /**
@@ -65,6 +79,7 @@ export function detectDispatchFailure(resultText: string): string | null {
 
 	const trimmed = resultText.trim();
 
+	// Try parsing as JSON — handles both single-line and multiline JSON error payloads
 	try {
 		const parsed = JSON.parse(trimmed) as Record<string, unknown>;
 		if (parsed.error || parsed.code || parsed.status === "error") {
@@ -79,7 +94,26 @@ export function detectDispatchFailure(resultText: string): string | null {
 			return errorMsg;
 		}
 	} catch {
-		// Not JSON — fall through to pattern matching
+		// Not clean JSON — check if a JSON error is embedded within larger text
+		const jsonMatch = trimmed.match(/\{[^{}]*"(?:error|code|status)"[^{}]*\}/);
+		if (jsonMatch) {
+			try {
+				const embedded = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+				if (embedded.error || embedded.code || embedded.status === "error") {
+					const errorMsg =
+						typeof embedded.error === "string"
+							? embedded.error
+							: typeof embedded.message === "string"
+								? embedded.message
+								: typeof embedded.code === "string"
+									? embedded.code
+									: jsonMatch[0];
+					return errorMsg;
+				}
+			} catch {
+				// embedded JSON parse failed — fall through
+			}
+		}
 	}
 
 	if (trimmed.length < MIN_MEANINGFUL_RESULT_LENGTH) {
@@ -116,7 +150,8 @@ export function decideRetry(
 	maxRetries: number = 2,
 ): DispatchRetryDecision {
 	const classification = classifyError(errorText);
-	const state = retryStates.get(dispatchId);
+	const key = buildRetryKey(phase, agent);
+	const state = retryStates.get(key);
 	const attempts = state?.attempts ?? 0;
 
 	if (!classification.isRecoverable) {
@@ -138,6 +173,7 @@ export function decideRetry(
 	if (attempts >= maxRetries) {
 		logger.info("Dispatch retry limit reached", {
 			dispatchId,
+			retryKey: key,
 			phase,
 			agent,
 			attempts,
@@ -175,6 +211,7 @@ export function decideRetry(
 
 	logger.info("Dispatch retry decision", {
 		dispatchId,
+		retryKey: key,
 		phase,
 		agent,
 		category: classification.category,
@@ -195,14 +232,15 @@ export function decideRetry(
 }
 
 export function recordRetryAttempt(
-	dispatchId: string,
+	_dispatchId: string,
 	phase: string,
 	agent: string,
 	errorCategory: ErrorCategory,
 ): void {
-	const existing = retryStates.get(dispatchId);
+	const key = buildRetryKey(phase, agent);
+	const existing = retryStates.get(key);
 	const nextState: DispatchRetryState = Object.freeze({
-		dispatchId,
+		retryKey: key,
 		phase,
 		agent,
 		attempts: (existing?.attempts ?? 0) + 1,
@@ -210,19 +248,31 @@ export function recordRetryAttempt(
 		lastError: null,
 		lastCategory: errorCategory,
 	});
-	retryStates.set(dispatchId, nextState);
+	retryStates.set(key, nextState);
 }
 
-export function clearRetryState(dispatchId: string): void {
-	retryStates.delete(dispatchId);
+export function clearRetryState(dispatchId: string, phase?: string, agent?: string): void {
+	if (phase && agent) {
+		retryStates.delete(buildRetryKey(phase, agent));
+	} else {
+		retryStates.delete(dispatchId);
+	}
+}
+
+export function clearRetryStateByKey(phase: string, agent: string): void {
+	retryStates.delete(buildRetryKey(phase, agent));
 }
 
 export function clearAllRetryState(): void {
 	retryStates.clear();
 }
 
-export function getRetryState(dispatchId: string): DispatchRetryState | null {
-	return retryStates.get(dispatchId) ?? null;
+export function getRetryState(keyOrDispatchId: string): DispatchRetryState | null {
+	return retryStates.get(keyOrDispatchId) ?? null;
+}
+
+export function getRetryStateByKey(phase: string, agent: string): DispatchRetryState | null {
+	return retryStates.get(buildRetryKey(phase, agent)) ?? null;
 }
 
 /**

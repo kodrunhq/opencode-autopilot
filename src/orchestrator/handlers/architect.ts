@@ -47,50 +47,102 @@ export async function handleArchitect(
 
 	// Check for existing proposals (Step 2)
 	const proposalsDir = join(phaseDir, "proposals");
-	const hasProposals = await hasProposalFiles(proposalsDir);
 
-	if (hasProposals) {
-		return Object.freeze({
-			action: "dispatch" as const,
-			agent: AGENT_NAMES.CRITIC,
-			resultKind: "phase_output",
-			prompt: [
-				`Review architecture proposals in ${proposalsDir}/`,
-				`Read ${getArtifactRef(artifactDir, "RECON", "report.md")} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md")} for context.`,
-				"",
-				`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md")}`,
-				"",
-				"Your critique MUST contain:",
-				"",
-				"## Per-Proposal Analysis",
-				"For each proposal:",
-				"- **Strengths**: What does this design get right? (be specific, reference sections)",
-				"- **Weaknesses**: What are the gaps or risks? (be specific, cite affected components)",
-				"- **Feasibility**: Can this be built with the identified stack and timeline?",
-				"- **Testability**: How easily can this design be validated and tested?",
-				"",
-				"## Comparative Matrix",
-				"| Criterion | Proposal A | Proposal B | ... |",
-				"| --- | --- | --- | --- |",
-				"| Simplicity | ... | ... | ... |",
-				"| Extensibility | ... | ... | ... |",
-				"| Performance | ... | ... | ... |",
-				"| Risk | ... | ... | ... |",
-				"",
-				"## Recommendation",
-				"- Which proposal to adopt (or which elements to combine)",
-				"- Key modifications needed before proceeding",
-				"- Confidence: HIGH / MEDIUM / LOW (with justification)",
-			].join("\n"),
-			phase: "ARCHITECT",
-			progress: "Dispatching critic for proposal review",
-		});
-	}
-
-	// Step 1: Dispatch architect(s) based on confidence depth
+	// Determine expected proposal count BEFORE checking existence
+	// so we can verify ALL proposals were written, not just one
 	await ensurePhaseDir(artifactDir, "ARCHITECT");
 	const reconEntries = filterByPhase(state.confidence, "RECON");
 	const depth = getMemoryTunedDepth(reconEntries, getProjectRootFromArtifactDir(artifactDir));
+
+	if (depth > 1) {
+		const proposalCount = await countProposalFiles(proposalsDir);
+		if (proposalCount > 0) {
+			if (proposalCount < depth) {
+				return Object.freeze({
+					action: "error" as const,
+					phase: "ARCHITECT",
+					message: `ARCHITECT arena: expected ${depth} proposals but only ${proposalCount} were written in ${proposalsDir}. Missing proposals must be written before critic can evaluate.`,
+				});
+			}
+			return Object.freeze({
+				action: "dispatch" as const,
+				agent: AGENT_NAMES.CRITIC,
+				resultKind: "phase_output",
+				prompt: [
+					`Review architecture proposals in ${proposalsDir}/`,
+					`Read ${getArtifactRef(artifactDir, "RECON", "report.md")} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md")} for context.`,
+					"",
+					`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md")}`,
+					"",
+					"Your critique MUST contain:",
+					"",
+					"## Per-Proposal Analysis",
+					"For each proposal:",
+					"- **Strengths**: What does this design get right? (be specific, reference sections)",
+					"- **Weaknesses**: What are the gaps or risks? (be specific, cite affected components)",
+					"- **Feasibility**: Can this be built with the identified stack and timeline?",
+					"- **Testability**: How easily can this design be validated and tested?",
+					"",
+					"## Comparative Matrix",
+					"| Criterion | Proposal A | Proposal B | ... |",
+					"| --- | --- | --- | --- |",
+					"| Simplicity | ... | ... | ... |",
+					"| Extensibility | ... | ... | ... |",
+					"| Performance | ... | ... | ... |",
+					"| Risk | ... | ... | ... |",
+					"",
+					"## Recommendation",
+					"- Which proposal to adopt (or which elements to combine)",
+					"- Key modifications needed before proceeding",
+					"- Confidence: HIGH / MEDIUM / LOW (with justification)",
+				].join("\n"),
+				phase: "ARCHITECT",
+				progress: "Dispatching critic for proposal review",
+			});
+		}
+	} else {
+		// depth === 1: single architect, no arena — check for any proposals for resume
+		const hasProposals = await hasProposalFiles(proposalsDir);
+		if (hasProposals) {
+			return Object.freeze({
+				action: "dispatch" as const,
+				agent: AGENT_NAMES.CRITIC,
+				resultKind: "phase_output",
+				prompt: [
+					`Review architecture proposals in ${proposalsDir}/`,
+					`Read ${getArtifactRef(artifactDir, "RECON", "report.md")} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md")} for context.`,
+					"",
+					`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md")}`,
+					"",
+					"Your critique MUST contain:",
+					"",
+					"## Per-Proposal Analysis",
+					"For each proposal:",
+					"- **Strengths**: What does this design get right? (be specific, reference sections)",
+					"- **Weaknesses**: What are the gaps or risks? (be specific, cite affected components)",
+					"- **Feasibility**: Can this be built with the identified stack and timeline?",
+					"- **Testability**: How easily can this design be validated and tested?",
+					"",
+					"## Comparative Matrix",
+					"| Criterion | Proposal A | Proposal B | ... |",
+					"| --- | --- | --- | --- |",
+					"| Simplicity | ... | ... | ... |",
+					"| Extensibility | ... | ... | ... |",
+					"| Performance | ... | ... | ... |",
+					"| Risk | ... | ... | ... |",
+					"",
+					"## Recommendation",
+					"- Which proposal to adopt (or which elements to combine)",
+					"- Key modifications needed before proceeding",
+					"- Confidence: HIGH / MEDIUM / LOW (with justification)",
+				].join("\n"),
+				phase: "ARCHITECT",
+				progress: "Dispatching critic for proposal review",
+			});
+		}
+	}
+
+	// Step 1: Dispatch architect(s) based on confidence depth
 	const reconRef = getArtifactRef(artifactDir, "RECON", "report.md");
 	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md");
 	const safeIdea = sanitizeTemplateContent(state.idea).replace(/[\r\n]+/g, " ");
@@ -196,5 +248,14 @@ async function hasProposalFiles(proposalsDir: string): Promise<boolean> {
 		return entries.some((e) => e.startsWith("proposal-") && e.endsWith(".md"));
 	} catch {
 		return false;
+	}
+}
+
+async function countProposalFiles(proposalsDir: string): Promise<number> {
+	try {
+		const entries = await readdir(proposalsDir);
+		return entries.filter((e) => e.startsWith("proposal-") && e.endsWith(".md")).length;
+	} catch {
+		return 0;
 	}
 }
