@@ -372,17 +372,17 @@ export function buildMergeTransform(
 	const redundantTaskIds = new Set<number>();
 
 	const transform = (current: Readonly<PipelineState>): PipelineState => {
-		// Merge branchLifecycle.tasksPushed additively
+		// Merge branchLifecycle.tasksPushed additively — even when this handler added
+		// no new push IDs, we must preserve current.branchLifecycle.tasksPushed so a
+		// stale updates.branchLifecycle doesn't overwrite sibling pushes.
 		const mergedUpdates = { ...updates };
-		if (newTasksPushed.length > 0 && current.branchLifecycle) {
+		if (updates.branchLifecycle && current.branchLifecycle) {
 			const currentPushed = new Set(current.branchLifecycle.tasksPushed);
 			const additionalPushed = newTasksPushed.filter((id) => !currentPushed.has(id));
-			if (additionalPushed.length > 0 || updates.branchLifecycle) {
-				mergedUpdates.branchLifecycle = {
-					...(updates.branchLifecycle ?? current.branchLifecycle),
-					tasksPushed: [...current.branchLifecycle.tasksPushed, ...additionalPushed],
-				};
-			}
+			mergedUpdates.branchLifecycle = {
+				...updates.branchLifecycle,
+				tasksPushed: [...current.branchLifecycle.tasksPushed, ...additionalPushed],
+			};
 		}
 
 		if (!taskChanges || !changedTaskIds) {

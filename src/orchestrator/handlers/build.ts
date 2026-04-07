@@ -285,7 +285,19 @@ export const handleBuild: PhaseHandler = async (
 		}
 
 		if (inProgressInWave.length > 0) {
-			return buildPendingResultError(currentWave, inProgressInWave, buildProgress, updatedTasks);
+			const pendingResult = buildPendingResultError(
+				currentWave,
+				inProgressInWave,
+				buildProgress,
+				updatedTasks,
+			);
+			return Object.freeze({
+				...pendingResult,
+				_stateUpdates: {
+					...pendingResult._stateUpdates,
+					branchLifecycle: cloneBranchLifecycle(updatedBranchLifecycle),
+				},
+			} satisfies DispatchResult);
 		}
 	}
 
@@ -307,7 +319,14 @@ export const handleBuild: PhaseHandler = async (
 	const inProgressTasks = findInProgressTasks(waveMap, currentWave);
 
 	if (pendingTasks.length === 0 && inProgressTasks.length > 0) {
-		return buildPendingResultError(currentWave, inProgressTasks, buildProgress);
+		const pendingResult = buildPendingResultError(currentWave, inProgressTasks, buildProgress);
+		return Object.freeze({
+			...pendingResult,
+			_stateUpdates: {
+				...pendingResult._stateUpdates,
+				branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
+			},
+		} satisfies DispatchResult);
 	}
 
 	if (pendingTasks.length === 0) {

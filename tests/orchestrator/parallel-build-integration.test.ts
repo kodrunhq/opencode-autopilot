@@ -790,4 +790,81 @@ describe("parallel BUILD integration", () => {
 		};
 		expect(extractDispatchTaskIds(noTask)).toEqual([]);
 	});
+
+	test("buildMergeTransform preserves branchLifecycle.tasksPushed when handler adds no new pushes", () => {
+		const baseState = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 },
+				{ id: 2, title: "Task B", status: "IN_PROGRESS", wave: 1 },
+			],
+			{ currentWave: 1, currentTasks: [1, 2] },
+		);
+		const lifecycle = {
+			currentBranch: "feat/test",
+			baseBranch: "main",
+			tasksPushed: ["task-1-branch"],
+			prNumber: null,
+			prUrl: null,
+			worktreePath: null,
+			createdAt: null,
+			lastPushedAt: null,
+		};
+		const diskState: PipelineState = { ...baseState, branchLifecycle: lifecycle };
+
+		const failedTaskUpdates: Partial<PipelineState> = {
+			tasks: baseState.tasks.map((t) => (t.id === 2 ? { ...t, status: "FAILED" as const } : t)),
+			branchLifecycle: {
+				...lifecycle,
+				tasksPushed: [],
+			},
+		};
+
+		const { transform } = buildMergeTransform(failedTaskUpdates, baseState);
+		const merged = transform(diskState);
+
+		expect(merged.branchLifecycle?.tasksPushed).toContain("task-1-branch");
+		expect(merged.branchLifecycle?.tasksPushed).not.toContain("task-2-branch");
+	});
+
+	test("handleBuild pending path includes branchLifecycle in _stateUpdates", async () => {
+		const lifecycle = {
+			currentBranch: "feat/test",
+			baseBranch: "main",
+			tasksPushed: ["prior-push"],
+			prNumber: null,
+			prUrl: null,
+			worktreePath: null,
+			createdAt: null,
+			lastPushedAt: null,
+		};
+		const baseState = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "IN_PROGRESS", wave: 1 },
+				{ id: 2, title: "Task B", status: "IN_PROGRESS", wave: 1 },
+			],
+			{ currentTask: null, currentTasks: [1, 2], currentWave: 1 },
+		);
+		const state: PipelineState = { ...baseState, branchLifecycle: lifecycle };
+
+		const result = await handleBuild(state, tempDir, "task 1 done", {
+			envelope: {
+				schemaVersion: 1,
+				resultId: "r1",
+				runId: "run-1",
+				phase: "BUILD",
+				dispatchId: "d1",
+				agent: "oc-implementer",
+				kind: "task_completion",
+				taskId: 1,
+				payload: { text: "task 1 done" },
+			},
+		});
+
+		expect(result.action).toBe("error");
+		expect(result.code).toBe("E_BUILD_RESULT_PENDING");
+		expect(result._stateUpdates?.tasks?.find((t) => t.id === 1)?.status).toBe("DONE");
+		expect(result._stateUpdates?.branchLifecycle).toBeDefined();
+		expect(result._stateUpdates?.branchLifecycle?.tasksPushed).toContain("1");
+		expect(result._stateUpdates?.branchLifecycle?.tasksPushed).toContain("prior-push");
+	});
 });
