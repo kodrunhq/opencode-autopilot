@@ -17,8 +17,10 @@ interface MemoryStatusResult {
 		readonly totalObservations: number;
 		readonly totalProjects: number;
 		readonly totalPreferences: number;
+		readonly totalMemories: number;
 		readonly storageSizeKb: number;
 		readonly observationsByType: Record<string, number>;
+		readonly memoriesByKind: Record<string, number>;
 	} | null;
 	readonly recentObservations: readonly {
 		readonly type: string;

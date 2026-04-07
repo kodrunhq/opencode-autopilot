@@ -4,6 +4,9 @@
  * Creates a per-session cached injector that retrieves relevant memories
  * and pushes them into the system prompt via output.system.
  *
+ * V2 retrieval (memories table) is preferred when active memories exist.
+ * Falls back to V1 (observations/preferences) for backward compatibility.
+ *
  * Best-effort: all errors are silently caught to never break the session.
  * Same pattern as skill-injection.ts.
  *
@@ -12,13 +15,10 @@
 
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../logging/domains";
-import { retrieveMemoryContext } from "./retrieval";
+import { retrieveMemoryContext, retrieveMemoryContextV2 } from "./retrieval";
 
 const logger = getLogger("memory", "injector");
 
-/**
- * Configuration for creating a memory injector.
- */
 export interface MemoryInjectorConfig {
 	readonly projectRoot: string;
 	readonly tokenBudget: number;
@@ -26,37 +26,34 @@ export interface MemoryInjectorConfig {
 	readonly getDb: () => Database;
 }
 
-/**
- * Input shape matching the experimental.chat.system.transform hook signature.
- */
 interface InjectorInput {
 	readonly sessionID?: string;
 	readonly model: Record<string, unknown>;
 }
 
-/**
- * Output shape matching the experimental.chat.system.transform hook signature.
- * system is mutable — the hook API expects callers to push into it.
- */
 interface InjectorOutput {
 	system: string[];
 }
 
-/**
- * Create a memory injector function for the experimental.chat.system.transform hook.
- *
- * Returns an async function that:
- * 1. Skips if no sessionID is provided
- * 2. Returns cached context for known sessions
- * 3. Retrieves and caches memory context for new sessions
- * 4. Pushes non-empty context to output.system
- *
- * All errors are silently caught (best-effort, per D-24 and skill-injection pattern).
- */
+function hasMemoriesTable(db: Database): boolean {
+	try {
+		const row = db
+			.query("SELECT name FROM sqlite_master WHERE type='table' AND name='memories'")
+			.get() as { name: string } | null;
+		return row !== null;
+	} catch {
+		return false;
+	}
+}
+
 export function createMemoryInjector(config: MemoryInjectorConfig) {
 	const cache = new Map<string, string>();
 
-	return async (input: InjectorInput, output: InjectorOutput): Promise<void> => {
+	function invalidate(): void {
+		cache.clear();
+	}
+
+	const injector = async (input: InjectorInput, output: InjectorOutput): Promise<void> => {
 		try {
 			if (!input.sessionID) return;
 
@@ -69,12 +66,26 @@ export function createMemoryInjector(config: MemoryInjectorConfig) {
 			}
 
 			const db = config.getDb();
-			const context = retrieveMemoryContext(
-				config.projectRoot,
-				config.tokenBudget,
-				db,
-				config.halfLifeDays,
-			);
+			let context: string;
+
+			if (hasMemoriesTable(db)) {
+				context = retrieveMemoryContextV2(config.projectRoot, config.tokenBudget, db);
+				if (context.length === 0) {
+					context = retrieveMemoryContext(
+						config.projectRoot,
+						config.tokenBudget,
+						db,
+						config.halfLifeDays,
+					);
+				}
+			} else {
+				context = retrieveMemoryContext(
+					config.projectRoot,
+					config.tokenBudget,
+					db,
+					config.halfLifeDays,
+				);
+			}
 
 			cache.set(input.sessionID, context);
 
@@ -85,4 +96,28 @@ export function createMemoryInjector(config: MemoryInjectorConfig) {
 			logger.warn("memory injection failed", { error: String(err) });
 		}
 	};
+
+	injector.invalidateCache = invalidate;
+
+	return injector;
+}
+
+export function invalidateMemoryCache(injector: ReturnType<typeof createMemoryInjector>): void {
+	injector.invalidateCache();
+}
+
+let activeMemoryInjector: ReturnType<typeof createMemoryInjector> | null = null;
+
+export function setActiveMemoryInjector(injector: ReturnType<typeof createMemoryInjector>): void {
+	activeMemoryInjector = injector;
+}
+
+export function resetActiveMemoryInjector(): void {
+	activeMemoryInjector = null;
+}
+
+export function notifyMemoryChanged(): void {
+	if (activeMemoryInjector) {
+		activeMemoryInjector.invalidateCache();
+	}
 }

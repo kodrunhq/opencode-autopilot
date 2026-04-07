@@ -232,8 +232,10 @@ export interface InspectMemoryOverview {
 		readonly totalObservations: number;
 		readonly totalProjects: number;
 		readonly totalPreferences: number;
+		readonly totalMemories: number;
 		readonly storageSizeKb: number;
 		readonly observationsByType: Readonly<Record<string, number>>;
+		readonly memoriesByKind: Readonly<Record<string, number>>;
 	};
 	readonly recentObservations: readonly InspectObservationSummary[];
 	readonly preferences: readonly InspectPreferenceSummary[];
@@ -804,10 +806,12 @@ export function getMemoryOverview(input?: InspectDbInput): InspectMemoryOverview
 				totalObservations: 0,
 				totalProjects: 0,
 				totalPreferences: 0,
+				totalMemories: 0,
 				storageSizeKb: 0,
 				observationsByType: Object.freeze(
 					Object.fromEntries(OBSERVATION_TYPES.map((type) => [type, 0])),
 				),
+				memoriesByKind: Object.freeze({}),
 			}),
 			recentObservations: Object.freeze([]),
 			preferences: Object.freeze([]),
@@ -828,12 +832,32 @@ export function getMemoryOverview(input?: InspectDbInput): InspectMemoryOverview
 					.get() as CountRow
 			).cnt;
 
+			const totalMemories = tableExists(db, "memories")
+				? (
+						db
+							.query("SELECT COUNT(*) as cnt FROM memories WHERE status = 'active'")
+							.get() as CountRow
+					).cnt
+				: 0;
+
 			const typeCounts = Object.fromEntries(OBSERVATION_TYPES.map((type) => [type, 0]));
 			const typeRows = db
 				.query("SELECT type, COUNT(*) as cnt FROM observations GROUP BY type")
 				.all() as TypeCountRow[];
 			for (const row of typeRows) {
 				typeCounts[row.type] = row.cnt;
+			}
+
+			const memoriesByKind: Record<string, number> = {};
+			if (tableExists(db, "memories")) {
+				const kindRows = db
+					.query(
+						"SELECT kind AS type, COUNT(*) as cnt FROM memories WHERE status = 'active' GROUP BY kind",
+					)
+					.all() as TypeCountRow[];
+				for (const row of kindRows) {
+					memoriesByKind[row.type] = row.cnt;
+				}
 			}
 
 			const recentRows = db
@@ -862,8 +886,10 @@ export function getMemoryOverview(input?: InspectDbInput): InspectMemoryOverview
 					totalObservations,
 					totalProjects,
 					totalPreferences,
+					totalMemories,
 					storageSizeKb,
 					observationsByType: Object.freeze(typeCounts),
+					memoriesByKind: Object.freeze(memoriesByKind),
 				}),
 				recentObservations: Object.freeze(
 					recentRows.map((row) =>

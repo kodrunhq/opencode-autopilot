@@ -7,7 +7,23 @@ export {
 export * from "./constants";
 export { closeMemoryDb, getMemoryDb, initMemoryDb } from "./database";
 export { computeRelevanceScore, pruneStaleObservations } from "./decay";
-export { createMemoryInjector, type MemoryInjectorConfig } from "./injector";
+export { computeBigramOverlap, findDuplicateCandidate, normalizeContent } from "./dedup";
+export {
+	createMemoryInjector,
+	invalidateMemoryCache,
+	type MemoryInjectorConfig,
+	notifyMemoryChanged,
+	resetActiveMemoryInjector,
+	setActiveMemoryInjector,
+} from "./injector";
+export {
+	forgetMemory,
+	getActiveMemories,
+	getMemoryById,
+	migratePreferencesToMemories,
+	saveMemory,
+	searchMemories,
+} from "./memories";
 export { computeProjectKey } from "./project-key";
 export {
 	deleteObservation,
@@ -17,7 +33,6 @@ export {
 	getConfirmedPreferencesForProject,
 	getObservationsByProject,
 	getPreferenceRecordById,
-	getProjectByPath,
 	getRecentFailureObservations,
 	insertObservation,
 	listPreferenceEvidence,
@@ -33,7 +48,9 @@ export {
 } from "./repository";
 export {
 	buildMemoryContext,
+	buildMemoryContextV2,
 	retrieveMemoryContext,
+	retrieveMemoryContextV2,
 	type ScoredObservation,
 	scoreAndRankObservations,
 } from "./retrieval";

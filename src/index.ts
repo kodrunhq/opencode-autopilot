@@ -28,6 +28,8 @@ import {
 	createMemoryChatMessageHandler,
 	createMemoryInjector,
 	getMemoryDb,
+	migratePreferencesToMemories,
+	setActiveMemoryInjector,
 } from "./memory";
 import { ContextMonitor } from "./observability/context-monitor";
 import {
@@ -71,7 +73,10 @@ import { ocForensics } from "./tools/forensics";
 import { ocHashlineEdit } from "./tools/hashline-edit";
 import { ocLogs } from "./tools/logs";
 import { ocLoop } from "./tools/loop";
+import { ocMemoryForget } from "./tools/memory-forget";
 import { ocMemoryPreferences } from "./tools/memory-preferences";
+import { ocMemorySave } from "./tools/memory-save";
+import { ocMemorySearch } from "./tools/memory-search";
 import { ocMemoryStatus } from "./tools/memory-status";
 import { ocMockFallback } from "./tools/mock-fallback";
 import { ocOrchestrate } from "./tools/orchestrate";
@@ -362,6 +367,19 @@ const plugin: Plugin = async (input) => {
 				getDb: () => getMemoryDb(),
 			})
 		: null;
+
+	if (memoryInjector) {
+		setActiveMemoryInjector(memoryInjector);
+	}
+
+	if (memoryConfig.enabled) {
+		try {
+			migratePreferencesToMemories(getMemoryDb());
+		} catch {
+			/* best-effort: migration failures must not block plugin load */
+		}
+	}
+
 	const contextInjector = createContextInjector({
 		projectRoot: process.cwd(),
 		totalBudget: 4000,
@@ -489,6 +507,9 @@ const plugin: Plugin = async (input) => {
 		oc_update_docs: ocUpdateDocs,
 		oc_memory_status: ocMemoryStatus,
 		oc_memory_preferences: ocMemoryPreferences,
+		oc_memory_save: ocMemorySave,
+		oc_memory_search: ocMemorySearch,
+		oc_memory_forget: ocMemoryForget,
 	};
 
 	return {

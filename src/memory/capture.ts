@@ -4,7 +4,7 @@ import { getLogger } from "../logging/domains";
 import { resolveProjectIdentity } from "../projects/resolve";
 import * as captureUtils from "./capture-utils";
 import { pruneStaleObservations } from "./decay";
-import { insertObservation, upsertPreferenceRecord, upsertProject } from "./repository";
+import { insertObservation, upsertProject } from "./repository";
 import type { ObservationType } from "./types";
 
 const logger = getLogger("memory", "capture");
@@ -163,62 +163,14 @@ export function createMemoryCaptureHandler(deps: MemoryCaptureDeps) {
 	};
 }
 
-export function createMemoryChatMessageHandler(deps: MemoryCaptureDeps) {
+export function createMemoryChatMessageHandler(_deps: MemoryCaptureDeps) {
 	return async (
-		input: { readonly sessionID: string },
-		output: { readonly parts: unknown[] },
+		_input: { readonly sessionID: string },
+		_output: { readonly parts: unknown[] },
 	): Promise<void> => {
-		try {
-			const candidates = captureUtils.extractExplicitPreferenceCandidates(output.parts);
-			if (candidates.length === 0) {
-				return;
-			}
-
-			const resolvedProject = await resolveProjectIdentity(deps.projectRoot, {
-				db: deps.getDb(),
-			});
-			const projectName = basename(deps.projectRoot);
-			const timestamp = new Date().toISOString();
-
-			upsertProject(
-				{
-					id: resolvedProject.id,
-					path: deps.projectRoot,
-					name: projectName,
-					firstSeenAt: resolvedProject.firstSeenAt,
-					lastUpdated: timestamp,
-				},
-				deps.getDb(),
-			);
-
-			for (const candidate of candidates) {
-				upsertPreferenceRecord(
-					{
-						key: candidate.key,
-						value: candidate.value,
-						scope: candidate.scope,
-						projectId: candidate.scope === "project" ? resolvedProject.id : null,
-						status: "confirmed",
-						confidence: candidate.confidence,
-						sourceSession: input.sessionID,
-						createdAt: timestamp,
-						lastUpdated: timestamp,
-						evidence: [
-							{
-								sessionId: input.sessionID,
-								statement: candidate.statement,
-								confidence: candidate.confidence,
-								confirmed: true,
-								createdAt: timestamp,
-							},
-						],
-					},
-					deps.getDb(),
-				);
-			}
-		} catch (err) {
-			logger.warn("explicit preference capture failed", { error: String(err) });
-		}
+		// V2: Chat-level preference extraction is handled by oc_memory_save tool.
+		// The regex-based extraction that lived here produced low-quality results.
+		// This handler is kept as a no-op for backward compatibility with the hook registration.
 	};
 }
 

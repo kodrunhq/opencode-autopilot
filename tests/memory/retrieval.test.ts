@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { runKernelMigrations } from "../../src/kernel/migrations";
 import { CHARS_PER_TOKEN } from "../../src/memory/constants";
 import { initMemoryDb } from "../../src/memory/database";
+import { saveMemory } from "../../src/memory/memories";
 import {
 	insertObservation,
 	upsertPreferenceRecord,
@@ -10,7 +11,9 @@ import {
 } from "../../src/memory/repository";
 import {
 	buildMemoryContext,
+	buildMemoryContextV2,
 	retrieveMemoryContext,
+	retrieveMemoryContextV2,
 	type ScoredObservation,
 	scoreAndRankObservations,
 } from "../../src/memory/retrieval";
@@ -337,3 +340,196 @@ describe("retrieveMemoryContext access-count integration", () => {
 		expect(row.access_count).toBeGreaterThanOrEqual(1);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// V2 retrieval tests
+// ---------------------------------------------------------------------------
+
+describe("buildMemoryContextV2", () => {
+	it("returns memory instructions block when no memories exist", () => {
+		const result = buildMemoryContextV2({
+			projectName: "my-project",
+			lastSessionDate: null,
+			projectMemories: [],
+			userMemories: [],
+		});
+		expect(result).toContain("Memory Instructions");
+		expect(result).toContain("oc_memory_save");
+	});
+
+	it("renders project header with name and session date", () => {
+		const mem = makeFakeMemory({ kind: "preference", summary: "Use tabs" });
+		const result = buildMemoryContextV2({
+			projectName: "my-app",
+			lastSessionDate: "2026-03-01",
+			projectMemories: [mem],
+			userMemories: [],
+		});
+		expect(result).toContain("my-app");
+		expect(result).toContain("2026-03-01");
+	});
+
+	it("groups memories by kind with correct section headers", () => {
+		const pref = makeFakeMemory({ kind: "preference", summary: "Always use Biome" });
+		const mistake = makeFakeMemory({ kind: "mistake", summary: "Never use var" });
+		const result = buildMemoryContextV2({
+			projectName: "proj",
+			lastSessionDate: null,
+			projectMemories: [pref, mistake],
+			userMemories: [],
+		});
+		expect(result).toContain("### Preferences");
+		expect(result).toContain("### Mistakes to Avoid");
+		expect(result).toContain("Always use Biome");
+		expect(result).toContain("Never use var");
+	});
+
+	it("marks user-scoped memories with _(user-wide)_", () => {
+		const userMem = makeFakeMemory({ kind: "preference", summary: "Dark mode", scope: "user" });
+		const result = buildMemoryContextV2({
+			projectName: "proj",
+			lastSessionDate: null,
+			projectMemories: [],
+			userMemories: [userMem],
+		});
+		expect(result).toContain("_(user-wide)_");
+	});
+
+	it("respects token budget and truncates", () => {
+		const mems = Array.from({ length: 100 }, (_, i) =>
+			makeFakeMemory({ kind: "preference", summary: `Preference ${i} ${"x".repeat(80)}` }),
+		);
+		const result = buildMemoryContextV2({
+			projectName: "proj",
+			lastSessionDate: null,
+			projectMemories: mems,
+			userMemories: [],
+			tokenBudget: 200,
+		});
+		expect(result.length).toBeLessThanOrEqual(200 * CHARS_PER_TOKEN);
+	});
+
+	it("displays mistakes before preferences (weight ordering)", () => {
+		const pref = makeFakeMemory({ kind: "preference", summary: "Use Biome" });
+		const mistake = makeFakeMemory({ kind: "mistake", summary: "Avoid console.log" });
+		const result = buildMemoryContextV2({
+			projectName: "proj",
+			lastSessionDate: null,
+			projectMemories: [pref, mistake],
+			userMemories: [],
+		});
+		const mistakeIdx = result.indexOf("Mistakes to Avoid");
+		const prefIdx = result.indexOf("Preferences");
+		expect(mistakeIdx).toBeLessThan(prefIdx);
+	});
+});
+
+describe("retrieveMemoryContextV2", () => {
+	let db: Database;
+
+	afterEach(() => {
+		try {
+			db.close();
+		} catch {
+			// already closed
+		}
+	});
+
+	it("returns memory instructions even with no project or memories", () => {
+		db = new Database(":memory:");
+		initMemoryDb(db);
+		runKernelMigrations(db);
+
+		const result = retrieveMemoryContextV2("/tmp/nonexistent-project", 2000, db);
+		expect(result).toContain("Memory Instructions");
+	});
+
+	it("retrieves memories for an existing project", () => {
+		db = new Database(":memory:");
+		initMemoryDb(db);
+		runKernelMigrations(db);
+
+		const projectPath = "/tmp/test-v2-retrieval";
+		const projectId = "proj-v2-test";
+		const now = new Date().toISOString();
+
+		upsertProject({ id: projectId, path: projectPath, name: "v2-test", lastUpdated: now }, db);
+
+		saveMemory(
+			{
+				kind: "decision",
+				content: "Use PostgreSQL for the main database",
+				summary: "PostgreSQL as main DB",
+				projectId,
+				scope: "project",
+			},
+			db,
+		);
+
+		const result = retrieveMemoryContextV2(projectPath, 2000, db);
+		expect(result).toContain("PostgreSQL as main DB");
+		expect(result).toContain("### Decisions");
+	});
+
+	it("bumps access_count for retrieved memories", () => {
+		db = new Database(":memory:");
+		initMemoryDb(db);
+		runKernelMigrations(db);
+
+		const projectPath = "/tmp/test-v2-access";
+		const projectId = "proj-v2-access";
+		const now = new Date().toISOString();
+
+		upsertProject({ id: projectId, path: projectPath, name: "v2-access", lastUpdated: now }, db);
+
+		saveMemory(
+			{
+				kind: "preference",
+				content: "Always use strict TypeScript",
+				summary: "Strict TS mode",
+				projectId,
+				scope: "project",
+			},
+			db,
+		);
+
+		retrieveMemoryContextV2(projectPath, 2000, db);
+
+		const row = db
+			.query("SELECT access_count FROM memories WHERE project_id = ?")
+			.get(projectId) as { access_count: number };
+		expect(row.access_count).toBeGreaterThanOrEqual(1);
+	});
+});
+
+function makeFakeMemory(
+	overrides: Partial<{
+		kind: "preference" | "decision" | "project_fact" | "mistake" | "workflow_rule";
+		summary: string;
+		scope: "project" | "user";
+		content: string;
+	}> = {},
+) {
+	const kind = overrides.kind ?? "preference";
+	const scope = overrides.scope ?? "project";
+	return {
+		id: Math.floor(Math.random() * 100000),
+		textId: `mem-${Math.random().toString(36).slice(2)}`,
+		projectId: null,
+		kind,
+		scope,
+		content: overrides.content ?? `Content for ${overrides.summary ?? "test memory"}`,
+		summary: overrides.summary ?? "Test memory",
+		reasoning: null,
+		confidence: 0.8,
+		evidenceCount: 1,
+		tags: [] as string[],
+		sourceSession: null,
+		status: "active" as const,
+		supersedesMemoryId: null,
+		accessCount: 0,
+		createdAt: new Date().toISOString(),
+		lastUpdated: new Date().toISOString(),
+		lastAccessed: new Date().toISOString(),
+	};
+}

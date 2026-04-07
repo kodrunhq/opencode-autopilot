@@ -97,13 +97,16 @@ describe("plugin entry point", () => {
 			"oc_mock_fallback",
 			"oc_stocktake",
 			"oc_update_docs",
+			"oc_memory_forget",
+			"oc_memory_save",
+			"oc_memory_search",
 			"oc_memory_status",
 			"oc_memory_preferences",
 			"oc_hashline_edit",
 			"oc_summary",
 		];
 		expect(toolNames).toEqual([...expected].sort());
-		expect(toolNames).toHaveLength(34);
+		expect(toolNames).toHaveLength(37);
 	});
 
 	test("every registered tool has a valid execute function", async () => {
