@@ -1,8 +1,43 @@
 import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
-import type { BuildProgress, Task } from "../types";
+import type { BranchLifecycle, BuildProgress, Task } from "../types";
 import type { DispatchResult } from "./types";
 import { AGENT_NAMES } from "./types";
+
+export const cloneBranchLifecycle = (bl: BranchLifecycle) => ({
+	...bl,
+	tasksPushed: [...bl.tasksPushed],
+});
+
+export function buildPendingResultWithLifecycle(
+	wave: number,
+	inProgressTasks: readonly Task[],
+	buildProgress: Readonly<BuildProgress>,
+	lifecycle: BranchLifecycle,
+	updatedTasks?: readonly Task[],
+): DispatchResult {
+	const pendingResult = buildPendingResultError(wave, inProgressTasks, buildProgress, updatedTasks);
+	return Object.freeze({
+		...pendingResult,
+		_stateUpdates: {
+			...pendingResult._stateUpdates,
+			branchLifecycle: cloneBranchLifecycle(lifecycle),
+		},
+	} satisfies DispatchResult);
+}
+
+export function mergeDispatchWithLifecycle(
+	dispatchResult: DispatchResult,
+	lifecycle: BranchLifecycle,
+): DispatchResult {
+	return Object.freeze({
+		...dispatchResult,
+		_stateUpdates: {
+			...dispatchResult._stateUpdates,
+			branchLifecycle: cloneBranchLifecycle(lifecycle),
+		},
+	} satisfies DispatchResult);
+}
 
 const MAX_STRIKES = 3;
 

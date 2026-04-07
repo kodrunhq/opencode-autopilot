@@ -2,12 +2,13 @@ import { loadConfig } from "../../config";
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getArtifactRef } from "../artifacts";
 import { groupByWave } from "../plan";
-import type { BranchLifecycle } from "../types";
 import { assignWaves } from "../wave-assigner";
 import { initBranchLifecycle, recordTaskPush } from "./branch-pr";
 import {
 	buildParallelDispatch,
 	buildPendingResultError,
+	buildPendingResultWithLifecycle,
+	cloneBranchLifecycle,
 	DEFAULT_MAX_PARALLEL_TASKS,
 	findCurrentWave,
 	findInProgressTasks,
@@ -18,6 +19,7 @@ import {
 	MAX_STRIKES,
 	markTaskDone,
 	markTaskFailed,
+	mergeDispatchWithLifecycle,
 } from "./build-utils";
 import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
@@ -35,7 +37,6 @@ function coerceTaskId(raw: unknown): number | null {
 	return null;
 }
 
-const cloneBranchLifecycle = (bl: BranchLifecycle) => ({ ...bl, tasksPushed: [...bl.tasksPushed] });
 export const handleBuild: PhaseHandler = async (
 	state,
 	artifactDir,
@@ -275,29 +276,17 @@ export const handleBuild: PhaseHandler = async (
 				maxParallel,
 				inProgressInWave.length,
 			);
-			return Object.freeze({
-				...dispatchResult,
-				_stateUpdates: {
-					...dispatchResult._stateUpdates,
-					branchLifecycle: cloneBranchLifecycle(updatedBranchLifecycle),
-				},
-			} satisfies DispatchResult);
+			return mergeDispatchWithLifecycle(dispatchResult, updatedBranchLifecycle);
 		}
 
 		if (inProgressInWave.length > 0) {
-			const pendingResult = buildPendingResultError(
+			return buildPendingResultWithLifecycle(
 				currentWave,
 				inProgressInWave,
 				buildProgress,
+				updatedBranchLifecycle,
 				updatedTasks,
 			);
-			return Object.freeze({
-				...pendingResult,
-				_stateUpdates: {
-					...pendingResult._stateUpdates,
-					branchLifecycle: cloneBranchLifecycle(updatedBranchLifecycle),
-				},
-			} satisfies DispatchResult);
 		}
 	}
 
@@ -319,14 +308,12 @@ export const handleBuild: PhaseHandler = async (
 	const inProgressTasks = findInProgressTasks(waveMap, currentWave);
 
 	if (pendingTasks.length === 0 && inProgressTasks.length > 0) {
-		const pendingResult = buildPendingResultError(currentWave, inProgressTasks, buildProgress);
-		return Object.freeze({
-			...pendingResult,
-			_stateUpdates: {
-				...pendingResult._stateUpdates,
-				branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
-			},
-		} satisfies DispatchResult);
+		return buildPendingResultWithLifecycle(
+			currentWave,
+			inProgressTasks,
+			buildProgress,
+			initialBranchLifecycle,
+		);
 	}
 
 	if (pendingTasks.length === 0) {
