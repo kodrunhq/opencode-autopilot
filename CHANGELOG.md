@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.26.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.25.0...opencode-autopilot-v1.26.0) (2026-04-07)
+
+
+### Features
+
+* **memory:** redesign memory system with tool-based capture and structured storage ([ef47620](https://github.com/kodrunhq/opencode-autopilot/commit/ef47620ee2325b3f300cca70cb643ab20ba6dcc9))
+
+
+### Bug Fixes
+
+* **memory:** address Copilot PR review feedback ([3bb1ca0](https://github.com/kodrunhq/opencode-autopilot/commit/3bb1ca09fd515c03d77e168e48ba347734b2ef16))
+
 ## [1.25.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.24.0...opencode-autopilot-v1.25.0) (2026-04-07)
 
 
