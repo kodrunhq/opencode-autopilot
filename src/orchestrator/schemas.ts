@@ -52,7 +52,7 @@ export const taskSchema = z.object({
 	strike: z.number().default(0),
 });
 
-export const buildProgressSchema = z.object({
+const baseBuildProgressSchema = z.object({
 	currentTask: z.number().nullable().default(null),
 	currentTasks: z.array(z.number()).default([]),
 	currentWave: z.number().nullable().default(null),
@@ -61,6 +61,20 @@ export const buildProgressSchema = z.object({
 	reviewPending: z.boolean().default(false),
 	oraclePending: z.boolean().default(false),
 });
+
+// Transform to make oraclePending optional in the inferred type
+const transformedBuildProgressSchema = baseBuildProgressSchema.transform((data) => ({
+	...data,
+	oraclePending: data.oraclePending,
+}));
+
+// Full schema with defaults for pipeline state
+export const buildProgressSchema = baseBuildProgressSchema;
+
+// Type that makes oraclePending optional for backward compatibility
+export type BuildProgress = z.infer<typeof transformedBuildProgressSchema> & {
+	oraclePending?: boolean;
+};
 
 export const dispatchResultKindSchema = z.enum([
 	"phase_output",
@@ -119,7 +133,7 @@ export const pipelineStateSchema = z.object({
 	tasks: z.array(taskSchema).default([]),
 	arenaConfidence: z.enum(["HIGH", "MEDIUM", "LOW"]).nullable().default(null),
 	exploreTriggered: z.boolean().default(false),
-	buildProgress: buildProgressSchema.default({
+	buildProgress: baseBuildProgressSchema.default({
 		currentTask: null,
 		currentTasks: [],
 		currentWave: null,

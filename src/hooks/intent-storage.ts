@@ -4,6 +4,7 @@
  */
 
 import { getLogger } from "../logging/domains";
+import { IntentTypeSchema } from "../routing/intent-types";
 import { storeIntentClassification } from "../routing/intent-gate";
 
 const logger = getLogger("hooks", "intent-storage");
@@ -39,6 +40,17 @@ export function createIntentStorageHandler() {
 			const result = JSON.parse(output.output);
 			if (result.action === "route" && result.primaryIntent) {
 				const intent = result.primaryIntent;
+
+				// Validate intent against known schema to prevent invalid values
+				const validation = IntentTypeSchema.safeParse(intent);
+				if (!validation.success) {
+					logger.warn("Skipping intent storage - invalid intent type", {
+						sessionID: hookInput.sessionID,
+						invalidIntent: intent,
+					});
+					return;
+				}
+
 				storeIntentClassification(hookInput.sessionID, intent);
 				logger.debug("Intent classification stored", {
 					sessionID: hookInput.sessionID,

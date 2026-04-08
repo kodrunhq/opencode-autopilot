@@ -99,9 +99,7 @@ import { getGlobalConfigDir } from "./utils/paths";
 import {
 	clearIntentSession,
 	enforceIntentGate,
-	intentTracker,
 	resetIntentForUserMessage,
-	storeIntentClassification,
 } from "./routing/intent-gate";
 import { ContextWarningMonitor } from "./ux/context-warnings";
 import { getRemediationHint } from "./ux/error-hints";
@@ -605,8 +603,31 @@ const plugin: Plugin = async (input) => {
 			if (event.type === "session.deleted") {
 				mcpManager.stopAll().catch(() => {});
 				// Clean up intent tracking for this session
-				const props = (event.properties ?? {}) as Record<string, unknown>;
-				const sessionID = typeof props.sessionID === "string" ? props.sessionID : undefined;
+				// Extract session ID from multiple possible locations
+				const props = event.properties as Record<string, unknown> | undefined;
+				let sessionID: string | undefined;
+
+				if (props) {
+					// Direct properties
+					if (typeof props.sessionID === "string") {
+						sessionID = props.sessionID;
+					} else if (typeof props.sessionId === "string") {
+						sessionID = props.sessionId;
+					} else {
+						// Check nested info object
+						const info = props.info as Record<string, unknown> | undefined;
+						if (info) {
+							if (typeof info.id === "string") {
+								sessionID = info.id;
+							} else if (typeof info.sessionID === "string") {
+								sessionID = info.sessionID;
+							} else if (typeof info.sessionId === "string") {
+								sessionID = info.sessionId;
+							}
+						}
+					}
+				}
+
 				if (sessionID) {
 					clearIntentSession(sessionID);
 				}

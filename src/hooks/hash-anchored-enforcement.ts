@@ -23,11 +23,29 @@ export function createHashAnchoredEnforcementHandler() {
 			return output;
 		}
 
-		const editArgs = hookInput.args as EditToolArgs;
-		const filePath = editArgs.filePath;
-		const oldString = editArgs.oldString;
-		const newString = editArgs.newString;
-		const replaceAll = editArgs.replaceAll ?? false;
+		// Validate args shape before accessing properties
+		const args = hookInput.args;
+		if (!args || typeof args !== "object") {
+			throw new Error(
+				"Hash-anchored edit enforcement: Cannot enforce - args is not an object. " +
+					"Use oc_hashline_edit for concurrent-safe file modifications.",
+			);
+		}
+
+		const editArgs = args as Record<string, unknown>;
+
+		// Check required fields exist and are strings
+		const filePath = typeof editArgs.filePath === "string" ? editArgs.filePath : null;
+		const oldString = typeof editArgs.oldString === "string" ? editArgs.oldString : null;
+		const newString = typeof editArgs.newString === "string" ? editArgs.newString : null;
+		const replaceAll = typeof editArgs.replaceAll === "boolean" ? editArgs.replaceAll : false;
+
+		if (!filePath || !oldString || !newString) {
+			throw new Error(
+				"Hash-anchored edit enforcement: Cannot enforce - missing required fields (filePath, oldString, newString). " +
+					"Use oc_hashline_edit for concurrent-safe file modifications.",
+			);
+		}
 
 		logger.warn("Blocked built-in edit tool, enforcing hash-anchored edits", {
 			sessionID: hookInput.sessionID,
