@@ -1,4 +1,5 @@
 import { getLogger } from "../logging/domains";
+import { loadConfig } from "../config";
 
 const logger = getLogger("hooks", "hashline-read-enhancer");
 
@@ -11,6 +12,10 @@ interface ReadToolArgs {
 }
 
 export function createHashlineReadEnhancerHandler() {
+	// Cache config at handler creation time
+	let cachedConfig: Awaited<ReturnType<typeof loadConfig>> | null = null;
+	let configLoadAttempted = false;
+
 	return (
 		hookInput: {
 			readonly tool: string;
@@ -27,12 +32,38 @@ export function createHashlineReadEnhancerHandler() {
 
 		const readArgs = hookInput.args as ReadToolArgs;
 		const originalContent = output.content;
-
-		// Check if agent is in enforcement list
 		const agentName = hookInput.agentName;
 
-		// For now, enhance all read outputs when hashline_edit is enabled
-		// We'll implement config checking later when we integrate with config
+		// Load config once (cached)
+		if (!configLoadAttempted) {
+			configLoadAttempted = true;
+			loadConfig()
+				.then((config) => {
+					cachedConfig = config;
+				})
+				.catch((error) => {
+					logger.warn("Failed to load config for hashline read enhancement", {
+						sessionID: hookInput.sessionID,
+						error: error instanceof Error ? error.message : String(error),
+					});
+				});
+		}
+
+		// If config hasn't loaded yet or failed, skip enhancement
+		if (!cachedConfig) {
+			return output;
+		}
+
+		// Check if hashline_edit is enabled
+		if (!cachedConfig?.hashline_edit?.enabled) {
+			return output;
+		}
+
+		// Check if agent should be enforced
+		const enforceForAgents = cachedConfig.hashline_edit.enforce_for_agents || [];
+		if (enforceForAgents.length > 0 && agentName && !enforceForAgents.includes(agentName)) {
+			return output;
+		}
 
 		// Parse the content lines (format: "1: line1\n2: line2\n...")
 		const lines = originalContent.split("\n");
