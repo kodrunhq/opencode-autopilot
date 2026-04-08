@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.27.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.0...opencode-autopilot-v1.27.1) (2026-04-08)
+
+
+### Bug Fixes
+
+* address code review issues from PR [#92](https://github.com/kodrunhq/opencode-autopilot/issues/92) ([669f73b](https://github.com/kodrunhq/opencode-autopilot/commit/669f73b531dbad103037a016bb7930bec34a8cfe))
+* complete schema fixes for backward compatibility with test fixtures ([76e553b](https://github.com/kodrunhq/opencode-autopilot/commit/76e553ba5885674b7c6a85beb12c7296aed8dbcc))
+* exclude tests from TypeScript compilation to resolve CI failures ([56679e8](https://github.com/kodrunhq/opencode-autopilot/commit/56679e899eadb78b27d6483a10110f4ed664c27f))
+* Implement config checking in hashline-read-enhancer ([8615ae6](https://github.com/kodrunhq/opencode-autopilot/commit/8615ae67dcb9cc377359ec288d80772fc15c9a09))
+* increase LOC limit for build.ts to 500 (actual is 489) ([ab0b48b](https://github.com/kodrunhq/opencode-autopilot/commit/ab0b48b2bf654e9aae4817a3bdde181b03ed119e))
+* resolve lint failures from code review fixes ([a95559e](https://github.com/kodrunhq/opencode-autopilot/commit/a95559e57bd90325f75a4ca1c081974aafcd797d))
+
 ## [1.27.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.26.1...opencode-autopilot-v1.27.0) (2026-04-07)
 
 
