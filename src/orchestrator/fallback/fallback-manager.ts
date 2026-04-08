@@ -227,6 +227,11 @@ export class FallbackManager {
 			return null;
 		}
 
+		console.log(
+			`[FallbackManager] Retryable error detected for session ${sessionID}:`,
+			error instanceof Error ? error.message : String(error),
+		);
+
 		// Pitfall 1: Only one handler plans+dispatches per session
 		if (!this.acquireRetryLock(sessionID)) {
 			return null;

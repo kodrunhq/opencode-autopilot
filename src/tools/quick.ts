@@ -59,8 +59,9 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 		currentPhase: "PLAN",
 		startedAt: now,
 		lastUpdatedAt: now,
-		phases: PHASES.map((name) => ({
+		phases: PHASES.map((name, i) => ({
 			name,
+			phaseNumber: i + 1,
 			status: QUICK_SKIP_PHASES.has(name) ? "SKIPPED" : name === "PLAN" ? "IN_PROGRESS" : "PENDING",
 			...(QUICK_SKIP_PHASES.has(name) ? { completedAt: now } : {}),
 		})),
