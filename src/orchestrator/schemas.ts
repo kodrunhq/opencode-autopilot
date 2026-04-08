@@ -62,19 +62,11 @@ const baseBuildProgressSchema = z.object({
 	oraclePending: z.boolean().default(false),
 });
 
-// Transform to make oraclePending optional in the inferred type
-const transformedBuildProgressSchema = baseBuildProgressSchema.transform((data) => ({
-	...data,
-	oraclePending: data.oraclePending,
-}));
-
 // Full schema with defaults for pipeline state
 export const buildProgressSchema = baseBuildProgressSchema;
 
-// Type that makes oraclePending optional for backward compatibility
-export type BuildProgress = z.infer<typeof transformedBuildProgressSchema> & {
-	oraclePending?: boolean;
-};
+// BuildProgress type from schema output (includes defaults from transform)
+export type BuildProgress = z.output<typeof baseBuildProgressSchema>;
 
 export const dispatchResultKindSchema = z.enum([
 	"phase_output",
