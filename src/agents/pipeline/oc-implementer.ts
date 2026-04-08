@@ -106,5 +106,6 @@ Prefer oc_hashline_edit over the built-in edit tool. Hash-anchored edits use LIN
 	permission: {
 		edit: "allow",
 		bash: "allow",
+		todowrite: "allow",
 	} as const,
 });

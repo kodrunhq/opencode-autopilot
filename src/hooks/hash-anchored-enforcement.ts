@@ -43,16 +43,17 @@ export function createHashAnchoredEnforcementHandler() {
 				`To convert your edit:\n` +
 				`1. Read the file to get current line hashes\n` +
 				`2. Identify the line number(s) you want to edit\n` +
-				`3. Use oc_hashline_edit with edits: [{line: N, hash: "XY", newContent: "..."}]\n\n` +
+				`3. Use oc_hashline_edit with edits: [{op: "replace", pos: "LINE#HASH", lines: "new content"}]\n\n` +
 				`Example:\n` +
 				`oc_hashline_edit({\n` +
-				`  filePath: "${filePath}",\n` +
+				`  file: "${filePath}",\n` +
 				`  edits: [\n` +
-				`    {line: 42, hash: "VK", newContent: "your new content"}\n` +
+				`    {op: "replace", pos: "42#VK", lines: "your new content"}\n` +
 				`  ]\n` +
 				`})\n\n` +
 				`For bulk replacements, use multiple edit entries. ` +
-				`The hash ensures you're editing the exact line content you expect.`,
+				`The hash ensures you're editing the exact line content you expect.\n\n` +
+				`Note: oc_hashline_edit requires 'file' parameter (not 'filePath') and 'pos: "LINE#HASH"' format.`,
 		);
 	};
 }

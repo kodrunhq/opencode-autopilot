@@ -59,12 +59,14 @@ export const buildProgressSchema = z.object({
 	attemptCount: z.number().default(0),
 	strikeCount: z.number().default(0),
 	reviewPending: z.boolean().default(false),
+	oraclePending: z.boolean().default(false),
 });
 
 export const dispatchResultKindSchema = z.enum([
 	"phase_output",
 	"task_completion",
 	"review_findings",
+	"oracle_consultation",
 ]);
 
 export const pendingDispatchSchema = z.object({
@@ -124,6 +126,7 @@ export const pipelineStateSchema = z.object({
 		attemptCount: 0,
 		strikeCount: 0,
 		reviewPending: false,
+		oraclePending: false,
 	}),
 	pendingDispatches: z.array(pendingDispatchSchema).max(2000).default([]),
 	processedResultIds: z.array(z.string().max(128)).max(10_000).default([]),

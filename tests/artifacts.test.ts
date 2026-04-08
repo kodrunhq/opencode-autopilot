@@ -205,6 +205,7 @@ describe("buildProgressSchema", () => {
 			attemptCount: 0,
 			strikeCount: 0,
 			reviewPending: false,
+			oraclePending: false,
 		});
 	});
 
@@ -276,6 +277,7 @@ describe("pipelineStateSchema with buildProgress", () => {
 			attemptCount: 0,
 			strikeCount: 0,
 			reviewPending: false,
+			oraclePending: false,
 		});
 	});
 });

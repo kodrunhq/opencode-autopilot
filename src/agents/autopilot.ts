@@ -144,5 +144,6 @@ Return agent results to oc_orchestrate using this JSON envelope:
 		edit: "allow",
 		bash: "allow",
 		webfetch: "allow",
+		todowrite: "allow",
 	} as const,
 });

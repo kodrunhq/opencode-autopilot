@@ -6,6 +6,7 @@ import { autopilotAgent } from "./autopilot";
 import { coderAgent } from "./coder";
 import { debuggerAgent } from "./debugger";
 import { metaprompterAgent } from "./metaprompter";
+import { oracleAgent } from "./oracle";
 import { pipelineAgents } from "./pipeline/index";
 import { plannerAgent } from "./planner";
 import { prReviewerAgent } from "./pr-reviewer";
@@ -23,6 +24,7 @@ export const agents = {
 	coder: coderAgent,
 	debugger: debuggerAgent,
 	metaprompter: metaprompterAgent,
+	oracle: oracleAgent,
 	planner: plannerAgent,
 	"pr-reviewer": prReviewerAgent,
 	researcher: researcherAgent,
@@ -151,6 +153,7 @@ export { autopilotAgent } from "./autopilot";
 export { coderAgent } from "./coder";
 export { debuggerAgent } from "./debugger";
 export { metaprompterAgent } from "./metaprompter";
+export { oracleAgent } from "./oracle";
 export { plannerAgent } from "./planner";
 export { prReviewerAgent } from "./pr-reviewer";
 export { researcherAgent } from "./researcher";

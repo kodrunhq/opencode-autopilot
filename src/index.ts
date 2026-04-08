@@ -7,6 +7,7 @@ import { createCompactionHandler, createContextInjector } from "./context";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { createHashAnchoredEnforcementHandler } from "./hooks/hash-anchored-enforcement";
+import { createHashlineReadEnhancerHandler } from "./hooks/hashline-read-enhancer";
 import { createIntentStorageHandler } from "./hooks/intent-storage";
 import { createKeywordDetectorHandler } from "./hooks/keyword-detector";
 import { createPreemptiveCompactionHandler } from "./hooks/preemptive-compaction";
@@ -350,6 +351,7 @@ const plugin: Plugin = async (input) => {
 	// --- Anti-slop hook initialization ---
 	const antiSlopHandler = createAntiSlopHandler({ showToast: sdkOps.showToast });
 	const hashAnchoredEnforcementHandler = createHashAnchoredEnforcementHandler();
+	const hashlineReadEnhancerHandler = createHashlineReadEnhancerHandler();
 	const intentStorageHandler = createIntentStorageHandler();
 	const keywordDetectorHandler = createKeywordDetectorHandler({ showToast: sdkOps.showToast });
 	const preemptiveCompactionHandler = createPreemptiveCompactionHandler({
@@ -672,6 +674,16 @@ const plugin: Plugin = async (input) => {
 				// best-effort
 			}
 
+			// Hashline read enhancement (best-effort, non-blocking)
+			try {
+				const enhancedResult = hashlineReadEnhancerHandler(hookInput, { content: output.output });
+				if (enhancedResult.content !== output.output) {
+					output.output = enhancedResult.content;
+				}
+			} catch {
+				// best-effort
+			}
+
 			// Fallback handling
 			if (fallbackConfig.enabled) {
 				await toolExecuteAfterHandler(hookInput, output);
@@ -730,4 +742,3 @@ const plugin: Plugin = async (input) => {
 export default plugin;
 
 // Export TUI plugin for sidebar integration
-export { todoSidebarTuiPlugin } from "./ux/todo-sidebar";
