@@ -97,6 +97,13 @@ export const memoryConfigSchema = z.object({
 
 export const memoryDefaults = memoryConfigSchema.parse({});
 
+export const hashlineEditConfigSchema = z.object({
+	enabled: z.boolean().default(true),
+	enforce_for_agents: z.array(z.string()).default(["oc-implementer", "autopilot"]),
+});
+
+export const hashlineEditDefaults = hashlineEditConfigSchema.parse({});
+
 export const notificationsConfigSchema = z.object({
 	desktop: z.boolean().default(true),
 	rateLimit: z.number().int().min(0).finite().default(5000),
@@ -218,6 +225,7 @@ const pluginConfigSchemaV7 = z
 		routing: routingConfigSchema.default(routingDefaults),
 		recovery: recoveryConfigSchema.default(recoveryDefaults),
 		mcp: mcpConfigSchema.default(mcpDefaults),
+		hashline_edit: hashlineEditConfigSchema.default(hashlineEditDefaults),
 	})
 	.superRefine((config, ctx) => {
 		for (const groupId of Object.keys(config.groups)) {
@@ -338,12 +346,13 @@ export const v7ConfigDefaults = {
 	background: backgroundDefaults,
 	autonomy: {
 		enabled: false,
-		verification: "normal" as const,
+		verification: "normal",
 		maxIterations: 10,
 	},
 	routing: routingDefaults,
 	recovery: recoveryDefaults,
 	mcp: mcpDefaults,
+	hashline_edit: hashlineEditDefaults,
 } as const;
 
 export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
@@ -366,6 +375,7 @@ export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
 		routing: routingDefaults,
 		recovery: recoveryDefaults,
 		mcp: mcpDefaults,
+		hashline_edit: hashlineEditDefaults,
 	};
 }
 
@@ -475,5 +485,6 @@ export function createDefaultConfig(): PluginConfig {
 		routing: routingDefaults,
 		recovery: recoveryDefaults,
 		mcp: mcpDefaults,
+		hashline_edit: hashlineEditDefaults,
 	};
 }

@@ -181,6 +181,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: false,
+				oraclePending: false,
 			},
 			phases: state.phases.map((p) =>
 				["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN"].includes(p.name)
@@ -224,6 +225,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: true,
+				oraclePending: false,
 			},
 			phases: state.phases.map((p) =>
 				["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN"].includes(p.name)
@@ -379,6 +381,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: false,
+				oraclePending: false,
 			},
 			phases: state.phases.map((p) =>
 				["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN"].includes(p.name)
@@ -421,6 +424,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: false,
+				oraclePending: false,
 			},
 			pendingDispatches: [
 				{
@@ -632,8 +636,8 @@ describe("configHook pipeline agents", () => {
 		expect((agents.build as Record<string, unknown>).mode).toBe("subagent");
 		expect((agents.build as Record<string, unknown>).hidden).toBe(true);
 
-		// Total: 9 standard + 8 pipeline + 2 suppressed native = 19
-		expect(Object.keys(agents).length).toBe(19);
+		// Total: 10 standard + 8 pipeline + 2 suppressed native = 20
+		expect(Object.keys(agents).length).toBe(20);
 	});
 
 	test("pipeline agents have mode subagent", async () => {

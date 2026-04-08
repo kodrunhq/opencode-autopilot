@@ -5,7 +5,7 @@ import {
 	createToolExecuteAfterHandler,
 	createToolExecuteBeforeHandler,
 } from "../../src/observability/event-handlers";
-import { SessionEventStore } from "../../src/observability/event-store";
+import { SessionEventStore, type SessionEvents } from "../../src/observability/event-store";
 
 describe("createObservabilityEventHandler", () => {
 	let store: SessionEventStore;
@@ -186,6 +186,82 @@ describe("createObservabilityEventHandler", () => {
 
 		expect(writeSessionLog).toHaveBeenCalledTimes(1);
 		expect(store.getSession("sess-1")).toBeUndefined();
+	});
+
+	it("on session.deleted, session_end event has correct totalCost and durationMs", async () => {
+		store.initSession("sess-1");
+		contextMonitor.initSession("sess-1", 100000);
+
+		// Accumulate some tokens first
+		store.accumulateTokens("sess-1", {
+			inputTokens: 100,
+			outputTokens: 50,
+			reasoningTokens: 25,
+			cacheReadTokens: 10,
+			cacheWriteTokens: 5,
+			totalCost: 0.015,
+			messageCount: 3,
+		});
+
+		// Get session to check startedAt
+		const sessionBefore = store.getSession("sess-1");
+		expect(sessionBefore).toBeDefined();
+
+		// Mock Date constructor to return a fixed time
+		const originalDate = global.Date;
+		const startedAtTime = new Date(sessionBefore?.startedAt ?? "").getTime();
+		const mockNowTime = startedAtTime + 5000; // 5 seconds later
+
+		// Create a mock Date class
+		class MockDate extends Date {
+			constructor(value?: string | number | Date) {
+				if (value === undefined) {
+					super(mockNowTime);
+				} else {
+					super(value);
+				}
+			}
+
+			static now() {
+				return mockNowTime;
+			}
+		}
+
+		global.Date = MockDate as typeof Date;
+
+		try {
+			await handler({
+				event: {
+					type: "session.deleted",
+					properties: {
+						info: { id: "sess-1" },
+					},
+				},
+			});
+
+			// Check that writeSessionLog was called with correct data
+			expect(writeSessionLog).toHaveBeenCalledTimes(1);
+			const loggedData = writeSessionLog.mock.calls[0][0] as SessionEvents | undefined;
+			expect(loggedData).toBeDefined();
+
+			// Find the session_end event
+			const sessionEndEvent = loggedData?.events.find((e) => e.type === "session_end");
+			expect(sessionEndEvent).toBeDefined();
+
+			// TypeScript doesn't know that toBeDefined() guarantees non-null
+			// so we need to check and cast
+			if (!sessionEndEvent) {
+				throw new Error("session_end event not found");
+			}
+
+			// Verify totalCost is not 0 (should be 0.015)
+			expect(sessionEndEvent.totalCost).toBe(0.015);
+
+			// Verify durationMs is calculated (should be 5000ms)
+			expect(sessionEndEvent.durationMs).toBe(5000);
+		} finally {
+			global.Date = originalDate;
+		}
 	});
 
 	it("handlers never modify output (pure observer)", async () => {

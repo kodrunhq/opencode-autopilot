@@ -41,5 +41,6 @@ Each task row must have all columns filled. Acceptance criteria must be verifiab
 	permission: {
 		edit: "allow",
 		bash: "allow",
+		todowrite: "allow",
 	} as const,
 });

@@ -1,6 +1,5 @@
 import type { z } from "zod";
 import type {
-	buildProgressSchema,
 	confidenceEntrySchema,
 	decisionEntrySchema,
 	dispatchResultKindSchema,
@@ -11,6 +10,9 @@ import type {
 	pipelineStateSchema,
 	taskSchema,
 } from "./schemas";
+
+// Re-export BuildProgress from schemas
+export type { BuildProgress } from "./schemas";
 
 export interface BranchLifecycle {
 	readonly currentBranch: string | null;
@@ -29,7 +31,7 @@ export type PhaseStatus = z.infer<typeof phaseStatusSchema>;
 export type DecisionEntry = z.infer<typeof decisionEntrySchema>;
 export type ConfidenceEntry = z.infer<typeof confidenceEntrySchema>;
 export type Task = z.infer<typeof taskSchema>;
-export type BuildProgress = z.infer<typeof buildProgressSchema>;
+// BuildProgress is imported from schemas as an interface (not z.infer)
 export type FailureContext = z.infer<typeof failureContextSchema>;
 export type PendingDispatch = z.infer<typeof pendingDispatchSchema>;
 export type DispatchResultKind = z.infer<typeof dispatchResultKindSchema>;

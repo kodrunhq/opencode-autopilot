@@ -15,6 +15,7 @@ const DEFAULT_PERMISSION: Readonly<Record<string, string>> = Object.freeze({
 	bash: "deny",
 	webfetch: "deny",
 	task: "deny",
+	todowrite: "deny",
 });
 
 export function generateAgentMarkdown(input: AgentTemplateInput): string {

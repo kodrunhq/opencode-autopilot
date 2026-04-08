@@ -216,12 +216,18 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 				const sessionId = extractSessionId(properties);
 				if (!sessionId) return;
 
+				const session = eventStore.getSession(sessionId);
+				const now = new Date();
+				const startedAt = session?.startedAt ? new Date(session.startedAt) : now;
+				const durationMs = Math.max(0, now.getTime() - startedAt.getTime());
+				const totalCost = session?.tokens?.totalCost ?? 0;
+
 				eventStore.appendEvent(sessionId, {
 					type: "session_end",
-					timestamp: new Date().toISOString(),
+					timestamp: now.toISOString(),
 					sessionId,
-					durationMs: 0,
-					totalCost: 0,
+					durationMs,
+					totalCost,
 				});
 
 				const summary = generateSessionSummary(eventStore.getSession(sessionId), null);

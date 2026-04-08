@@ -24,11 +24,12 @@ describe("autopilot agent config", () => {
 		expect(autopilotAgent.maxSteps).toBe(50);
 	});
 
-	test("permissions: edit, bash, webfetch all allowed", () => {
+	test("permissions: edit, bash, webfetch, todowrite all allowed", () => {
 		expect(autopilotAgent.permission).toEqual({
 			edit: "allow",
 			bash: "allow",
 			webfetch: "allow",
+			todowrite: "allow",
 		});
 	});
 

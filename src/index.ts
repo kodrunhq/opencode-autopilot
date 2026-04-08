@@ -6,6 +6,9 @@ import { isFirstLoad, loadConfig, notificationsDefaults } from "./config";
 import { createCompactionHandler, createContextInjector } from "./context";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
+import { createHashAnchoredEnforcementHandler } from "./hooks/hash-anchored-enforcement";
+import { createHashlineReadEnhancerHandler } from "./hooks/hashline-read-enhancer";
+import { createIntentStorageHandler } from "./hooks/intent-storage";
 import { createKeywordDetectorHandler } from "./hooks/keyword-detector";
 import { createPreemptiveCompactionHandler } from "./hooks/preemptive-compaction";
 import { createSessionNotificationHandler } from "./hooks/session-notification";
@@ -55,6 +58,11 @@ import {
 	createRecoveryOrchestratorWithDb,
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
+import {
+	clearIntentSession,
+	enforceIntentGate,
+	resetIntentForUserMessage,
+} from "./routing/intent-gate";
 import { createAgentSkillInjector } from "./skills/agent-injector";
 import { ocBackground, setBackgroundSdkOperations } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
@@ -340,6 +348,9 @@ const plugin: Plugin = async (input) => {
 
 	// --- Anti-slop hook initialization ---
 	const antiSlopHandler = createAntiSlopHandler({ showToast: sdkOps.showToast });
+	const hashAnchoredEnforcementHandler = createHashAnchoredEnforcementHandler();
+	const hashlineReadEnhancerHandler = createHashlineReadEnhancerHandler();
+	const intentStorageHandler = createIntentStorageHandler();
 	const keywordDetectorHandler = createKeywordDetectorHandler({ showToast: sdkOps.showToast });
 	const preemptiveCompactionHandler = createPreemptiveCompactionHandler({
 		showToast: sdkOps.showToast,
@@ -555,6 +566,23 @@ const plugin: Plugin = async (input) => {
 					if (tokens && typeof tokens.input === "number") {
 						contextWarningMonitor.checkUtilization(tokens.input, 200_000);
 					}
+
+					// Detect user messages and reset intent tracking
+					const role = info.role as string | undefined;
+					if (role === "user") {
+						// Extract session ID from properties
+						let sessionID: string | undefined;
+						if (typeof props.sessionID === "string") {
+							sessionID = props.sessionID;
+						} else if (typeof info.sessionID === "string") {
+							sessionID = info.sessionID;
+						} else if (typeof info.id === "string") {
+							sessionID = info.id;
+						}
+						if (sessionID) {
+							resetIntentForUserMessage(sessionID);
+						}
+					}
 				}
 			}
 
@@ -574,6 +602,35 @@ const plugin: Plugin = async (input) => {
 
 			if (event.type === "session.deleted") {
 				mcpManager.stopAll().catch(() => {});
+				// Clean up intent tracking for this session
+				// Extract session ID from multiple possible locations
+				const props = event.properties as Record<string, unknown> | undefined;
+				let sessionID: string | undefined;
+
+				if (props) {
+					// Direct properties
+					if (typeof props.sessionID === "string") {
+						sessionID = props.sessionID;
+					} else if (typeof props.sessionId === "string") {
+						sessionID = props.sessionId;
+					} else {
+						// Check nested info object
+						const info = props.info as Record<string, unknown> | undefined;
+						if (info) {
+							if (typeof info.id === "string") {
+								sessionID = info.id;
+							} else if (typeof info.sessionID === "string") {
+								sessionID = info.sessionID;
+							} else if (typeof info.sessionId === "string") {
+								sessionID = info.sessionId;
+							}
+						}
+					}
+				}
+
+				if (sessionID) {
+					clearIntentSession(sessionID);
+				}
 			}
 		},
 		config: async (cfg: Config) => {
@@ -606,6 +663,19 @@ const plugin: Plugin = async (input) => {
 			output: { args: unknown },
 		) => {
 			obsToolBeforeHandler({ ...input, args: output.args });
+
+			const hashAnchoredResult = hashAnchoredEnforcementHandler(
+				{ ...input, args: output.args },
+				output,
+			);
+			if (hashAnchoredResult.args !== output.args) {
+				output.args = hashAnchoredResult.args;
+			}
+
+			const { allowed, reason } = enforceIntentGate(input.tool, input.sessionID, output.args);
+			if (!allowed) {
+				throw new Error(`Intent gate blocked ${input.tool}: ${reason}`);
+			}
 		},
 		"tool.execute.after": async (
 			hookInput: {
@@ -625,6 +695,16 @@ const plugin: Plugin = async (input) => {
 				// best-effort
 			}
 
+			// Hashline read enhancement (best-effort, non-blocking)
+			try {
+				const enhancedResult = hashlineReadEnhancerHandler(hookInput, { content: output.output });
+				if (enhancedResult.content !== output.output) {
+					output.output = enhancedResult.content;
+				}
+			} catch {
+				// best-effort
+			}
+
 			// Fallback handling
 			if (fallbackConfig.enabled) {
 				await toolExecuteAfterHandler(hookInput, output);
@@ -639,6 +719,13 @@ const plugin: Plugin = async (input) => {
 
 			try {
 				await keywordDetectorHandler(hookInput, output);
+			} catch {
+				// best-effort
+			}
+
+			// Intent classification storage (best-effort, non-blocking)
+			try {
+				await intentStorageHandler(hookInput, output);
 			} catch {
 				// best-effort
 			}
@@ -674,3 +761,5 @@ const plugin: Plugin = async (input) => {
 };
 
 export default plugin;
+
+// Export TUI plugin for sidebar integration

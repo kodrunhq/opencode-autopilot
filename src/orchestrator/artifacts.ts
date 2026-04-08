@@ -3,10 +3,8 @@ import { join } from "node:path";
 import { ensureDir } from "../utils/fs-helpers";
 import type { Phase } from "./types";
 
-const LEGACY_RUN_ID = "legacy-run";
-
 function isRunScoped(runId: string | undefined): runId is string {
-	return runId !== undefined && runId !== LEGACY_RUN_ID;
+	return runId !== undefined;
 }
 
 export function getPhaseDir(artifactDir: string, phase: Phase, runId?: string): string {

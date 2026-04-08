@@ -1,6 +1,7 @@
 import { loadConfig } from "../../config";
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getArtifactRef } from "../artifacts";
+import { createOracleGateIntegration, defaultOracleGate } from "../oracle-gate";
 import { groupByWave } from "../plan";
 import { assignWaves } from "../wave-assigner";
 import { initBranchLifecycle, recordTaskPush } from "./branch-pr";
@@ -126,6 +127,44 @@ export const handleBuild: PhaseHandler = async (
 
 	if (buildProgress.reviewPending && resultText) {
 		if (hasCriticalFindings(resultText)) {
+			// Check if Oracle consultation is needed for this task
+			const oracleGate = createOracleGateIntegration(defaultOracleGate);
+			const taskToCheck = effectiveTasks.find((t) => t.id === buildProgress.currentTask);
+
+			if (taskToCheck) {
+				const { needsConsultation, prompt: oraclePrompt } = oracleGate.checkTaskForOracle(
+					taskToCheck,
+					{
+						attemptCount: 0,
+						strikeCount: buildProgress.strikeCount,
+						reviewFindings: [resultText],
+						artifactDir,
+						runId: state.runId,
+					},
+				);
+
+				if (needsConsultation && oraclePrompt) {
+					// Dispatch to Oracle instead of BUILD
+					return Object.freeze({
+						action: "dispatch",
+						agent: "oracle",
+						prompt: oraclePrompt,
+						phase: "BUILD",
+						resultKind: "oracle_consultation",
+						taskId: buildProgress.currentTask,
+						progress: "Oracle consultation — CRITICAL findings detected",
+						_stateUpdates: {
+							buildProgress: {
+								...buildProgress,
+								reviewPending: false,
+								oraclePending: true,
+							},
+						},
+					} satisfies DispatchResult);
+				}
+			}
+
+			// No Oracle consultation needed or no task found, proceed with BUILD fix
 			const safeResult = sanitizeTemplateContent(resultText).slice(0, 4000);
 			const prompt = [
 				`CRITICAL review findings detected. Fix the following issues:`,
@@ -206,8 +245,105 @@ export const handleBuild: PhaseHandler = async (
 
 	const hasTypedContext = context !== undefined;
 	const isTaskCompletion = hasTypedContext && context.envelope.kind === "task_completion";
-	const rawTaskId = isTaskCompletion ? context.envelope.taskId : buildProgress.currentTask;
+	const isOracleConsultation = hasTypedContext && context.envelope.kind === "oracle_consultation";
+	const rawTaskId =
+		isTaskCompletion || isOracleConsultation ? context.envelope.taskId : buildProgress.currentTask;
 	const taskToComplete = coerceTaskId(rawTaskId);
+
+	// Handle Oracle consultation result
+	if (
+		resultText &&
+		buildProgress.oraclePending &&
+		isOracleConsultation &&
+		taskToComplete !== null
+	) {
+		const oracleGate = createOracleGateIntegration(defaultOracleGate);
+		const {
+			success,
+			result: oracleResult,
+			error,
+		} = oracleGate.applyOracleRecommendation(taskToComplete, resultText);
+
+		if (!success) {
+			return Object.freeze({
+				action: "error",
+				code: "E_ORACLE_PARSE_FAILED",
+				phase: "BUILD",
+				message: `Failed to parse Oracle recommendation: ${error}`,
+				progress: "Oracle consultation failed",
+				_stateUpdates: {
+					buildProgress: {
+						...buildProgress,
+						oraclePending: false,
+					},
+				},
+			} satisfies DispatchResult);
+		}
+
+		if (!oracleResult) {
+			return Object.freeze({
+				action: "error",
+				code: "E_ORACLE_NO_RESULT",
+				phase: "BUILD",
+				message: "Oracle returned no actionable recommendation",
+				progress: "Oracle consultation inconclusive",
+				_stateUpdates: {
+					buildProgress: {
+						...buildProgress,
+						oraclePending: false,
+					},
+				},
+			} satisfies DispatchResult);
+		}
+
+		// Check if Oracle recommends blocking progression
+		if (
+			oracleResult.recommendedAction.toLowerCase().includes("block") ||
+			oracleResult.recommendedAction.toLowerCase().includes("stop")
+		) {
+			return Object.freeze({
+				action: "error",
+				code: "E_ORACLE_BLOCKED",
+				phase: "BUILD",
+				message: `Oracle blocks progression: ${oracleResult.recommendedAction}`,
+				progress: "Oracle blocked progression — CRITICAL issues",
+				_stateUpdates: {
+					buildProgress: {
+						...buildProgress,
+						oraclePending: false,
+						strikeCount: buildProgress.strikeCount + 1,
+					},
+				},
+			} satisfies DispatchResult);
+		}
+
+		// Oracle allows progression, dispatch to BUILD with fix prompt
+		const safeResult = sanitizeTemplateContent(resultText).slice(0, 4000);
+		const prompt = [
+			`Oracle consultation completed. Recommendation: ${oracleResult.recommendedAction}`,
+			`Reasoning: ${oracleResult.reasoning}`,
+			`Fix the following issues:`,
+			safeResult,
+			`Reference ${getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId)} for context.`,
+		].join(" ");
+
+		return Object.freeze({
+			action: "dispatch",
+			agent: AGENT_NAMES.BUILD,
+			prompt,
+			phase: "BUILD",
+			resultKind: "task_completion",
+			taskId: taskToComplete,
+			progress: "Fix dispatch — Oracle approved",
+			_stateUpdates: {
+				buildProgress: {
+					...buildProgress,
+					oraclePending: false,
+					strikeCount: buildProgress.strikeCount + 1,
+				},
+			},
+		} satisfies DispatchResult);
+	}
 
 	if (resultText && !buildProgress.reviewPending && taskToComplete === null) {
 		return Object.freeze({
@@ -218,7 +354,12 @@ export const handleBuild: PhaseHandler = async (
 		} satisfies DispatchResult);
 	}
 
-	if (resultText && !buildProgress.reviewPending && taskToComplete !== null) {
+	if (
+		resultText &&
+		!buildProgress.reviewPending &&
+		!buildProgress.oraclePending &&
+		taskToComplete !== null
+	) {
 		if (!effectiveTasks.some((t) => t.id === taskToComplete)) {
 			return Object.freeze({
 				action: "error",

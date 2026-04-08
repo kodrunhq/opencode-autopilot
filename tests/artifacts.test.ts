@@ -25,8 +25,10 @@ describe("getPhaseDir", () => {
 		expect(getPhaseDir("./artifacts", "RECON")).toBe("artifacts/phases/RECON");
 	});
 
-	test("returns flat path when runId is legacy-run", () => {
-		expect(getPhaseDir("./artifacts", "RECON", "legacy-run")).toBe("artifacts/phases/RECON");
+	test("returns run-scoped path even for legacy-run", () => {
+		expect(getPhaseDir("./artifacts", "RECON", "legacy-run")).toBe(
+			"artifacts/phases/legacy-run/RECON",
+		);
 	});
 
 	test("returns run-scoped path with real runId", () => {
@@ -62,9 +64,9 @@ describe("getArtifactRef", () => {
 		);
 	});
 
-	test("returns flat artifact path for legacy-run", () => {
+	test("returns run-scoped artifact path even for legacy-run", () => {
 		expect(getArtifactRef("/project/.oca", "RECON", "report.md", "legacy-run")).toBe(
-			"/project/.oca/phases/RECON/report.md",
+			"/project/.oca/phases/legacy-run/RECON/report.md",
 		);
 	});
 });
@@ -203,6 +205,7 @@ describe("buildProgressSchema", () => {
 			attemptCount: 0,
 			strikeCount: 0,
 			reviewPending: false,
+			oraclePending: false,
 		});
 	});
 
@@ -274,6 +277,7 @@ describe("pipelineStateSchema with buildProgress", () => {
 			attemptCount: 0,
 			strikeCount: 0,
 			reviewPending: false,
+			oraclePending: false,
 		});
 	});
 });

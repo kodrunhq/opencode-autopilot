@@ -100,7 +100,7 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 		},
 	];
 	for (const stub of stubs) {
-		const phaseDir = await ensurePhaseDir(artifactDir, stub.phase);
+		const phaseDir = await ensurePhaseDir(artifactDir, stub.phase, quickState.runId);
 		try {
 			await writeFile(join(phaseDir, stub.file), stub.content, { flag: "wx" });
 		} catch (error) {

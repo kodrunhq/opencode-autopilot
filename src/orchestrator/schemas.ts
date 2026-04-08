@@ -1,4 +1,9 @@
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
+
+function generateRunId(): string {
+	return `run_${randomBytes(8).toString("hex")}`;
+}
 
 export const PHASES = Object.freeze([
 	"RECON",
@@ -47,19 +52,27 @@ export const taskSchema = z.object({
 	strike: z.number().default(0),
 });
 
-export const buildProgressSchema = z.object({
+const baseBuildProgressSchema = z.object({
 	currentTask: z.number().nullable().default(null),
 	currentTasks: z.array(z.number()).default([]),
 	currentWave: z.number().nullable().default(null),
 	attemptCount: z.number().default(0),
 	strikeCount: z.number().default(0),
 	reviewPending: z.boolean().default(false),
+	oraclePending: z.boolean().default(false),
 });
+
+// Full schema with defaults for pipeline state
+export const buildProgressSchema = baseBuildProgressSchema;
+
+// BuildProgress type from schema output (includes defaults from transform)
+export type BuildProgress = z.output<typeof baseBuildProgressSchema>;
 
 export const dispatchResultKindSchema = z.enum([
 	"phase_output",
 	"task_completion",
 	"review_findings",
+	"oracle_consultation",
 ]);
 
 export const pendingDispatchSchema = z.object({
@@ -96,7 +109,11 @@ export const branchLifecycleSchema = z.object({
 export const pipelineStateSchema = z.object({
 	schemaVersion: z.literal(2),
 	status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED", "INTERRUPTED"]),
-	runId: z.string().max(128).default("legacy-run"),
+	runId: z
+		.string()
+		.max(128)
+		.regex(/^[a-z0-9_-]+$/i, "runId must be alphanumeric with hyphens or underscores")
+		.default(generateRunId),
 	stateRevision: z.number().int().min(0).default(0),
 	idea: z.string().max(4096),
 	currentPhase: phaseSchema.nullable(),
@@ -108,13 +125,14 @@ export const pipelineStateSchema = z.object({
 	tasks: z.array(taskSchema).default([]),
 	arenaConfidence: z.enum(["HIGH", "MEDIUM", "LOW"]).nullable().default(null),
 	exploreTriggered: z.boolean().default(false),
-	buildProgress: buildProgressSchema.default({
+	buildProgress: baseBuildProgressSchema.default({
 		currentTask: null,
 		currentTasks: [],
 		currentWave: null,
 		attemptCount: 0,
 		strikeCount: 0,
 		reviewPending: false,
+		oraclePending: false,
 	}),
 	pendingDispatches: z.array(pendingDispatchSchema).max(2000).default([]),
 	processedResultIds: z.array(z.string().max(128)).max(10_000).default([]),

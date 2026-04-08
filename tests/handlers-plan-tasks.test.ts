@@ -35,10 +35,6 @@ describe("handlePlan task loading", () => {
 
 	beforeEach(async () => {
 		tempDir = await mkdtemp(join(tmpdir(), "test-plan-"));
-		// Create required phase directories
-		await ensureDir(join(tempDir, "phases", "ARCHITECT"));
-		await ensureDir(join(tempDir, "phases", "CHALLENGE"));
-		await ensureDir(join(tempDir, "phases", "PLAN"));
 	});
 
 	afterEach(async () => {
@@ -52,18 +48,25 @@ describe("handlePlan task loading", () => {
 ## Task Table
 
 | Task ID | Title | Description | Files to Modify | Wave Number | Acceptance Criteria |
-|---|---|---|---|---:|---|
+|---|---|---|---|---|---:|---|
 | W1-T01 | Add v1 API schemas | Pydantic models | api/schemas.py | 1 | pytest passes |
 | W1-T02 | Extend ORM models | SQLAlchemy | models/db.py | 1 | pytest passes |
 | W2-T01 | Build repositories | DAL | repos/portfolio.py | 2 | pytest passes |
 `;
 
-		// Create ARCHITECT and CHALLENGE artifacts (required by handler)
-		await writeFile(join(tempDir, "phases", "ARCHITECT", "design.md"), "# Architecture");
-		await writeFile(join(tempDir, "phases", "CHALLENGE", "brief.md"), "# Challenge");
-		await writeFile(join(tempDir, "phases", "PLAN", "tasks.md"), tasksMd);
-
 		const state = makeState({ currentPhase: "PLAN" });
+
+		// Create run-scoped ARCHITECT and CHALLENGE artifacts (required by handler)
+		await ensureDir(join(tempDir, "phases", state.runId, "ARCHITECT"));
+		await ensureDir(join(tempDir, "phases", state.runId, "CHALLENGE"));
+		await ensureDir(join(tempDir, "phases", state.runId, "PLAN"));
+		await writeFile(
+			join(tempDir, "phases", state.runId, "ARCHITECT", "design.md"),
+			"# Architecture",
+		);
+		await writeFile(join(tempDir, "phases", state.runId, "CHALLENGE", "brief.md"), "# Challenge");
+		await writeFile(join(tempDir, "phases", state.runId, "PLAN", "tasks.md"), tasksMd);
+
 		const result = await handlePlan(state, tempDir, "tasks written");
 
 		expect(result.action).toBe("complete");
@@ -82,7 +85,10 @@ describe("handlePlan task loading", () => {
 			status: "PENDING",
 		});
 
-		const jsonRaw = await readFile(join(tempDir, "phases", "PLAN", "tasks.json"), "utf-8");
+		const jsonRaw = await readFile(
+			join(tempDir, "phases", state.runId, "PLAN", "tasks.json"),
+			"utf-8",
+		);
 		const parsed = JSON.parse(jsonRaw) as {
 			schemaVersion: number;
 			tasks: Array<{ taskId: string; title: string; wave: number; depends_on: string[] }>;
@@ -112,15 +118,21 @@ describe("handlePlan task loading", () => {
 			],
 		};
 
-		await writeFile(join(tempDir, "phases", "ARCHITECT", "design.md"), "# Architecture");
-		await writeFile(join(tempDir, "phases", "CHALLENGE", "brief.md"), "# Challenge");
+		const state = makeState({ currentPhase: "PLAN" });
+
+		await ensureDir(join(tempDir, "phases", state.runId, "ARCHITECT"));
+		await ensureDir(join(tempDir, "phases", state.runId, "CHALLENGE"));
+		await ensureDir(join(tempDir, "phases", state.runId, "PLAN"));
 		await writeFile(
-			join(tempDir, "phases", "PLAN", "tasks.json"),
+			join(tempDir, "phases", state.runId, "ARCHITECT", "design.md"),
+			"# Architecture",
+		);
+		await writeFile(join(tempDir, "phases", state.runId, "CHALLENGE", "brief.md"), "# Challenge");
+		await writeFile(
+			join(tempDir, "phases", state.runId, "PLAN", "tasks.json"),
 			JSON.stringify(tasksJson, null, 2),
 			"utf-8",
 		);
-
-		const state = makeState({ currentPhase: "PLAN" });
 		const result = await handlePlan(state, tempDir, "tasks written");
 
 		expect(result.action).toBe("complete");
@@ -131,7 +143,10 @@ describe("handlePlan task loading", () => {
 			depends_on: [1],
 		});
 
-		const markdown = await readFile(join(tempDir, "phases", "PLAN", "tasks.md"), "utf-8");
+		const markdown = await readFile(
+			join(tempDir, "phases", state.runId, "PLAN", "tasks.md"),
+			"utf-8",
+		);
 		expect(markdown).toContain("| W1-T01 | Seed DB schema");
 		expect(markdown).toContain("| W2-T01 | Add repositories");
 	});
@@ -147,11 +162,18 @@ describe("handlePlan task loading", () => {
 | W1-T02 | Extend ORM models | SQLAlchemy | models/db.py | 1 | pytest passes
 `;
 
-		await writeFile(join(tempDir, "phases", "ARCHITECT", "design.md"), "# Architecture");
-		await writeFile(join(tempDir, "phases", "CHALLENGE", "brief.md"), "# Challenge");
-		await writeFile(join(tempDir, "phases", "PLAN", "tasks.md"), tasksMd);
-
 		const state = makeState({ currentPhase: "PLAN" });
+
+		await ensureDir(join(tempDir, "phases", state.runId, "ARCHITECT"));
+		await ensureDir(join(tempDir, "phases", state.runId, "CHALLENGE"));
+		await ensureDir(join(tempDir, "phases", state.runId, "PLAN"));
+		await writeFile(
+			join(tempDir, "phases", state.runId, "ARCHITECT", "design.md"),
+			"# Architecture",
+		);
+		await writeFile(join(tempDir, "phases", state.runId, "CHALLENGE", "brief.md"), "# Challenge");
+		await writeFile(join(tempDir, "phases", state.runId, "PLAN", "tasks.md"), tasksMd);
+
 		const result = await handlePlan(state, tempDir, "tasks written");
 
 		expect(result.action).toBe("complete");
@@ -165,11 +187,17 @@ describe("handlePlan task loading", () => {
 	});
 
 	test("returns error when tasks.md is missing", async () => {
-		// Create ARCHITECT and CHALLENGE artifacts but no tasks.md
-		await writeFile(join(tempDir, "phases", "ARCHITECT", "design.md"), "# Architecture");
-		await writeFile(join(tempDir, "phases", "CHALLENGE", "brief.md"), "# Challenge");
-
 		const state = makeState({ currentPhase: "PLAN" });
+
+		// Create run-scoped ARCHITECT and CHALLENGE artifacts but no tasks.md
+		await ensureDir(join(tempDir, "phases", state.runId, "ARCHITECT"));
+		await ensureDir(join(tempDir, "phases", state.runId, "CHALLENGE"));
+		await writeFile(
+			join(tempDir, "phases", state.runId, "ARCHITECT", "design.md"),
+			"# Architecture",
+		);
+		await writeFile(join(tempDir, "phases", state.runId, "CHALLENGE", "brief.md"), "# Challenge");
+
 		const result = await handlePlan(state, tempDir, "tasks written");
 
 		expect(result.action).toBe("error");
@@ -190,11 +218,18 @@ describe("handlePlan task loading", () => {
 | W2-T01 | Second valid task | desc | b.ts | 2 | ok |
 `;
 
-		await writeFile(join(tempDir, "phases", "ARCHITECT", "design.md"), "# Architecture");
-		await writeFile(join(tempDir, "phases", "CHALLENGE", "brief.md"), "# Challenge");
-		await writeFile(join(tempDir, "phases", "PLAN", "tasks.md"), tasksMd);
-
 		const state = makeState({ currentPhase: "PLAN" });
+
+		await ensureDir(join(tempDir, "phases", state.runId, "ARCHITECT"));
+		await ensureDir(join(tempDir, "phases", state.runId, "CHALLENGE"));
+		await ensureDir(join(tempDir, "phases", state.runId, "PLAN"));
+		await writeFile(
+			join(tempDir, "phases", state.runId, "ARCHITECT", "design.md"),
+			"# Architecture",
+		);
+		await writeFile(join(tempDir, "phases", state.runId, "CHALLENGE", "brief.md"), "# Challenge");
+		await writeFile(join(tempDir, "phases", state.runId, "PLAN", "tasks.md"), tasksMd);
+
 		const result = await handlePlan(state, tempDir, "tasks written");
 
 		expect(result.action).toBe("complete");
