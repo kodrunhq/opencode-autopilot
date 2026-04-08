@@ -1,4 +1,9 @@
 import { z } from "zod";
+import { randomBytes } from "node:crypto";
+
+function generateRunId(): string {
+	return `run_${randomBytes(8).toString("hex")}`;
+}
 
 export const PHASES = Object.freeze([
 	"RECON",
@@ -96,7 +101,11 @@ export const branchLifecycleSchema = z.object({
 export const pipelineStateSchema = z.object({
 	schemaVersion: z.literal(2),
 	status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED", "INTERRUPTED"]),
-	runId: z.string().max(128).default("legacy-run"),
+	runId: z
+		.string()
+		.max(128)
+		.regex(/^[a-z0-9_-]+$/i, "runId must be alphanumeric with hyphens or underscores")
+		.default(generateRunId),
 	stateRevision: z.number().int().min(0).default(0),
 	idea: z.string().max(4096),
 	currentPhase: phaseSchema.nullable(),

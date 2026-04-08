@@ -12,3 +12,10 @@ export {
 	IntentTypeSchema,
 } from "./intent-types";
 export type { CategoryDefinition } from "./types";
+export {
+	clearIntentSession,
+	enforceIntentGate,
+	intentTracker,
+	resetIntentForUserMessage,
+	storeIntentClassification,
+} from "./intent-gate";

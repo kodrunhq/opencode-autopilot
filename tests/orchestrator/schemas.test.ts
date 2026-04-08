@@ -141,6 +141,7 @@ describe("pipelineStateSchema", () => {
 		const state = {
 			schemaVersion: 2,
 			status: "IN_PROGRESS",
+			runId: "run_1234567890abcdef",
 			idea: "build a chat app",
 			currentPhase: "RECON",
 			startedAt: "2026-03-31T00:00:00Z",
@@ -157,6 +158,7 @@ describe("pipelineStateSchema", () => {
 			],
 		};
 		const result = pipelineStateSchema.parse(state);
+		expect(result.runId).toBe("run_1234567890abcdef");
 		expect(result.decisions).toEqual([]);
 		expect(result.confidence).toEqual([]);
 		expect(result.tasks).toEqual([]);
@@ -168,6 +170,7 @@ describe("pipelineStateSchema", () => {
 		const state = {
 			schemaVersion: 1,
 			status: "IN_PROGRESS",
+			runId: "run_4567890abcdef123",
 			idea: "test",
 			currentPhase: "RECON",
 			startedAt: "2026-03-31T00:00:00Z",
@@ -177,10 +180,56 @@ describe("pipelineStateSchema", () => {
 		expect(() => pipelineStateSchema.parse(state)).toThrow();
 	});
 
+	test("throws on invalid runId format with spaces", () => {
+		const state = {
+			schemaVersion: 2,
+			status: "IN_PROGRESS",
+			runId: "invalid run id with spaces",
+			idea: "test",
+			currentPhase: "RECON",
+			startedAt: "2026-03-31T00:00:00Z",
+			lastUpdatedAt: "2026-03-31T00:00:00Z",
+			phases: [],
+		};
+		expect(() => pipelineStateSchema.parse(state)).toThrow(
+			/runId must be alphanumeric with hyphens or underscores/,
+		);
+	});
+
+	test("accepts legacy runId format", () => {
+		const state = {
+			schemaVersion: 2,
+			status: "IN_PROGRESS",
+			runId: "legacy-run",
+			idea: "test",
+			currentPhase: "RECON",
+			startedAt: "2026-03-31T00:00:00Z",
+			lastUpdatedAt: "2026-03-31T00:00:00Z",
+			phases: [],
+		};
+		const result = pipelineStateSchema.parse(state);
+		expect(result.runId).toBe("legacy-run");
+	});
+
+	test("generates runId when not provided", () => {
+		const state = {
+			schemaVersion: 2,
+			status: "IN_PROGRESS",
+			idea: "test",
+			currentPhase: "RECON",
+			startedAt: "2026-03-31T00:00:00Z",
+			lastUpdatedAt: "2026-03-31T00:00:00Z",
+			phases: [],
+		};
+		const result = pipelineStateSchema.parse(state);
+		expect(result.runId).toMatch(/^run_[a-f0-9]{16}$/);
+	});
+
 	test("accepts partial state with empty decisions/confidence via defaults", () => {
 		const state = {
 			schemaVersion: 2,
 			status: "NOT_STARTED",
+			runId: "run_7890abcdef123456",
 			idea: "minimal",
 			currentPhase: null,
 			startedAt: "2026-03-31T00:00:00Z",
@@ -188,6 +237,7 @@ describe("pipelineStateSchema", () => {
 			phases: [],
 		};
 		const result = pipelineStateSchema.parse(state);
+		expect(result.runId).toBe("run_7890abcdef123456");
 		expect(result.decisions).toEqual([]);
 		expect(result.confidence).toEqual([]);
 		expect(result.tasks).toEqual([]);
@@ -197,6 +247,7 @@ describe("pipelineStateSchema", () => {
 		const state = {
 			schemaVersion: 2,
 			status: "IN_PROGRESS",
+			runId: "run_typedtestabcdef",
 			idea: "typed test",
 			currentPhase: "RECON",
 			startedAt: "2026-03-31T00:00:00Z",
@@ -204,6 +255,7 @@ describe("pipelineStateSchema", () => {
 			phases: [],
 		};
 		const result: PipelineState = pipelineStateSchema.parse(state);
+		expect(result.runId).toBe("run_typedtestabcdef");
 		expect(result.idea).toBe("typed test");
 	});
 });

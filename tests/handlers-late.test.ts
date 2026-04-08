@@ -39,8 +39,9 @@ describe("handlePlan", () => {
 
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe(AGENT_NAMES.PLAN);
-		expect(result.prompt).toContain("phases/ARCHITECT/design.md");
-		expect(result.prompt).toContain("phases/CHALLENGE/brief.md");
+		// Note: run-scoped paths now include runId directory
+		expect(result.prompt).toMatch(/phases\/run_[a-f0-9]{16}\/ARCHITECT\/design\.md/);
+		expect(result.prompt).toMatch(/phases\/run_[a-f0-9]{16}\/CHALLENGE\/brief\.md/);
 		expect(result.phase).toBe("PLAN");
 	});
 
@@ -63,12 +64,14 @@ describe("handleShip", () => {
 
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe(AGENT_NAMES.SHIP);
-		expect(prompt).toContain("phases/RECON/report.md");
-		expect(prompt).toContain("phases/CHALLENGE/brief.md");
-		expect(prompt).toContain("phases/ARCHITECT/design.md");
+		// Run-scoped paths now include runId directory
+		expect(prompt).toMatch(/phases\/run_[a-f0-9]{16}\/RECON\/report\.md/);
+		expect(prompt).toMatch(/phases\/run_[a-f0-9]{16}\/CHALLENGE\/brief\.md/);
+		expect(prompt).toMatch(/phases\/run_[a-f0-9]{16}\/ARCHITECT\/design\.md/);
 		expect(
-			prompt.includes("phases/PLAN/tasks.json") || prompt.includes("phases/PLAN/tasks.md"),
-		).toBe(true);
+			prompt.match(/phases\/run_[a-f0-9]{16}\/PLAN\/tasks\.json/) ||
+				prompt.match(/phases\/run_[a-f0-9]{16}\/PLAN\/tasks\.md/),
+		).toBeTruthy();
 		expect(prompt).toContain("walkthrough.md");
 		expect(prompt).toContain("decisions.md");
 		expect(prompt).toContain("changelog.md");
@@ -78,9 +81,10 @@ describe("handleShip", () => {
 	test("returns error when no SHIP artifacts exist after result", async () => {
 		const fs = await import("node:fs/promises");
 		const tmpDir = `/tmp/test-ship-error-${Date.now()}`;
-		await fs.mkdir(`${tmpDir}/phases/SHIP`, { recursive: true });
-
 		const state = makeState({ currentPhase: "SHIP" });
+		// Create run-scoped directory
+		await fs.mkdir(`${tmpDir}/phases/${state.runId}/SHIP`, { recursive: true });
+
 		const result = await handleShip(state, tmpDir, "shipped");
 
 		expect(result.action).toBe("error");
@@ -94,10 +98,14 @@ describe("handleShip", () => {
 	test("returns complete when walkthrough.md exists after result", async () => {
 		const fs = await import("node:fs/promises");
 		const tmpDir = `/tmp/test-ship-complete-${Date.now()}`;
-		await fs.mkdir(`${tmpDir}/phases/SHIP`, { recursive: true });
-		await fs.writeFile(`${tmpDir}/phases/SHIP/walkthrough.md`, "# Walkthrough\nContent");
-
 		const state = makeState({ currentPhase: "SHIP" });
+		// Create run-scoped directory
+		await fs.mkdir(`${tmpDir}/phases/${state.runId}/SHIP`, { recursive: true });
+		await fs.writeFile(
+			`${tmpDir}/phases/${state.runId}/SHIP/walkthrough.md`,
+			"# Walkthrough\nContent",
+		);
+
 		const result = await handleShip(state, tmpDir, "shipped");
 
 		expect(result.action).toBe("complete");
