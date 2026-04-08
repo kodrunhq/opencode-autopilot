@@ -2,13 +2,6 @@ import { getLogger } from "../logging/domains";
 
 const logger = getLogger("hooks", "hash-anchored-enforcement");
 
-interface EditToolArgs {
-	readonly filePath: string;
-	readonly oldString: string;
-	readonly newString: string;
-	readonly replaceAll?: boolean;
-}
-
 export function createHashAnchoredEnforcementHandler() {
 	return (
 		hookInput: {

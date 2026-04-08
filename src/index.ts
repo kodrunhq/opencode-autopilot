@@ -58,6 +58,11 @@ import {
 	createRecoveryOrchestratorWithDb,
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
+import {
+	clearIntentSession,
+	enforceIntentGate,
+	resetIntentForUserMessage,
+} from "./routing/intent-gate";
 import { createAgentSkillInjector } from "./skills/agent-injector";
 import { ocBackground, setBackgroundSdkOperations } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
@@ -96,11 +101,6 @@ import { ocStocktake } from "./tools/stocktake";
 import { ocSummary } from "./tools/summary";
 import { ocUpdateDocs } from "./tools/update-docs";
 import { getGlobalConfigDir } from "./utils/paths";
-import {
-	clearIntentSession,
-	enforceIntentGate,
-	resetIntentForUserMessage,
-} from "./routing/intent-gate";
 import { ContextWarningMonitor } from "./ux/context-warnings";
 import { getRemediationHint } from "./ux/error-hints";
 import { NotificationManager } from "./ux/notifications";

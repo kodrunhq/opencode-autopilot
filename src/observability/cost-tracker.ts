@@ -15,7 +15,7 @@ export interface CostEntry {
 	readonly outputTokens: number;
 	readonly totalTokens: number;
 	readonly cost: number;
-	readonly metadata?: Record<string, any>;
+	readonly metadata?: Record<string, unknown>;
 }
 
 export interface CostSummary {

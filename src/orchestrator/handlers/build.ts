@@ -1,9 +1,9 @@
 import { loadConfig } from "../../config";
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getArtifactRef } from "../artifacts";
+import { createOracleGateIntegration, defaultOracleGate } from "../oracle-gate";
 import { groupByWave } from "../plan";
 import { assignWaves } from "../wave-assigner";
-import { createOracleGateIntegration, defaultOracleGate } from "../oracle-gate";
 import { initBranchLifecycle, recordTaskPush } from "./branch-pr";
 import {
 	buildParallelDispatch,

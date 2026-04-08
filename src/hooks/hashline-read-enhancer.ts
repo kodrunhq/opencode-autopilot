@@ -1,11 +1,7 @@
-import { getLogger } from "../logging/domains";
 import { loadConfig } from "../config";
+import { getLogger } from "../logging/domains";
 
 const logger = getLogger("hooks", "hashline-read-enhancer");
-
-interface ReadToolOutput {
-	readonly content: string;
-}
 
 interface ReadToolArgs {
 	readonly filePath: string;

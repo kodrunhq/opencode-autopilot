@@ -4,8 +4,8 @@
  */
 
 import { getLogger } from "../logging/domains";
-import { IntentTypeSchema } from "../routing/intent-types";
 import { storeIntentClassification } from "../routing/intent-gate";
+import { IntentTypeSchema } from "../routing/intent-types";
 
 const logger = getLogger("hooks", "intent-storage");
 

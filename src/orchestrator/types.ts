@@ -1,6 +1,5 @@
 import type { z } from "zod";
 import type {
-	buildProgressSchema,
 	confidenceEntrySchema,
 	decisionEntrySchema,
 	dispatchResultKindSchema,
