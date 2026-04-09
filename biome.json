@@ -1,7 +1,14 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
 	"files": {
-		"includes": ["**", "!.opencode", "!claude-supermemory", "!supermemory", "!feedback_sessions"]
+		"includes": [
+			"**",
+			"!.opencode",
+			"!.omx",
+			"!claude-supermemory",
+			"!supermemory",
+			"!feedback_sessions"
+		]
 	},
 	"linter": {
 		"enabled": true,
