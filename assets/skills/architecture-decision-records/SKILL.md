@@ -1,158 +1,310 @@
 ---
 # opencode-autopilot
 name: architecture-decision-records
-description: Methodology for creating Architecture Decision Records (ADRs) during the ARCHITECT phase to document WHY choices were made.
+description: Methodology for creating Architecture Decision Records (ADRs) during the ARCHITECT phase to document WHY architectural choices were made
 stacks: []
 requires: []
 ---
 
-# Architecture Decision Records
+# Architecture Decision Records (ADR)
 
-Methodology for documenting the WHY behind architectural choices. Code tells you what was built. ADRs tell you why it was built that way.
+Architecture Decision Records capture the reasoning behind significant technical choices. They serve as a decision log, not a design document. Future developers need to understand WHY you chose a particular path, not just WHAT you built.
 
-## When to Use
+## What is an ADR
 
-- During the ARCHITECT phase when making significant design choices
-- When choosing between competing approaches (database, framework, pattern)
-- When a decision is irreversible or expensive to reverse
-- When multiple team members need to understand the reasoning
+An ADR is a short document (1-2 pages) that records a single architectural decision. It captures:
+- The context and forces at play when the decision was made
+- The decision itself
+- The consequences of that decision
 
-## ADR Structure
+Unlike design documents that describe how a system works, ADRs explain why it works that way. They prevent the cycle of "why did we do this?" questions that slow down teams.
 
-Every ADR follows this template:
+## When to Write an ADR
 
-```
-# ADR-NNN: [Short title]
+Not every choice needs an ADR. Document decisions that are:
+
+**IRREVERSIBLE OR EXPENSIVE TO CHANGE**
+- Data storage choices (SQL vs NoSQL, single vs multi-region)
+- Framework or language selection
+- Deployment architecture (monolith vs microservices)
+
+**TEAM-WIDE IMPACT**
+- Affects how multiple developers write code
+- Changes coding standards or patterns
+- Impacts the technology stack for future features
+
+**NON-OBVIOUS CHOICES**
+- You rejected a seemingly better option for a specific reason
+- The decision involves trade-offs that are not immediately clear
+- Future developers might question the choice without context
+
+## ADR Template
+
+Use this structure for every ADR:
+
+```markdown
+# ADR-NNN: Title
+
+## Status
+Proposed | Accepted | Superseded by ADR-XXX
 
 ## Context
-What is the situation that requires a decision? What forces are at play?
-What constraints exist? What problem are we trying to solve?
+What is the issue that we're seeing that is motivating this decision or change?
+What forces are at play? What constraints exist?
 
 ## Decision
-What did we decide? Be specific and unambiguous.
-"We will use X" not "We might consider X"
+What is the change that we're proposing or have agreed to implement?
+Be specific. State the decision as a clear statement.
 
 ## Consequences
 
 ### Positive
-- What benefits does this decision bring?
-- What problems does it solve?
+- List the benefits of this decision
+- What does this enable?
+- What problems does this solve?
 
 ### Negative
-- What trade-offs does this introduce?
-- What problems does it create?
-- What does this decision prevent us from doing easily?
+- List the trade-offs and drawbacks
+- What are we giving up?
+- What new problems does this create?
 ```
 
-## The ADR Process
+## Writing Effective ADRs
 
-### Step 1: Identify Decisions Worth Recording
+### Context: Set the Stage
 
-Not every choice needs an ADR. Record decisions that are:
+Describe the situation that required a decision. Include:
+- The problem or opportunity
+- Constraints (budget, time, team skills, existing tech)
+- Options considered
 
-- **Irreversible**: Hard or expensive to change later (database choice, architectural pattern)
-- **Expensive**: Significant time or resource investment
-- **Team-wide**: Affects how multiple people work
-- **Non-obvious**: The reasoning isn't clear from the code alone
-- **Contested**: There were reasonable alternatives that were rejected
+```markdown
+## Context
 
-**DO:**
-- Write an ADR when you can imagine a future developer asking "why did they do it this way?"
-- Include the date and who was involved in the decision
-- Reference the alternatives that were considered
+Our user authentication needs have outgrown the simple JWT approach we started with.
+Requirements:
+- Support for social login (Google, GitHub)
+- Session management across multiple devices
+- Token revocation capability
+- Compliance with SOC2 audit requirements
 
-**DON'T:**
-- Write ADRs for obvious choices ("we'll use HTTP for a web API")
-- Use ADRs as design documents (they record decisions, not designs)
-- Write ADRs after the code is already built (capture the reasoning while it's fresh)
-
-### Step 2: Write the Context Section
-
-The context section is the most important part. It explains the forces that shaped the decision.
-
-**DO:**
-- Describe the problem, not the solution
-- List constraints (budget, timeline, team skills, existing infrastructure)
-- Include non-functional requirements (performance, security, maintainability)
-- Reference relevant findings from RECON and CHALLENGE phases
-
-**DON'T:**
-- Jump to the solution in the context
-- Assume the reader knows the project history
-- Omit constraints because they seem obvious
-
-### Step 3: Write the Decision Section
-
-Be specific and decisive.
-
-**DO:**
-- State the decision in one clear sentence
-- Reference the chosen technology, pattern, or approach by name
-- Include version numbers if relevant ("PostgreSQL 15+" not "a SQL database")
-
-**DON'T:**
-- Hedge ("we'll probably use X")
-- Leave the decision open ("we need to decide on X")
-- Write the decision in terms of what you're NOT doing
-
-### Step 4: Document Consequences Honestly
-
-List both positive and negative consequences. If there are no negatives, you haven't thought hard enough.
-
-**DO:**
-- Be honest about trade-offs (every decision has downsides)
-- Include operational consequences (monitoring, deployment, debugging)
-- Note what this decision prevents or makes harder
-- Estimate the cost of reversing this decision
-
-**DON'T:**
-- List only positive consequences (that's advocacy, not analysis)
-- Downplay negatives to make the decision look better
-- Ignore long-term consequences for short-term gains
-
-### Step 5: Handle Superseded ADRs
-
-When a decision is reversed, don't delete the old ADR. Create a new one:
-
+We evaluated three approaches:
+1. Build custom OAuth2 server
+2. Use Auth0 SaaS
+3. Adopt Keycloak self-hosted
 ```
-# ADR-NNN: [New decision]
 
-**Status: Supersedes ADR-MMM**
+### Decision: Be Specific
+
+State the decision clearly. Avoid vague language.
+
+```markdown
+## Decision
+
+We will use Keycloak as our identity provider, self-hosted on our Kubernetes cluster.
+
+Keycloak was chosen over Auth0 due to data residency requirements for our
+European customers. We rejected a custom OAuth2 implementation due to the
+security expertise required to maintain it properly.
+```
+
+### Consequences: Be Honest
+
+List both positive and negative outcomes. Future developers need to know the trade-offs.
+
+```markdown
+## Consequences
+
+### Positive
+- SOC2 compliant authentication out of the box
+- Supports all required identity providers
+- No per-user licensing costs (critical for our freemium model)
+- Active open source community with regular security patches
+
+### Negative
+- Requires dedicated DevOps time for upgrades and maintenance
+- Adds ~2GB memory overhead to our infrastructure
+- Team needs to learn Keycloak configuration and troubleshooting
+- Potential single point of failure; needs HA setup
+```
+
+## Handling Superseded ADRs
+
+Decisions change. When you reverse a decision:
+
+1. Update the status of the old ADR to "Superseded by ADR-XXX"
+2. Write a new ADR explaining the reversal
+3. Reference the old ADR in the new one's context
+
+```markdown
+# ADR-042: Replace Keycloak with Auth0
+
+## Status
+Accepted
 
 ## Context
-Why are we reversing the previous decision? What changed?
 
-## Decision
-[New decision]
+ADR-023 established Keycloak as our identity provider in 2023. However,
+the operational burden has proven higher than anticipated. Our DevOps team
+spends approximately 8 hours per month on Keycloak maintenance, and we've
+had two production incidents related to Keycloak upgrades.
 
-## Consequences
-[New consequences, including the cost of the reversal]
+Additionally, our European data residency concerns were addressed when
+Auth0 opened their EU region data center in Frankfurt.
 ```
 
-**DO:**
-- Link to the superseded ADR
-- Explain what changed (new requirements, new technology, lessons learned)
-- Acknowledge that the original decision was reasonable given its context
+## DO and DON'T
 
-**DON'T:**
-- Delete or modify superseded ADRs (they're historical records)
-- Blame the original decision-makers (context changes)
+**DO: Keep ADRs short and focused**
 
-### Step 6: Store ADRs with the Code
+```markdown
+# ADR-001: Use PostgreSQL for primary data store
 
-Place ADRs in a `docs/adr/` directory at the project root.
+## Context
+We need a relational database for user data, orders, and inventory.
+Requirements: ACID compliance, JSON support for flexible schemas,
+excellent Node.js driver ecosystem.
 
-**Naming convention:**
-- `0001-use-postgresql.md`
-- `0002-event-driven-architecture.md`
-- `0003-superseded-by-0007.md`
+## Decision
+Use PostgreSQL 15+ as our primary database.
 
-**DO:**
-- Use sequential numbering
-- Include the decision topic in the filename
-- Reference ADR numbers in code comments where relevant
+## Consequences
 
-**DON'T:**
-- Store ADRs in a wiki separate from the code (they'll drift)
-- Use dates in filenames (sequential is clearer for ordering)
-- Write ADRs in a format that's hard to diff (use Markdown)
+### Positive
+- ACID compliance ensures data integrity
+- JSONB columns allow flexible schema evolution
+- Excellent tooling (pgAdmin, migration libraries)
+- Team has prior experience
+
+### Negative
+- Requires careful connection pool management
+- Vertical scaling limits compared to some NoSQL options
+```
+
+**DON'T: Write novels or include implementation details**
+
+```markdown
+# ADR-001: Database Selection
+
+## Context
+[Three paragraphs about the history of databases...]
+
+## Decision
+We will use PostgreSQL. Here is the connection configuration:
+```javascript
+const pool = new Pool({
+  host: 'localhost',
+  port: 5432,
+  // ... 50 more lines of config
+})
+```
+
+## Consequences
+[List of 20 generic PostgreSQL features...]
+```
+
+**DO: Explain why alternatives were rejected**
+
+```markdown
+## Context
+
+We considered MongoDB for its flexible schema but rejected it because:
+1. Our data is highly relational (users have orders, orders have items)
+2. Team lacks MongoDB operational experience
+3. ACID guarantees are required for financial transactions
+```
+
+**DON'T: Just list what you chose without context**
+
+```markdown
+## Decision
+
+We chose PostgreSQL.
+
+## Consequences
+
+It's good.
+```
+
+**DO: Update status when decisions change**
+
+```markdown
+## Status
+Superseded by ADR-015
+
+This ADR is kept for historical context. The caching strategy described
+here was replaced due to cost concerns. See ADR-015 for current approach.
+```
+
+**DON'T: Leave stale ADRs marked as "Accepted"**
+
+```markdown
+## Status
+Accepted
+
+[ADR content from 2019 that no longer reflects the system]
+```
+
+## Common ADR Categories
+
+During the ARCHITECT phase, you'll typically write ADRs for:
+
+**Data Storage**
+- Database selection (PostgreSQL, MongoDB, Redis, etc.)
+- Caching strategy
+- Data retention policies
+- Multi-region data placement
+
+**API Design**
+- REST vs GraphQL vs gRPC
+- API versioning strategy
+- Authentication mechanism
+- Rate limiting approach
+
+**Deployment**
+- Container orchestration (Kubernetes vs ECS vs Nomad)
+- CI/CD pipeline design
+- Environment strategy
+- Infrastructure as code tool selection
+
+**Security**
+- Secret management (Vault, AWS Secrets Manager, etc.)
+- Encryption at rest vs in transit
+- Network segmentation
+- Compliance approach (GDPR, SOC2)
+
+## Numbering and Organization
+
+Use sequential numbers: ADR-001, ADR-002, etc.
+
+Store ADRs in a dedicated directory:
+```
+docs/adr/
+  ADR-001-use-postgresql.md
+  ADR-002-rest-api-design.md
+  ADR-003-keycloak-authentication.md
+  ADR-042-replace-keycloak-with-auth0.md
+```
+
+Include an index in README.md:
+```markdown
+# Architecture Decision Records
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| 001 | Use PostgreSQL | Accepted |
+| 002 | REST API Design | Accepted |
+| 003 | Keycloak Authentication | Superseded by 042 |
+| 042 | Replace Keycloak with Auth0 | Accepted |
+```
+
+## Integration with ARCHITECT Phase
+
+During the ARCHITECT phase:
+
+1. Identify decisions that need ADRs as you design
+2. Write ADRs before or alongside technical specifications
+3. Link ADRs to relevant design documents
+4. Review ADRs with the team before finalizing architecture
+
+Remember: ADRs are for future you and your teammates. Write them so that someone joining the project in two years can understand why the system works the way it does.

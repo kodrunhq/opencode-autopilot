@@ -1,180 +1,374 @@
 ---
 # opencode-autopilot
 name: continuous-improvement
-description: Systematic methodology for turning retrospective lessons into concrete process improvements during the RETROSPECTIVE phase.
+description: Systematic methodology for turning retrospective lessons into concrete process improvements during the RETROSPECTIVE phase
 stacks: []
 requires: []
 ---
 
 # Continuous Improvement
 
-Methodology for converting lessons learned into measurable process improvements. Lessons without action are just complaints.
+Lessons are worthless without action. The RETROSPECTIVE phase must produce concrete improvements that actually get implemented, not just documented and forgotten.
 
-## When to Use
+This skill covers how to turn lessons learned into systematic process improvements that stick.
 
-- During the RETROSPECTIVE phase after lessons have been identified
-- When you have a list of problems but no plan to fix them
-- When previous retrospectives produced lessons that were never acted on
-- When the team feels like "nothing ever changes"
+## From Lessons to Actions: The Critical Gap
 
-## The Continuous Improvement Process
+Most teams capture lessons. Few teams systematically improve. The gap is a process for prioritizing, assigning, and validating improvements.
 
-### Step 1: Convert Lessons to Improvement Items
+---
 
-Take each lesson from the lessons-learned phase and convert it to an actionable improvement item:
+## Prioritizing Improvement Actions
 
-**Template:**
-```
-**Improvement**: [What we will change]
-**Why**: [Which lesson this addresses]
-**How**: [Specific steps to implement the change]
-**Measure**: [How we'll know it worked]
-**Owner**: [Who is responsible]
-**Deadline**: [When it will be done]
-```
+You cannot fix everything at once. Prioritize ruthlessly.
 
-**DO:**
-- Make each improvement item testable (you can verify whether it was done)
-- Limit to 3-5 items per cycle (more than that and nothing gets done)
-- Include the measurement criteria before starting
-
-**DON'T:**
-- Write vague improvements ("improve communication", "write better tests")
-- Create improvements that require no behavior change
-- Assign improvements to "the team" (assign to a specific person)
-
-### Step 2: Prioritize with Impact vs. Effort Matrix
-
-Plot each improvement on a 2×2 matrix:
+**The Impact vs. Effort Matrix**
 
 | | Low Effort | High Effort |
 |---|---|---|
-| **High Impact** | DO FIRST | PLAN |
-| **Low Impact** | FILLER | SKIP |
+| **High Impact** | Do First | Schedule |
+| **Low Impact** | Quick Wins (maybe) | Don't Do |
 
-**Quadrant actions:**
-- **Do First**: Implement immediately (quick wins with real impact)
-- **Plan**: Schedule for next cycle (big investments that need planning)
-- **Filler**: Do if you have spare capacity (low cost, low reward)
-- **Skip**: Explicitly reject (not worth the effort)
+**DO: Prioritize by objective criteria**
 
-**DO:**
-- Start with Do First items to build momentum
-- Be honest about effort estimates (multiply by 2)
-- Re-evaluate the matrix each cycle (impact and effort change)
+1. **Impact**: How much would this improve future projects? (1-5 scale)
+   - 5 = Would have saved 1+ weeks or prevented a major failure
+   - 3 = Would have saved 2-3 days or prevented minor issues
+   - 1 = Nice to have, marginal improvement
 
-**DON'T:**
-- Do all the Fillers because they're easy (they don't move the needle)
-- Skip the high-effort, high-impact items forever (plan them)
-- Let the matrix become a justification for doing nothing
+2. **Frequency**: How often will this matter? (1-5 scale)
+   - 5 = Applies to every project
+   - 3 = Applies to most projects of this type
+   - 1 = Applies only to rare edge cases
 
-### Step 3: Apply the PDCA Cycle
+3. **Effort**: How hard is it to implement? (1-5 scale, inverted)
+   - 5 = Can implement today in under 30 minutes
+   - 3 = Requires a few days of work
+   - 1 = Requires major organizational change
 
-For each improvement item, run through Plan-Do-Check-Act:
+**Priority Score = Impact × Frequency × (6 - Effort)**
 
-**Plan**: Define the change and how to measure it
-- What exactly will change?
+Actions with scores above 60 are your top priorities.
+
+**DON'T: Try to fix everything**
+
+- Limit active improvements to 3-5 per quarter
+- More improvements = less chance any get done
+- If you have 20 improvement items, you have a wishlist, not a plan
+
+**DO: Timebox improvement work**
+
+- Reserve 10-20% of capacity for process improvements
+- If improvements are always deprioritized for "real work," nothing changes
+- Schedule improvement work like any other work
+
+---
+
+## Creating Actionable Improvement Items
+
+Vague improvement goals fail. Specific improvement tasks succeed.
+
+**DO: Write improvement items with clear ownership and deadlines**
+
+```
+IMPROVEMENT: Automate staging database refresh
+CONTEXT: Lesson from Project X - staging/prod drift caused production bug
+ACTION: Create GitHub Action to refresh staging DB from production weekly
+OWNER: @devops-lead
+DEADLINE: 2024-03-15
+SUCCESS CRITERIA: Staging DB refreshes automatically; zero manual refreshes needed in Q2
+```
+
+**DON'T: Write improvement items that are vague or unowned**
+
+```
+IMPROVEMENT: Fix staging
+CONTEXT: Staging was bad
+ACTION: Make staging better
+OWNER: The team
+DEADLINE: Soon
+SUCCESS CRITERIA: Staging works good
+```
+
+**Required fields for every improvement item:**
+
+1. **What**: Specific, concrete action
+2. **Why**: Which lesson(s) this addresses
+3. **Who**: Single owner (not "the team")
+4. **When**: Specific deadline
+5. **How we'll know**: Measurable success criteria
+
+---
+
+## The PDCA Cycle for Process Improvement
+
+Plan-Do-Check-Act is the scientific method applied to process improvement.
+
+**PLAN**: Define the improvement and success metrics
+
+- What specific process are we changing?
+- What is the expected outcome?
 - How will we measure success?
-- What is the baseline (current state)?
-- What is the target (desired state)?
+- What is the timeline?
 
-**Do**: Implement the change on a small scale
-- Try the change in one project or one sprint
-- Collect data during the experiment
-- Note any unexpected side effects
+**DO**: Implement the change on a small scale first
 
-**Check**: Compare results against the baseline
-- Did the metric improve?
-- Were there unintended consequences?
-- Was the effort worth the impact?
+- Test the improvement on one project or one team
+- Document what happens
+- Don't roll out organization-wide immediately
 
-**Act**: Decide what to do next
-- **Adopt**: The change worked — make it standard practice
-- **Adapt**: The change partially worked — adjust and try again
-- **Abandon**: The change didn't work — try a different approach
+**CHECK**: Measure the results against your success criteria
 
-**DO:**
-- Run the full cycle for each improvement (don't skip Check or Act)
-- Document the results (even failed experiments are valuable data)
-- Share results with the team (transparency builds trust in the process)
+- Did the change produce the expected outcome?
+- What unexpected effects occurred?
+- Is the improvement worth the cost?
 
-**DON'T:**
-- Implement changes without measuring results (that's guessing, not improving)
-- Abandon an improvement after one failed attempt (adapt first)
-- Treat PDCA as a one-time process (it's a cycle)
+**ACT**: Standardize or abandon
 
-### Step 4: Create Feedback Loops
+- If it worked: document, train, and make it the new standard
+- If it failed: understand why, adjust, and try again
+- If it partially worked: iterate and refine
 
-Build mechanisms that catch problems early:
+**DO: Apply PDCA to every improvement**
 
-- **Leading indicators**: Metrics that predict problems before they happen (build time, test coverage, PR age)
-- **Lagging indicators**: Metrics that confirm problems after they happen (bug count, production incidents, customer complaints)
-- **Feedback triggers**: Automatic alerts when a metric crosses a threshold
+- "We'll try requiring two code reviews for 2 sprints and measure review cycle time. If it improves without blocking work, we'll keep it."
 
-**DO:**
-- Monitor leading indicators (they give you time to act)
-- Set thresholds based on historical data, not guesses
-- Review indicators regularly (weekly or per-sprint)
+**DON'T: Roll out changes without measuring impact**
 
-**DON'T:**
-- Monitor everything (focus on 3-5 key metrics)
-- Set thresholds so tight that you get alert fatigue
-- Ignore lagging indicators (they tell you if your leading indicators are wrong)
+- "We're switching to trunk-based development company-wide starting Monday."
+- Without measurement, you cannot distinguish correlation from causation
 
-### Step 5: Balance Process Rigor with Speed
+---
 
-Improvement should make work faster, not slower:
+## Measuring Whether Improvements Actually Worked
 
-- **Automate** repetitive process steps (linting, testing, deployment)
-- **Eliminate** process steps that don't add value (status meetings, manual approvals)
-- **Simplify** process steps that are too complex (multi-page templates → checklists)
+If you cannot measure it, you cannot manage it. Define metrics before implementing changes.
 
-**The improvement test**: "Does this change make us faster at delivering value?"
+**DO: Define leading and lagging indicators**
 
-**DO:**
-- Measure the cost of each process step (time spent vs. value delivered)
-- Remove process steps that cost more than they save
-- Automate before you optimize (don't optimize a manual process)
+**Leading indicators** (predict future outcomes):
+- Code review turnaround time (predicts cycle time)
+- Test coverage percentage (predicts bug escape rate)
+- Integration test failure rate (predicts production stability)
 
-**DON'T:**
-- Add process to fix a one-time problem (fix the problem, not the process)
-- Confuse ceremony with quality (more meetings ≠ better work)
-- Let process become an end in itself (process serves delivery, not vice versa)
+**Lagging indicators** (confirm past outcomes):
+- Production incident count
+- Customer-reported bug count
+- Project delivery date variance
 
-### Step 6: Track Improvement Velocity
+**Example metrics for common improvements:**
 
-Measure whether your improvement efforts are actually improving things:
+| Improvement | Leading Indicator | Lagging Indicator |
+|-------------|-------------------|-------------------|
+| Require integration tests | Test coverage % | Production bugs in API layer |
+| Daily standups | Blocker resolution time | Sprint commitment accuracy |
+| ADRs for all decisions | ADR count / decisions | Architecture confusion incidents |
+| Feature flags for risky changes | % of changes behind flags | Rollback time |
 
-- **Improvement completion rate**: How many improvement items are completed per cycle?
-- **Impact rate**: How many completed improvements actually moved the metric?
-- **Process debt**: How many improvement items are carried over without action?
+**DON'T: Rely on gut feeling**
 
-**DO:**
-- Track improvement velocity alongside delivery velocity
-- Celebrate completed improvements (they're real work)
-- Address process debt explicitly (it compounds like technical debt)
+- "Seems like code review is faster now" is not measurement
+- "The team feels better about deployments" is not evidence
 
-**DON'T:**
-- Measure improvement by how many meetings you had
-- Ignore improvement velocity (if it's zero, your process is broken)
-- Let improvement items accumulate without action (that's process debt)
+**DO: Set baselines before changes**
 
-### Step 7: Produce the Improvement Plan
+- Measure current state for 2-4 weeks before implementing change
+- Without a baseline, you cannot claim improvement
 
-Create a structured improvement plan:
+---
 
-1. **Improvement backlog**: All identified improvements, prioritized
-2. **Current cycle items**: 3-5 items with owners, deadlines, and measures
-3. **PDCA results**: Outcomes from previous cycles (adopt/adapt/abandon)
-4. **Feedback loop dashboard**: Current metrics and thresholds
-5. **Process debt register**: Unaddressed improvements with aging
+## Avoiding Improvement Bloat
 
-**DO:**
-- Keep it to one page (if it's longer, it won't be used)
-- Update it every cycle (stale plans are worse than no plans)
-- Reference it at the start of each project (what did we learn last time?)
+Too many process changes at once creates chaos. Teams spend more time learning new processes than doing work.
 
-**DON'T:**
-- Create a plan that requires a separate tool to maintain
-- Include improvements that no one owns
-- Let the plan become a guilt document ("look at all the things we didn't do")
+**DO: Limit concurrent changes**
+
+- Maximum 1 major process change per quarter
+- Maximum 3 minor changes per quarter
+- Major = changes how people work daily (e.g., switching to async standups)
+- Minor = adds a checklist or tool (e.g., adding a pre-deploy checklist)
+
+**DO: Let changes stabilize before adding more**
+
+- A process change needs 4-6 weeks to settle
+- Teams need time to learn and adapt
+- Adding another change during adaptation is counterproductive
+
+**DON'T: Change processes reactively**
+
+- One bad incident should not trigger a process overhaul
+- Look for patterns across multiple incidents before changing process
+- "Someone made a mistake" is not a reason to add more process
+
+**The Improvement Budget**
+
+Treat process change capacity like a budget:
+- Each team has 10 "improvement points" per quarter
+- Major changes cost 5 points
+- Minor changes cost 1-2 points
+- Don't exceed the budget
+
+---
+
+## Creating Feedback Loops That Catch Problems Early
+
+The earlier you detect a problem, the cheaper it is to fix. Build feedback loops at every stage.
+
+**DO: Build quality gates that fail fast**
+
+| Stage | Feedback Mechanism | Catches |
+|-------|-------------------|---------|
+| Coding | Pre-commit hooks (lint, format) | Style violations, type errors |
+| Pre-merge | CI pipeline (test, build) | Logic errors, integration issues |
+| Post-merge | Staging auto-deploy + smoke tests | Environment-specific bugs |
+| Pre-production | Integration test suite | Cross-service issues |
+| Production | Monitoring, alerting | Runtime failures |
+| Post-release | User feedback, error tracking | UX issues, edge cases |
+
+**DO: Make feedback immediate and actionable**
+
+- CI failures should point to the specific line and fix
+- Alerts should include runbook links
+- Error messages should suggest solutions
+
+**DON'T: Create feedback loops without action paths**
+
+- An alert that nobody knows how to respond to is noise
+- A CI check that fails with "something is wrong" is useless
+- A test that fails intermittently without explanation gets ignored
+
+**DO: Review and tune feedback loops quarterly**
+
+- Which alerts fire but require no action? (Remove or tune)
+- Which tests fail but never indicate real bugs? (Fix or remove)
+- Where do bugs escape to production? (Add earlier detection)
+
+---
+
+## DO/DON'T Summary
+
+| DO | DON'T |
+|----|-------|
+| Use Impact × Frequency × (6 - Effort) to prioritize | Try to fix everything at once |
+| Assign single owners and specific deadlines | Assign improvements to "the team" with no deadline |
+| Define measurable success criteria before implementing | Rely on gut feeling to judge success |
+| Apply PDCA: Plan, Do on small scale, Check, Act | Roll out changes organization-wide immediately |
+| Measure leading and lagging indicators | Define only lagging indicators (too late to adjust) |
+| Limit to 1 major + 3 minor changes per quarter | Change processes after every incident |
+| Let changes stabilize 4-6 weeks before adding more | Stack multiple changes simultaneously |
+| Build fast feedback loops with actionable outputs | Create alerts or checks nobody knows how to fix |
+| Review and tune feedback loops quarterly | Set up monitoring and never revisit it |
+| Timebox 10-20% of capacity for improvements | Always deprioritize improvements for "real work" |
+
+---
+
+## Balancing Process Rigor with Development Speed
+
+Too little process and you ship broken code. Too much process and you ship nothing. Find the balance.
+
+**The Process Sweet Spot**
+
+Process should prevent the most expensive mistakes without preventing progress on common cases.
+
+**DO: Differentiate between high-risk and low-risk changes**
+
+| Risk Level | Examples | Process Level |
+|------------|----------|---------------|
+| High | Database migrations, auth changes, payment flows | Full checklist, mandatory review, staged rollout |
+| Medium | New API endpoints, UI changes | Standard review, integration tests |
+| Low | Copy changes, config updates, typo fixes | Automated checks only, optional review |
+
+**DON'T: Apply the same process to everything**
+
+- Requiring 2 reviewers for a typo fix wastes everyone's time
+- Skipping review for a database migration invites disaster
+
+**DO: Make the default path the easy path**
+
+- If the "right way" is harder than the "fast way," people will take the fast way
+- Automate the right way so it's also the easy way
+
+**Example**: If you want people to write tests, make `npm test` run automatically on commit and fail the commit if tests fail. Don't rely on people remembering to run tests.
+
+---
+
+## Making Improvements Incremental and Testable
+
+Big-bang process changes fail. Incremental improvements stick.
+
+**DO: Break large improvements into small, testable experiments**
+
+**Big change**: "We're switching to full test-driven development."
+**Incremental approach**:
+1. Week 1-2: Try TDD on one small feature
+2. Week 3-4: Measure time-to-completion and bug count vs. previous approach
+3. Week 5-6: If successful, expand to one whole team
+4. Week 7-8: Measure team velocity and quality metrics
+5. Week 9+: Roll out organization-wide only if metrics improve
+
+**DO: Define kill criteria before starting**
+
+- "If code review time increases by more than 20%, we revert."
+- "If bug count doesn't decrease in 6 weeks, we try a different approach."
+- Pre-defined kill criteria prevent sunk-cost fallacy
+
+**DON'T: Commit to improvements before validating them**
+
+- "We're doing this for the next 6 months no matter what" prevents learning
+- Be willing to abandon changes that don't work
+
+---
+
+## Tracking Improvements Over Time
+
+Improvements need maintenance or they decay.
+
+**DO: Maintain an Improvement Log**
+
+```markdown
+# Improvement Log
+
+## 2024-Q1
+
+### COMPLETED: Automated staging refresh
+- Implemented: 2024-01-15
+- Owner: @devops-lead
+- Result: Staging refresh time reduced from 4 hours (manual) to 0 (automated)
+- Success: YES - continue
+
+### COMPLETED: Require integration tests for API changes
+- Implemented: 2024-02-01
+- Owner: @backend-lead
+- Result: API bug escape rate decreased 40%, but review time increased 15%
+- Success: PARTIAL - keep but look for ways to reduce review overhead
+
+### ABANDONED: Async standups
+- Implemented: 2024-02-15
+- Owner: @team-lead
+- Result: Blockers took 2x longer to surface
+- Success: NO - reverted to synchronous standups
+```
+
+**DO: Review the log quarterly**
+
+- Which improvements stuck? Why?
+- Which were abandoned? What can we learn?
+- Are we improving the right things?
+
+---
+
+## Final Checklist for Continuous Improvement
+
+Before marking the RETROSPECTIVE phase complete, verify:
+
+- [ ] All high-priority lessons have improvement items created
+- [ ] Every improvement has a single owner and specific deadline
+- [ ] Every improvement has measurable success criteria
+- [ ] PDCA cycle defined for each improvement
+- [ ] Baseline metrics captured before changes
+- [ ] No more than 1 major + 3 minor improvements queued
+- [ ] 10-20% of capacity reserved for improvement work
+- [ ] Feedback loops documented and assigned owners for maintenance
+- [ ] Improvement Log created and location shared
+
+Process improvement is a practice, not a project. Build the habit of systematic improvement, and every project gets better than the last.

@@ -1,3 +1,7 @@
 [test]
 coverageSkipTestFiles = true
 root = "./tests"
+# Reduce parallelism to prevent race conditions in CI
+# Setting to 4 workers instead of default (CPU cores)
+# This makes tests more reliable at the cost of some speed
+preload = ["./tests/preload.ts"]

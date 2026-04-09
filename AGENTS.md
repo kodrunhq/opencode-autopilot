@@ -156,6 +156,98 @@ describe("functionName", () => {
 
 ---
 
+## Test Isolation Requirements
+
+**CRITICAL**: All tests MUST use proper isolation patterns to prevent CI flakiness.
+
+### Required Patterns
+
+1. **Temp Directories**: ALWAYS use `mkdtemp` with unique prefix:
+   ```typescript
+   // ✅ Correct - guaranteed unique
+   import { mkdtemp } from "node:fs/promises";
+   import { tmpdir } from "node:os";
+   import { join } from "node:path";
+   import { randomUUID } from "node:crypto";
+   
+   const tempDir = await mkdtemp(join(tmpdir(), `test-${randomUUID()}-`));
+   
+   // ❌ Wrong - may conflict with parallel tests
+   const tempDir = join(tmpdir(), "my-test-dir");
+   ```
+
+2. **Cleanup**: ALWAYS clean up in `afterEach` or `afterAll`:
+   ```typescript
+   let tempDir: string;
+   
+   beforeEach(async () => {
+     tempDir = await mkdtemp(join(tmpdir(), `test-${randomUUID()}-`));
+   });
+   
+   afterEach(async () => {
+     await rm(tempDir, { recursive: true, force: true });
+   });
+   ```
+
+3. **Avoid `import.meta.dir`**: May resolve differently under coverage:
+   ```typescript
+   // ❌ Wrong - may point to coverage-instrumented location
+   const TMP_BASE = join(import.meta.dir, "__tmp__");
+   
+   // ✅ Correct - use system temp directory
+   const TMP_BASE = await mkdtemp(join(tmpdir(), `test-${randomUUID()}-`));
+   ```
+
+### Forbidden Patterns
+
+1. **NEVER use `Math.random()`**: Non-deterministic behavior
+   ```typescript
+   // ❌ Wrong - different results each run
+   const delay = Math.random() * 50;
+   
+   // ✅ Correct - use fixed values or mock time
+   const delay = 50;
+   ```
+
+2. **NEVER mutate `process.exitCode`**: Global state pollution
+   ```typescript
+   // ❌ Wrong - pollutes global state
+   process.exitCode = 1;
+   
+   // ✅ Correct - use local state
+   const exitCode = 1;
+   ```
+
+3. **NEVER use timeouts < 50ms**: Too short for CI reliability
+   ```typescript
+   // ❌ Wrong - may timeout on loaded CI
+   setTimeout(resolve, 5);
+   
+   // ✅ Correct - use adequate timeout
+   setTimeout(resolve, 100);
+   ```
+
+### Automatic Isolation
+
+**All tests automatically receive**:
+- Unique temp directory via `tests/preload.ts`
+- `process.env.TEST_TEMP_DIR` set to isolated directory
+- Automatic cleanup after each test
+
+**Even with automatic isolation**, you MUST still follow the patterns above for explicit file operations.
+
+### CI Gate
+
+A GitHub Actions workflow (`.github/workflows/test-isolation-check.yml`) enforces these rules:
+- Checks for `Math.random()` in tests → BLOCKS if found
+- Warns about `process.exitCode` mutations
+- Warns about `import.meta.dir` usage
+- Warns about timeouts < 10ms
+
+**Run locally**: `./scripts/check-test-isolation.sh`
+
+---
+
 ## Commit Messages
 
 Use conventional commits format:
