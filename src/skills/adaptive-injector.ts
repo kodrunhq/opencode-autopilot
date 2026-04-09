@@ -100,10 +100,14 @@ const EXT_MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.fr
 export async function detectProjectStackTags(projectRoot: string): Promise<readonly string[]> {
 	const tags = new Set<string>();
 
+	// Debug: log project root to diagnose CI issue
+	console.log("DEBUG detectProjectStackTags projectRoot:", projectRoot);
+
 	const results = await Promise.all(
 		Object.entries(MANIFEST_TAGS).map(async ([manifest, manifestTags]) => {
 			try {
 				await access(join(projectRoot, manifest));
+				console.log("DEBUG found manifest:", manifest, "tags:", manifestTags);
 				return [...manifestTags];
 			} catch {
 				return [];
@@ -120,6 +124,7 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 	// Check extension-based manifests (e.g., *.csproj, *.sln)
 	try {
 		const entries = await readdir(projectRoot);
+		console.log("DEBUG readdir entries:", entries);
 		for (const [ext, extTags] of Object.entries(EXT_MANIFEST_TAGS)) {
 			if (entries.some((entry) => entry.endsWith(ext))) {
 				for (const tag of extTags) {
@@ -138,6 +143,7 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 		}
 	}
 
+	console.log("DEBUG detected tags:", [...tags]);
 	return [...tags];
 }
 
