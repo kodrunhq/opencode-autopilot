@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	commandHealthCheck,
@@ -14,7 +15,7 @@ import {
 import { resetGlobalMcpManager } from "../../src/mcp";
 
 function createIsolatedTempDir(prefix: string): string {
-	return join(import.meta.dir, `.temp-${prefix}-${randomUUID()}`);
+	return join(tmpdir(), `oca-${prefix}-${randomUUID()}`);
 }
 
 // ---------------------------------------------------------------------------
