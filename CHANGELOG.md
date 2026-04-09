@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.29.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.28.0...opencode-autopilot-v1.29.0) (2026-04-09)
+
+
+### Features
+
+* add test isolation checker and update documentation ([7b35a87](https://github.com/kodrunhq/opencode-autopilot/commit/7b35a878b7611107737acf52a6be4e5354d78a67))
+* add test isolation harness and reduce CI parallelism ([58aa480](https://github.com/kodrunhq/opencode-autopilot/commit/58aa4803019d9bcdbce98499104336d585578034))
+
+
+### Bug Fixes
+
+* CI test flakiness - comprehensive permanent fix ([a689b56](https://github.com/kodrunhq/opencode-autopilot/commit/a689b564c2ca148c83a1f8f80ce68200609942fa))
+* CI test isolation for skillHealthCheck Python detection bug ([88aab76](https://github.com/kodrunhq/opencode-autopilot/commit/88aab76951372180b0cb3d43d878cb5a415e0a4f))
+* make Math.random() non-blocking in isolation checker ([8aae93f](https://github.com/kodrunhq/opencode-autopilot/commit/8aae93fc3ba9079727f2e6a5659c011e3a12c6eb))
+* remove debug logging after CI diagnosis passed ([1c1744c](https://github.com/kodrunhq/opencode-autopilot/commit/1c1744c69216940033787f3fe1aed9bdb0818e43))
+* remove unused randomUUID import and restore nested subdirectory test isolation ([ffc1291](https://github.com/kodrunhq/opencode-autopilot/commit/ffc1291bf7239888195518b8ee3d91e59f994636))
+* sort imports in preload.ts to pass lint check ([e2e7a6d](https://github.com/kodrunhq/opencode-autopilot/commit/e2e7a6d0f24ca3e2b81d02b2e323d44334e837cd))
+
 ## [1.28.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.5...opencode-autopilot-v1.28.0) (2026-04-09)
 
 
