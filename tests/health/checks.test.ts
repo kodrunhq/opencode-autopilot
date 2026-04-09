@@ -28,6 +28,12 @@ describe("skillHealthCheck", () => {
 
 		await writeFile(join(tempDir, "tsconfig.json"), "{}");
 
+		// Debug: log files and path to diagnose CI issue
+		const { readdir: readdirDebug } = await import("node:fs/promises");
+		const files = await readdirDebug(tempDir);
+		console.log("DEBUG tempDir files:", files);
+		console.log("DEBUG tempDir path:", tempDir);
+
 		const skillsDir = join(baseDir, "skills", "typescript");
 		await mkdir(skillsDir, { recursive: true });
 		await writeFile(
@@ -43,6 +49,7 @@ Content here`,
 		);
 
 		const result = await skillHealthCheck(tempDir, join(baseDir, "skills"));
+		console.log("DEBUG result:", JSON.stringify(result, null, 2));
 		expect(result.status).toBe("pass");
 		expect(result.name).toBe("skill-loading");
 		expect(result.message).toContain("typescript");
