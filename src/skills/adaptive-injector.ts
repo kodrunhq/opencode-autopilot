@@ -7,8 +7,7 @@
  * filtering even before any git diff is available.
  */
 
-import { access, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir } from "node:fs/promises";
 import { getLogger } from "../logging/domains";
 import { getGlobalMcpManager } from "../mcp";
 import { sanitizeTemplateContent } from "../review/sanitize";
@@ -100,41 +99,36 @@ const EXT_MANIFEST_TAGS: Readonly<Record<string, readonly string[]>> = Object.fr
 export async function detectProjectStackTags(projectRoot: string): Promise<readonly string[]> {
 	const tags = new Set<string>();
 
-	const results = await Promise.all(
-		Object.entries(MANIFEST_TAGS).map(async ([manifest, manifestTags]) => {
-			try {
-				await access(join(projectRoot, manifest));
-				return [...manifestTags];
-			} catch {
-				return [];
-			}
-		}),
-	);
+	let entries: Set<string>;
+	try {
+		entries = new Set(await readdir(projectRoot));
+	} catch (error: unknown) {
+		if (!isEnoentError(error)) {
+			console.error(
+				"[adaptive-injector] readdir failed for project root, skipping stack detection:",
+				error instanceof Error ? error.message : String(error),
+			);
+		}
+		return [];
+	}
 
-	for (const result of results) {
-		for (const tag of result) {
-			tags.add(tag);
+	for (const [manifest, manifestTags] of Object.entries(MANIFEST_TAGS)) {
+		if (entries.has(manifest)) {
+			for (const tag of manifestTags) {
+				tags.add(tag);
+			}
 		}
 	}
 
 	// Check extension-based manifests (e.g., *.csproj, *.sln)
-	try {
-		const entries = await readdir(projectRoot);
-		for (const [ext, extTags] of Object.entries(EXT_MANIFEST_TAGS)) {
-			if (entries.some((entry) => entry.endsWith(ext))) {
+	for (const [ext, extTags] of Object.entries(EXT_MANIFEST_TAGS)) {
+		for (const entry of entries) {
+			if (entry.endsWith(ext)) {
 				for (const tag of extTags) {
 					tags.add(tag);
 				}
+				break;
 			}
-		}
-	} catch (error: unknown) {
-		// ENOENT is expected (directory may not exist) — skip silently.
-		// Other errors (EACCES, etc.) are logged but non-fatal.
-		if (!isEnoentError(error)) {
-			console.error(
-				"[adaptive-injector] readdir failed for project root, skipping extension detection:",
-				error instanceof Error ? error.message : String(error),
-			);
 		}
 	}
 
