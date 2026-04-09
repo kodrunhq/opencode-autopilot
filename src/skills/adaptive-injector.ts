@@ -101,13 +101,16 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 	const tags = new Set<string>();
 
 	// Debug: log project root to diagnose CI issue
-	console.log("DEBUG detectProjectStackTags projectRoot:", projectRoot);
+	console.log(`DEBUG detectProjectStackTags START: projectRoot="${projectRoot}"`);
 
 	const results = await Promise.all(
 		Object.entries(MANIFEST_TAGS).map(async ([manifest, manifestTags]) => {
+			const manifestPath = join(projectRoot, manifest);
 			try {
-				await access(join(projectRoot, manifest));
-				console.log("DEBUG found manifest:", manifest, "tags:", manifestTags);
+				await access(manifestPath);
+				console.log(
+					`DEBUG FOUND manifest: ${manifest} at ${manifestPath} => tags: [${manifestTags.join(", ")}]`,
+				);
 				return [...manifestTags];
 			} catch {
 				return [];
@@ -124,9 +127,13 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 	// Check extension-based manifests (e.g., *.csproj, *.sln)
 	try {
 		const entries = await readdir(projectRoot);
-		console.log("DEBUG readdir entries:", entries);
+		console.log(`DEBUG readdir("${projectRoot}"): entries=[${entries.join(", ")}]`);
 		for (const [ext, extTags] of Object.entries(EXT_MANIFEST_TAGS)) {
-			if (entries.some((entry) => entry.endsWith(ext))) {
+			const matchingFiles = entries.filter((entry) => entry.endsWith(ext));
+			if (matchingFiles.length > 0) {
+				console.log(
+					`DEBUG FOUND extension: ${ext} => files: [${matchingFiles.join(", ")}] => tags: [${extTags.join(", ")}]`,
+				);
 				for (const tag of extTags) {
 					tags.add(tag);
 				}
@@ -143,7 +150,9 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 		}
 	}
 
-	console.log("DEBUG detected tags:", [...tags]);
+	console.log(
+		`DEBUG detectProjectStackTags END: projectRoot="${projectRoot}" => tags: [${[...tags].join(", ")}]`,
+	);
 	return [...tags];
 }
 
