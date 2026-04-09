@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.5](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.4...opencode-autopilot-v1.27.5) (2026-04-09)
+
+
+### Bug Fixes
+
+* **tests:** use tmpdir with unique prefix for truly isolated temp directories ([ba3ca42](https://github.com/kodrunhq/opencode-autopilot/commit/ba3ca429f402185c0bb69da328346d66f874b7f0))
+
 ## [1.27.4](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.3...opencode-autopilot-v1.27.4) (2026-04-09)
 
 
