@@ -24,10 +24,9 @@ async function createIsolatedTempDir(prefix: string): Promise<string> {
 describe("skillHealthCheck", () => {
 	test("returns pass with typescript stack when tsconfig.json exists", async () => {
 		const tempDir = await createIsolatedTempDir("skill-check-ts");
-		await mkdir(tempDir, { recursive: true });
+
 		await writeFile(join(tempDir, "tsconfig.json"), "{}");
 
-		// Create a skills dir with one skill
 		const skillsDir = join(tempDir, "skills", "typescript");
 		await mkdir(skillsDir, { recursive: true });
 		await writeFile(
