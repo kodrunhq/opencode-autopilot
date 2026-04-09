@@ -73,6 +73,67 @@ function createDispatchId(): string {
 	return `dispatch_${randomBytes(6).toString("hex")}`;
 }
 
+function startProgressForDispatch(phase: string, totalSteps: number): void {
+	const tracker = getProgressTracker();
+	if (!tracker) {
+		return;
+	}
+	tracker.startPhase(phase, Math.max(1, totalSteps));
+}
+
+function buildProgressLabelFromEnvelope(envelope: Readonly<ResultEnvelope>): string {
+	if (envelope.taskId !== null) {
+		return `${envelope.phase} task ${String(envelope.taskId)}`;
+	}
+	if (envelope.agent) {
+		return `${envelope.phase} ${envelope.agent}`;
+	}
+	return envelope.phase;
+}
+
+function buildProgressLabelFromPending(pending: Readonly<PendingDispatch>): string {
+	if (pending.taskId !== null) {
+		return `${pending.phase} task ${String(pending.taskId)}`;
+	}
+	return `${pending.phase} ${pending.agent}`;
+}
+
+function advanceProgressForEnvelope(envelope: Readonly<ResultEnvelope>): void {
+	getProgressTracker()?.advanceStep(buildProgressLabelFromEnvelope(envelope));
+}
+
+function addToastTaskForDispatch(
+	pending: Readonly<PendingDispatch>,
+	options?: { readonly description?: string },
+): void {
+	getTaskToastManager()?.addTask({
+		id: pending.dispatchId,
+		description: options?.description ?? buildProgressLabelFromPending(pending),
+		agent: pending.agent,
+		isBackground: false,
+	});
+}
+
+function clearToastTaskForDispatch(dispatchId: string): void {
+	getTaskToastManager()?.removeTask(dispatchId);
+}
+
+function showCompletionToastForEnvelope(
+	state: Readonly<PipelineState>,
+	envelope: Readonly<ResultEnvelope>,
+): void {
+	const pending = findPendingDispatch(state, envelope.dispatchId);
+	if (!pending) {
+		return;
+	}
+
+	getTaskToastManager()?.showCompletionToast({
+		id: pending.dispatchId,
+		description: buildProgressLabelFromEnvelope(envelope),
+		duration: formatElapsed(pending.issuedAt),
+	});
+}
+
 function findPendingDispatch(
 	state: Readonly<PipelineState>,
 	dispatchId: string,
@@ -826,10 +887,7 @@ async function processHandlerResult(
 				agent: normalizedResult.agent ?? "unknown",
 				isBackground: false,
 			});
-			const tracker = getProgressTracker();
-			if (tracker) {
-				tracker.startPhase(phase, 1);
-			}
+			startProgressForDispatch(phase, 1);
 
 			// Check if this is a review dispatch that should be inlined
 			const { inlined, reviewResult } = await maybeInlineReview(normalizedResult, artifactDir);
@@ -866,6 +924,12 @@ async function processHandlerResult(
 						(current) =>
 							applyResultEnvelope(withPendingDispatch(current, pendingEntry), inlinedEnvelope),
 					);
+					getTaskToastManager()?.showCompletionToast({
+						id: pendingEntry.dispatchId,
+						description: normalizedResult.progress ?? phase,
+						duration: formatElapsed(pendingEntry.issuedAt),
+					});
+					advanceProgressForEnvelope(inlinedEnvelope);
 
 					const handler = PHASE_HANDLERS[currentState.currentPhase];
 					const nextResult = await handler(withInlineResult, artifactDir, reviewPayloadText, {
@@ -970,6 +1034,12 @@ async function processHandlerResult(
 				agent: `${normalizedResult.agents?.length ?? 0} agents`,
 				attempt,
 			});
+			for (const pendingEntry of pendingEntries) {
+				addToastTaskForDispatch(pendingEntry, {
+					description: buildProgressLabelFromPending(pendingEntry),
+				});
+			}
+			startProgressForDispatch(phase, pendingEntries.length);
 			currentState = await updatePersistedState(artifactDir, currentState, (current) => {
 				let nextState = current;
 				for (const entry of pendingEntries) {
@@ -1302,24 +1372,6 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 								});
 							});
 
-							state = await updatePersistedState(artifactDir, state, (current) => {
-								const currentPersisted = getPersistedRetryAttempts(
-									current.retryAttempts,
-									failedPhase,
-									failedAgent,
-								);
-								const retryCountToPersist = Math.max(newCount, currentPersisted + 1);
-
-								return patchState(current, {
-									retryAttempts: setPersistedRetryAttempts(
-										current.retryAttempts,
-										failedPhase,
-										failedAgent,
-										retryCountToPersist,
-									),
-								});
-							});
-
 							logOrchestrationEvent(artifactDir, {
 								timestamp: new Date().toISOString(),
 								phase: failedPhase,
@@ -1342,6 +1394,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 							state = await updatePersistedState(artifactDir, state, (current) =>
 								applyResultEnvelope(current, parsed.envelope),
 							);
+							clearToastTaskForDispatch(parsed.envelope.dispatchId);
 
 							if (state.currentPhase !== null) {
 								const retryHandler = PHASE_HANDLERS[state.currentPhase];
@@ -1366,6 +1419,8 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 								),
 							});
 						});
+						clearToastTaskForDispatch(parsed.envelope.dispatchId);
+						advanceProgressForEnvelope(parsed.envelope);
 						const failureSummary = buildFailureSummary(
 							failedDispatchId,
 							failedPhase,
@@ -1390,7 +1445,9 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 								),
 							});
 						});
+						showCompletionToastForEnvelope(state, parsed.envelope);
 						state = nextState;
+						advanceProgressForEnvelope(parsed.envelope);
 
 						phaseHandlerContext = {
 							envelope: parsed.envelope,

@@ -33,7 +33,9 @@ export class IntentTracker {
 
 	/**
 	 * Check if intent is authorized for a session.
-	 * Returns true if oc_route has been called for this session's current user message.
+	 *
+	 * Bare oc_orchestrate calls are only allowed after an implementation
+	 * classification. Explicit intents must match exactly.
 	 */
 	isIntentAuthorized(sessionID: string, intent?: IntentType): boolean {
 		const storedIntent = this.sessionIntentMap.get(sessionID);
@@ -41,19 +43,16 @@ export class IntentTracker {
 			return false;
 		}
 
-		// If no specific intent requested, check if any intent is stored
+		// Bare oc_orchestrate calls are only valid for implementation work.
 		if (!intent) {
-			return true;
-		}
-
-		// For implementation intent, we require explicit classification
-		if (intent === "implementation") {
 			return storedIntent === "implementation";
 		}
 
-		// For other intents, allow if any intent is stored
-		// (they don't use the pipeline, so gate is less strict)
-		return true;
+		if (intent !== "implementation") {
+			return false;
+		}
+
+		return storedIntent === "implementation";
 	}
 
 	/**
@@ -161,22 +160,33 @@ export function enforceIntentGate(
 		return { allowed: true, reason: "result-based resume" };
 	}
 
+	if (intent && intent !== "implementation") {
+		return {
+			allowed: false,
+			reason: `oc_orchestrate only supports implementation intent; received "${intent}"`,
+		};
+	}
+
 	// If intent is not specified, require classification
 	if (!intent) {
 		if (!intentTracker.isIntentAuthorized(sessionID)) {
 			return {
 				allowed: false,
-				reason: "oc_orchestrate requires intent classification via oc_route first",
+				reason:
+					"oc_orchestrate without a result requires an implementation classification via oc_route first",
 			};
 		}
-		return { allowed: true, reason: "no intent specified, but session has classification" };
+		return {
+			allowed: true,
+			reason: "no intent specified, but session is classified for implementation",
+		};
 	}
 
 	// Intent is specified, check authorization
 	if (!intentTracker.isIntentAuthorized(sessionID, intent)) {
 		return {
 			allowed: false,
-			reason: `intent "${intent}" not authorized for this session. Call oc_route first.`,
+			reason: `implementation intent not authorized for this session. Call oc_route first.`,
 		};
 	}
 
