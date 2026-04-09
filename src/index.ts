@@ -298,9 +298,22 @@ const plugin: Plugin = async (input) => {
 			// biome-ignore lint/suspicious/noExplicitAny: v7 config structure
 			const configWithGroups = openCodeConfig as any;
 			const groupConfig = agentDef ? configWithGroups?.groups?.[agentDef.group] : undefined;
-			const globalFallbacks = groupConfig
-				? [groupConfig.primary, ...groupConfig.fallbacks]
-				: undefined;
+
+			const primaryFallback =
+				typeof groupConfig?.primary === "string" && groupConfig.primary.trim().length > 0
+					? groupConfig.primary
+					: undefined;
+			const groupFallbacks = Array.isArray(groupConfig?.fallbacks)
+				? groupConfig.fallbacks.filter(
+						(fallback: unknown): fallback is string =>
+							typeof fallback === "string" && fallback.trim().length > 0,
+					)
+				: [];
+			const globalFallbacks =
+				primaryFallback || groupFallbacks.length > 0
+					? [...(primaryFallback ? [primaryFallback] : []), ...groupFallbacks]
+					: undefined;
+
 			return resolveChain(agentName ?? "", agentConfigs, globalFallbacks);
 		},
 	});

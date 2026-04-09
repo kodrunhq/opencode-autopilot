@@ -1010,11 +1010,17 @@ async function processHandlerResult(
 			if (normalizedResult.taskId != null) {
 				const taskId = String(normalizedResult.taskId);
 				const taskTitle = normalizedResult.progress ?? `Task ${taskId}`;
-				const elapsed_ms = Date.now();
+
+				const matchingPendingDispatch = currentState.pendingDispatches.find(
+					(pending) => pending.dispatchId === taskId || pending.taskId === normalizedResult.taskId,
+				);
+
 				getTaskToastManager()?.showCompletionToast({
 					id: taskId,
 					description: taskTitle,
-					duration: formatElapsed(new Date(elapsed_ms).toISOString()),
+					...(matchingPendingDispatch?.issuedAt != null
+						? { duration: formatElapsed(matchingPendingDispatch.issuedAt) }
+						: {}),
 				});
 				getLogger("tool", "orchestrate").info("task completed", {
 					taskId,
