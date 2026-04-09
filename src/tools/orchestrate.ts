@@ -688,7 +688,7 @@ const MAX_PHASE_DISPATCHES: Readonly<Record<string, number>> = Object.freeze({
 	ARCHITECT: 3,
 	EXPLORE: 2,
 	PLAN: 2,
-	BUILD: 500,
+	BUILD: 20,
 	SHIP: 2,
 	RETROSPECTIVE: 2,
 });
