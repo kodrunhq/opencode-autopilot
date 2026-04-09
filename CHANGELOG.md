@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.29.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.29.0...opencode-autopilot-v1.29.1) (2026-04-09)
+
+
+### Bug Fixes
+
+* eliminate CI race condition in detectProjectStackTags ([885fa94](https://github.com/kodrunhq/opencode-autopilot/commit/885fa94705d0c0ce78546a15bf82c2c081578fe0))
+* replace parallel access() with single readdir in detectProjectStackTags ([1533ca4](https://github.com/kodrunhq/opencode-autopilot/commit/1533ca40019e2c1629edcfb041da2e66e01afa6f))
+
 ## [1.29.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.28.0...opencode-autopilot-v1.29.0) (2026-04-09)
 
 
