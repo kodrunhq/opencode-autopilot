@@ -23,11 +23,13 @@ async function createIsolatedTempDir(prefix: string): Promise<string> {
 // ---------------------------------------------------------------------------
 describe("skillHealthCheck", () => {
 	test("returns pass with typescript stack when tsconfig.json exists", async () => {
-		const tempDir = await createIsolatedTempDir("skill-check-ts");
+		const baseDir = await createIsolatedTempDir("skill-check-ts");
+		const tempDir = join(baseDir, "project");
+		await mkdir(tempDir, { recursive: true });
 
 		await writeFile(join(tempDir, "tsconfig.json"), "{}");
 
-		const skillsDir = join(tempDir, "skills", "typescript");
+		const skillsDir = join(baseDir, "skills", "typescript");
 		await mkdir(skillsDir, { recursive: true });
 		await writeFile(
 			join(skillsDir, "SKILL.md"),
@@ -41,12 +43,12 @@ requires: []
 Content here`,
 		);
 
-		const result = await skillHealthCheck(tempDir, join(tempDir, "skills"));
+		const result = await skillHealthCheck(tempDir, join(baseDir, "skills"));
 		expect(result.status).toBe("pass");
 		expect(result.name).toBe("skill-loading");
 		expect(result.message).toContain("typescript");
 
-		await rm(tempDir, { recursive: true, force: true });
+		await rm(baseDir, { recursive: true, force: true });
 	});
 
 	test("returns pass with 0 stacks for empty project root", async () => {
