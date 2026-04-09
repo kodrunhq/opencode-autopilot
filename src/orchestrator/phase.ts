@@ -169,19 +169,3 @@ export function getPhaseStatus(
 ): PhaseStatus | undefined {
 	return state.phases.find((p) => p.name === phase);
 }
-
-/**
- * Resumes an interrupted pipeline by setting status back to IN_PROGRESS.
- * Throws if the pipeline is not in INTERRUPTED status.
- */
-export function resumePhase(state: Readonly<PipelineState>): PipelineState {
-	if (state.status !== "INTERRUPTED") {
-		throw new Error(
-			`Cannot resume phase: pipeline status is "${state.status}", expected "INTERRUPTED"`,
-		);
-	}
-
-	return patchState(state, {
-		status: "IN_PROGRESS",
-	});
-}

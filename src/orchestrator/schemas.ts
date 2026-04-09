@@ -20,7 +20,6 @@ export const phaseSchema = z.enum(PHASES);
 
 export const phaseStatusSchema = z.object({
 	name: phaseSchema,
-	phaseNumber: z.number().int().positive(),
 	status: z.enum(["PENDING", "IN_PROGRESS", "DONE", "SKIPPED"]),
 	completedAt: z.string().max(128).nullable().default(null),
 	confidence: z.enum(["HIGH", "MEDIUM", "LOW"]).nullable().default(null),

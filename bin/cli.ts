@@ -339,9 +339,7 @@ if (import.meta.main) {
 		case "configure": {
 			const groupIdx = args.indexOf("--group");
 			const groupFilter =
-				groupIdx >= 0 && args[groupIdx + 1]
-					? (args[groupIdx + 1].split(",").map((g: string) => g.trim()) as readonly GroupId[])
-					: undefined;
+				groupIdx >= 0 && args[groupIdx + 1] ? (args[groupIdx + 1] as GroupId) : undefined;
 			await runConfigure(CONFIG_PATH, groupFilter);
 			break;
 		}

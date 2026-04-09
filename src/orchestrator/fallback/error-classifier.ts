@@ -173,7 +173,6 @@ export function classifyErrorType(error: unknown): ErrorType {
 	if (
 		errorName?.includes("providermodelnotfounderror") ||
 		errorName?.includes("modelnotfounderror") ||
-		errorName?.toLowerCase().includes("providermodelnotfound") ||
 		(errorName?.includes("unknownerror") && /model\s+not\s+found/i.test(message)) ||
 		/model.*not.*(?:found|exist)/i.test(message)
 	)

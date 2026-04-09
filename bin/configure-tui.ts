@@ -6,7 +6,6 @@
 
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
-import checkbox from "@inquirer/checkbox";
 import confirm from "@inquirer/confirm";
 import search, { Separator } from "@inquirer/search";
 import { CONFIG_PATH, createDefaultConfig, loadConfig, saveConfig } from "../src/config";
@@ -106,36 +105,63 @@ export function createSearchSource(models: readonly DiscoveredModel[], exclude?:
 	};
 }
 
-// ── Checkbox-based fallback selection ──────────────────────────────
+// ── Searchable fallback selection ──────────────────────────────────
 
 /**
- * Select fallback models using a checkbox prompt.
- * Shows all available models (excluding the primary) as choices.
- * Returns the selected array of model IDs.
+ * Select fallback models one at a time using the searchable prompt.
+ * Each iteration lets the user type to search, pick a model, then
+ * decide whether to add another. Already-selected models and the
+ * primary are excluded from subsequent searches.
  */
-async function selectFallbacksViaCheckbox(
+async function selectFallbacksViaSearch(
 	models: readonly DiscoveredModel[],
 	primary: string,
 	groupLabel: string,
 ): Promise<string[]> {
-	const available = models.filter((m) => m.id !== primary);
+	const selected: string[] = [];
+	const excluded = new Set<string>([primary]);
 
-	if (available.length === 0) {
-		console.log(`  ${dim("No other models available for fallbacks.")}`);
-		return [];
+	while (true) {
+		const available = models.filter((m) => !excluded.has(m.id));
+		if (available.length === 0) {
+			if (selected.length === 0) {
+				console.log(`  ${dim("No other models available for fallbacks.")}`);
+			} else {
+				console.log(`  ${dim("No more models available.")}`);
+			}
+			break;
+		}
+
+		const orderLabel =
+			selected.length === 0
+				? "1st"
+				: selected.length === 1
+					? "2nd"
+					: selected.length === 2
+						? "3rd"
+						: `${selected.length + 1}th`;
+
+		if (selected.length > 0) {
+			console.log(`  ${dim("Selected so far:")} ${selected.map(cyan).join(" → ")}`);
+		}
+
+		const fallback = await search({
+			message: `${orderLabel} fallback for ${groupLabel} (type to search):`,
+			source: createSearchSource(models, excluded),
+			pageSize: 15,
+		});
+
+		selected.push(fallback);
+		excluded.add(fallback);
+		console.log(`  ${green("+")} ${cyan(fallback)}`);
+
+		const addMore = await confirm({
+			message: "Add another fallback?",
+			default: false,
+		});
+
+		if (!addMore) break;
 	}
-
-	const choices = available.map((m) => ({
-		name: m.id,
-		value: m.id,
-		description: m.model,
-	}));
-
-	const selected = await checkbox({
-		message: `Select fallback models for ${groupLabel}:`,
-		choices,
-		pageSize: 15,
-	});
 
 	return selected;
 }
@@ -212,7 +238,7 @@ async function configureGroup(
 		});
 
 		if (wantFallbacks) {
-			fallbacks = await selectFallbacksViaCheckbox(models, primary, def.label);
+			fallbacks = await selectFallbacksViaSearch(models, primary, def.label);
 		}
 	} else {
 		console.log(`  ${dim("No other models available for fallbacks.")}`);
@@ -235,7 +261,7 @@ async function configureGroup(
 
 export async function runConfigure(
 	configPath: string = CONFIG_PATH,
-	groupFilter?: readonly GroupId[],
+	groupFilter?: GroupId,
 ): Promise<void> {
 	console.log("");
 	console.log(bold("opencode-autopilot configure"));
@@ -264,10 +290,9 @@ export async function runConfigure(
 	const existingConfig = await loadConfig(configPath);
 
 	if (groupFilter) {
-		const invalidGroups = groupFilter.filter((g) => !ALL_GROUP_IDS.includes(g));
-		if (invalidGroups.length > 0) {
+		if (!ALL_GROUP_IDS.includes(groupFilter)) {
 			console.log(
-				`  ${red("✗")} Unknown group(s): ${invalidGroups.join(", ")}. Valid groups: ${ALL_GROUP_IDS.join(", ")}`,
+				`  ${red("✗")} Unknown group "${groupFilter}". Valid groups: ${ALL_GROUP_IDS.join(", ")}`,
 			);
 			process.exit(1);
 		}
@@ -278,14 +303,11 @@ export async function runConfigure(
 			GroupModelAssignment
 		>;
 
-		const groupLabels = groupFilter.map((g) => GROUP_DEFINITIONS[g].label).join(", ");
-		console.log(`  Configuring groups: ${bold(groupLabels)}`);
+		console.log(`  Configuring group: ${bold(GROUP_DEFINITIONS[groupFilter].label)}`);
 		console.log("");
 
-		for (const groupId of groupFilter) {
-			assignments[groupId] = await configureGroup(groupId, models, assignments);
-			showDiversityWarnings(assignments);
-		}
+		assignments[groupFilter] = await configureGroup(groupFilter, models, assignments);
+		showDiversityWarnings(assignments);
 
 		console.log("");
 		const doCommit = await confirm({

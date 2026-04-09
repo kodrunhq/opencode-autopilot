@@ -30,7 +30,6 @@ export function createInitialState(idea: string): PipelineState {
 		lastUpdatedAt: now,
 		phases: PHASES.map((name, i) => ({
 			name,
-			phaseNumber: i + 1,
 			status: i === 0 ? "IN_PROGRESS" : "PENDING",
 		})),
 		decisions: [],

@@ -15,23 +15,15 @@ describe("generateSessionSummary", () => {
 			status: "COMPLETED",
 			currentPhase: "RETROSPECTIVE",
 			phases: [
-				{
-					name: "RECON",
-					phaseNumber: 1,
-					status: "DONE",
-					completedAt: "2024-01-01T00:00:00Z",
-					confidence: "HIGH",
-				},
+				{ name: "RECON", status: "DONE", completedAt: "2024-01-01T00:00:00Z", confidence: "HIGH" },
 				{
 					name: "CHALLENGE",
-					phaseNumber: 2,
 					status: "DONE",
 					completedAt: "2024-01-01T00:01:00Z",
 					confidence: "HIGH",
 				},
 				{
 					name: "ARCHITECT",
-					phaseNumber: 3,
 					status: "DONE",
 					completedAt: "2024-01-01T00:02:00Z",
 					confidence: "HIGH",

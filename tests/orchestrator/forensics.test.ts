@@ -16,9 +16,8 @@ function makeMinimalState(overrides: Record<string, unknown> = {}): PipelineStat
 		(status === "COMPLETED" ? null : "RECON");
 	const phases =
 		(overrides.phases as PipelineState["phases"] | undefined) ??
-		PHASES.map((name, i) => ({
+		PHASES.map((name) => ({
 			name,
-			phaseNumber: i + 1,
 			status: currentPhase === null ? "PENDING" : name === currentPhase ? "IN_PROGRESS" : "PENDING",
 		}));
 	return pipelineStateSchema.parse({
@@ -104,7 +103,7 @@ describe("failureContext schema", () => {
 			currentPhase: "BUILD",
 			startedAt: new Date().toISOString(),
 			lastUpdatedAt: new Date().toISOString(),
-			phases: PHASES.map((name, i) => ({ name, phaseNumber: i + 1, status: "PENDING" })),
+			phases: PHASES.map((name) => ({ name, status: "PENDING" })),
 		};
 		const parsed = pipelineStateSchema.parse(raw);
 		expect(parsed.failureContext).toBeNull();
@@ -146,9 +145,8 @@ describe("orchestrateCore failure metadata capture", () => {
 
 		const state = makeMinimalState({
 			currentPhase: "RECON",
-			phases: PHASES.map((name, i) => ({
+			phases: PHASES.map((name) => ({
 				name,
-				phaseNumber: i + 1,
 				status: name === "RECON" ? "IN_PROGRESS" : "PENDING",
 			})),
 		});
@@ -188,9 +186,8 @@ describe("orchestrateCore failure metadata capture", () => {
 
 		const state = makeMinimalState({
 			currentPhase: "ARCHITECT",
-			phases: PHASES.map((name, i) => ({
+			phases: PHASES.map((name) => ({
 				name,
-				phaseNumber: i + 1,
 				status:
 					name === "RECON" || name === "CHALLENGE"
 						? "DONE"
@@ -301,9 +298,8 @@ describe("forensicsCore", () => {
 		const state = makeMinimalState({
 			status: "FAILED",
 			currentPhase: "ARCHITECT",
-			phases: PHASES.map((name, i) => ({
+			phases: PHASES.map((name) => ({
 				name,
-				phaseNumber: i + 1,
 				status:
 					name === "RECON" || name === "CHALLENGE"
 						? "DONE"
@@ -377,9 +373,8 @@ describe("forensicsCore", () => {
 		const state = makeMinimalState({
 			status: "FAILED",
 			currentPhase: "PLAN",
-			phases: PHASES.map((name, i) => ({
+			phases: PHASES.map((name) => ({
 				name,
-				phaseNumber: i + 1,
 				status:
 					name === "RECON" || name === "CHALLENGE" || name === "ARCHITECT"
 						? "DONE"

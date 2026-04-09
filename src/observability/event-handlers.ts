@@ -17,7 +17,6 @@ import { classifyErrorType, getErrorMessage } from "../orchestrator/fallback/err
 import { generateSessionSummary } from "../ux/session-summary";
 import { getContextUtilizationString } from "./context-display";
 import type { ContextMonitor } from "./context-monitor";
-import { globalCostTracker } from "./cost-tracker";
 import { emitErrorEvent, emitToolCompleteEvent } from "./event-emitter";
 import type { ObservabilityEvent, SessionEventStore, SessionEvents } from "./event-store";
 import { accumulateTokensFromMessage, createEmptyTokenAggregate } from "./token-tracker";
@@ -163,20 +162,6 @@ export function createObservabilityEventHandler(deps: ObservabilityHandlerDeps) 
 					const empty = createEmptyTokenAggregate();
 					const accumulated = accumulateTokensFromMessage(empty, info);
 					eventStore.accumulateTokens(sessionId, accumulated);
-
-					const agent = (info as Record<string, unknown>).agent;
-					const model = (info as Record<string, unknown>).model;
-					globalCostTracker.recordCost({
-						timestamp: new Date().toISOString(),
-						sessionId,
-						agent: typeof agent === "string" ? agent : "unknown",
-						model: typeof model === "string" ? model : undefined,
-						operation: "message",
-						inputTokens: info.tokens.input,
-						outputTokens: info.tokens.output,
-						totalTokens:
-							accumulated.inputTokens + accumulated.outputTokens + accumulated.reasoningTokens,
-					});
 
 					// Check context utilization
 					const utilResult = contextMonitor.processMessage(sessionId, info.tokens.input);
