@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.27.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.1...opencode-autopilot-v1.27.2) (2026-04-09)
+
+
+### Bug Fixes
+
+* **orchestrator:** add phaseNumber to PhaseStatus schema (Issue 9) ([aea7eed](https://github.com/kodrunhq/opencode-autopilot/commit/aea7eed866b86286afb7a47d376362faf228587e))
+* **orchestrator:** resolve fallback groups and pass toast duration ([11645c4](https://github.com/kodrunhq/opencode-autopilot/commit/11645c4cc7fbaad1422705c9a626baa66b325db5))
+
 ## [1.27.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.0...opencode-autopilot-v1.27.1) (2026-04-08)
 
 
