@@ -58,7 +58,6 @@ import {
 	createRecoveryOrchestratorWithDb,
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
-import { AGENT_REGISTRY } from "./registry/model-groups";
 import {
 	clearIntentSession,
 	enforceIntentGate,
@@ -185,7 +184,8 @@ const plugin: Plugin = async (input) => {
 	const notificationManager = new NotificationManager({
 		sink: {
 			showToast: async (title, message, variant, duration) => {
-				await sdkOps.showToast(title, message, variant as "info" | "warning" | "error", duration);
+				await sdkOps.showToast(title, message, variant as "info" | "warning" | "error");
+				void duration;
 			},
 		},
 	});
@@ -228,9 +228,9 @@ const plugin: Plugin = async (input) => {
 				query: { directory: process.cwd() },
 			});
 		},
-		showToast: async (title, message, variant, duration) => {
+		showToast: async (title, message, variant) => {
 			await client.tui.showToast({
-				body: { title, message, variant, duration: duration ?? 5000 },
+				body: { title, message, variant, duration: 5000 },
 			});
 		},
 	};
@@ -294,14 +294,7 @@ const plugin: Plugin = async (input) => {
 				| undefined;
 			// Per-agent fallback_models are populated by configHook from group/override config.
 			// resolveChain reads config.agent[agentName].fallback_models (tier 1).
-			const agentDef = AGENT_REGISTRY[agentName ?? ""];
-			// biome-ignore lint/suspicious/noExplicitAny: v7 config structure
-			const configWithGroups = openCodeConfig as any;
-			const groupConfig = agentDef ? configWithGroups?.groups?.[agentDef.group] : undefined;
-			const globalFallbacks = groupConfig
-				? [groupConfig.primary, ...groupConfig.fallbacks]
-				: undefined;
-			return resolveChain(agentName ?? "", agentConfigs, globalFallbacks);
+			return resolveChain(agentName ?? "", agentConfigs, undefined);
 		},
 	});
 

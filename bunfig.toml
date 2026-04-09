@@ -1,3 +1,2 @@
 [test]
 coverageSkipTestFiles = true
-root = "./tests"
