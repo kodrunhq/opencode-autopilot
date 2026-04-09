@@ -24,16 +24,16 @@ describe("Agent visibility invariants", () => {
 			expect(agents.debugger.mode).toBe("all");
 		});
 
-		it("planner has mode 'all'", () => {
-			expect(agents.planner.mode).toBe("all");
+		it("specialist-planner has mode 'all'", () => {
+			expect(agents["specialist-planner"].mode).toBe("all");
 		});
 
-		it("reviewer has mode 'all'", () => {
-			expect(agents.reviewer.mode).toBe("all");
+		it("specialist-reviewer has mode 'all'", () => {
+			expect(agents["specialist-reviewer"].mode).toBe("all");
 		});
 
-		it("researcher has mode 'all'", () => {
-			expect(agents.researcher.mode).toBe("all");
+		it("specialist-researcher has mode 'all'", () => {
+			expect(agents["specialist-researcher"].mode).toBe("all");
 		});
 
 		it("metaprompter has mode 'subagent' (not 'all')", () => {
@@ -48,7 +48,7 @@ describe("Agent visibility invariants", () => {
 			expect(agents["security-auditor"].mode).toBe("subagent");
 		});
 
-		it("exactly 7 agents have mode 'all': autopilot, coder, debugger, oracle, planner, researcher, reviewer", () => {
+		it("exactly 7 agents have mode 'all': autopilot, coder, debugger, oracle, specialist-planner, specialist-researcher, specialist-reviewer", () => {
 			const primaryAgents = Object.entries(agents)
 				.filter(([_, agent]) => agent.mode === "all")
 				.map(([name]) => name);
@@ -57,9 +57,9 @@ describe("Agent visibility invariants", () => {
 				"coder",
 				"debugger",
 				"oracle",
-				"planner",
-				"researcher",
-				"reviewer",
+				"specialist-planner",
+				"specialist-researcher",
+				"specialist-reviewer",
 			]);
 		});
 	});
@@ -83,17 +83,17 @@ describe("Agent visibility invariants", () => {
 				"coder",
 				"debugger",
 				"oracle",
-				"planner",
-				"researcher",
-				"reviewer",
+				"specialist-planner",
+				"specialist-researcher",
+				"specialist-reviewer",
 			]);
 			expect(sorted[0]).toBe("autopilot");
 			expect(sorted[1]).toBe("coder");
 			expect(sorted[2]).toBe("debugger");
 			expect(sorted[3]).toBe("oracle");
-			expect(sorted[4]).toBe("planner");
-			expect(sorted[5]).toBe("researcher");
-			expect(sorted[6]).toBe("reviewer");
+			expect(sorted[4]).toBe("specialist-planner");
+			expect(sorted[5]).toBe("specialist-researcher");
+			expect(sorted[6]).toBe("specialist-reviewer");
 		});
 	});
 
@@ -104,16 +104,16 @@ describe("Agent visibility invariants", () => {
 			expect(agents.debugger.permission?.webfetch).toBe("deny");
 		});
 
-		it("planner allows edit and bash, denies webfetch", () => {
-			expect(agents.planner.permission?.edit).toBe("allow");
-			expect(agents.planner.permission?.bash).toBe("allow");
-			expect(agents.planner.permission?.webfetch).toBe("deny");
+		it("specialist-planner allows edit and bash, denies webfetch", () => {
+			expect(agents["specialist-planner"].permission?.edit).toBe("allow");
+			expect(agents["specialist-planner"].permission?.bash).toBe("allow");
+			expect(agents["specialist-planner"].permission?.webfetch).toBe("deny");
 		});
 
-		it("reviewer denies edit, allows bash, denies webfetch", () => {
-			expect(agents.reviewer.permission?.edit).toBe("deny");
-			expect(agents.reviewer.permission?.bash).toBe("allow");
-			expect(agents.reviewer.permission?.webfetch).toBe("deny");
+		it("specialist-reviewer denies edit, allows bash, denies webfetch", () => {
+			expect(agents["specialist-reviewer"].permission?.edit).toBe("deny");
+			expect(agents["specialist-reviewer"].permission?.bash).toBe("allow");
+			expect(agents["specialist-reviewer"].permission?.webfetch).toBe("deny");
 		});
 	});
 

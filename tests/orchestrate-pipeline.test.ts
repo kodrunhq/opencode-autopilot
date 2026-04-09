@@ -140,6 +140,11 @@ describe("orchestrateCore pipeline dispatch", () => {
 		};
 		await saveState(planState, tempDir);
 
+		// Create ARCHITECT artifact for PLAN handler
+		const architectDir = getPhaseDir(tempDir, "ARCHITECT", planState.runId);
+		await mkdir(architectDir, { recursive: true });
+		await writeFile(join(architectDir, "design.md"), "# Design\n\nArchitecture design");
+
 		// No result = resume -> handler should dispatch
 		const result = await orchestrateCore({}, tempDir);
 		const parsed = JSON.parse(result);
@@ -289,10 +294,10 @@ describe("orchestrateCore pipeline dispatch", () => {
 	test("circuit breaker returns error when phase exceeds max dispatches", async () => {
 		const { orchestrateCore } = await import("../src/tools/orchestrate");
 		const state = createInitialState("test idea");
-		// Pre-set dispatch count to just under the RECON limit (3)
+		// Pre-set dispatch count to just under the RECON limit (2)
 		const preloaded = {
 			...state,
-			phaseDispatchCounts: { RECON: 3 },
+			phaseDispatchCounts: { "RECON:oc-researcher": 2 },
 		};
 		await saveState(preloaded, tempDir);
 
@@ -472,7 +477,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 		const { orchestrateCore } = await import("../src/tools/orchestrate");
 		const state = createInitialState("test idea");
 		// ARCHITECT with MEDIUM confidence triggers dispatch_multi (depth=2).
-		// Pre-set dispatch count to the ARCHITECT limit (10) so next dispatch is blocked.
+		// Pre-set dispatch count to the ARCHITECT limit (3) so next dispatch is blocked.
 		const archState = {
 			...state,
 			currentPhase: "ARCHITECT" as Phase,
@@ -486,7 +491,7 @@ describe("orchestrateCore pipeline dispatch", () => {
 					rationale: "some uncertainty",
 				},
 			],
-			phaseDispatchCounts: { ARCHITECT: 10 },
+			phaseDispatchCounts: { "ARCHITECT:oc-architect": 3 },
 			phases: state.phases.map((p) =>
 				["RECON", "CHALLENGE"].includes(p.name)
 					? { ...p, status: "DONE" as const }
@@ -545,6 +550,10 @@ describe("orchestrateCore pipeline dispatch", () => {
 			),
 		};
 		await saveState(planState, tempDir);
+
+		const architectDir = getPhaseDir(tempDir, "ARCHITECT", planState.runId);
+		await mkdir(architectDir, { recursive: true });
+		await writeFile(join(architectDir, "design.md"), "# Design\n\nArchitecture design");
 
 		const first = JSON.parse(await orchestrateCore({}, tempDir));
 		expect(first.action).toBe("dispatch");
@@ -612,13 +621,13 @@ describe("configHook pipeline agents", () => {
 		expect(config.agent).toBeDefined();
 		const agents = config.agent as Record<string, unknown>;
 		// standard agents
-		expect(agents.researcher).toBeDefined();
+		expect(agents["specialist-researcher"]).toBeDefined();
 		expect(agents.metaprompter).toBeDefined();
 		expect(agents["pr-reviewer"]).toBeDefined();
 		expect(agents.autopilot).toBeDefined();
 		expect(agents.debugger).toBeDefined();
-		expect(agents.planner).toBeDefined();
-		expect(agents.reviewer).toBeDefined();
+		expect(agents["specialist-planner"]).toBeDefined();
+		expect(agents["specialist-reviewer"]).toBeDefined();
 		expect(agents.coder).toBeDefined();
 		expect(agents["security-auditor"]).toBeDefined();
 

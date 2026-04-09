@@ -1,9 +1,10 @@
+import { execFile } from "node:child_process";
+import { mkdir, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import type { BranchLifecycle } from "../types";
 
-// ADR: Worktrees deferred. Parallel BUILD execution uses dispatch_multi on a
-// single branch rather than per-task worktrees. The worktreePath field and
-// recordWorktreePath utility are retained for future multi-branch support
-// but are not invoked at runtime. See PR #90 for rationale.
+const execFileAsync = promisify(execFile);
 
 export interface BranchPrUpdateInput {
 	readonly runId: string;
@@ -135,4 +136,86 @@ export function buildPrBody(
 	);
 
 	return lines.join("\n");
+}
+
+export interface WorktreeInfo {
+	readonly path: string;
+	readonly branch: string;
+	readonly agentIndex: number;
+}
+
+export async function createWorktree(
+	projectRoot: string,
+	branchName: string,
+	agentIndex: number,
+	sessionId: string,
+): Promise<WorktreeInfo> {
+	const worktreeBaseDir = `/tmp/opencode-${sessionId}`;
+	const worktreePath = join(worktreeBaseDir, `wt-${agentIndex}`);
+
+	await mkdir(worktreeBaseDir, { recursive: true });
+
+	try {
+		await execFileAsync("git", ["worktree", "add", worktreePath, branchName], {
+			cwd: projectRoot,
+		});
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		if (errorMessage.includes("already exists")) {
+			await execFileAsync("git", ["worktree", "remove", worktreePath], {
+				cwd: projectRoot,
+			});
+			await execFileAsync("git", ["worktree", "add", worktreePath, branchName], {
+				cwd: projectRoot,
+			});
+		} else {
+			throw error;
+		}
+	}
+
+	return Object.freeze({
+		path: worktreePath,
+		branch: branchName,
+		agentIndex,
+	});
+}
+
+export async function removeWorktree(projectRoot: string, worktreePath: string): Promise<void> {
+	try {
+		await execFileAsync("git", ["worktree", "remove", worktreePath, "--force"], {
+			cwd: projectRoot,
+		});
+	} catch {
+		try {
+			await rm(worktreePath, { recursive: true, force: true });
+		} catch {}
+	}
+}
+
+export async function cleanupWorktrees(projectRoot: string, sessionId: string): Promise<void> {
+	const worktreeBaseDir = `/tmp/opencode-${sessionId}`;
+
+	try {
+		const { stdout } = await execFileAsync("git", ["worktree", "list", "--porcelain"], {
+			cwd: projectRoot,
+		});
+
+		const worktreePaths = stdout
+			.split("\n")
+			.filter((line) => line.startsWith("worktree "))
+			.map((line) => line.slice("worktree ".length).trim())
+			.filter((path) => path.startsWith(worktreeBaseDir));
+
+		for (const path of worktreePaths) {
+			await removeWorktree(projectRoot, path);
+		}
+	} catch {}
+
+	try {
+		await rm(worktreeBaseDir, { recursive: true, force: true });
+	} catch {}
+}
+
+export function getWorktreePath(sessionId: string, agentIndex: number): string {
+	return `/tmp/opencode-${sessionId}/wt-${agentIndex}`;
 }

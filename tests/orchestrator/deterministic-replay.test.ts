@@ -222,6 +222,7 @@ describe("deterministic replay", () => {
 			processedResultIds: [],
 			failureContext: null,
 			phaseDispatchCounts: {},
+			retryAttempts: {},
 		};
 
 		await Bun.write(join(tempDirA, "state.json"), JSON.stringify(customState, null, 2));

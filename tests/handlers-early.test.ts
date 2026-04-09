@@ -1,16 +1,24 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { PipelineState } from "../src/orchestrator/types";
 
-// Minimal state factory for handler tests
+let tempDir: string;
+
+beforeEach(async () => {
+	tempDir = await mkdtemp(join(tmpdir(), "handler-test-"));
+});
+
+// Minimal state factory for handler tests (non-run-scoped paths)
 function makeState(overrides: Partial<PipelineState> = {}): PipelineState {
-	const now = new Date().toISOString();
 	return {
 		schemaVersion: 2,
 		status: "IN_PROGRESS",
 		idea: "Build a CLI tool for managing dotfiles",
 		currentPhase: "RECON",
-		startedAt: now,
-		lastUpdatedAt: now,
+		startedAt: new Date().toISOString(),
+		lastUpdatedAt: new Date().toISOString(),
 		phases: [
 			{ name: "RECON", phaseNumber: 1, status: "IN_PROGRESS" },
 			{ name: "CHALLENGE", phaseNumber: 2, status: "PENDING" },
@@ -34,7 +42,7 @@ describe("handleRecon", () => {
 	test("returns dispatch with oc-researcher agent", async () => {
 		const { handleRecon } = await import("../src/orchestrator/handlers/recon");
 		const state = makeState();
-		const result = await handleRecon(state, "/tmp/test-artifacts");
+		const result = await handleRecon(state, tempDir);
 
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe("oc-researcher");
@@ -44,7 +52,7 @@ describe("handleRecon", () => {
 	test("prompt includes idea text", async () => {
 		const { handleRecon } = await import("../src/orchestrator/handlers/recon");
 		const state = makeState({ idea: "A tool for dotfile management" });
-		const result = await handleRecon(state, "/tmp/test-artifacts");
+		const result = await handleRecon(state, tempDir);
 
 		expect(result.prompt).toContain("A tool for dotfile management");
 	});
@@ -52,15 +60,15 @@ describe("handleRecon", () => {
 	test("prompt includes absolute artifact path reference", async () => {
 		const { handleRecon } = await import("../src/orchestrator/handlers/recon");
 		const state = makeState();
-		const result = await handleRecon(state, "/tmp/test-artifacts");
+		const result = await handleRecon(state, tempDir);
 
-		expect(result.prompt).toContain("/tmp/test-artifacts/phases/RECON/report.md");
+		expect(result.prompt).toContain(`${tempDir}/phases/RECON/report.md`);
 	});
 
 	test("prompt does NOT include content from other phases", async () => {
 		const { handleRecon } = await import("../src/orchestrator/handlers/recon");
 		const state = makeState();
-		const result = await handleRecon(state, "/tmp/test-artifacts");
+		const result = await handleRecon(state, tempDir);
 
 		expect(result.prompt).not.toContain("CHALLENGE");
 		expect(result.prompt).not.toContain("ARCHITECT");
@@ -68,24 +76,22 @@ describe("handleRecon", () => {
 
 	test("returns complete when result is provided", async () => {
 		const { handleRecon } = await import("../src/orchestrator/handlers/recon");
-		const fs = await import("node:fs/promises");
-		const tmpDir = `/tmp/test-recon-complete-${Date.now()}`;
-		const artifactPath = `${tmpDir}/phases/RECON/report.md`;
-		await fs.mkdir(`${tmpDir}/phases/RECON`, { recursive: true });
-		await fs.writeFile(artifactPath, "# Report\nContent");
+		const artifactDir = join(tempDir, "artifacts");
+		const artifactPath = join(artifactDir, "phases", "RECON", "report.md");
+		await mkdir(join(artifactDir, "phases", "RECON"), { recursive: true });
+		await writeFile(artifactPath, "# Report\nContent");
 
 		const state = makeState();
-		const result = await handleRecon(state, tmpDir, "done");
+		const result = await handleRecon(state, artifactDir, "done");
 
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("RECON");
-		await fs.rm(tmpDir, { recursive: true, force: true });
 	});
 
 	test("returned DispatchResult is frozen", async () => {
 		const { handleRecon } = await import("../src/orchestrator/handlers/recon");
 		const state = makeState();
-		const result = await handleRecon(state, "/tmp/test-artifacts");
+		const result = await handleRecon(state, tempDir);
 
 		expect(Object.isFrozen(result)).toBe(true);
 	});
@@ -95,7 +101,7 @@ describe("handleChallenge", () => {
 	test("returns dispatch with oc-challenger agent", async () => {
 		const { handleChallenge } = await import("../src/orchestrator/handlers/challenge");
 		const state = makeState({ currentPhase: "CHALLENGE" });
-		const result = await handleChallenge(state, "/tmp/test-artifacts");
+		const result = await handleChallenge(state, tempDir);
 
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe("oc-challenger");
@@ -105,31 +111,29 @@ describe("handleChallenge", () => {
 	test("prompt references absolute RECON artifacts path", async () => {
 		const { handleChallenge } = await import("../src/orchestrator/handlers/challenge");
 		const state = makeState({ currentPhase: "CHALLENGE" });
-		const result = await handleChallenge(state, "/tmp/test-artifacts");
+		const result = await handleChallenge(state, tempDir);
 
-		expect(result.prompt).toContain("/tmp/test-artifacts/phases/RECON/report.md");
+		expect(result.prompt).toContain(`${tempDir}/phases/RECON/report.md`);
 	});
 
 	test("returns complete when result is provided", async () => {
 		const { handleChallenge } = await import("../src/orchestrator/handlers/challenge");
-		const fs = await import("node:fs/promises");
-		const tmpDir = `/tmp/test-challenge-complete-${Date.now()}`;
-		const artifactPath = `${tmpDir}/phases/CHALLENGE/brief.md`;
-		await fs.mkdir(`${tmpDir}/phases/CHALLENGE`, { recursive: true });
-		await fs.writeFile(artifactPath, "# Brief\nContent");
+		const artifactDir = join(tempDir, "artifacts");
+		const artifactPath = join(artifactDir, "phases", "CHALLENGE", "brief.md");
+		await mkdir(join(artifactDir, "phases", "CHALLENGE"), { recursive: true });
+		await writeFile(artifactPath, "# Brief\nContent");
 
 		const state = makeState({ currentPhase: "CHALLENGE" });
-		const result = await handleChallenge(state, tmpDir, "done");
+		const result = await handleChallenge(state, artifactDir, "done");
 
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("CHALLENGE");
-		await fs.rm(tmpDir, { recursive: true, force: true });
 	});
 
 	test("returned DispatchResult is frozen", async () => {
 		const { handleChallenge } = await import("../src/orchestrator/handlers/challenge");
 		const state = makeState({ currentPhase: "CHALLENGE" });
-		const result = await handleChallenge(state, "/tmp/test-artifacts");
+		const result = await handleChallenge(state, tempDir);
 
 		expect(Object.isFrozen(result)).toBe(true);
 	});
@@ -151,7 +155,7 @@ describe("handleArchitect", () => {
 				},
 			],
 		});
-		const result = await handleArchitect(state, "/tmp/test-artifacts");
+		const result = await handleArchitect(state, tempDir);
 
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe("oc-architect");
@@ -173,7 +177,7 @@ describe("handleArchitect", () => {
 				},
 			],
 		});
-		const result = await handleArchitect(state, "/tmp/test-artifacts");
+		const result = await handleArchitect(state, tempDir);
 
 		expect(result.action).toBe("dispatch_multi");
 		expect(result.agents).toHaveLength(2);
@@ -196,75 +200,62 @@ describe("handleArchitect", () => {
 				},
 			],
 		});
-		const result = await handleArchitect(state, "/tmp/test-artifacts");
+		const result = await handleArchitect(state, tempDir);
 
 		expect(result.action).toBe("dispatch_multi");
 		expect(result.agents).toHaveLength(3);
 	});
 
 	test("after proposals exist, dispatches oc-critic", async () => {
-		// Test with actual files to verify artifact-existence idempotency
-		const { mkdirSync, writeFileSync, rmSync } = await import("node:fs");
-		const tmpDir = `/tmp/test-architect-critic-${Date.now()}`;
-		const phaseDir = `${tmpDir}/phases/ARCHITECT`;
-		const proposalsDir = `${phaseDir}/proposals`;
-		mkdirSync(proposalsDir, { recursive: true });
-		writeFileSync(`${proposalsDir}/proposal-A.md`, "proposal A");
-		writeFileSync(`${proposalsDir}/proposal-B.md`, "proposal B");
+		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
+		const phaseDir = join(tempDir, "phases", "ARCHITECT");
+		const proposalsDir = join(phaseDir, "proposals");
+		await mkdir(proposalsDir, { recursive: true });
+		await writeFile(join(proposalsDir, "proposal-A.md"), "proposal A");
+		await writeFile(join(proposalsDir, "proposal-B.md"), "proposal B");
 
-		try {
-			const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
-			const state = makeState({
-				currentPhase: "ARCHITECT",
-				confidence: [
-					{
-						phase: "RECON",
-						agent: "oc-researcher",
-						level: "MEDIUM",
-						area: "general",
-						rationale: "moderate signal",
-						timestamp: new Date().toISOString(),
-					},
-				],
-			});
-			const result = await handleArchitect(state, tmpDir);
+		const state = makeState({
+			currentPhase: "ARCHITECT",
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "MEDIUM",
+					area: "general",
+					rationale: "moderate signal",
+					timestamp: new Date().toISOString(),
+				},
+			],
+		});
+		const result = await handleArchitect(state, tempDir);
 
-			expect(result.action).toBe("dispatch");
-			expect(result.agent).toBe("oc-critic");
-		} finally {
-			rmSync(tmpDir, { recursive: true, force: true });
-		}
+		expect(result.action).toBe("dispatch");
+		expect(result.agent).toBe("oc-critic");
 	});
 
 	test("after critique exists, returns complete", async () => {
-		const { mkdirSync, writeFileSync, rmSync } = await import("node:fs");
-		const tmpDir = `/tmp/test-architect-complete-${Date.now()}`;
-		const phaseDir = `${tmpDir}/phases/ARCHITECT`;
-		mkdirSync(phaseDir, { recursive: true });
-		writeFileSync(`${phaseDir}/critique.md`, "critique content");
+		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
+		const phaseDir = join(tempDir, "phases", "ARCHITECT");
+		await mkdir(phaseDir, { recursive: true });
+		await writeFile(join(phaseDir, "critique.md"), "critique content");
 
-		try {
-			const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
-			const state = makeState({
-				currentPhase: "ARCHITECT",
-				confidence: [
-					{
-						phase: "RECON",
-						agent: "oc-researcher",
-						level: "MEDIUM",
-						area: "general",
-						rationale: "moderate signal",
-						timestamp: new Date().toISOString(),
-					},
-				],
-			});
-			const result = await handleArchitect(state, tmpDir);
+		const state = makeState({
+			currentPhase: "ARCHITECT",
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "MEDIUM",
+					area: "general",
+					rationale: "moderate signal",
+					timestamp: new Date().toISOString(),
+				},
+			],
+		});
+		const result = await handleArchitect(state, tempDir);
 
-			expect(result.action).toBe("complete");
-			expect(result.phase).toBe("ARCHITECT");
-		} finally {
-			rmSync(tmpDir, { recursive: true, force: true });
-		}
+		expect(result.action).toBe("complete");
+		expect(result.phase).toBe("ARCHITECT");
 	});
 
 	test("prompt includes absolute artifact refs to RECON and CHALLENGE", async () => {
@@ -282,44 +273,47 @@ describe("handleArchitect", () => {
 				},
 			],
 		});
-		const result = await handleArchitect(state, "/tmp/test-artifacts");
+		const result = await handleArchitect(state, tempDir);
 
-		expect(result.prompt).toContain("/tmp/test-artifacts/phases/RECON/report.md");
-		expect(result.prompt).toContain("/tmp/test-artifacts/phases/CHALLENGE/brief.md");
+		expect(result.prompt).toContain(`${tempDir}/phases/RECON/report.md`);
+		expect(result.prompt).toContain(`${tempDir}/phases/CHALLENGE/brief.md`);
 	});
 
 	test("result with existing design.md returns complete (no infinite loop)", async () => {
 		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
+		const phaseDir = join(tempDir, "phases", "ARCHITECT");
+		await mkdir(phaseDir, { recursive: true });
+		await writeFile(join(phaseDir, "design.md"), "# Design\ntest content");
+
 		const state = makeState({ currentPhase: "ARCHITECT", confidence: [] });
-
-		// Simulate the agent having written design.md
-		const fs = await import("node:fs/promises");
-		const phaseDir = "/tmp/test-artifacts/phases/ARCHITECT";
-		await fs.mkdir(phaseDir, { recursive: true });
-		await fs.writeFile(`${phaseDir}/design.md`, "# Design\ntest content");
-
-		const result = await handleArchitect(state, "/tmp/test-artifacts", "architecture done");
+		const result = await handleArchitect(state, tempDir, "architecture done");
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("ARCHITECT");
-
-		await fs.rm(phaseDir, { recursive: true, force: true });
 	});
 
 	test("result with existing proposals dispatches critic (arena path)", async () => {
 		const { handleArchitect } = await import("../src/orchestrator/handlers/architect");
-		const state = makeState({ currentPhase: "ARCHITECT", confidence: [] });
+		const proposalsDir = join(tempDir, "phases", "ARCHITECT", "proposals");
+		await mkdir(proposalsDir, { recursive: true });
+		await writeFile(join(proposalsDir, "proposal-A.md"), "# Proposal A");
+		await writeFile(join(proposalsDir, "proposal-B.md"), "# Proposal B");
 
-		// Simulate proposal files from dispatch_multi
-		const fs = await import("node:fs/promises");
-		const proposalsDir = "/tmp/test-artifacts/phases/ARCHITECT/proposals";
-		await fs.mkdir(proposalsDir, { recursive: true });
-		await fs.writeFile(`${proposalsDir}/proposal-A.md`, "# Proposal A");
-
-		const result = await handleArchitect(state, "/tmp/test-artifacts", "proposals written");
+		const state = makeState({
+			currentPhase: "ARCHITECT",
+			confidence: [
+				{
+					phase: "RECON",
+					agent: "oc-researcher",
+					level: "MEDIUM",
+					area: "general",
+					rationale: "moderate signal",
+					timestamp: new Date().toISOString(),
+				},
+			],
+		});
+		const result = await handleArchitect(state, tempDir, "proposals written");
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe("oc-critic");
-
-		await fs.rm("/tmp/test-artifacts/phases/ARCHITECT", { recursive: true, force: true });
 	});
 
 	test("each multi-dispatch proposal has distinct constraint framing", async () => {
@@ -337,7 +331,7 @@ describe("handleArchitect", () => {
 				},
 			],
 		});
-		const result = await handleArchitect(state, "/tmp/test-artifacts");
+		const result = await handleArchitect(state, tempDir);
 
 		const prompts = result.agents?.map((a) => a.prompt) ?? [];
 		expect(prompts[0]).toContain("simplicity");
@@ -360,7 +354,7 @@ describe("handleArchitect", () => {
 				},
 			],
 		});
-		const result = await handleArchitect(state, "/tmp/test-artifacts");
+		const result = await handleArchitect(state, tempDir);
 
 		expect(Object.isFrozen(result)).toBe(true);
 	});

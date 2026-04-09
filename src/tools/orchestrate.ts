@@ -5,11 +5,14 @@ import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-resul
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
 import {
 	buildFailureSummary,
+	clearPersistedRetryAttempts,
 	clearRetryStateByKey,
 	decideRetry,
 	detectDispatchFailure,
+	getPersistedRetryAttempts,
 	getRetryStateByKey,
 	recordRetryAttempt,
+	setPersistedRetryAttempts,
 	sleep,
 } from "../orchestrator/dispatch-retry";
 import { enrichErrorMessage } from "../orchestrator/error-context";
@@ -51,6 +54,7 @@ interface OrchestrateArgs {
 	readonly idea?: string;
 	readonly result?: string;
 	readonly intent?: IntentType;
+	readonly abandon?: boolean;
 }
 
 const ORCHESTRATE_ERROR_CODES = Object.freeze({
@@ -62,6 +66,7 @@ const ORCHESTRATE_ERROR_CODES = Object.freeze({
 	DUPLICATE_DISPATCH: "E_DUPLICATE_DISPATCH",
 	PENDING_RESULT_REQUIRED: "E_PENDING_RESULT_REQUIRED",
 	RESULT_KIND_MISMATCH: "E_RESULT_KIND_MISMATCH",
+	NO_STATE: "E_NO_STATE",
 });
 
 function createDispatchId(): string {
@@ -550,42 +555,45 @@ function formatElapsed(issuedAt: string): string {
 	return `${minutes}m ${seconds % 60}s`;
 }
 
-/** Per-phase dispatch limits. BUILD is high because of multi-task waves. */
+/** Per-agent-per-phase dispatch limits. Keyed by `${phase}:${agent}`. */
 const MAX_PHASE_DISPATCHES: Readonly<Record<string, number>> = Object.freeze({
-	RECON: 3,
-	CHALLENGE: 3,
-	ARCHITECT: 10,
-	EXPLORE: 3,
-	PLAN: 5,
-	BUILD: 100,
-	SHIP: 5,
-	RETROSPECTIVE: 3,
+	RECON: 2,
+	CHALLENGE: 2,
+	ARCHITECT: 3,
+	EXPLORE: 2,
+	PLAN: 2,
+	BUILD: 20,
+	SHIP: 2,
+	RETROSPECTIVE: 2,
 });
 
 /**
- * Circuit breaker: increment per-phase dispatch count and abort if limit exceeded.
+ * Circuit breaker: increment per-agent-per-phase dispatch count and abort if limit exceeded.
  * Returns `{ abortMsg, newCount }`. When `abortMsg` is non-null the caller must
  * return it immediately. `newCount` is the authoritative post-increment value.
  */
 async function checkCircuitBreaker(
 	currentState: Readonly<PipelineState>,
 	phase: string,
+	agent: string,
 	artifactDir: string,
+	incrementBy: number = 1,
 ): Promise<{
 	readonly abortMsg: string | null;
 	readonly newCount: number;
 	readonly nextState: PipelineState;
 }> {
-	const counts = { ...(currentState.phaseDispatchCounts ?? {}) };
-	counts[phase] = (counts[phase] ?? 0) + 1;
-	const candidateCount = counts[phase];
+	const agentPhaseKey = `${phase}:${agent}`;
+	const currentCounts = { ...(currentState.phaseDispatchCounts ?? {}) };
+	const candidateCount = (currentCounts[agentPhaseKey] ?? 0) + incrementBy;
 	const limit = MAX_PHASE_DISPATCHES[phase] ?? 5;
 	if (candidateCount > limit) {
-		const msg = `Phase ${phase} exceeded max dispatches (${candidateCount}/${limit}) — possible infinite loop detected. Aborting.`;
+		const msg = `Agent "${agent}" in phase ${phase} exceeded max dispatches (${candidateCount}/${limit}) — possible infinite loop detected. Aborting.`;
 		logOrchestrationEvent(artifactDir, {
 			timestamp: new Date().toISOString(),
 			phase,
 			action: "loop_detected",
+			agent,
 			attempt: candidateCount,
 			message: msg,
 		});
@@ -597,12 +605,12 @@ async function checkCircuitBreaker(
 	}
 	const withCounts = await updatePersistedState(artifactDir, currentState, (current) => {
 		const nextCounts = { ...(current.phaseDispatchCounts ?? {}) };
-		nextCounts[phase] = (nextCounts[phase] ?? 0) + 1;
+		nextCounts[agentPhaseKey] = (nextCounts[agentPhaseKey] ?? 0) + incrementBy;
 		return patchState(current, { phaseDispatchCounts: nextCounts });
 	});
 	return {
 		abortMsg: null,
-		newCount: withCounts.phaseDispatchCounts[phase] ?? candidateCount,
+		newCount: withCounts.phaseDispatchCounts[agentPhaseKey] ?? candidateCount,
 		nextState: withCounts,
 	};
 }
@@ -760,16 +768,16 @@ async function processHandlerResult(
 		case "dispatch": {
 			// Circuit breaker
 			const phase = normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
+			const dispatchAgent = normalizedResult.agent ?? "unknown";
 			const {
 				abortMsg,
 				newCount: attempt,
 				nextState,
-			} = await checkCircuitBreaker(currentState, phase, artifactDir);
+			} = await checkCircuitBreaker(currentState, phase, dispatchAgent, artifactDir, 1);
 			if (abortMsg) return abortMsg;
 			currentState = nextState;
 
 			// Duplicate dispatch guard: prevent dispatching the same agent+phase twice
-			const dispatchAgent = normalizedResult.agent ?? "unknown";
 			const isDuplicate = currentState.pendingDispatches.some(
 				(p) => p.agent === dispatchAgent && p.phase === phase,
 			);
@@ -908,13 +916,21 @@ async function processHandlerResult(
 		}
 
 		case "dispatch_multi": {
-			// Circuit breaker
+			// Circuit breaker — key on first agent, increment by total agent count
 			const phase = normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
+			const multiAgentName = normalizedResult.agents?.[0]?.agent ?? "unknown";
+			const multiAgentCount = normalizedResult.agents?.length ?? 1;
 			const {
 				abortMsg,
 				newCount: attempt,
 				nextState,
-			} = await checkCircuitBreaker(currentState, phase, artifactDir);
+			} = await checkCircuitBreaker(
+				currentState,
+				phase,
+				multiAgentName,
+				artifactDir,
+				multiAgentCount,
+			);
 			if (abortMsg) return abortMsg;
 			currentState = nextState;
 
@@ -1155,6 +1171,20 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 				}
 			}
 
+			if (args.abandon) {
+				const abandonedState = patchState(state, {
+					status: "INTERRUPTED" as const,
+					pendingDispatches: [],
+				});
+				await saveState(abandonedState, artifactDir);
+				return JSON.stringify({
+					action: "abandoned",
+					runId: state.runId,
+					status: "INTERRUPTED",
+					displayText: `Pipeline run ${state.runId} abandoned. Start fresh with oc_orchestrate.`,
+				});
+			}
+
 			let phaseHandlerContext: PhaseHandlerContext | undefined;
 			let handlerInputResult = args.result;
 
@@ -1167,7 +1197,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 
 			if (args.result === undefined && state.pendingDispatches.length > 0) {
 				const pending = state.pendingDispatches.at(-1);
-				const msg = `Pending result required for dispatch ${pending?.dispatchId ?? "unknown"} (${pending?.agent ?? "unknown"} / ${pending?.phase ?? state.currentPhase}). Submit a typed result envelope before calling oc_orchestrate again.`;
+				const msg = `Pending result required for dispatch ${pending?.dispatchId ?? "unknown"} (${pending?.agent ?? "unknown"} / ${pending?.phase ?? state.currentPhase}). Submit a typed result envelope, or call oc_orchestrate with abandon: true to reset the pipeline.`;
 				logDeterministicError(
 					artifactDir,
 					pending?.phase ?? state.currentPhase,
@@ -1231,15 +1261,38 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 							`${failedAgent} in ${failedPhase}: ${dispatchError.slice(0, 100)}`,
 						);
 
-						const decision = decideRetry(failedDispatchId, failedPhase, failedAgent, dispatchError);
+						const persistedAttempts = getPersistedRetryAttempts(
+							state.retryAttempts,
+							failedPhase,
+							failedAgent,
+						);
+						const decision = decideRetry(
+							failedDispatchId,
+							failedPhase,
+							failedAgent,
+							dispatchError,
+							2,
+							persistedAttempts,
+						);
 
 						if (decision.shouldRetry) {
-							recordRetryAttempt(
+							const newCount = recordRetryAttempt(
 								failedDispatchId,
 								failedPhase,
 								failedAgent,
 								decision.errorCategory,
 								dispatchError,
+							);
+
+							state = await updatePersistedState(artifactDir, state, (current) =>
+								patchState(current, {
+									retryAttempts: setPersistedRetryAttempts(
+										current.retryAttempts,
+										failedPhase,
+										failedAgent,
+										newCount,
+									),
+								}),
 							);
 
 							logOrchestrationEvent(artifactDir, {
@@ -1274,12 +1327,20 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 
 						// Read retry state BEFORE clearing — otherwise attempts is always lost
 						const retryState = getRetryStateByKey(failedPhase, failedAgent);
-						const actualAttempts = retryState?.attempts ?? 1;
+						const inMemoryAttempts = retryState?.attempts ?? 0;
+						const actualAttempts = Math.max(inMemoryAttempts, persistedAttempts) || 1;
 						clearRetryStateByKey(failedPhase, failedAgent);
 
-						state = await updatePersistedState(artifactDir, state, (current) =>
-							applyResultEnvelope(current, parsed.envelope),
-						);
+						state = await updatePersistedState(artifactDir, state, (current) => {
+							const withEnvelope = applyResultEnvelope(current, parsed.envelope);
+							return patchState(withEnvelope, {
+								retryAttempts: clearPersistedRetryAttempts(
+									withEnvelope.retryAttempts,
+									failedPhase,
+									failedAgent,
+								),
+							});
+						});
 						const failureSummary = buildFailureSummary(
 							failedDispatchId,
 							failedPhase,
@@ -1294,9 +1355,16 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 					} else {
 						clearRetryStateByKey(parsed.envelope.phase, parsed.envelope.agent ?? "unknown");
 
-						const nextState = await updatePersistedState(artifactDir, state, (current) =>
-							applyResultEnvelope(current, parsed.envelope),
-						);
+						const nextState = await updatePersistedState(artifactDir, state, (current) => {
+							const withEnvelope = applyResultEnvelope(current, parsed.envelope);
+							return patchState(withEnvelope, {
+								retryAttempts: clearPersistedRetryAttempts(
+									withEnvelope.retryAttempts,
+									parsed.envelope.phase,
+									parsed.envelope.agent ?? "unknown",
+								),
+							});
+						});
 						state = nextState;
 
 						phaseHandlerContext = {
@@ -1381,7 +1449,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 
 export const ocOrchestrate = tool({
 	description:
-		"Drive the orchestrator pipeline. Provide an idea to start a new run, or a result to advance the current phase. Returns JSON with action (dispatch/dispatch_multi/complete/error).",
+		"Drive the orchestrator pipeline. Provide an idea to start a new run, or a result to advance the current phase. Returns JSON with action (dispatch/dispatch_multi/complete/error/abandoned).",
 	args: {
 		idea: tool.schema
 			.string()
@@ -1396,6 +1464,12 @@ export const ocOrchestrate = tool({
 		intent: IntentTypeSchema.optional().describe(
 			"Intent classification from oc_route. Required for new pipeline starts — must be 'implementation'. Non-implementation intents are rejected with routing guidance. Optional when resuming an existing pipeline with a result.",
 		),
+		abandon: tool.schema
+			.boolean()
+			.optional()
+			.describe(
+				"Set to true to abandon the current pipeline run. Clears pending dispatches and sets status to INTERRUPTED. Use when a dispatch result is unavailable (crashed agent, closed TUI, dead subagent).",
+			),
 	},
 	async execute(args) {
 		return orchestrateCore(args, getProjectArtifactDir(process.cwd()));

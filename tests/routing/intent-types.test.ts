@@ -107,11 +107,11 @@ describe("IntentClassificationSchema", () => {
 describe("IntentRoutingSchema", () => {
 	test("accepts valid routing with behavior", () => {
 		const result = IntentRoutingSchema.parse({
-			targetAgent: "researcher",
+			targetAgent: "specialist-researcher",
 			usePipeline: false,
 			behavior: "Answer using research tools.",
 		});
-		expect(result.targetAgent).toBe("researcher");
+		expect(result.targetAgent).toBe("specialist-researcher");
 		expect(result.usePipeline).toBe(false);
 		expect(result.behavior).toBe("Answer using research tools.");
 	});
@@ -153,9 +153,9 @@ describe("intent routing lookup API", () => {
 		expect(types).toContain("open_ended");
 	});
 
-	test("maps research to researcher without pipeline", () => {
+	test("maps research to specialist-researcher without pipeline", () => {
 		const routing = getIntentRouting("research");
-		expect(routing.targetAgent).toBe("researcher");
+		expect(routing.targetAgent).toBe("specialist-researcher");
 		expect(routing.usePipeline).toBe(false);
 	});
 
@@ -171,15 +171,15 @@ describe("intent routing lookup API", () => {
 		expect(routing.usePipeline).toBe(false);
 	});
 
-	test("maps review to reviewer without pipeline", () => {
+	test("maps review to specialist-reviewer without pipeline", () => {
 		const routing = getIntentRouting("review");
-		expect(routing.targetAgent).toBe("reviewer");
+		expect(routing.targetAgent).toBe("specialist-reviewer");
 		expect(routing.usePipeline).toBe(false);
 	});
 
-	test("maps planning to planner without pipeline", () => {
+	test("maps planning to specialist-planner without pipeline", () => {
 		const routing = getIntentRouting("planning");
-		expect(routing.targetAgent).toBe("planner");
+		expect(routing.targetAgent).toBe("specialist-planner");
 		expect(routing.usePipeline).toBe(false);
 	});
 
@@ -189,15 +189,15 @@ describe("intent routing lookup API", () => {
 		expect(routing.usePipeline).toBe(false);
 	});
 
-	test("maps investigation to researcher without pipeline", () => {
+	test("maps investigation to specialist-researcher without pipeline", () => {
 		const routing = getIntentRouting("investigation");
-		expect(routing.targetAgent).toBe("researcher");
+		expect(routing.targetAgent).toBe("specialist-researcher");
 		expect(routing.usePipeline).toBe(false);
 	});
 
-	test("maps evaluation to reviewer without pipeline", () => {
+	test("maps evaluation to specialist-reviewer without pipeline", () => {
 		const routing = getIntentRouting("evaluation");
-		expect(routing.targetAgent).toBe("reviewer");
+		expect(routing.targetAgent).toBe("specialist-reviewer");
 		expect(routing.usePipeline).toBe(false);
 	});
 

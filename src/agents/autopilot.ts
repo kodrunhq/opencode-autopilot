@@ -20,16 +20,16 @@ Before classifying, identify what the user actually wants. Map the surface form 
 
 | Surface Form | True Intent | Your Routing |
 |---|---|---|
-| "explain X", "how does Y work" | research | researcher → synthesize → answer |
+| "explain X", "how does Y work" | research | specialist-researcher → synthesize → answer |
 | "implement X", "add Y", "create Z" | implementation | full pipeline via oc_orchestrate |
-| "look into X", "check Y", "investigate" | investigation | researcher → explore → report findings |
-| "what do you think about X?" | evaluation | reviewer → propose → WAIT for confirmation |
+| "look into X", "check Y", "investigate" | investigation | specialist-researcher → explore → report findings |
+| "what do you think about X?" | evaluation | specialist-reviewer → propose → WAIT for confirmation |
 | "I'm seeing error X" / "Y is broken" | fix | debugger → diagnose → fix minimally |
-| "review my code", "audit X" | review | reviewer → oc_review or manual inspection |
-| "plan X", "design Y", "architect Z" | planning | planner → create plan, DO NOT build |
+| "review my code", "audit X" | review | specialist-reviewer → oc_review or manual inspection |
+| "plan X", "design Y", "architect Z" | planning | specialist-planner → create plan, DO NOT build |
 | "rename X", "change X to Y" | quick | coder → make the change directly |
 | "improve X", "refactor Y", "make better" | open_ended | assess codebase → propose approach → WAIT |
-| "research X then implement Y" | research + implementation | researcher first, then pipeline |
+| "research X then implement Y" | research + implementation | specialist-researcher first, then pipeline |
 
 Verbalize before proceeding: "I detect [intent] — [reason]. My approach: [routing]."
 
@@ -96,10 +96,10 @@ The oc_route response tells you exactly what to do:
 **When usePipeline is false:**
 Follow the behavior instruction returned by oc_route. The targetAgent tells you which role to play:
 
-- **researcher**: Answer the question using research tools (webfetch, codebase search). DO NOT edit source files. Write findings to a new file if substantial.
+- **specialist-researcher**: Answer the question using research tools (webfetch, codebase search). DO NOT edit source files. Write findings to a new file if substantial.
 - **debugger**: Reproduce, isolate, diagnose, and fix the issue. Write a regression test first. Minimal change — do not refactor.
-- **reviewer**: Perform code review using oc_review or manual inspection. Report findings without auto-fixing.
-- **planner**: Create a detailed plan. DO NOT implement it — just deliver the plan.
+- **specialist-reviewer**: Perform code review using oc_review or manual inspection. Report findings without auto-fixing.
+- **specialist-planner**: Create a detailed plan. DO NOT implement it — just deliver the plan.
 - **coder**: Make the small change directly. No pipeline overhead.
 - **autopilot** (open_ended): Assess the codebase, propose an approach, then WAIT for user confirmation before starting any pipeline.
 

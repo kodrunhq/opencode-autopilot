@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { routeCore } from "../../src/tools/route";
 
 describe("routeCore", () => {
-	test("routes research intent to researcher without pipeline", () => {
+	test("routes research intent to specialist-researcher without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
 				primaryIntent: "research",
@@ -12,10 +12,10 @@ describe("routeCore", () => {
 		);
 		expect(result.action).toBe("route");
 		expect(result.primaryIntent).toBe("research");
-		expect(result.targetAgent).toBe("researcher");
+		expect(result.targetAgent).toBe("specialist-researcher");
 		expect(result.usePipeline).toBe(false);
 		expect(result.behavior).toBeDefined();
-		expect(result.instruction).toContain("researcher");
+		expect(result.instruction).toContain("specialist-researcher");
 		expect(result.instruction).not.toContain("oc_orchestrate");
 	});
 
@@ -48,7 +48,7 @@ describe("routeCore", () => {
 		expect(result.usePipeline).toBe(false);
 	});
 
-	test("routes review intent to reviewer without pipeline", () => {
+	test("routes review intent to specialist-reviewer without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
 				primaryIntent: "review",
@@ -57,10 +57,10 @@ describe("routeCore", () => {
 			}),
 		);
 		expect(result.action).toBe("route");
-		expect(result.targetAgent).toBe("reviewer");
+		expect(result.targetAgent).toBe("specialist-reviewer");
 	});
 
-	test("routes planning intent to planner without pipeline", () => {
+	test("routes planning intent to specialist-planner without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
 				primaryIntent: "planning",
@@ -69,7 +69,7 @@ describe("routeCore", () => {
 			}),
 		);
 		expect(result.action).toBe("route");
-		expect(result.targetAgent).toBe("planner");
+		expect(result.targetAgent).toBe("specialist-planner");
 		expect(result.usePipeline).toBe(false);
 	});
 
@@ -86,7 +86,7 @@ describe("routeCore", () => {
 		expect(result.usePipeline).toBe(false);
 	});
 
-	test("routes investigation to researcher without pipeline", () => {
+	test("routes investigation to specialist-researcher without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
 				primaryIntent: "investigation",
@@ -95,11 +95,11 @@ describe("routeCore", () => {
 			}),
 		);
 		expect(result.action).toBe("route");
-		expect(result.targetAgent).toBe("researcher");
+		expect(result.targetAgent).toBe("specialist-researcher");
 		expect(result.usePipeline).toBe(false);
 	});
 
-	test("routes evaluation to reviewer without pipeline", () => {
+	test("routes evaluation to specialist-reviewer without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({
 				primaryIntent: "evaluation",
@@ -108,7 +108,7 @@ describe("routeCore", () => {
 			}),
 		);
 		expect(result.action).toBe("route");
-		expect(result.targetAgent).toBe("reviewer");
+		expect(result.targetAgent).toBe("specialist-reviewer");
 		expect(result.usePipeline).toBe(false);
 	});
 
@@ -202,7 +202,7 @@ describe("routeCore multi-intent (CRITICAL 1)", () => {
 		expect(result.action).toBe("route");
 		expect(result.primaryIntent).toBe("research");
 		expect(result.secondaryIntent).toBe("implementation");
-		expect(result.targetAgent).toBe("researcher");
+		expect(result.targetAgent).toBe("specialist-researcher");
 		expect(result.usePipeline).toBe(false);
 		expect(result.secondaryTargetAgent).toBe("autopilot");
 		expect(result.secondaryUsePipeline).toBe(true);
@@ -234,7 +234,7 @@ describe("routeCore multi-intent (CRITICAL 1)", () => {
 		);
 		expect(result.primaryIntent).toBe("review");
 		expect(result.secondaryIntent).toBe("fix");
-		expect(result.targetAgent).toBe("reviewer");
+		expect(result.targetAgent).toBe("specialist-reviewer");
 		expect(result.secondaryTargetAgent).toBe("debugger");
 	});
 
@@ -262,7 +262,7 @@ describe("routeCore behavioral scenarios (MEDIUM 7)", () => {
 			}),
 		);
 		expect(result.usePipeline).toBe(false);
-		expect(result.targetAgent).toBe("researcher");
+		expect(result.targetAgent).toBe("specialist-researcher");
 	});
 
 	test("'Make the dashboard better' routes to open_ended, no pipeline", () => {
@@ -299,7 +299,7 @@ describe("routeCore behavioral scenarios (MEDIUM 7)", () => {
 			}),
 		);
 		expect(result.usePipeline).toBe(false);
-		expect(result.targetAgent).toBe("reviewer");
+		expect(result.targetAgent).toBe("specialist-reviewer");
 	});
 
 	test("'The login page crashes on submit' routes to fix, no pipeline", () => {
@@ -324,7 +324,7 @@ describe("routeCore behavioral scenarios (MEDIUM 7)", () => {
 			}),
 		);
 		expect(result.usePipeline).toBe(false);
-		expect(result.targetAgent).toBe("researcher");
+		expect(result.targetAgent).toBe("specialist-researcher");
 		expect(result.secondaryUsePipeline).toBe(true);
 		expect(result.secondaryTargetAgent).toBe("autopilot");
 	});
@@ -356,7 +356,7 @@ describe("routeCore multi-intent routing metadata", () => {
 			}),
 		);
 		expect(result.instruction).not.toContain("oc_orchestrate");
-		expect(result.instruction).toContain("reviewer");
+		expect(result.instruction).toContain("specialist-reviewer");
 		expect(result.secondaryInstruction).toContain("debugger");
 	});
 
@@ -369,11 +369,11 @@ describe("routeCore multi-intent routing metadata", () => {
 				verbalization: "I detect investigation + planning",
 			}),
 		);
-		expect(result.targetAgent).toBe("researcher");
+		expect(result.targetAgent).toBe("specialist-researcher");
 		expect(result.usePipeline).toBe(false);
-		expect(result.secondaryTargetAgent).toBe("planner");
+		expect(result.secondaryTargetAgent).toBe("specialist-planner");
 		expect(result.secondaryUsePipeline).toBe(false);
-		expect(result.secondaryInstruction).toContain("planner");
+		expect(result.secondaryInstruction).toContain("specialist-planner");
 	});
 
 	test("all 9 intents produce valid routing when used as primary", () => {

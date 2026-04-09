@@ -1,8 +1,21 @@
 import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
 import type { BranchLifecycle, BuildProgress, Task } from "../types";
+import { createWorktree } from "./branch-pr";
 import type { DispatchResult } from "./types";
 import { AGENT_NAMES } from "./types";
+
+/**
+ * Coerce a raw taskId (number, string, or null) to a numeric Task.id.
+ */
+export function coerceTaskId(raw: unknown): number | null {
+	if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+	if (typeof raw === "string") {
+		const parsed = Number(raw);
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+	return null;
+}
 
 export const cloneBranchLifecycle = (bl: BranchLifecycle) => ({
 	...bl,
@@ -181,11 +194,13 @@ export async function buildParallelDispatch(
 	runId?: string,
 	maxParallel: number = DEFAULT_MAX_PARALLEL_TASKS,
 	currentInProgressCount = 0,
+	useWorktrees = false,
+	projectRoot?: string,
+	sessionId?: string,
 ): Promise<DispatchResult> {
 	const remainingSlots = Math.max(0, maxParallel - currentInProgressCount);
 
 	if (remainingSlots === 0) {
-		// Cap is full — return pending result so caller waits for in-progress tasks to finish.
 		const inProgressTasks = effectiveTasks.filter((t) => t.status === "IN_PROGRESS");
 		return buildPendingResultError(wave, inProgressTasks, buildProgress, effectiveTasks);
 	}
@@ -215,6 +230,47 @@ export async function buildParallelDispatch(
 				buildProgress: {
 					...buildProgress,
 					currentTask: task.id,
+					currentTasks: [...allInProgressIds],
+					currentWave: wave,
+				},
+			},
+		} satisfies DispatchResult);
+	}
+
+	if (useWorktrees && projectRoot && sessionId) {
+		const branchName = `autopilot/${runId ?? "unknown"}/wave-${wave}`;
+		const worktrees = await Promise.all(
+			tasksToDispatch.map(async (task, index) => {
+				const worktreeInfo = await createWorktree(projectRoot, branchName, index, sessionId);
+				return { task, worktreeInfo, index };
+			}),
+		);
+
+		const agents = await Promise.all(
+			worktrees.map(async ({ task, worktreeInfo }) => {
+				const basePrompt = await buildTaskPrompt(task, artifactDir, runId, mode);
+				const worktreePath = worktreeInfo.path;
+				const worktreePrompt = `${basePrompt}\n\n[WORKTREE: ${worktreePath}]\nYour working directory is ${worktreePath}. All file operations must be relative to this directory.`;
+				return {
+					agent: AGENT_NAMES.BUILD,
+					prompt: worktreePrompt,
+					taskId: task.id,
+					resultKind: "task_completion" as const,
+					workdir: worktreePath,
+				};
+			}),
+		);
+
+		return Object.freeze({
+			action: "dispatch_multi",
+			agents,
+			phase: "BUILD",
+			progress: `Wave ${wave} — parallel tasks [${taskIds.join(", ")}] with worktrees`,
+			_stateUpdates: {
+				tasks: [...updatedTaskList],
+				buildProgress: {
+					...buildProgress,
+					currentTask: taskIds[0],
 					currentTasks: [...allInProgressIds],
 					currentWave: wave,
 				},

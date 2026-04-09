@@ -140,4 +140,6 @@ export const pipelineStateSchema = z.object({
 	failureContext: failureContextSchema.nullable().default(null),
 	branchLifecycle: branchLifecycleSchema.nullable().default(null),
 	phaseDispatchCounts: z.record(z.string().max(32), z.number().int().min(0).max(1000)).default({}),
+	retryAttempts: z.record(z.string().max(128), z.number().int().min(0).max(100)).default({}),
+	useWorktrees: z.boolean().default(false),
 });

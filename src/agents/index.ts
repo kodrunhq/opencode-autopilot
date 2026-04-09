@@ -25,11 +25,11 @@ export const agents = {
 	debugger: debuggerAgent,
 	metaprompter: metaprompterAgent,
 	oracle: oracleAgent,
-	planner: plannerAgent,
 	"pr-reviewer": prReviewerAgent,
-	researcher: researcherAgent,
-	reviewer: reviewerAgent,
 	"security-auditor": securityAuditorAgent,
+	"specialist-planner": plannerAgent,
+	"specialist-researcher": researcherAgent,
+	"specialist-reviewer": reviewerAgent,
 } as const;
 
 /**

@@ -29,6 +29,7 @@ const baseState = (overrides: Partial<PipelineState>): PipelineState =>
 		processedResultIds: [],
 		failureContext: null,
 		phaseDispatchCounts: {},
+		retryAttempts: {},
 		...overrides,
 	}) as PipelineState;
 

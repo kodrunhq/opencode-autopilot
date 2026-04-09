@@ -272,7 +272,7 @@ Analyzes a task description to determine the most appropriate category and model
 Inspect and manage session recovery state.
 
 **Arguments:**
-* `action` (enum): `status`, `retry`, `reset`, `history`.
+* `action` (enum): `status`, `retry`, `clear-strategies`, `history`.
 * `sessionId` (string, optional): Session ID to inspect.
 
 **What it does:**

@@ -1,15 +1,17 @@
 import { loadConfig } from "../../config";
 import { sanitizeTemplateContent } from "../../review/sanitize";
+import { getProjectRootFromArtifactDir } from "../../utils/paths";
 import { getArtifactRef } from "../artifacts";
 import { createOracleGateIntegration, defaultOracleGate } from "../oracle-gate";
 import { groupByWave } from "../plan";
 import { assignWaves } from "../wave-assigner";
-import { initBranchLifecycle, recordTaskPush } from "./branch-pr";
+import { cleanupWorktrees, initBranchLifecycle, recordTaskPush } from "./branch-pr";
 import {
 	buildParallelDispatch,
 	buildPendingResultError,
 	buildPendingResultWithLifecycle,
 	cloneBranchLifecycle,
+	coerceTaskId,
 	DEFAULT_MAX_PARALLEL_TASKS,
 	findCurrentWave,
 	findInProgressTasks,
@@ -25,19 +27,6 @@ import {
 import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
 
-/**
- * Coerce a raw taskId (number, string, or null) to a numeric Task.id.
- * Handles: number → keep (including 0), numeric string → Number(), else → null.
- */
-function coerceTaskId(raw: unknown): number | null {
-	if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
-	if (typeof raw === "string") {
-		const parsed = Number(raw);
-		return Number.isFinite(parsed) ? parsed : null;
-	}
-	return null;
-}
-
 export const handleBuild: PhaseHandler = async (
 	state,
 	artifactDir,
@@ -48,6 +37,8 @@ export const handleBuild: PhaseHandler = async (
 	const resultText = context?.envelope.payload.text ?? result;
 	const config = await loadConfig();
 	const maxParallel = config?.orchestrator?.maxParallelTasks ?? DEFAULT_MAX_PARALLEL_TASKS;
+	const useWorktrees = state.useWorktrees ?? false;
+	const projectRoot = getProjectRootFromArtifactDir(artifactDir);
 	const initialBranchLifecycle =
 		state.branchLifecycle ??
 		initBranchLifecycle({
@@ -67,12 +58,12 @@ export const handleBuild: PhaseHandler = async (
 		} satisfies DispatchResult);
 	}
 
-	if (buildProgress.strikeCount > MAX_STRIKES && buildProgress.reviewPending && resultText) {
+	if (buildProgress.strikeCount > MAX_STRIKES) {
 		return Object.freeze({
 			action: "error",
 			code: "E_BUILD_MAX_STRIKES",
 			phase: "BUILD",
-			message: "Max retries exceeded — too many CRITICAL review findings",
+			message: `Max retries exceeded (${buildProgress.strikeCount} > ${MAX_STRIKES}) — too many CRITICAL review findings`,
 		} satisfies DispatchResult);
 	}
 
@@ -194,6 +185,9 @@ export const handleBuild: PhaseHandler = async (
 		const nextWave = findCurrentWave(waveMap);
 
 		if (nextWave === null) {
+			if (useWorktrees) {
+				await cleanupWorktrees(projectRoot, state.runId);
+			}
 			return Object.freeze({
 				action: "complete",
 				phase: "BUILD",
@@ -232,6 +226,9 @@ export const handleBuild: PhaseHandler = async (
 				state.runId,
 				maxParallel,
 				inProgressTasks.length,
+				useWorktrees,
+				projectRoot,
+				state.runId,
 			);
 		}
 
@@ -435,6 +432,9 @@ export const handleBuild: PhaseHandler = async (
 	const currentWave = findCurrentWave(waveMap);
 
 	if (currentWave === null) {
+		if (useWorktrees) {
+			await cleanupWorktrees(projectRoot, state.runId);
+		}
 		return Object.freeze({
 			action: "complete",
 			phase: "BUILD",
@@ -458,6 +458,9 @@ export const handleBuild: PhaseHandler = async (
 	}
 
 	if (pendingTasks.length === 0) {
+		if (useWorktrees) {
+			await cleanupWorktrees(projectRoot, state.runId);
+		}
 		return Object.freeze({
 			action: "complete",
 			phase: "BUILD",
@@ -477,6 +480,9 @@ export const handleBuild: PhaseHandler = async (
 		state.runId,
 		maxParallel,
 		inProgressTasks.length,
+		useWorktrees,
+		projectRoot,
+		state.runId,
 	);
 	return Object.freeze({
 		...initialDispatch,

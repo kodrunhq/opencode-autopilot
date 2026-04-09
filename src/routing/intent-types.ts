@@ -46,7 +46,7 @@ const ROUTING_ENTRIES: ReadonlyArray<readonly [IntentType, IntentRouting]> = Obj
 	[
 		"research",
 		Object.freeze({
-			targetAgent: "researcher",
+			targetAgent: "specialist-researcher",
 			usePipeline: false,
 			behavior: "Answer using research tools. DO NOT start any pipeline or edit code.",
 		}),
@@ -62,7 +62,7 @@ const ROUTING_ENTRIES: ReadonlyArray<readonly [IntentType, IntentRouting]> = Obj
 	[
 		"investigation",
 		Object.freeze({
-			targetAgent: "researcher",
+			targetAgent: "specialist-researcher",
 			usePipeline: false,
 			behavior:
 				"Explore the codebase or topic and report findings. DO NOT edit code or start a pipeline.",
@@ -71,7 +71,7 @@ const ROUTING_ENTRIES: ReadonlyArray<readonly [IntentType, IntentRouting]> = Obj
 	[
 		"evaluation",
 		Object.freeze({
-			targetAgent: "reviewer",
+			targetAgent: "specialist-reviewer",
 			usePipeline: false,
 			behavior:
 				"Evaluate the approach or code, propose improvements, then WAIT for user confirmation before acting.",
@@ -89,7 +89,7 @@ const ROUTING_ENTRIES: ReadonlyArray<readonly [IntentType, IntentRouting]> = Obj
 	[
 		"review",
 		Object.freeze({
-			targetAgent: "reviewer",
+			targetAgent: "specialist-reviewer",
 			usePipeline: false,
 			behavior: "Perform the code review directly using oc_review or manual inspection.",
 		}),
@@ -97,7 +97,7 @@ const ROUTING_ENTRIES: ReadonlyArray<readonly [IntentType, IntentRouting]> = Obj
 	[
 		"planning",
 		Object.freeze({
-			targetAgent: "planner",
+			targetAgent: "specialist-planner",
 			usePipeline: false,
 			behavior: "Create a plan without implementing it. DO NOT start a build pipeline.",
 		}),

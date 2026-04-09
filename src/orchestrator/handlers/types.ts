@@ -24,6 +24,7 @@ export interface DispatchResult {
 		readonly dispatchId?: string;
 		readonly taskId?: number | string | null;
 		readonly resultKind?: DispatchResultKind;
+		readonly workdir?: string;
 	}[];
 	readonly prompt?: string;
 	readonly phase?: string;
