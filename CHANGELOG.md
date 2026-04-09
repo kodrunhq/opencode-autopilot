@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.3](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.2...opencode-autopilot-v1.27.3) (2026-04-09)
+
+
+### Bug Fixes
+
+* **tests:** use isolated temp dirs to avoid CI environment pollution ([42bdf07](https://github.com/kodrunhq/opencode-autopilot/commit/42bdf07878657a4773337734b8bbdb873b2625b3))
+
 ## [1.27.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.1...opencode-autopilot-v1.27.2) (2026-04-09)
 
 
