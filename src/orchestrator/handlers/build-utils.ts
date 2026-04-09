@@ -238,9 +238,10 @@ export async function buildParallelDispatch(
 	}
 
 	if (useWorktrees && projectRoot && sessionId) {
-		const branchName = `autopilot/${runId ?? "unknown"}/wave-${wave}`;
+		const branchNameBase = `autopilot/${runId ?? "unknown"}/wave-${wave}`;
 		const worktrees = await Promise.all(
 			tasksToDispatch.map(async (task, index) => {
+				const branchName = `${branchNameBase}/task-${task.id}`;
 				const worktreeInfo = await createWorktree(projectRoot, branchName, index, sessionId);
 				return { task, worktreeInfo, index };
 			}),

@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 import type { BranchLifecycle } from "../types";
 
@@ -150,22 +152,22 @@ export async function createWorktree(
 	agentIndex: number,
 	sessionId: string,
 ): Promise<WorktreeInfo> {
-	const worktreeBaseDir = `/tmp/opencode-${sessionId}`;
+	const worktreeBaseDir = join(tmpdir(), `opencode-${sessionId}`);
 	const worktreePath = join(worktreeBaseDir, `wt-${agentIndex}`);
 
 	await mkdir(worktreeBaseDir, { recursive: true });
 
 	try {
-		await execFileAsync("git", ["worktree", "add", worktreePath, branchName], {
+		await execFileAsync("git", ["worktree", "add", "-b", branchName, worktreePath, "HEAD"], {
 			cwd: projectRoot,
 		});
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		if (errorMessage.includes("already exists")) {
-			await execFileAsync("git", ["worktree", "remove", worktreePath], {
+		if (errorMessage.includes("already exists") || errorMessage.includes("already checked out")) {
+			await execFileAsync("git", ["worktree", "remove", worktreePath, "--force"], {
 				cwd: projectRoot,
-			});
-			await execFileAsync("git", ["worktree", "add", worktreePath, branchName], {
+			}).catch(() => {});
+			await execFileAsync("git", ["worktree", "add", "-b", branchName, worktreePath, "HEAD"], {
 				cwd: projectRoot,
 			});
 		} else {
@@ -193,7 +195,7 @@ export async function removeWorktree(projectRoot: string, worktreePath: string):
 }
 
 export async function cleanupWorktrees(projectRoot: string, sessionId: string): Promise<void> {
-	const worktreeBaseDir = `/tmp/opencode-${sessionId}`;
+	const worktreeBaseDir = join(tmpdir(), `opencode-${sessionId}`);
 
 	try {
 		const { stdout } = await execFileAsync("git", ["worktree", "list", "--porcelain"], {
@@ -217,5 +219,5 @@ export async function cleanupWorktrees(projectRoot: string, sessionId: string): 
 }
 
 export function getWorktreePath(sessionId: string, agentIndex: number): string {
-	return `/tmp/opencode-${sessionId}/wt-${agentIndex}`;
+	return join(tmpdir(), `opencode-${sessionId}/wt-${agentIndex}`);
 }

@@ -562,7 +562,7 @@ const MAX_PHASE_DISPATCHES: Readonly<Record<string, number>> = Object.freeze({
 	ARCHITECT: 3,
 	EXPLORE: 2,
 	PLAN: 2,
-	BUILD: 20,
+	BUILD: 500,
 	SHIP: 2,
 	RETROSPECTIVE: 2,
 });
@@ -1284,16 +1284,41 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 								dispatchError,
 							);
 
-							state = await updatePersistedState(artifactDir, state, (current) =>
-								patchState(current, {
+							state = await updatePersistedState(artifactDir, state, (current) => {
+								const currentPersisted = getPersistedRetryAttempts(
+									current.retryAttempts,
+									failedPhase,
+									failedAgent,
+								);
+								const retryCountToPersist = Math.max(newCount, currentPersisted + 1);
+
+								return patchState(current, {
 									retryAttempts: setPersistedRetryAttempts(
 										current.retryAttempts,
 										failedPhase,
 										failedAgent,
-										newCount,
+										retryCountToPersist,
 									),
-								}),
-							);
+								});
+							});
+
+							state = await updatePersistedState(artifactDir, state, (current) => {
+								const currentPersisted = getPersistedRetryAttempts(
+									current.retryAttempts,
+									failedPhase,
+									failedAgent,
+								);
+								const retryCountToPersist = Math.max(newCount, currentPersisted + 1);
+
+								return patchState(current, {
+									retryAttempts: setPersistedRetryAttempts(
+										current.retryAttempts,
+										failedPhase,
+										failedAgent,
+										retryCountToPersist,
+									),
+								});
+							});
 
 							logOrchestrationEvent(artifactDir, {
 								timestamp: new Date().toISOString(),
