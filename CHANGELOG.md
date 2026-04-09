@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.28.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.5...opencode-autopilot-v1.28.0) (2026-04-09)
+
+
+### Features
+
+* create 10 missing skills for Bug [#8](https://github.com/kodrunhq/opencode-autopilot/issues/8) PHASE_SKILL_MAP completion ([3d04a1c](https://github.com/kodrunhq/opencode-autopilot/commit/3d04a1c0ca31ff037e109dc379b9ba16d743f145))
+
+
+### Bug Fixes
+
+* address 6 Copilot PR review comments ([a5ea994](https://github.com/kodrunhq/opencode-autopilot/commit/a5ea994da35403d4e36761ed30ee681a1e13d545))
+* address all 11 bugs from opus_feedback.md ([f8ff830](https://github.com/kodrunhq/opencode-autopilot/commit/f8ff830ff3853b8ce394fb402468635990676d4e))
+* address all 11 bugs from opus_feedback.md ([412beb3](https://github.com/kodrunhq/opencode-autopilot/commit/412beb35aeb969549c8f018a777281501a670719))
+* remove duplicate unused import in branch-pr.ts ([49c714d](https://github.com/kodrunhq/opencode-autopilot/commit/49c714db11c2cb38721cf784b998753d006291d1))
+* remove duplicate unused import in branch-pr.ts ([90851cb](https://github.com/kodrunhq/opencode-autopilot/commit/90851cb9ff7b4f05421165c53571aedee7947a88))
+* remove unnecessary mkdir from skillHealthCheck test ([ab98187](https://github.com/kodrunhq/opencode-autopilot/commit/ab981877bae21031c98c6eacfb723db9275419ff))
+* use mkdtemp for truly isolated test directories ([c52e207](https://github.com/kodrunhq/opencode-autopilot/commit/c52e207fd0cf6a1a09edb7893ed0538013ce72d4))
+* use mkdtemp for truly isolated test directories ([dcec9cd](https://github.com/kodrunhq/opencode-autopilot/commit/dcec9cdc88a8485fc2b55112a28b403b74f0de6d))
+* use mkdtemp for truly isolated test directories ([4013604](https://github.com/kodrunhq/opencode-autopilot/commit/40136045304512f44ce152efa7820780362faa96))
+* use nested subdirectory for skillHealthCheck test isolation ([d4fcc7d](https://github.com/kodrunhq/opencode-autopilot/commit/d4fcc7db1cad5e22e06a579f0172fbb327f38b0d))
+
 ## [1.27.5](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.4...opencode-autopilot-v1.27.5) (2026-04-09)
 
 
