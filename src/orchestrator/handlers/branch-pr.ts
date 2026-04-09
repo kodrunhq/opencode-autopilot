@@ -2,7 +2,6 @@ import { execFile } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 import type { BranchLifecycle } from "../types";
 
