@@ -9,8 +9,8 @@ import {
 import { clearRecoveryState, loadRecoveryState } from "../recovery/persistence";
 import type { RecoveryState } from "../recovery/types";
 
-const recoverActionSchema = tool.schema.enum(["status", "retry", "reset", "history"]);
-type RecoverToolAction = "status" | "retry" | "reset" | "history";
+const recoverActionSchema = tool.schema.enum(["status", "retry", "clear-strategies", "history"]);
+type RecoverToolAction = "status" | "retry" | "clear-strategies" | "history";
 
 interface RecoverToolOptions {
 	readonly sessionId?: string;
@@ -97,19 +97,19 @@ export async function recoverCore(
 			});
 		}
 
-		case "reset": {
+		case "clear-strategies": {
 			orchestrator.reset(sessionId);
 			if (db) {
 				clearRecoveryState(db, sessionId);
 			}
 
 			return JSON.stringify({
-				action: "recovery_reset",
+				action: "recovery_clear_strategies",
 				sessionId,
 				ok: true,
-				displayText: createDisplayText("Recovery reset", [
+				displayText: createDisplayText("Recovery strategies cleared", [
 					`Session: ${sessionId}`,
-					"Recovery state cleared.",
+					"Recovery strategy state cleared.",
 				]),
 			});
 		}
@@ -156,7 +156,7 @@ export async function recoverCore(
 
 export const ocRecover = tool({
 	description:
-		"Inspect and manage session recovery state. Actions: status, retry, reset, history. Returns JSON with displayText.",
+		"Inspect and manage session recovery state. Actions: status, retry, clear-strategies, history. Returns JSON with displayText.",
 	args: {
 		action: recoverActionSchema.describe("Recovery action"),
 		sessionId: tool.schema.string().min(1).optional().describe("Session ID to inspect"),

@@ -47,6 +47,7 @@ function makeMinimalState(overrides: Record<string, unknown> = {}): PipelineStat
 		processedResultIds: [],
 		failureContext: null,
 		phaseDispatchCounts: {},
+		retryAttempts: {},
 		...overrides,
 	});
 }

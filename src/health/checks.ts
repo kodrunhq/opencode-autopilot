@@ -216,14 +216,14 @@ export async function configV7FieldsCheck(configPath?: string): Promise<HealthRe
 
 /** Standard agent names, derived from the agents barrel export. */
 const STANDARD_AGENT_NAMES: readonly string[] = Object.freeze([
-	"researcher",
+	"specialist-researcher",
 	"metaprompter",
 	"pr-reviewer",
 	"autopilot",
 	"coder",
 	"debugger",
-	"planner",
-	"reviewer",
+	"specialist-planner",
+	"specialist-reviewer",
 	"security-auditor",
 ]);
 

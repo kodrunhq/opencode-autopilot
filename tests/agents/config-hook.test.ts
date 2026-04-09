@@ -18,14 +18,14 @@ describe("configHook", () => {
 		const config = { agent: {} } as Config;
 		await configHook(config);
 
-		expect(config.agent?.researcher).toBeDefined();
+		expect(config.agent?.["specialist-researcher"]).toBeDefined();
 		expect(config.agent?.metaprompter).toBeDefined();
 		expect(config.agent?.["pr-reviewer"]).toBeDefined();
 		expect(config.agent?.autopilot).toBeDefined();
 		expect(config.agent?.coder).toBeDefined();
 		expect(config.agent?.debugger).toBeDefined();
-		expect(config.agent?.planner).toBeDefined();
-		expect(config.agent?.reviewer).toBeDefined();
+		expect(config.agent?.["specialist-planner"]).toBeDefined();
+		expect(config.agent?.["specialist-reviewer"]).toBeDefined();
 		expect(config.agent?.["security-auditor"]).toBeDefined();
 	});
 
@@ -34,14 +34,14 @@ describe("configHook", () => {
 		await configHook(config);
 
 		expect(config.agent).toBeDefined();
-		expect(config.agent?.researcher).toBeDefined();
+		expect(config.agent?.["specialist-researcher"]).toBeDefined();
 		expect(config.agent?.metaprompter).toBeDefined();
 		expect(config.agent?.["pr-reviewer"]).toBeDefined();
 		expect(config.agent?.autopilot).toBeDefined();
 		expect(config.agent?.coder).toBeDefined();
 		expect(config.agent?.debugger).toBeDefined();
-		expect(config.agent?.planner).toBeDefined();
-		expect(config.agent?.reviewer).toBeDefined();
+		expect(config.agent?.["specialist-planner"]).toBeDefined();
+		expect(config.agent?.["specialist-reviewer"]).toBeDefined();
 		expect(config.agent?.["security-auditor"]).toBeDefined();
 	});
 
@@ -51,11 +51,11 @@ describe("configHook", () => {
 			mode: "subagent" as const,
 			prompt: "custom prompt",
 		};
-		const config = { agent: { researcher: customAgent } } as Config;
+		const config = { agent: { "specialist-researcher": customAgent } } as Config;
 		await configHook(config);
 
-		expect(config.agent?.researcher).toBe(customAgent);
-		expect(config.agent?.researcher?.description).toBe("custom researcher");
+		expect(config.agent?.["specialist-researcher"]).toBe(customAgent);
+		expect(config.agent?.["specialist-researcher"]?.description).toBe("custom researcher");
 	});
 
 	test("suppresses built-in build agent with disable: true", async () => {
@@ -122,14 +122,14 @@ describe("configHook", () => {
 		expect((config.agent?.Builder as Record<string, unknown>).prompt).toBe("native Builder");
 	});
 
-	test("does NOT suppress custom planner agent registered by the plugin", async () => {
+	test("does NOT suppress custom specialist-planner agent registered by the plugin", async () => {
 		const config = {
 			agent: {},
 		} as Config;
 		await configHook(config);
 
-		// Our custom planner should be registered and NOT have disable: true
-		const planner = config.agent?.planner as Record<string, unknown> | undefined;
+		// Our custom specialist-planner should be registered and NOT have disable: true
+		const planner = config.agent?.["specialist-planner"] as Record<string, unknown> | undefined;
 		expect(planner).toBeDefined();
 		expect(planner?.disable).toBeUndefined();
 		expect(planner?.mode).toBe("all");
@@ -266,7 +266,7 @@ describe("configHook with model resolution", () => {
 		const config = { agent: {} } as Config;
 		await configHook(config, configPath);
 
-		const researcherConfig = config.agent?.researcher as Record<string, unknown>;
+		const researcherConfig = config.agent?.["specialist-researcher"] as Record<string, unknown>;
 		expect(researcherConfig).toBeDefined();
 		expect(researcherConfig.model).toBeUndefined();
 		expect(researcherConfig.fallback_models).toBeUndefined();
@@ -299,7 +299,7 @@ describe("configHook with model resolution", () => {
 		const config = { agent: {} } as Config;
 		await configHook(config, noFilePath);
 
-		const researcherConfig = config.agent?.researcher as Record<string, unknown>;
+		const researcherConfig = config.agent?.["specialist-researcher"] as Record<string, unknown>;
 		expect(researcherConfig).toBeDefined();
 		expect(researcherConfig.model).toBeUndefined();
 	});

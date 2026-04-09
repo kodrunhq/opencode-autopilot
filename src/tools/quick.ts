@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { ensurePhaseDir } from "../orchestrator/artifacts";
 import { PHASES, pipelineStateSchema } from "../orchestrator/schemas";
-import { loadState, saveState } from "../orchestrator/state";
+import { loadState, patchState, saveState } from "../orchestrator/state";
 import { ensureGitignore } from "../utils/gitignore";
 import { getProjectArtifactDir, getProjectRootFromArtifactDir } from "../utils/paths";
 import { orchestrateCore } from "./orchestrate";
@@ -18,6 +18,7 @@ const QUICK_SKIP_PHASES: ReadonlySet<string> = new Set([
 
 interface QuickArgs {
 	readonly idea: string;
+	readonly abandon?: boolean;
 }
 
 /**
@@ -38,7 +39,30 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 		});
 	}
 
-	// 2. Check for existing in-progress run
+	// 2. Handle abandon request
+	if (args.abandon) {
+		const existing = await loadState(artifactDir);
+		if (existing !== null) {
+			const abandonedState = patchState(existing, {
+				status: "INTERRUPTED" as const,
+				pendingDispatches: [],
+			});
+			await saveState(abandonedState, artifactDir);
+			return JSON.stringify({
+				action: "abandoned",
+				runId: existing.runId,
+				status: "INTERRUPTED",
+				displayText: `Pipeline run ${existing.runId} abandoned. Start fresh with /oc-quick.`,
+			});
+		}
+		return JSON.stringify({
+			action: "error",
+			code: "E_NO_STATE",
+			message: "No pipeline state to abandon.",
+		});
+	}
+
+	// 3. Check for existing in-progress run
 	const existing = await loadState(artifactDir);
 	if (existing !== null && existing.status === "IN_PROGRESS") {
 		return JSON.stringify({
@@ -48,7 +72,7 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 		});
 	}
 
-	// 3. Create quick-mode initial state (starts at PLAN, skips discovery phases)
+	// 4. Create quick-mode initial state (starts at PLAN, skips discovery phases)
 	const now = new Date().toISOString();
 	const quickState = pipelineStateSchema.parse({
 		schemaVersion: 2,
@@ -82,10 +106,10 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 		processedResultIds: [],
 	});
 
-	// 4. Persist quick state to disk
+	// 5. Persist quick state to disk
 	await saveState(quickState, artifactDir);
 
-	// 5. Create minimal stub artifacts for skipped phases so the PLAN handler
+	// 6. Create minimal stub artifacts for skipped phases so the PLAN handler
 	//    has something to reference (design.md for ARCHITECT, brief.md for CHALLENGE).
 	//    Uses "wx" flag to avoid overwriting existing files.
 	const stubs: readonly {
@@ -112,14 +136,14 @@ export async function quickCore(args: QuickArgs, artifactDir: string): Promise<s
 		}
 	}
 
-	// 6. Best-effort .gitignore update (same pattern as orchestrateCore)
+	// 7. Best-effort .gitignore update (same pattern as orchestrateCore)
 	try {
 		await ensureGitignore(getProjectRootFromArtifactDir(artifactDir));
 	} catch {
 		// Non-critical -- swallow gitignore errors
 	}
 
-	// 7. Delegate to orchestrateCore to continue from PLAN phase
+	// 8. Delegate to orchestrateCore to continue from PLAN phase
 	return orchestrateCore({ result: undefined }, artifactDir);
 }
 
@@ -128,6 +152,12 @@ export const ocQuick = tool({
 		"Run a quick task through a simplified pipeline. Skips research and architecture phases (RECON, CHALLENGE, ARCHITECT, EXPLORE) and goes straight to PLAN -> BUILD -> SHIP -> RETROSPECTIVE. Use for small, well-understood tasks.",
 	args: {
 		idea: tool.schema.string().min(1).max(4096).describe("The task to accomplish"),
+		abandon: tool.schema
+			.boolean()
+			.optional()
+			.describe(
+				"Set to true to abandon the current pipeline run. Clears pending dispatches and sets status to INTERRUPTED. Use when a dispatch result is unavailable (crashed agent, closed TUI, dead subagent).",
+			),
 	},
 	async execute(args) {
 		return quickCore(args, getProjectArtifactDir(process.cwd()));

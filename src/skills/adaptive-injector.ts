@@ -46,14 +46,14 @@ function activateMcpForSkills(skills: ReadonlyMap<string, LoadedSkill>, mcpEnabl
  * preventing the full 13-19KB per-skill content from bloating every dispatch.
  */
 export const PHASE_SKILL_MAP: Readonly<Record<string, readonly string[]>> = Object.freeze({
-	RECON: [],
-	CHALLENGE: [],
-	ARCHITECT: [],
+	RECON: ["domain-research", "evidence-gathering"],
+	CHALLENGE: ["scope-pruning", "risk-assessment"],
+	ARCHITECT: ["architecture-decision-records", "system-design"],
 	PLAN: ["plan-writing", "plan-executing"],
 	BUILD: ["coding-standards", "tdd-workflow"],
 	SHIP: ["plan-executing"],
-	RETROSPECTIVE: [],
-	EXPLORE: [],
+	RETROSPECTIVE: ["lessons-learned", "continuous-improvement"],
+	EXPLORE: ["codebase-mapping", "exploration-methodology"],
 });
 
 const MCP_SUPPORT_NOTE =

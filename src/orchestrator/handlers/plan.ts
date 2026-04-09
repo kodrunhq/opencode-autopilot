@@ -1,7 +1,8 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { getLogger } from "../../logging/domains";
-import { isEnoentError } from "../../utils/fs-helpers";
-import { getArtifactRef } from "../artifacts";
+import { fileExists, isEnoentError } from "../../utils/fs-helpers";
+import { getArtifactRef, getPhaseDir } from "../artifacts";
 import { normalizePlanTasks, planTasksArtifactSchema } from "../contracts/phase-artifacts";
 import { logOrchestrationEvent } from "../orchestration-logger";
 import { renderTasksMarkdown } from "../renderers/tasks-markdown";
@@ -199,12 +200,42 @@ export const handlePlan: PhaseHandler = async (state, artifactDir, result?) => {
 		}
 	}
 
-	const architectRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md", state.runId);
+	const phaseDir = getPhaseDir(artifactDir, "ARCHITECT", state.runId);
+	const critiquePath = join(phaseDir, "critique.md");
+	const designPath = join(phaseDir, "design.md");
+	const proposalsDir = join(phaseDir, "proposals");
+
+	const critiqueExists = await fileExists(critiquePath);
+	const designExists = await fileExists(designPath);
+
+	let architectRef: string;
+	let architectDescription: string;
+
+	if (critiqueExists) {
+		architectRef = critiquePath;
+		architectDescription = "the architecture critique and proposals";
+	} else if (designExists) {
+		architectRef = designPath;
+		architectDescription = "the architecture design";
+	} else {
+		const proposalFiles = await readdir(proposalsDir).catch(() => []);
+		if (proposalFiles.length === 0) {
+			return Object.freeze({
+				action: "error",
+				code: "E_ARCHITECT_ARTIFACT_MISSING",
+				message:
+					"No architecture artifacts found. Expected design.md, critique.md, or proposals/ directory.",
+			} satisfies DispatchResult);
+		}
+		architectRef = proposalsDir;
+		architectDescription = "the architecture proposals";
+	}
+
 	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId);
 	const tasksPath = getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId);
 
 	const prompt = [
-		"Read the architecture design at",
+		`Read ${architectDescription} at`,
 		architectRef,
 		"and the challenge brief at",
 		challengeRef,

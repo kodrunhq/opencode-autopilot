@@ -4,12 +4,15 @@ import {
 	buildFailureSummary,
 	buildRetryKey,
 	clearAllRetryState,
+	clearPersistedRetryAttempts,
 	clearRetryStateByKey,
 	decideRetry,
 	detectDispatchFailure,
+	getPersistedRetryAttempts,
 	getRetryState,
 	getRetryStateByKey,
 	recordRetryAttempt,
+	setPersistedRetryAttempts,
 	sleep,
 } from "../../src/orchestrator/dispatch-retry";
 
@@ -765,6 +768,126 @@ describe("orchestration-level retry integration", () => {
 	});
 });
 
+// ── Persisted retry state (Bug #3 fix) ────────────────────────────
+
+describe("persisted retry state (Bug #3)", () => {
+	test("getPersistedRetryAttempts returns 0 for empty state", () => {
+		expect(getPersistedRetryAttempts({}, "RECON", "oc-researcher")).toBe(0);
+	});
+
+	test("getPersistedRetryAttempts returns count for existing key", () => {
+		const state = { "RECON:oc-researcher": 3 };
+		expect(getPersistedRetryAttempts(state, "RECON", "oc-researcher")).toBe(3);
+	});
+
+	test("getPersistedRetryAttempts returns 0 for different key", () => {
+		const state = { "RECON:oc-researcher": 3 };
+		expect(getPersistedRetryAttempts(state, "BUILD", "oc-implementer")).toBe(0);
+	});
+
+	test("setPersistedRetryAttempts creates new entry", () => {
+		const result = setPersistedRetryAttempts({}, "RECON", "oc-researcher", 2);
+		expect(result).toEqual({ "RECON:oc-researcher": 2 });
+	});
+
+	test("setPersistedRetryAttempts updates existing entry", () => {
+		const state = { "RECON:oc-researcher": 1, "BUILD:oc-implementer": 3 };
+		const result = setPersistedRetryAttempts(state, "RECON", "oc-researcher", 5);
+		expect(result).toEqual({ "RECON:oc-researcher": 5, "BUILD:oc-implementer": 3 });
+	});
+
+	test("setPersistedRetryAttempts returns new object (immutable)", () => {
+		const state = { "RECON:oc-researcher": 1 };
+		const result = setPersistedRetryAttempts(state, "BUILD", "oc-implementer", 2);
+		expect(state).toEqual({ "RECON:oc-researcher": 1 });
+		expect(result).toEqual({ "RECON:oc-researcher": 1, "BUILD:oc-implementer": 2 });
+	});
+
+	test("clearPersistedRetryAttempts removes entry", () => {
+		const state = { "RECON:oc-researcher": 3, "BUILD:oc-implementer": 1 };
+		const result = clearPersistedRetryAttempts(state, "RECON", "oc-researcher");
+		expect(result).toEqual({ "BUILD:oc-implementer": 1 });
+	});
+
+	test("clearPersistedRetryAttempts returns same object when key missing", () => {
+		const state = { "BUILD:oc-implementer": 1 };
+		const result = clearPersistedRetryAttempts(state, "RECON", "oc-researcher");
+		expect(result).toBe(state);
+	});
+
+	test("clearPersistedRetryAttempts returns new object (immutable)", () => {
+		const state = { "RECON:oc-researcher": 3, "BUILD:oc-implementer": 1 };
+		const result = clearPersistedRetryAttempts(state, "RECON", "oc-researcher");
+		expect(state).toEqual({ "RECON:oc-researcher": 3, "BUILD:oc-implementer": 1 });
+		expect(result).toEqual({ "BUILD:oc-implementer": 1 });
+	});
+
+	test("decideRetry uses persisted attempts when higher than in-memory", () => {
+		// In-memory is 0, persisted is 2 -> should deny retry (limit 2)
+		const decision = decideRetry("d-1", "RECON", "oc-researcher", "rate limit exceeded", 2, 2);
+		expect(decision.shouldRetry).toBe(false);
+		expect(decision.reasoning).toContain("Retry limit reached");
+	});
+
+	test("decideRetry uses in-memory attempts when higher than persisted", () => {
+		// Record 2 in-memory attempts
+		recordRetryAttempt("d-1", "RECON", "oc-researcher", "rate_limit");
+		recordRetryAttempt("d-2", "RECON", "oc-researcher", "rate_limit");
+
+		// Persisted is 0, in-memory is 2 -> should deny retry (limit 2)
+		const decision = decideRetry("d-3", "RECON", "oc-researcher", "rate limit exceeded", 2, 0);
+		expect(decision.shouldRetry).toBe(false);
+	});
+
+	test("decideRetry takes max of in-memory and persisted", () => {
+		// Record 1 in-memory attempt
+		recordRetryAttempt("d-1", "BUILD", "oc-implementer", "timeout");
+
+		// Persisted is 3, in-memory is 1 -> effective is 3 -> deny (limit 2)
+		const decision = decideRetry("d-2", "BUILD", "oc-implementer", "timeout", 2, 3);
+		expect(decision.shouldRetry).toBe(false);
+	});
+
+	test("recordRetryAttempt returns new attempt count", () => {
+		const count1 = recordRetryAttempt("d-1", "RECON", "oc-researcher", "rate_limit");
+		expect(count1).toBe(1);
+
+		const count2 = recordRetryAttempt("d-2", "RECON", "oc-researcher", "rate_limit");
+		expect(count2).toBe(2);
+
+		const count3 = recordRetryAttempt("d-3", "RECON", "oc-researcher", "timeout");
+		expect(count3).toBe(3);
+	});
+
+	test("simulated restart: persisted state preserves retry count across sessions", () => {
+		// Session 1: record 2 attempts, then "persist" to state
+		recordRetryAttempt("d-1", "ARCHITECT", "oc-architect", "service_unavailable");
+		recordRetryAttempt("d-2", "ARCHITECT", "oc-architect", "timeout");
+		const persistedState = setPersistedRetryAttempts({}, "ARCHITECT", "oc-architect", 2);
+
+		// Session 2: in-memory Map is empty (process restart), but persisted state has count
+		clearAllRetryState();
+		const persistedAttempts = getPersistedRetryAttempts(
+			persistedState,
+			"ARCHITECT",
+			"oc-architect",
+		);
+		expect(persistedAttempts).toBe(2);
+
+		// decideRetry should see the persisted count and deny retry (limit 2)
+		const decision = decideRetry(
+			"d-3",
+			"ARCHITECT",
+			"oc-architect",
+			"503 bad gateway",
+			2,
+			persistedAttempts,
+		);
+		expect(decision.shouldRetry).toBe(false);
+		expect(decision.reasoning).toContain("Retry limit reached");
+	});
+});
+
 function makeMinimalState(
 	phase: string,
 	overrides: Record<string, unknown> = {},
@@ -798,6 +921,7 @@ function makeMinimalState(
 		failureContext: null,
 		branchLifecycle: null,
 		phaseDispatchCounts: {},
+		retryAttempts: {},
 		...overrides,
 	} as import("../../src/orchestrator/types").PipelineState;
 }

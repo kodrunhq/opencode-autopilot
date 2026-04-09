@@ -46,7 +46,7 @@ describe("recoverCore", () => {
 		expect(orchestrator.getState("sess-3")).toBeNull();
 	});
 
-	test("reset clears persisted recovery state", async () => {
+	test("clear-strategies clears persisted recovery state", async () => {
 		const db = openKernelDb(tempDir);
 		try {
 			saveRecoveryState(db, {
@@ -58,8 +58,8 @@ describe("recoverCore", () => {
 				lastError: null,
 			});
 
-			const result = JSON.parse(await recoverCore("reset", { sessionId: "sess-4" }, db));
-			expect(result.action).toBe("recovery_reset");
+			const result = JSON.parse(await recoverCore("clear-strategies", { sessionId: "sess-4" }, db));
+			expect(result.action).toBe("recovery_clear_strategies");
 			expect(result.ok).toBe(true);
 			const persisted = db
 				.query("SELECT session_id FROM recovery_state WHERE session_id = ?")

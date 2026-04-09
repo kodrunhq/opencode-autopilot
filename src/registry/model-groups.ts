@@ -14,7 +14,7 @@ export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = deepFreeze({
 	"oc-architect": { group: "architects" },
 	"oc-planner": { group: "architects" },
 	autopilot: { group: "architects" },
-	planner: { group: "architects" },
+	"specialist-planner": { group: "architects" },
 
 	// ── Challengers ────────────────────────────────────────────
 	"oc-critic": { group: "challengers" },
@@ -27,7 +27,7 @@ export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = deepFreeze({
 
 	// ── Reviewers ──────────────────────────────────────────────
 	"oc-reviewer": { group: "reviewers" },
-	reviewer: { group: "reviewers" },
+	"specialist-reviewer": { group: "reviewers" },
 
 	// ── Red Team ───────────────────────────────────────────────
 	"red-team": { group: "red-team" },
@@ -35,7 +35,7 @@ export const AGENT_REGISTRY: Readonly<Record<string, AgentEntry>> = deepFreeze({
 
 	// ── Researchers ────────────────────────────────────────────
 	"oc-researcher": { group: "researchers" },
-	researcher: { group: "researchers" },
+	"specialist-researcher": { group: "researchers" },
 
 	// ── Communicators ──────────────────────────────────────────
 	"oc-shipper": { group: "communicators" },

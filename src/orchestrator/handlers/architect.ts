@@ -1,5 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { getLogger } from "../../logging/domains";
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { fileExists } from "../../utils/fs-helpers";
 import { getProjectRootFromArtifactDir } from "../../utils/paths";
@@ -8,6 +9,8 @@ import { ensurePhaseDir, getArtifactRef, getPhaseDir } from "../artifacts";
 import { filterByPhase } from "../confidence";
 import type { PipelineState } from "../types";
 import { AGENT_NAMES, type DispatchResult, type PhaseHandlerContext } from "./types";
+
+const logger = getLogger("orchestrator", "architect");
 
 const CONSTRAINT_FRAMINGS: readonly string[] = Object.freeze([
 	"Optimize for simplicity and minimal dependencies",
@@ -26,15 +29,72 @@ const CONSTRAINT_FRAMINGS: readonly string[] = Object.freeze([
 export async function handleArchitect(
 	state: Readonly<PipelineState>,
 	artifactDir: string,
-	_result?: string,
+	result?: string,
 	_context?: PhaseHandlerContext,
 ): Promise<DispatchResult> {
-	// _result is received from the orchestrator but completion is determined by
-	// artifact existence (design.md/critique.md), not by result truthiness.
-	// This preserves the three-step arena flow: proposals → critic → complete.
 	const phaseDir = getPhaseDir(artifactDir, "ARCHITECT", state.runId);
 	const critiqueExists = await fileExists(join(phaseDir, "critique.md"));
 	const designExists = await fileExists(join(phaseDir, "design.md"));
+
+	// Result-envelope validation: when agent returns, verify expected artifact exists
+	if (result) {
+		// Step 3: critique or design exists -> complete
+		if (critiqueExists || designExists) {
+			return Object.freeze({
+				action: "complete" as const,
+				phase: "ARCHITECT",
+				progress: "ARCHITECT complete",
+			});
+		}
+
+		// Determine expected proposal count for arena mode
+		await ensurePhaseDir(artifactDir, "ARCHITECT", state.runId);
+		const reconEntries = filterByPhase(state.confidence, "RECON");
+		const depth = getMemoryTunedDepth(reconEntries, getProjectRootFromArtifactDir(artifactDir));
+		const proposalsDir = join(phaseDir, "proposals");
+
+		if (depth > 1) {
+			// Arena mode: expect proposals directory with >= depth files
+			const proposalCount = await countProposalFiles(proposalsDir);
+			if (proposalCount < depth) {
+				const artifactPath = join(proposalsDir, `proposal-*.md`);
+				logger.warn("ARCHITECT result received but proposals incomplete", {
+					operation: "phase_transition",
+					phase: "ARCHITECT",
+					artifactPath,
+					expected: depth,
+					actual: proposalCount,
+				});
+				return Object.freeze({
+					action: "error" as const,
+					phase: "ARCHITECT",
+					message: `ARCHITECT agent returned a result but did not write all required proposals: expected ${depth} proposals in ${proposalsDir}, found ${proposalCount}. The agent must write all proposal files before the phase can complete.`,
+				});
+			}
+			// Proposals complete, dispatch critic
+			return Object.freeze({
+				action: "dispatch" as const,
+				agent: AGENT_NAMES.CRITIC,
+				resultKind: "phase_output",
+				prompt: buildCriticPrompt(artifactDir, proposalsDir, state),
+				phase: "ARCHITECT",
+				progress: "Dispatching critic for proposal review",
+			});
+		} else {
+			// Single mode: expect design.md
+			const artifactPath = getArtifactRef(artifactDir, "ARCHITECT", "design.md", state.runId);
+			logger.warn("ARCHITECT result received but artifact not found", {
+				operation: "phase_transition",
+				phase: "ARCHITECT",
+				artifactPath,
+			});
+			return Object.freeze({
+				action: "error" as const,
+				phase: "ARCHITECT",
+				message: `ARCHITECT agent returned a result but did not write the required artifact: ${artifactPath}. The agent must write design.md before the phase can complete.`,
+			});
+		}
+	}
 
 	// Step 3: critique or design exists -> complete (idempotency on resume)
 	if (critiqueExists || designExists) {
@@ -68,34 +128,7 @@ export async function handleArchitect(
 				action: "dispatch" as const,
 				agent: AGENT_NAMES.CRITIC,
 				resultKind: "phase_output",
-				prompt: [
-					`Review architecture proposals in ${proposalsDir}/`,
-					`Read ${getArtifactRef(artifactDir, "RECON", "report.md", state.runId)} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId)} for context.`,
-					"",
-					`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md", state.runId)}`,
-					"",
-					"Your critique MUST contain:",
-					"",
-					"## Per-Proposal Analysis",
-					"For each proposal:",
-					"- **Strengths**: What does this design get right? (be specific, reference sections)",
-					"- **Weaknesses**: What are the gaps or risks? (be specific, cite affected components)",
-					"- **Feasibility**: Can this be built with the identified stack and timeline?",
-					"- **Testability**: How easily can this design be validated and tested?",
-					"",
-					"## Comparative Matrix",
-					"| Criterion | Proposal A | Proposal B | ... |",
-					"| --- | --- | --- | --- |",
-					"| Simplicity | ... | ... | ... |",
-					"| Extensibility | ... | ... | ... |",
-					"| Performance | ... | ... | ... |",
-					"| Risk | ... | ... | ... |",
-					"",
-					"## Recommendation",
-					"- Which proposal to adopt (or which elements to combine)",
-					"- Key modifications needed before proceeding",
-					"- Confidence: HIGH / MEDIUM / LOW (with justification)",
-				].join("\n"),
+				prompt: buildCriticPrompt(artifactDir, proposalsDir, state),
 				phase: "ARCHITECT",
 				progress: "Dispatching critic for proposal review",
 			});
@@ -108,34 +141,7 @@ export async function handleArchitect(
 				action: "dispatch" as const,
 				agent: AGENT_NAMES.CRITIC,
 				resultKind: "phase_output",
-				prompt: [
-					`Review architecture proposals in ${proposalsDir}/`,
-					`Read ${getArtifactRef(artifactDir, "RECON", "report.md", state.runId)} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId)} for context.`,
-					"",
-					`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md", state.runId)}`,
-					"",
-					"Your critique MUST contain:",
-					"",
-					"## Per-Proposal Analysis",
-					"For each proposal:",
-					"- **Strengths**: What does this design get right? (be specific, reference sections)",
-					"- **Weaknesses**: What are the gaps or risks? (be specific, cite affected components)",
-					"- **Feasibility**: Can this be built with the identified stack and timeline?",
-					"- **Testability**: How easily can this design be validated and tested?",
-					"",
-					"## Comparative Matrix",
-					"| Criterion | Proposal A | Proposal B | ... |",
-					"| --- | --- | --- | --- |",
-					"| Simplicity | ... | ... | ... |",
-					"| Extensibility | ... | ... | ... |",
-					"| Performance | ... | ... | ... |",
-					"| Risk | ... | ... | ... |",
-					"",
-					"## Recommendation",
-					"- Which proposal to adopt (or which elements to combine)",
-					"- Key modifications needed before proceeding",
-					"- Confidence: HIGH / MEDIUM / LOW (with justification)",
-				].join("\n"),
+				prompt: buildCriticPrompt(artifactDir, proposalsDir, state),
 				phase: "ARCHITECT",
 				progress: "Dispatching critic for proposal review",
 			});
@@ -240,6 +246,41 @@ export async function handleArchitect(
 		phase: "ARCHITECT",
 		progress: `Dispatching ${depth} architects for Arena proposals`,
 	});
+}
+
+function buildCriticPrompt(
+	artifactDir: string,
+	proposalsDir: string,
+	state: Readonly<PipelineState>,
+): string {
+	return [
+		`Review architecture proposals in ${proposalsDir}/`,
+		`Read ${getArtifactRef(artifactDir, "RECON", "report.md", state.runId)} and ${getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId)} for context.`,
+		"",
+		`Write a comparative critique to ${getArtifactRef(artifactDir, "ARCHITECT", "critique.md", state.runId)}`,
+		"",
+		"Your critique MUST contain:",
+		"",
+		"## Per-Proposal Analysis",
+		"For each proposal:",
+		"- **Strengths**: What does this design get right? (be specific, reference sections)",
+		"- **Weaknesses**: What are the gaps or risks? (be specific, cite affected components)",
+		"- **Feasibility**: Can this be built with the identified stack and timeline?",
+		"- **Testability**: How easily can this design be validated and tested?",
+		"",
+		"## Comparative Matrix",
+		"| Criterion | Proposal A | Proposal B | ... |",
+		"| --- | --- | --- | --- |",
+		"| Simplicity | ... | ... | ... |",
+		"| Extensibility | ... | ... | ... |",
+		"| Performance | ... | ... | ... |",
+		"| Risk | ... | ... | ... |",
+		"",
+		"## Recommendation",
+		"- Which proposal to adopt (or which elements to combine)",
+		"- Key modifications needed before proceeding",
+		"- Confidence: HIGH / MEDIUM / LOW (with justification)",
+	].join("\n");
 }
 
 async function hasProposalFiles(proposalsDir: string): Promise<boolean> {

@@ -1,4 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { handleBuild } from "../src/orchestrator/handlers/build";
 import { handleExplore } from "../src/orchestrator/handlers/explore";
 import { handlePlan } from "../src/orchestrator/handlers/plan";
@@ -7,6 +10,12 @@ import { handleShip } from "../src/orchestrator/handlers/ship";
 import { AGENT_NAMES } from "../src/orchestrator/handlers/types";
 import { pipelineStateSchema } from "../src/orchestrator/schemas";
 import type { PipelineState } from "../src/orchestrator/types";
+
+let tempDir: string;
+
+beforeEach(async () => {
+	tempDir = await mkdtemp(join(tmpdir(), "handlers-late-test-"));
+});
 
 function makeState(overrides: Partial<PipelineState> = {}): PipelineState {
 	const now = new Date().toISOString();
@@ -35,19 +44,22 @@ function makeState(overrides: Partial<PipelineState> = {}): PipelineState {
 describe("handlePlan", () => {
 	test("dispatches oc-planner with ARCHITECT artifact refs when no result", async () => {
 		const state = makeState({ currentPhase: "PLAN" });
-		const result = await handlePlan(state, "/tmp/artifacts");
+		const runId = state.runId ?? "test-run";
+		const architectDir = join(tempDir, "phases", runId, "ARCHITECT");
+		await mkdir(architectDir, { recursive: true });
+		await writeFile(join(architectDir, "design.md"), "# Design\n\nArchitecture design content");
+
+		const result = await handlePlan(state, tempDir);
 
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe(AGENT_NAMES.PLAN);
-		// Note: run-scoped paths now include runId directory
-		expect(result.prompt).toMatch(/phases\/run_[a-f0-9]{16}\/ARCHITECT\/design\.md/);
-		expect(result.prompt).toMatch(/phases\/run_[a-f0-9]{16}\/CHALLENGE\/brief\.md/);
+		expect(result.prompt).toContain("design.md");
 		expect(result.phase).toBe("PLAN");
 	});
 
 	test("returns complete when result provided", async () => {
 		const state = makeState({ currentPhase: "PLAN" });
-		const result = await handlePlan(state, "/tmp/artifacts", "tasks written");
+		const result = await handlePlan(state, tempDir, "tasks written");
 
 		expect(result.action).toBe("error");
 		expect(result.phase).toBe("PLAN");

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -14,8 +14,8 @@ import {
 } from "../../src/health/checks";
 import { resetGlobalMcpManager } from "../../src/mcp";
 
-function createIsolatedTempDir(prefix: string): string {
-	return join(tmpdir(), `oca-${prefix}-${randomUUID()}`);
+async function createIsolatedTempDir(prefix: string): Promise<string> {
+	return mkdtemp(join(tmpdir(), `oca-${prefix}-`));
 }
 
 // ---------------------------------------------------------------------------
@@ -23,12 +23,13 @@ function createIsolatedTempDir(prefix: string): string {
 // ---------------------------------------------------------------------------
 describe("skillHealthCheck", () => {
 	test("returns pass with typescript stack when tsconfig.json exists", async () => {
-		const tempDir = createIsolatedTempDir("skill-check-ts");
+		const baseDir = await createIsolatedTempDir("skill-check-ts");
+		const tempDir = join(baseDir, "project");
 		await mkdir(tempDir, { recursive: true });
+
 		await writeFile(join(tempDir, "tsconfig.json"), "{}");
 
-		// Create a skills dir with one skill
-		const skillsDir = join(tempDir, "skills", "typescript");
+		const skillsDir = join(baseDir, "skills", "typescript");
 		await mkdir(skillsDir, { recursive: true });
 		await writeFile(
 			join(skillsDir, "SKILL.md"),
@@ -42,16 +43,16 @@ requires: []
 Content here`,
 		);
 
-		const result = await skillHealthCheck(tempDir, join(tempDir, "skills"));
+		const result = await skillHealthCheck(tempDir, join(baseDir, "skills"));
 		expect(result.status).toBe("pass");
 		expect(result.name).toBe("skill-loading");
 		expect(result.message).toContain("typescript");
 
-		await rm(tempDir, { recursive: true, force: true });
+		await rm(baseDir, { recursive: true, force: true });
 	});
 
 	test("returns pass with 0 stacks for empty project root", async () => {
-		const tempDir = createIsolatedTempDir("skill-check-empty");
+		const tempDir = await createIsolatedTempDir("skill-check-empty");
 		await mkdir(tempDir, { recursive: true });
 		// No manifest files, no skills dir
 
@@ -63,7 +64,7 @@ Content here`,
 	});
 
 	test("returns frozen result", async () => {
-		const tempDir = createIsolatedTempDir("skill-check-frozen");
+		const tempDir = await createIsolatedTempDir("skill-check-frozen");
 		await mkdir(tempDir, { recursive: true });
 
 		const result = await skillHealthCheck(tempDir, join(tempDir, "skills"));
@@ -78,7 +79,7 @@ Content here`,
 // ---------------------------------------------------------------------------
 describe("memoryHealthCheck", () => {
 	test("returns pass when DB file exists and is readable", async () => {
-		const tempDir = createIsolatedTempDir("mem-check-pass");
+		const tempDir = await createIsolatedTempDir("mem-check-pass");
 		await mkdir(tempDir, { recursive: true });
 
 		// Create a minimal SQLite DB with observations table
@@ -99,7 +100,7 @@ describe("memoryHealthCheck", () => {
 	});
 
 	test("returns pass when DB file does not exist (fresh install)", async () => {
-		const tempDir = createIsolatedTempDir("mem-check-noexist");
+		const tempDir = await createIsolatedTempDir("mem-check-noexist");
 		await mkdir(tempDir, { recursive: true });
 
 		const result = await memoryHealthCheck(tempDir);
@@ -111,7 +112,7 @@ describe("memoryHealthCheck", () => {
 	});
 
 	test("returns frozen result", async () => {
-		const tempDir = createIsolatedTempDir("mem-check-frozen");
+		const tempDir = await createIsolatedTempDir("mem-check-frozen");
 		await mkdir(tempDir, { recursive: true });
 
 		const result = await memoryHealthCheck(tempDir);
@@ -121,7 +122,7 @@ describe("memoryHealthCheck", () => {
 	});
 
 	test("returns pass when only legacy memory DB exists", async () => {
-		const tempDir = createIsolatedTempDir("mem-check-legacy");
+		const tempDir = await createIsolatedTempDir("mem-check-legacy");
 		const memoryDir = join(tempDir, "memory");
 		await mkdir(memoryDir, { recursive: true });
 
@@ -143,7 +144,7 @@ describe("memoryHealthCheck", () => {
 // ---------------------------------------------------------------------------
 describe("commandHealthCheck", () => {
 	test("returns pass when all command files exist with valid frontmatter", async () => {
-		const tempDir = createIsolatedTempDir("cmd-check-pass");
+		const tempDir = await createIsolatedTempDir("cmd-check-pass");
 		const commandsDir = join(tempDir, "commands");
 		await mkdir(commandsDir, { recursive: true });
 
@@ -180,7 +181,7 @@ Command content`,
 	});
 
 	test("returns fail when command files are missing", async () => {
-		const tempDir = createIsolatedTempDir("cmd-check-missing");
+		const tempDir = await createIsolatedTempDir("cmd-check-missing");
 		const commandsDir = join(tempDir, "commands");
 		await mkdir(commandsDir, { recursive: true });
 
@@ -203,7 +204,7 @@ Content`,
 	});
 
 	test("returns frozen result", async () => {
-		const tempDir = createIsolatedTempDir("cmd-check-frozen");
+		const tempDir = await createIsolatedTempDir("cmd-check-frozen");
 		await mkdir(tempDir, { recursive: true });
 
 		const result = await commandHealthCheck(tempDir);
@@ -293,7 +294,7 @@ describe("configV7FieldsCheck", () => {
 	}
 
 	test("returns pass when all v7 fields are present", async () => {
-		const tempDir = createIsolatedTempDir("v7-check-pass");
+		const tempDir = await createIsolatedTempDir("v7-check-pass");
 		await mkdir(tempDir, { recursive: true });
 
 		const configPath = await writeTempConfig(tempDir, {
@@ -342,7 +343,7 @@ describe("configV7FieldsCheck", () => {
 	});
 
 	test("returns fail when config file is missing", async () => {
-		const tempDir = createIsolatedTempDir("v7-check-missing");
+		const tempDir = await createIsolatedTempDir("v7-check-missing");
 		await mkdir(tempDir, { recursive: true });
 
 		const result = await configV7FieldsCheck(join(tempDir, "nonexistent.json"));
@@ -354,7 +355,7 @@ describe("configV7FieldsCheck", () => {
 	});
 
 	test("returns fail when v7 fields are missing from a v7 config", async () => {
-		const tempDir = createIsolatedTempDir("v7-check-incomplete");
+		const tempDir = await createIsolatedTempDir("v7-check-incomplete");
 		await mkdir(tempDir, { recursive: true });
 
 		const configPath = await writeTempConfig(tempDir, {
@@ -401,7 +402,7 @@ describe("configV7FieldsCheck", () => {
 	});
 
 	test("returns pass with migration message for a pre-v7 config", async () => {
-		const tempDir = createIsolatedTempDir("v7-check-prev7");
+		const tempDir = await createIsolatedTempDir("v7-check-prev7");
 		await mkdir(tempDir, { recursive: true });
 
 		const configPath = await writeTempConfig(tempDir, {
@@ -446,7 +447,7 @@ describe("configV7FieldsCheck", () => {
 	});
 
 	test("returns fail when only some v7 fields are missing", async () => {
-		const tempDir = createIsolatedTempDir("v7-check-partial");
+		const tempDir = await createIsolatedTempDir("v7-check-partial");
 		await mkdir(tempDir, { recursive: true });
 
 		const configPath = await writeTempConfig(tempDir, {
@@ -494,7 +495,7 @@ describe("configV7FieldsCheck", () => {
 	});
 
 	test("returns frozen result", async () => {
-		const tempDir = createIsolatedTempDir("v7-check-frozen");
+		const tempDir = await createIsolatedTempDir("v7-check-frozen");
 		await mkdir(tempDir, { recursive: true });
 
 		const result = await configV7FieldsCheck(join(tempDir, "nonexistent.json"));
@@ -517,7 +518,7 @@ describe("mcpHealthCheck", () => {
 	});
 
 	test("returns pass when mcp is disabled", async () => {
-		const tempDir = createIsolatedTempDir("mcp-health-disabled");
+		const tempDir = await createIsolatedTempDir("mcp-health-disabled");
 		await mkdir(tempDir, { recursive: true });
 		const configPath = join(tempDir, "opencode-autopilot.json");
 		await writeFile(
@@ -553,7 +554,7 @@ describe("mcpHealthCheck", () => {
 	});
 
 	test("reports mcp-capable skills when enabled", async () => {
-		const tempDir = createIsolatedTempDir("mcp-health-enabled");
+		const tempDir = await createIsolatedTempDir("mcp-health-enabled");
 		const skillsDir = join(tempDir, "skills", "docs");
 		await mkdir(skillsDir, { recursive: true });
 		await writeFile(

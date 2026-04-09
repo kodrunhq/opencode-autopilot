@@ -14,35 +14,15 @@ import { getLogger } from "../logging/domains";
 import { classifyError } from "../recovery/classifier";
 import { getStrategy } from "../recovery/strategies";
 import type { ErrorCategory } from "../types/recovery";
+import { detectDispatchFailure } from "./dispatch-error-detection";
+
+export { detectDispatchFailure };
 
 const logger = getLogger("orchestrator", "dispatch-retry");
 
 export function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-/** Regex patterns matching provider/transport errors embedded in result text. */
-const DISPATCH_ERROR_PATTERNS: readonly RegExp[] = Object.freeze([
-	/\bprovider_unavailable\b/i,
-	/\b(?:502|503|504)\b.*(?:bad\s+gateway|service\s+unavailable|gateway\s+timeout)/i,
-	/\bnetwork\s+connection\s+lost\b/i,
-	/\brate\s*limit/i,
-	/\btoo\s+many\s+requests\b/i,
-	/\b429\b/,
-	/\btimeout\b/i,
-	/\btimed?\s*out\b/i,
-	/\bECONNRESET\b/i,
-	/\bsocket\s+hang\s+up\b/i,
-	/\bservice\s+unavailable\b/i,
-	/\boverloaded\b/i,
-	/\bE_INVALID_RESULT\b/,
-	/\btool\s+execution\s+aborted\b/i,
-	/\binternal\s+server\s+error\b/i,
-]);
-
-// Results shorter than this with an error pattern are almost certainly failures,
-// not real agent output that happens to mention an error.
-const MIN_MEANINGFUL_RESULT_LENGTH = 120;
 
 export interface DispatchRetryState {
 	readonly retryKey: string;
@@ -69,78 +49,13 @@ export function buildRetryKey(phase: string, agent: string): string {
 const retryStates = new Map<string, DispatchRetryState>();
 
 /**
- * Detect whether a result payload indicates a dispatch failure.
- * Returns the extracted error string if detected, null otherwise.
- */
-export function detectDispatchFailure(resultText: string): string | null {
-	if (!resultText || resultText.trim().length === 0) {
-		return "empty result payload";
-	}
-
-	const trimmed = resultText.trim();
-
-	// Try parsing as JSON — handles both single-line and multiline JSON error payloads
-	try {
-		const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-		if (parsed.error || parsed.code || parsed.status === "error") {
-			const errorMsg =
-				typeof parsed.error === "string"
-					? parsed.error
-					: typeof parsed.message === "string"
-						? parsed.message
-						: typeof parsed.code === "string"
-							? parsed.code
-							: JSON.stringify(parsed);
-			return errorMsg;
-		}
-	} catch {
-		// Not clean JSON — check if a JSON error is embedded within larger text
-		const jsonMatch = trimmed.match(/\{[^{}]*"(?:error|code|status)"[^{}]*\}/);
-		if (jsonMatch) {
-			try {
-				const embedded = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-				if (embedded.error || embedded.code || embedded.status === "error") {
-					const errorMsg =
-						typeof embedded.error === "string"
-							? embedded.error
-							: typeof embedded.message === "string"
-								? embedded.message
-								: typeof embedded.code === "string"
-									? embedded.code
-									: jsonMatch[0];
-					return errorMsg;
-				}
-			} catch {
-				// embedded JSON parse failed — fall through
-			}
-		}
-	}
-
-	if (trimmed.length < MIN_MEANINGFUL_RESULT_LENGTH) {
-		for (const pattern of DISPATCH_ERROR_PATTERNS) {
-			if (pattern.test(trimmed)) {
-				return trimmed;
-			}
-		}
-	}
-
-	// Check first line for error patterns — only flag if total output is short
-	// (indicating the agent never produced real output after the error)
-	const firstLine = trimmed.split("\n")[0] ?? "";
-	if (firstLine.length < 200) {
-		for (const pattern of DISPATCH_ERROR_PATTERNS) {
-			if (pattern.test(firstLine) && trimmed.length < MIN_MEANINGFUL_RESULT_LENGTH * 4) {
-				return firstLine;
-			}
-		}
-	}
-
-	return null;
-}
-
-/**
  * Decide whether a failed dispatch should be retried, using the
  * recovery classifier to categorize the error and select a strategy.
+ *
+ * `persistedAttempts` is the retry count from PipelineState.retryAttempts,
+ * which survives process restarts. When provided, the effective attempt count
+ * is the max of in-memory and persisted values, ensuring restarts don't
+ * reset the retry counter.
  */
 export function decideRetry(
 	dispatchId: string,
@@ -148,11 +63,13 @@ export function decideRetry(
 	agent: string,
 	errorText: string,
 	maxRetries: number = 2,
+	persistedAttempts: number = 0,
 ): DispatchRetryDecision {
 	const classification = classifyError(errorText);
 	const key = buildRetryKey(phase, agent);
 	const state = retryStates.get(key);
-	const attempts = state?.attempts ?? 0;
+	const inMemoryAttempts = state?.attempts ?? 0;
+	const attempts = Math.max(inMemoryAttempts, persistedAttempts);
 
 	if (!classification.isRecoverable) {
 		logger.info("Non-recoverable dispatch error", {
@@ -262,19 +179,21 @@ export function recordRetryAttempt(
 	agent: string,
 	errorCategory: ErrorCategory,
 	errorText: string | null = null,
-): void {
+): number {
 	const key = buildRetryKey(phase, agent);
 	const existing = retryStates.get(key);
+	const newAttempts = (existing?.attempts ?? 0) + 1;
 	const nextState: DispatchRetryState = Object.freeze({
 		retryKey: key,
 		phase,
 		agent,
-		attempts: (existing?.attempts ?? 0) + 1,
+		attempts: newAttempts,
 		maxAttempts: existing?.maxAttempts ?? 2,
 		lastError: errorText,
 		lastCategory: errorCategory,
 	});
 	retryStates.set(key, nextState);
+	return newAttempts;
 }
 
 export function clearRetryStateByKey(phase: string, agent: string): void {
@@ -315,4 +234,44 @@ export function buildFailureSummary(
 		"The orchestrator should either skip this dispatch and proceed,",
 		"or report the failure to the user.",
 	].join("\n");
+}
+
+/**
+ * Read the persisted retry attempt count from PipelineState for a given
+ * phase:agent composite key. Returns 0 if no retry state exists.
+ */
+export function getPersistedRetryAttempts(
+	retryAttempts: Readonly<Record<string, number>>,
+	phase: string,
+	agent: string,
+): number {
+	return retryAttempts[buildRetryKey(phase, agent)] ?? 0;
+}
+
+/**
+ * Produce a new retryAttempts record with the given phase:agent key
+ * set to `count`. Returns a new object (immutable pattern).
+ */
+export function setPersistedRetryAttempts(
+	retryAttempts: Readonly<Record<string, number>>,
+	phase: string,
+	agent: string,
+	count: number,
+): Record<string, number> {
+	return { ...retryAttempts, [buildRetryKey(phase, agent)]: count };
+}
+
+/**
+ * Produce a new retryAttempts record with the given phase:agent key
+ * removed. Returns a new object (immutable pattern).
+ */
+export function clearPersistedRetryAttempts(
+	retryAttempts: Readonly<Record<string, number>>,
+	phase: string,
+	agent: string,
+): Record<string, number> {
+	const key = buildRetryKey(phase, agent);
+	if (!(key in retryAttempts)) return retryAttempts as Record<string, number>;
+	const { [key]: _, ...rest } = retryAttempts;
+	return rest;
 }
