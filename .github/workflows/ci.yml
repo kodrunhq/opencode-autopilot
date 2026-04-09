@@ -28,4 +28,6 @@ jobs:
         run: bunx tsc --noEmit
 
       - name: Test with coverage
-        run: bun test --coverage --bail=1
+        run: bun test --coverage --bail=1 --timeout=10000
+        env:
+          BUN_TEST_MAX_CONCURRENCY: "4"

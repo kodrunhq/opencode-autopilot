@@ -1,158 +1,254 @@
 ---
 # opencode-autopilot
 name: lessons-learned
-description: Methodology for extracting actionable lessons from a completed project during the RETROSPECTIVE phase.
+description: Methodology for extracting actionable lessons from a completed project during the RETROSPECTIVE phase
 stacks: []
 requires: []
 ---
 
 # Lessons Learned
 
-Methodology for extracting actionable lessons from completed work. The goal is not to assign blame but to identify patterns worth repeating and patterns worth avoiding.
+The RETROSPECTIVE phase is your only opportunity to harvest knowledge from a completed project. Do it wrong and you get vague platitudes that help nobody. Do it right and you build an organizational memory that prevents repeated mistakes and amplifies successes.
 
-## When to Use
+This skill covers how to extract lessons that are specific, actionable, and free from the blame games that kill retrospective value.
 
-- During the RETROSPECTIVE phase after a project or phase is complete
-- After a significant milestone or release
-- When something went noticeably well or poorly
-- Before starting a similar project (to apply past lessons)
+## The Goal: Build a Lessons Log, Not a Complaint Session
 
-## The Lessons Learned Process
+A lessons learned session should produce a document that future project leads actually reference. If nobody reads it six months later, you failed.
 
-### Step 1: Gather Data
+---
 
-Collect facts about what happened:
+## Identifying What Went Well
 
-- **Timeline**: What was planned vs. what actually happened?
-- **Metrics**: Lines of code, number of commits, bugs found, time per task
-- **Events**: Significant decisions, blockers, breakthroughs, incidents
-- **Feedback**: User feedback, code review comments, test results
+Focus on specific patterns and decisions, not general praise. The goal is to identify what to repeat.
 
-**DO:**
-- Start with data, not opinions
-- Include both quantitative (numbers) and qualitative (observations) data
-- Gather data from multiple sources (git history, issue tracker, chat logs)
+**DO: Identify reproducible patterns**
 
-**DON'T:**
-- Rely on memory alone (it's unreliable and biased)
-- Start with "what went wrong" (start with facts, not judgments)
-- Exclude data that contradicts your narrative
+- "We caught the API contract mismatch early because we wrote integration tests before implementation. Do this on every project with external dependencies."
+- "Daily 15-minute syncs prevented the frontend/backend drift that plagued Project X. The key was keeping them strictly timeboxed."
+- "Using feature flags let us deploy the search rewrite incrementally. We should make feature flags standard for any user-facing change over 2 story points."
 
-### Step 2: Identify What Went Well
+**DON'T: Write generic praise**
 
-List the successes and understand WHY they happened:
+- "The team worked hard." (Not actionable)
+- "Communication was good." (What specifically? How can we repeat it?)
+- "We had a great tech lead." (Not reproducible)
 
-- What decisions turned out to be correct?
-- What processes worked smoothly?
-- What technical choices paid off?
-- What collaboration patterns were effective?
+**Technique: The "Would This Work on Project X?" Test**
 
-**For each success, ask:**
-- Was this deliberate or accidental?
-- Can we repeat this intentionally?
-- What conditions made this possible?
+For every positive you identify, ask: would this specific approach have helped on a previous struggling project? If the answer is no, your lesson is too specific to this project's unique constraints. Broaden it.
 
-**DO:**
-- Be specific ("the decision to use PostgreSQL avoided 3 days of schema migration work")
-- Identify the conditions that enabled the success
-- Note whether the success was repeatable or a one-off
+---
 
-**DON'T:**
-- List generic successes ("we worked hard", "we communicated well")
-- Attribute success to individual heroics (look for systemic factors)
-- Skip this step because "there's nothing to celebrate"
+## Identifying What Went Wrong
 
-### Step 3: Identify What Went Wrong
+The hardest part of any retrospective. The goal is process improvement, not blame assignment.
 
-List the failures and understand WHY they happened:
+**DO: Focus on the gap between expectation and reality**
 
-- What decisions turned out to be incorrect?
-- What processes caused friction or delays?
-- What technical choices created problems?
-- What assumptions were wrong?
+- "We estimated 3 days for the auth integration but it took 2 weeks. The gap: we assumed the OAuth provider matched their docs. It didn't. Lesson: always schedule a 2-hour spike to test external APIs before committing to estimates."
+- "The staging environment had different timeouts than production, causing a production-only bug. Lesson: staging must mirror production timeout configs exactly."
 
-**For each failure, apply the 5 Whys:**
-1. What happened? (the symptom)
-2. Why did it happen? (the immediate cause)
-3. Why did THAT happen? (a deeper cause)
-4. Why did THAT happen? (a systemic cause)
-5. Why did THAT happen? (the root cause)
+**DON'T: Assign blame or write inactionable complaints**
 
-**DO:**
-- Focus on process and system failures, not individual failures
-- Trace each problem to its root cause, not its symptom
-- Note which failures were predictable (could have been prevented)
+- "The backend team was slow delivering the API." (Blame-focused, not actionable)
+- "We had bad requirements." (Too vague)
+- "The third-party service was terrible." (What do we do differently next time?)
 
-**DON'T:**
-- Blame individuals ("John broke the build")
-- Stop at the first why ("it failed because the test didn't run")
-- Include problems that were outside the project's control
+**Technique: Process Failure vs. Execution Failure**
 
-### Step 4: Categorize Lessons
+**Process Failure**: The system allowed a bad decision. Even a competent person following the process would have failed.
+- Example: "We merged broken code because there was no CI check for TypeScript errors."
+- Fix: Update CI pipeline, not "train developers better."
 
-Organize lessons into categories:
+**Execution Failure**: A competent person ignored or bypassed an existing good process.
+- Example: "We merged broken code because someone used `--no-verify` to skip pre-commit hooks."
+- Fix: Address why the process was bypassed, or add enforcement if it happens repeatedly.
 
-- **Technical**: Architecture choices, technology selection, code quality, testing
-- **Process**: Planning, estimation, workflow, communication, review
-- **Product**: Requirements, user understanding, scope management
-- **Team**: Collaboration, knowledge sharing, onboarding, decision-making
+**Critical**: 80% of "execution failures" are actually process failures in disguise. If bypassing a process is the path of least resistance, your process is broken.
 
-**For each lesson, write:**
-- **Observation**: What happened (fact, not judgment)
-- **Insight**: Why it happened (the underlying pattern)
-- **Action**: What we should do differently next time (specific, testable)
+---
 
-**DO:**
-- Write actions that are specific and testable ("write ADRs for all database decisions" not "document more")
-- Include the context that made the lesson relevant
-- Note which lessons apply to future projects vs. this project only
+## The 5 Whys Technique
 
-**DON'T:**
-- Write lessons that are too generic to act on ("communicate better")
-- Create more action items than the team can realistically implement
-- Include lessons that are really just complaints
+When something went wrong, ask "why?" five times to reach the root cause. Stop when you hit a process or systemic issue, not a person.
 
-### Step 5: Prioritize Lessons
+**Example: Production outage from a bad deploy**
 
-Not all lessons are equally important. Prioritize by:
+1. Why did the site go down? → A bad deploy made it to production.
+2. Why did a bad deploy make it to production? → The staging tests didn't catch the database migration issue.
+3. Why didn't staging tests catch it? → Staging uses a fresh database, not a copy of production data.
+4. Why does staging use a fresh database? → We have no process for refreshing staging with production data.
+5. Why is there no process? → We never prioritized it because "it takes too long."
 
-- **Impact**: How much would acting on this lesson improve future work?
-- **Frequency**: How often will this lesson be relevant?
-- **Effort**: How hard is it to act on this lesson?
+**Root cause**: Process gap in staging environment management.
+**Lesson**: Implement weekly staging refresh from production (automated). Test migrations against real data patterns, not empty schemas.
 
-**Priority matrix:**
-- **High impact, high frequency**: Must act on these immediately
-- **High impact, low frequency**: Act on these when the situation arises
-- **Low impact, high frequency**: Consider automating or process-izing
-- **Low impact, low frequency**: Document but don't prioritize
+**DON'T**: Stop at "because someone made a mistake." That's not a root cause, that's a symptom.
 
-**DO:**
-- Limit top-priority lessons to 3-5 (more than that and nothing gets done)
-- Assign an owner to each top-priority lesson
-- Set a deadline for acting on each lesson
+---
 
-**DON'T:**
-- Treat all lessons as equally important
-- Create a lessons document that no one will read again
-- Blame the lessons on external factors only
+## Writing Specific, Actionable Lessons
 
-### Step 6: Produce the Lessons Document
+Vague lessons are useless. Every lesson should pass the "Could someone act on this without asking clarifying questions?" test.
 
-Create a structured lessons document:
+**DO: Write lessons with context, action, and trigger**
 
-1. **Project summary**: What was built, timeline, team
-2. **What went well**: 3-5 specific successes with root causes
-3. **What went wrong**: 3-5 specific failures with root causes (5 Whys)
-4. **Categorized lessons**: Technical, Process, Product, Team
-5. **Prioritized actions**: Top 3-5 actions with owners and deadlines
-6. **Patterns to watch**: Recurring themes across multiple projects
+```
+LESSON: Integration testing before implementation
+CONTEXT: Our OAuth integration took 3x longer than estimated because the provider's docs were outdated.
+ACTION: For any external API integration, schedule a 2-hour spike to test the actual API before providing estimates.
+TRIGGER: New project with external dependencies, or estimate request for integration work.
+```
 
-**DO:**
-- Keep it concise (2-3 pages max)
-- Use specific examples, not generalizations
-- Make it searchable and referenceable for future projects
+**DON'T: Write vague platitudes**
 
-**DON'T:**
-- Write a novel (if it's too long, no one will read it)
-- Include lessons that are really just feature requests
-- File it and forget it (reference it at the start of the next project)
+```
+LESSON: Communicate better
+CONTEXT: Sometimes communication was unclear.
+ACTION: Improve communication.
+TRIGGER: Always.
+```
+
+**Examples of Specific vs. Vague:**
+
+| Vague | Specific |
+|-------|----------|
+| "Test more" | "Require integration tests for any API endpoint before merging to main" |
+| "Better estimates" | "Break down tasks over 5 points before estimation; reject stories with unclear acceptance criteria" |
+| "Improve documentation" | "Document architectural decisions in ADRs; review docs monthly for staleness" |
+| "Be more careful" | "Use checklists for production deploys; require two approvals for infrastructure changes" |
+
+---
+
+## Categorizing Lessons
+
+Group lessons by category to make the lessons log searchable and to identify systemic patterns.
+
+**Technical**: Code, architecture, infrastructure, tooling
+- Examples: tech debt accumulation, deployment pipeline gaps, monitoring blind spots
+
+**Process**: Methodology, ceremonies, workflows
+- Examples: estimation accuracy, code review delays, unclear decision rights
+
+**Communication**: Information flow, stakeholder management, team dynamics
+- Examples: requirements drift, cross-team handoff failures, status visibility
+
+**Estimation**: Planning, forecasting, resource allocation
+- Examples: consistent underestimation, scope creep handling, dependency risk
+
+**Why categorize**: If 60% of your lessons are "Estimation," you have a systemic planning problem. Categories reveal patterns that individual lessons hide.
+
+---
+
+## Creating a Lessons Log
+
+A lessons log is a living document that future project leads consult during planning.
+
+**Structure:**
+
+```markdown
+# Lessons Log - Project: [Name] - Completed: [Date]
+
+## Executive Summary
+- 3-line summary of what the project was
+- Top 3 lessons (most impactful)
+- Overall sentiment: would we do this again? What would we change?
+
+## Detailed Lessons by Category
+
+### Technical
+1. [Lesson with context, action, trigger]
+2. [Lesson with context, action, trigger]
+...
+
+### Process
+...
+
+### Communication
+...
+
+### Estimation
+...
+
+## Patterns Identified
+- [Recurring themes across categories]
+
+## Action Items for Process Improvement
+- [Specific improvements to implement, with owners and deadlines]
+
+## Appendix: Raw Notes
+- [Unfiltered retrospective notes for reference]
+```
+
+**Maintenance:**
+- Archive completed project logs in a searchable location
+- Review previous logs before starting similar projects
+- Update logs if lessons prove wrong (some "fixes" create new problems)
+
+---
+
+## Avoiding Blame-Focused Retrospectives
+
+Blame kills honesty. If people fear retribution, they hide problems or minimize failures.
+
+**DO: Use neutral language**
+
+- "The deployment failed because..." not "You broke the deployment when..."
+- "The process allowed..." not "Someone forgot to..."
+- "We assumed..." not "You told us..."
+
+**DO: Focus on system, not individuals**
+
+- "Our code review process didn't catch..." not "The reviewer missed..."
+- "The staging environment doesn't match production..." not "The devops engineer configured staging wrong..."
+
+**DO: Assume good intent**
+
+- People generally do their best with the information and constraints they have
+- If someone "should have known better," ask why the system allowed them not to know
+- If a mistake repeats, the problem is the system's failure to learn, not the person
+
+**DON'T: Name names in lessons logs**
+
+- Keep individual performance discussions in private 1:1s
+- Public lessons logs should discuss systems and processes only
+
+**DON'T: Let managers use retrospectives for evaluation**
+
+- If retrospectives affect performance reviews, honesty dies
+- Make this explicit: "Retrospectives are for process improvement, not performance management"
+
+---
+
+## DO/DON'T Summary
+
+| DO | DON'T |
+|----|-------|
+| Focus on reproducible patterns | Write generic praise or complaints |
+| Distinguish process failures from execution failures | Stop at "someone made a mistake" |
+| Use the 5 Whys to find root causes | Accept surface-level explanations |
+| Write lessons with context, action, and trigger | Write vague platitudes like "communicate better" |
+| Categorize lessons to identify systemic issues | Dump lessons in an unstructured list |
+| Create a searchable lessons log | Let lessons live only in people's heads |
+| Use neutral, blame-free language | Name names or assign blame |
+| Assume good intent | Treat mistakes as character flaws |
+| Focus 80% on process/system issues | Focus on individual errors |
+| Make lessons actionable for future projects | Write lessons nobody can act on |
+
+---
+
+## Final Checklist for Lessons Learned
+
+Before finalizing your lessons log, verify:
+
+- [ ] Every lesson has a specific context (when does this apply?)
+- [ ] Every lesson has a concrete action (what do we do differently?)
+- [ ] Every lesson has a trigger (when do we remember to apply this?)
+- [ ] No individual is named or blamed
+- [ ] Root causes are identified using 5 Whys where applicable
+- [ ] Lessons are categorized and searchable
+- [ ] The log is stored where future project leads will find it
+- [ ] Action items have owners and deadlines for process improvements
+
+A good lessons log prevents repeated mistakes. A great lessons log amplifies your successes. Build the great one.
