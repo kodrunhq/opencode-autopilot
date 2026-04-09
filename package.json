@@ -21,6 +21,11 @@
 	"bugs": {
 		"url": "https://github.com/kodrunhq/opencode-autopilot/issues"
 	},
+	"engines": {
+		"node": ">=22",
+		"bun": ">=1.3.11"
+	},
+	"packageManager": "bun@1.3.11",
 	"author": "kodrunhq",
 	"publishConfig": {
 		"access": "public",
@@ -44,6 +49,7 @@
 		"bin/"
 	],
 	"scripts": {
+		"preinstall": "node ./bin/check-runtime.js",
 		"test": "bun test",
 		"lint": "biome check .",
 		"format": "biome format . --write",

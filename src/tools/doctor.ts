@@ -157,7 +157,7 @@ export async function doctorCore(options?: DoctorOptions): Promise<string> {
 
 	const allChecks = [...healthChecks, hookCheck];
 	const contractHealth = await detectContractHealth(options?.projectRoot);
-	const allPassed = report.allPassed && hookCheck.status === "pass";
+	const allPassed = allChecks.every((check) => check.status !== "fail");
 	const displayText = buildDisplayText(allChecks, report.duration);
 
 	return JSON.stringify({

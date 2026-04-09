@@ -16,6 +16,8 @@ Alternatively, install it globally using npm:
 npm install -g @kodrunhq/opencode-autopilot
 ```
 
+The npm global path still requires Bun on `PATH`, because the published CLI entrypoints use a Bun shebang and the plugin uses Bun-specific APIs.
+
 ## Commands
 
 ### install

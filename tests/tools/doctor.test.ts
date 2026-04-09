@@ -123,7 +123,7 @@ describe("doctorCore", () => {
 		expect(result.contractHealth.legacyTasksFallbackSeen).toBe(false);
 		expect(result.contractHealth.legacyResultParserSeen).toBe(false);
 		for (const check of result.checks) {
-			expect(check.status).toBe("pass");
+			expect(["pass", "warn"]).toContain(check.status);
 		}
 		const suppressionCheck = result.checks.find(
 			(c: { name: string }) => c.name === "native-agent-suppression",
@@ -189,7 +189,7 @@ describe("doctorCore", () => {
 		expect(result.checks.length).toBeGreaterThan(0);
 		for (const check of result.checks) {
 			expect(typeof check.name).toBe("string");
-			expect(["pass", "fail"]).toContain(check.status);
+			expect(["pass", "warn", "fail"]).toContain(check.status);
 			expect(typeof check.message).toBe("string");
 			// fixSuggestion is string for failed checks, null for passed
 			expect(check.fixSuggestion === null || typeof check.fixSuggestion === "string").toBe(true);
