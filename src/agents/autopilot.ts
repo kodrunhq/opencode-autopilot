@@ -139,7 +139,9 @@ Return agent results to oc_orchestrate using this JSON envelope:
 
 - If an agent fails, retry once, then simplify the prompt once, then return the failure details through oc_orchestrate.
 - If state is unclear, query oc_state first, then call oc_orchestrate to resume.
-- ${NEVER_HALT_SILENTLY}`,
+- ${NEVER_HALT_SILENTLY}
+
+On any new user message, you MUST call oc_route before taking any other action. Do NOT call oc_orchestrate or any other tool without first calling oc_route.`,
 	permission: {
 		edit: "allow",
 		bash: "allow",

@@ -15,7 +15,11 @@ import {
 import { enrichErrorMessage } from "../orchestrator/error-context";
 import { isWaveComplete } from "../orchestrator/handlers/build-utils";
 import { PHASE_HANDLERS } from "../orchestrator/handlers/index";
-import type { DispatchResult, PhaseHandlerContext } from "../orchestrator/handlers/types";
+import {
+	AGENT_NAMES,
+	type DispatchResult,
+	type PhaseHandlerContext,
+} from "../orchestrator/handlers/types";
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
@@ -55,6 +59,7 @@ const ORCHESTRATE_ERROR_CODES = Object.freeze({
 	PHASE_MISMATCH: "E_PHASE_MISMATCH",
 	UNKNOWN_DISPATCH: "E_UNKNOWN_DISPATCH",
 	DUPLICATE_RESULT: "E_DUPLICATE_RESULT",
+	DUPLICATE_DISPATCH: "E_DUPLICATE_DISPATCH",
 	PENDING_RESULT_REQUIRED: "E_PENDING_RESULT_REQUIRED",
 	RESULT_KIND_MISMATCH: "E_RESULT_KIND_MISMATCH",
 });
@@ -763,6 +768,23 @@ async function processHandlerResult(
 			if (abortMsg) return abortMsg;
 			currentState = nextState;
 
+			// Duplicate dispatch guard: prevent dispatching the same agent+phase twice
+			const dispatchAgent = normalizedResult.agent ?? "unknown";
+			const isDuplicate = currentState.pendingDispatches.some(
+				(p) => p.agent === dispatchAgent && p.phase === phase,
+			);
+			if (isDuplicate) {
+				const msg = `Duplicate dispatch: agent "${dispatchAgent}" already has a pending dispatch for phase ${phase}.`;
+				logOrchestrationEvent(artifactDir, {
+					timestamp: new Date().toISOString(),
+					phase,
+					action: "error",
+					agent: dispatchAgent,
+					message: `${ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH}: ${msg}`,
+				});
+				return asErrorJson(ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH, msg);
+			}
+
 			const pendingEntry: PendingDispatch = {
 				dispatchId: normalizedResult.dispatchId ?? createDispatchId(),
 				phase: phase as Phase,
@@ -896,6 +918,24 @@ async function processHandlerResult(
 			if (abortMsg) return abortMsg;
 			currentState = nextState;
 
+			// Duplicate dispatch guard: prevent dispatching the same agent+phase twice
+			if (normalizedResult.agents) {
+				const duplicateAgent = normalizedResult.agents.find((entry) =>
+					currentState.pendingDispatches.some((p) => p.agent === entry.agent && p.phase === phase),
+				);
+				if (duplicateAgent) {
+					const msg = `Duplicate dispatch: agent "${duplicateAgent.agent}" already has a pending dispatch for phase ${phase}.`;
+					logOrchestrationEvent(artifactDir, {
+						timestamp: new Date().toISOString(),
+						phase,
+						action: "error",
+						agent: duplicateAgent.agent,
+						message: `${ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH}: ${msg}`,
+					});
+					return asErrorJson(ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH, msg);
+				}
+			}
+
 			const pendingEntries: readonly PendingDispatch[] =
 				normalizedResult.agents?.map((entry) => ({
 					dispatchId: entry.dispatchId ?? createDispatchId(),
@@ -966,6 +1006,28 @@ async function processHandlerResult(
 				action: "complete",
 			});
 
+			// Task completion toast when taskId is present
+			if (normalizedResult.taskId != null) {
+				const taskId = String(normalizedResult.taskId);
+				const taskTitle = normalizedResult.progress ?? `Task ${taskId}`;
+
+				const matchingPendingDispatch = currentState.pendingDispatches.find(
+					(pending) => pending.dispatchId === taskId || pending.taskId === normalizedResult.taskId,
+				);
+
+				getTaskToastManager()?.showCompletionToast({
+					id: taskId,
+					description: taskTitle,
+					...(matchingPendingDispatch?.issuedAt != null
+						? { duration: formatElapsed(matchingPendingDispatch.issuedAt) }
+						: {}),
+				});
+				getLogger("tool", "orchestrate").info("task completed", {
+					taskId,
+					phase: currentState.currentPhase,
+				});
+			}
+
 			for (const pending of currentState.pendingDispatches) {
 				getTaskToastManager()?.showCompletionToast({
 					id: pending.dispatchId,
@@ -981,6 +1043,12 @@ async function processHandlerResult(
 				completePhase(current),
 			);
 
+			// Phase complete toast
+			void getNotificationManager()?.success(
+				"Phase Complete",
+				`Advanced to ${nextPhase ?? "finished"}`,
+			);
+
 			if (nextPhase === null) {
 				const idx = PHASE_INDEX[currentState.currentPhase] ?? TOTAL_PHASES;
 				void getNotificationManager()?.success(
@@ -993,6 +1061,13 @@ async function processHandlerResult(
 					_userProgress: `Completed ${currentState.currentPhase} (${idx}/${TOTAL_PHASES}), pipeline finished`,
 				});
 			}
+
+			// Phase started toast
+			const nextAgent = AGENT_NAMES[nextPhase as keyof typeof AGENT_NAMES] ?? "unknown";
+			void getNotificationManager()?.info(
+				`Phase ${nextPhase} Started`,
+				`Executing agent ${nextAgent}`,
+			);
 
 			// Invoke the next phase handler immediately
 			const nextHandler = PHASE_HANDLERS[nextPhase];

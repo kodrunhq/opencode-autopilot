@@ -83,13 +83,13 @@ export class TaskToastManager {
 		this.tasks.delete(id);
 	}
 
-	showCompletionToast(task: { id: string; description: string; duration: string }): void {
+	showCompletionToast(task: { id: string; description: string; duration?: string }): void {
 		this.removeTask(task.id);
 
 		const remaining = this.getRunningTasks();
 		const queued = this.getQueuedTasks();
 
-		let message = `"${task.description}" finished in ${task.duration}`;
+		let message = `"${task.description}" finished${task.duration ? ` in ${task.duration}` : ""}`;
 		if (remaining.length > 0 || queued.length > 0) {
 			message += `\n\nStill running: ${remaining.length} | Queued: ${queued.length}`;
 		}

@@ -23,6 +23,7 @@ export interface SdkOperations {
 		title: string,
 		message: string,
 		variant: "info" | "warning" | "error",
+		duration?: number,
 	) => Promise<void>;
 }
 

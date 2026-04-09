@@ -41,9 +41,11 @@ describe("phaseStatusSchema", () => {
 	test("parses valid phase status", () => {
 		const result = phaseStatusSchema.parse({
 			name: "RECON",
+			phaseNumber: 1,
 			status: "PENDING",
 		});
 		expect(result.name).toBe("RECON");
+		expect(result.phaseNumber).toBe(1);
 		expect(result.status).toBe("PENDING");
 		expect(result.completedAt).toBeNull();
 		expect(result.confidence).toBeNull();
@@ -147,14 +149,14 @@ describe("pipelineStateSchema", () => {
 			startedAt: "2026-03-31T00:00:00Z",
 			lastUpdatedAt: "2026-03-31T00:00:00Z",
 			phases: [
-				{ name: "RECON", status: "IN_PROGRESS" },
-				{ name: "CHALLENGE", status: "PENDING" },
-				{ name: "ARCHITECT", status: "PENDING" },
-				{ name: "EXPLORE", status: "PENDING" },
-				{ name: "PLAN", status: "PENDING" },
-				{ name: "BUILD", status: "PENDING" },
-				{ name: "SHIP", status: "PENDING" },
-				{ name: "RETROSPECTIVE", status: "PENDING" },
+				{ name: "RECON", phaseNumber: 1, status: "IN_PROGRESS" },
+				{ name: "CHALLENGE", phaseNumber: 2, status: "PENDING" },
+				{ name: "ARCHITECT", phaseNumber: 3, status: "PENDING" },
+				{ name: "EXPLORE", phaseNumber: 4, status: "PENDING" },
+				{ name: "PLAN", phaseNumber: 5, status: "PENDING" },
+				{ name: "BUILD", phaseNumber: 6, status: "PENDING" },
+				{ name: "SHIP", phaseNumber: 7, status: "PENDING" },
+				{ name: "RETROSPECTIVE", phaseNumber: 8, status: "PENDING" },
 			],
 		};
 		const result = pipelineStateSchema.parse(state);

@@ -1,7 +1,12 @@
 import { tool } from "@opencode-ai/plugin";
-import { completePhase, getPhaseStatus, validateTransition } from "../orchestrator/phase";
+import {
+	completePhase,
+	getPhaseStatus,
+	resumePhase,
+	validateTransition,
+} from "../orchestrator/phase";
 import { phaseSchema } from "../orchestrator/schemas";
-import { loadState, saveState } from "../orchestrator/state";
+import { loadState, saveState, updatePersistedState } from "../orchestrator/state";
 import { getProjectArtifactDir } from "../utils/paths";
 
 interface PhaseArgs {
@@ -65,6 +70,22 @@ export async function phaseCore(args: PhaseArgs, artifactDir: string): Promise<s
 				}
 			}
 
+			case "resume": {
+				const state = await loadState(artifactDir);
+				if (state === null) {
+					return JSON.stringify({ error: "no_state" });
+				}
+				const updated = await updatePersistedState(artifactDir, state, (current) =>
+					resumePhase(current),
+				);
+				return JSON.stringify({
+					ok: true,
+					status: updated.status,
+					currentPhase: updated.currentPhase,
+					message: "Pipeline resumed successfully",
+				});
+			}
+
 			default:
 				return JSON.stringify({
 					error: `unknown subcommand: ${args.subcommand}`,
@@ -78,10 +99,10 @@ export async function phaseCore(args: PhaseArgs, artifactDir: string): Promise<s
 
 export const ocPhase = tool({
 	description:
-		"Manage orchestrator phase transitions. Subcommands: status (current phase), complete (advance to next), validate (check transition validity).",
+		"Manage orchestrator phase transitions. Subcommands: status (current phase), complete (advance to next), validate (check transition validity), resume (resume interrupted pipeline).",
 	args: {
 		subcommand: tool.schema
-			.enum(["status", "complete", "validate"])
+			.enum(["status", "complete", "validate", "resume"])
 			.describe("Operation to perform"),
 		from: tool.schema.string().optional().describe("Source phase for validate subcommand"),
 		to: tool.schema.string().optional().describe("Target phase for validate subcommand"),
