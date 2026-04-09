@@ -58,6 +58,7 @@ interface OrchestrateArgs {
 }
 
 const ORCHESTRATE_ERROR_CODES = Object.freeze({
+	ACTIVE_RUN_EXISTS: "E_ACTIVE_RUN_EXISTS",
 	INVALID_RESULT: "E_INVALID_RESULT",
 	STALE_RESULT: "E_STALE_RESULT",
 	PHASE_MISMATCH: "E_PHASE_MISMATCH",
@@ -318,6 +319,38 @@ export function isAbortError(error: unknown): boolean {
 	return ["abort", "cancel", "interrupt", "signal"].some((term) =>
 		normalizedMessage.includes(term),
 	);
+}
+
+function canStartFreshRun(state: Readonly<PipelineState>): boolean {
+	return (
+		state.currentPhase === null ||
+		state.status === "COMPLETED" ||
+		state.status === "INTERRUPTED" ||
+		state.status === "FAILED"
+	);
+}
+
+async function startFreshRun(idea: string, artifactDir: string): Promise<string> {
+	const newState = createInitialState(idea);
+	await saveState(newState, artifactDir);
+
+	try {
+		await clearReviewState(artifactDir);
+	} catch {
+		// Review state is best-effort and should not block a fresh run.
+	}
+
+	// Best-effort .gitignore update
+	try {
+		const projectRoot = getProjectRootFromArtifactDir(artifactDir);
+		await ensureGitignore(projectRoot);
+	} catch {
+		// Swallow gitignore errors -- non-critical
+	}
+
+	const handler = PHASE_HANDLERS[newState.currentPhase as Phase];
+	const handlerResult = await handler(newState, artifactDir, undefined, undefined);
+	return processHandlerResult(handlerResult, newState, artifactDir);
 }
 
 /**
@@ -1200,20 +1233,7 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 				});
 			}
 
-			const newState = createInitialState(args.idea);
-			await saveState(newState, artifactDir);
-
-			// Best-effort .gitignore update
-			try {
-				const projectRoot = getProjectRootFromArtifactDir(artifactDir);
-				await ensureGitignore(projectRoot);
-			} catch {
-				// Swallow gitignore errors -- non-critical
-			}
-
-			const handler = PHASE_HANDLERS[newState.currentPhase as Phase];
-			const handlerResult = await handler(newState, artifactDir, undefined, undefined);
-			return processHandlerResult(handlerResult, newState, artifactDir);
+			return startFreshRun(args.idea, artifactDir);
 		}
 
 		// State exists
@@ -1237,6 +1257,18 @@ export async function orchestrateCore(args: OrchestrateArgs, artifactDir: string
 						code: "E_INTENT_REQUIRED",
 						message:
 							"A new idea on an active pipeline requires intent classification. Call oc_route first, then pass intent: 'implementation' to continue the pipeline with a new idea.",
+					});
+				}
+
+				if (args.idea && args.intent === "implementation") {
+					if (canStartFreshRun(state)) {
+						return startFreshRun(args.idea, artifactDir);
+					}
+
+					return JSON.stringify({
+						action: "error",
+						code: ORCHESTRATE_ERROR_CODES.ACTIVE_RUN_EXISTS,
+						message: `Active pipeline run ${state.runId} is still in progress at ${state.currentPhase}. Resume it with a typed result envelope, or call oc_orchestrate with abandon: true before starting a new idea.`,
 					});
 				}
 			}

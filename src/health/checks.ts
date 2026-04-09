@@ -751,8 +751,8 @@ export async function lspHealthCheck(): Promise<HealthResult> {
 	if (found.length === 0) {
 		return Object.freeze({
 			name: "lsp-servers",
-			status: "warn" as const,
-			message: `No LSP servers found on PATH. Install at least one for oc_lsp_* tools to work.`,
+			status: "pass" as const,
+			message: `No LSP servers found on PATH. Install one to enable oc_lsp_* tools.`,
 			details: Object.freeze(missing),
 		});
 	}
