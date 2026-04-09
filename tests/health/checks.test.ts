@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
 	commandHealthCheck,
 	configV7FieldsCheck,
-	configVersionCheck,
 	mcpHealthCheck,
 	memoryHealthCheck,
 	nativeAgentSuppressionHealthCheck,
@@ -13,13 +13,8 @@ import {
 } from "../../src/health/checks";
 import { resetGlobalMcpManager } from "../../src/mcp";
 
-/**
- * Create an isolated temp directory within the tests folder.
- * Uses tests/ folder instead of system tmpdir() to avoid pollution from
- * CI environment (e.g., GitHub Actions runners may have Python manifest files in /tmp).
- */
 function createIsolatedTempDir(prefix: string): string {
-	return join(import.meta.dir, `.temp-${prefix}-${Date.now()}`);
+	return join(import.meta.dir, `.temp-${prefix}-${randomUUID()}`);
 }
 
 // ---------------------------------------------------------------------------
