@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.4](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.3...opencode-autopilot-v1.27.4) (2026-04-09)
+
+
+### Bug Fixes
+
+* **tests:** use randomUUID for unique temp dir names to prevent CI race conditions ([79e940d](https://github.com/kodrunhq/opencode-autopilot/commit/79e940d69b018f12d7eec0a2ece030ccad98ef3e))
+
 ## [1.27.3](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.27.2...opencode-autopilot-v1.27.3) (2026-04-09)
 
 
