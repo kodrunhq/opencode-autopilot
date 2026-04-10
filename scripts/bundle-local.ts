@@ -70,6 +70,11 @@ export async function prepareBundleDir(sourceDir: string, targetDir: string): Pr
 	await mkdir(targetDir, { recursive: true });
 	await cp(join(sourceDir, "src"), join(targetDir, "src"), { recursive: true });
 	await cp(join(sourceDir, "assets"), join(targetDir, "assets"), { recursive: true });
+	const runtimeCheckPath = join(sourceDir, "bin", "check-runtime.js");
+	if (await pathExists(runtimeCheckPath)) {
+		await mkdir(join(targetDir, "bin"), { recursive: true });
+		await cp(runtimeCheckPath, join(targetDir, "bin", "check-runtime.js"));
+	}
 
 	// Install from the original package.json + lockfile for reproducible builds,
 	// then overwrite with the stripped version for the final bundle.

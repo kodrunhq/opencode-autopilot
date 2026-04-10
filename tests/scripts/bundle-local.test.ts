@@ -10,6 +10,7 @@ interface BunInstallSnapshot {
 	readonly args: ReadonlyArray<string>;
 	readonly hadLockfile: boolean;
 	readonly hadDevDependencies: boolean;
+	readonly hadRuntimeCheck: boolean;
 }
 
 const bunInstallSnapshots: BunInstallSnapshot[] = [];
@@ -30,7 +31,13 @@ mock.module("node:child_process", () => ({
 			>;
 			const hadDevDependencies =
 				pkg.devDependencies != null && Object.keys(pkg.devDependencies as object).length > 0;
-			bunInstallSnapshots.push({ args: [...args], hadLockfile, hadDevDependencies });
+			const hadRuntimeCheck = fs.existsSync(join(cwd, "bin", "check-runtime.js"));
+			bunInstallSnapshots.push({
+				args: [...args],
+				hadLockfile,
+				hadDevDependencies,
+				hadRuntimeCheck,
+			});
 			const deps = pkg.dependencies as Record<string, string> | undefined;
 			const peers = pkg.peerDependencies as Record<string, string> | undefined;
 
@@ -114,8 +121,10 @@ describe("prepareBundleDir", () => {
 
 		await mkdir(join(sourceDir, "src"), { recursive: true });
 		await mkdir(join(sourceDir, "assets"), { recursive: true });
+		await mkdir(join(sourceDir, "bin"), { recursive: true });
 		await writeFile(join(sourceDir, "src", "index.ts"), "export const value = 1;\n");
 		await writeFile(join(sourceDir, "assets", "test.md"), "# asset\n");
+		await writeFile(join(sourceDir, "bin", "check-runtime.js"), "#!/usr/bin/env node\n");
 		await writeFile(join(sourceDir, "bun.lock"), "# bun lockfile\n");
 		await writeFile(
 			join(sourceDir, "package.json"),
@@ -131,7 +140,10 @@ describe("prepareBundleDir", () => {
 					type: "module",
 					license: "MIT",
 					files: ["src/", "assets/", "bin/"],
-					scripts: { lint: "biome check ." },
+					scripts: {
+						preinstall: "node ./bin/check-runtime.js",
+						lint: "biome check .",
+					},
 					publishConfig: { access: "public" },
 					bin: { cli: "bin/cli.ts" },
 				},
@@ -146,11 +158,15 @@ describe("prepareBundleDir", () => {
 		expect(bunInstallSnapshots[0].args).toEqual(["install", "--frozen-lockfile"]);
 		expect(bunInstallSnapshots[0].hadLockfile).toBe(true);
 		expect(bunInstallSnapshots[0].hadDevDependencies).toBe(true);
+		expect(bunInstallSnapshots[0].hadRuntimeCheck).toBe(true);
 
 		expect(await readFile(join(targetDir, "src", "index.ts"), "utf8")).toBe(
 			"export const value = 1;\n",
 		);
 		expect(await readFile(join(targetDir, "assets", "test.md"), "utf8")).toBe("# asset\n");
+		expect(await readFile(join(targetDir, "bin", "check-runtime.js"), "utf8")).toBe(
+			"#!/usr/bin/env node\n",
+		);
 
 		const bundledPackage = JSON.parse(
 			await readFile(join(targetDir, "package.json"), "utf8"),
@@ -174,8 +190,10 @@ describe("prepareBundleDir", () => {
 
 		await mkdir(join(sourceDir, "src"), { recursive: true });
 		await mkdir(join(sourceDir, "assets"), { recursive: true });
+		await mkdir(join(sourceDir, "bin"), { recursive: true });
 		await writeFile(join(sourceDir, "src", "index.ts"), "export const v = 1;\n");
 		await writeFile(join(sourceDir, "assets", "a.md"), "# a\n");
+		await writeFile(join(sourceDir, "bin", "check-runtime.js"), "#!/usr/bin/env node\n");
 		await writeFile(join(sourceDir, "bun.lock"), "# bun lockfile\n");
 		await writeFile(
 			join(sourceDir, "package.json"),
@@ -190,6 +208,7 @@ describe("prepareBundleDir", () => {
 						"@biomejs/biome": "^2.4.10",
 					},
 					peerDependencies: { "@opencode-ai/plugin": ">=1.3.0" },
+					scripts: { preinstall: "node ./bin/check-runtime.js" },
 					type: "module",
 				},
 				null,
@@ -201,6 +220,7 @@ describe("prepareBundleDir", () => {
 
 		expect(bunInstallSnapshots).toHaveLength(1);
 		expect(bunInstallSnapshots[0].args).toEqual(["install", "--frozen-lockfile"]);
+		expect(bunInstallSnapshots[0].hadRuntimeCheck).toBe(true);
 
 		const pluginPath = join(targetDir, "node_modules", "@opencode-ai", "plugin");
 		await expect(access(pluginPath).then(() => true)).resolves.toBe(true);
