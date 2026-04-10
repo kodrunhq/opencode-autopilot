@@ -26,7 +26,7 @@ export async function graphIndexCore(args: GraphIndexArgs): Promise<{
 
 		const resolved = resolveProjectIdentitySync(projectRoot, {
 			db,
-			allowCreate: false,
+			allowCreate: true,
 		});
 		const projectId = resolved.id.startsWith("project:") ? null : resolved.id;
 

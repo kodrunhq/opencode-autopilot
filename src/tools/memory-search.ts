@@ -39,7 +39,7 @@ export function memorySearchCore(
 		const scope = args.scope ?? "all";
 		const filters: MemorySearchFilters = {
 			topicGroup: args.topicGroup,
-			topic: args.topic,
+			topic: args.topicGroup ? args.topic : undefined,
 			sourceKind: args.sourceKind,
 		};
 

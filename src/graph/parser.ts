@@ -186,7 +186,7 @@ function getNodeId(
 	node: ts.Node,
 	name: string,
 ): string {
-	const start = node.getStart(sourceFile);
+	const start = getGraphNodeStart(sourceFile, node);
 	const position = ts.getLineAndCharacterOfPosition(sourceFile, start);
 	return `${filePath}:${position.line + 1}:${name}`;
 }
