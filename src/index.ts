@@ -59,6 +59,7 @@ import {
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
 import { AGENT_REGISTRY, ALL_GROUP_IDS } from "./registry/model-groups";
+import { clearIntentSession, resetIntentForUserMessage } from "./routing/intent-gate";
 import { createAgentSkillInjector } from "./skills/agent-injector";
 import { ocBackground, setBackgroundSdkOperations } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
@@ -726,6 +727,14 @@ const plugin: Plugin = async (input) => {
 					if (tokens && typeof tokens.input === "number") {
 						contextWarningMonitor.checkUtilization(tokens.input, 200_000);
 					}
+
+					const role = info.role as string | undefined;
+					if (role === "user") {
+						const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
+						if (sessionID) {
+							resetIntentForUserMessage(sessionID);
+						}
+					}
 				}
 			}
 
@@ -743,14 +752,15 @@ const plugin: Plugin = async (input) => {
 
 			await compactionHandler({ event });
 
-				if (event.type === "session.deleted") {
-					mcpManager.stopAll().catch(() => {});
-					const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
-					if (sessionID) {
-						deleteLoopController(sessionID);
-					}
+			if (event.type === "session.deleted") {
+				mcpManager.stopAll().catch(() => {});
+				const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
+				if (sessionID) {
+					clearIntentSession(sessionID);
+					deleteLoopController(sessionID);
 				}
-			},
+			}
+		},
 		config: async (cfg: Config) => {
 			openCodeConfig = cfg;
 			setOpenCodeConfig(cfg);
