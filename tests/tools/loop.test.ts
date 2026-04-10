@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { LoopController, setLoopControllerForTests } from "../../src/autonomy";
-import { loopCore } from "../../src/tools/loop";
+import { loopCore, ocLoop } from "../../src/tools/loop";
 
 describe("loopCore", () => {
 	afterEach(() => {
@@ -68,6 +68,52 @@ describe("loopCore", () => {
 		expect(result.action).toBe("loop_iterate");
 		expect(result.context.currentIteration).toBe(1);
 		expect(result.context.accumulatedContext).toContain("Completed step 1");
+	});
+
+	test("oc_loop keeps sessions isolated across start, status, and iterate", async () => {
+		const sessionOne = { sessionID: "session-one" } as Parameters<typeof ocLoop.execute>[1];
+		const sessionTwo = { sessionID: "session-two" } as Parameters<typeof ocLoop.execute>[1];
+
+		const startOne = JSON.parse(
+			await ocLoop.execute(
+				{ action: "start", taskDescription: "Session one task", maxIterations: 4 },
+				sessionOne,
+			),
+		);
+		const startTwo = JSON.parse(
+			await ocLoop.execute(
+				{ action: "start", taskDescription: "Session two task", maxIterations: 2 },
+				sessionTwo,
+			),
+		);
+
+		expect(startOne.context.taskDescription).toBe("Session one task");
+		expect(startTwo.context.taskDescription).toBe("Session two task");
+
+		const iterateOne = JSON.parse(
+			await ocLoop.execute(
+				{ action: "iterate", iterationResult: "first session progressed" },
+				sessionOne,
+			),
+		);
+		const statusTwo = JSON.parse(await ocLoop.execute({ action: "status" }, sessionTwo));
+
+		expect(iterateOne.context.currentIteration).toBe(1);
+		expect(statusTwo.context.currentIteration).toBe(0);
+		expect(statusTwo.context.taskDescription).toBe("Session two task");
+
+		const iterateTwo = JSON.parse(
+			await ocLoop.execute(
+				{ action: "iterate", iterationResult: "second session progressed" },
+				sessionTwo,
+			),
+		);
+		const statusOne = JSON.parse(await ocLoop.execute({ action: "status" }, sessionOne));
+
+		expect(iterateTwo.context.currentIteration).toBe(1);
+		expect(statusOne.context.currentIteration).toBe(1);
+		expect(statusOne.context.accumulatedContext).toContain("first session progressed");
+		expect(statusOne.context.accumulatedContext).not.toContain("second session progressed");
 	});
 
 	test("pause pauses the running loop", async () => {

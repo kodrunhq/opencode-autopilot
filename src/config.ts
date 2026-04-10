@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
 import {
 	fallbackConfigSchema,
@@ -111,6 +111,28 @@ export const notificationsConfigSchema = z.object({
 
 export const notificationsDefaults = notificationsConfigSchema.parse({});
 
+export const verificationCommandSchema = z.object({
+	name: z.string().min(1),
+	command: z.string().min(1),
+});
+
+export const verificationSettingsSchema = z.object({
+	commandChecks: z.array(verificationCommandSchema).default([]),
+});
+
+export type VerificationSettings = z.infer<typeof verificationSettingsSchema>;
+
+export const projectVerificationConfigSchema = z.object({
+	verification: verificationSettingsSchema.default(verificationSettingsSchema.parse({})),
+});
+
+export const verificationConfigSchema = z.object({
+	commandChecks: z.array(verificationCommandSchema).default([]),
+	projectOverrides: z.record(z.string(), verificationSettingsSchema).default({}),
+});
+
+export const verificationDefaults = verificationConfigSchema.parse({});
+
 // --- V4 sub-schemas ---
 
 const groupModelAssignmentSchema = z.object({
@@ -214,6 +236,7 @@ const pluginConfigSchemaV7 = z
 		fallback: fallbackConfigSchemaV6.default(fallbackDefaultsV6),
 		memory: memoryConfigSchema.default(memoryDefaults),
 		notifications: notificationsConfigSchema.optional().default(notificationsDefaults),
+		verification: verificationConfigSchema.default(verificationDefaults),
 		background: backgroundConfigSchema.default(backgroundDefaults),
 		autonomy: z
 			.object({
@@ -343,6 +366,7 @@ function migrateV5toV6(v5Config: PluginConfigV5): PluginConfigV6 {
 
 export const v7ConfigDefaults = {
 	notifications: notificationsDefaults,
+	verification: verificationDefaults,
 	background: backgroundDefaults,
 	autonomy: {
 		enabled: false,
@@ -355,6 +379,23 @@ export const v7ConfigDefaults = {
 	hashline_edit: hashlineEditDefaults,
 } as const;
 
+export function resolveProjectVerificationSettings(
+	config: PluginConfig | null,
+	projectRoot: string,
+): VerificationSettings | null {
+	const projectKey = resolve(projectRoot);
+	const projectOverride = config?.verification.projectOverrides[projectKey];
+	if (projectOverride && projectOverride.commandChecks.length > 0) {
+		return projectOverride;
+	}
+
+	if (config?.verification.commandChecks && config.verification.commandChecks.length > 0) {
+		return { commandChecks: [...config.verification.commandChecks] };
+	}
+
+	return null;
+}
+
 export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
 	return {
 		version: 7 as const,
@@ -366,6 +407,7 @@ export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
 		fallback: v6Config.fallback,
 		memory: v6Config.memory,
 		notifications: notificationsDefaults,
+		verification: verificationDefaults,
 		background: backgroundDefaults,
 		autonomy: {
 			enabled: false,
@@ -476,6 +518,7 @@ export function createDefaultConfig(): PluginConfig {
 		fallback: fallbackDefaultsV6,
 		memory: memoryDefaults,
 		notifications: notificationsDefaults,
+		verification: verificationDefaults,
 		background: backgroundDefaults,
 		autonomy: {
 			enabled: false,

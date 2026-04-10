@@ -9,6 +9,10 @@ The configuration file is located at:
 
 This file is created by the CLI installer (`bunx @kodrunhq/opencode-autopilot install`) and migrates across versions as the plugin updates.
 
+Project-local verification overrides can also live under `.opencode/config.json` (or another
+project-local OpenCode config file) and take precedence over the global plugin config for that
+project/worktree.
+
 ## Schema Reference (v7)
 
 ### Core Fields
@@ -39,6 +43,21 @@ A record of model assignments that override the group defaults for specific agen
 
 *   `primary`: string. The model identifier for this specific agent.
 *   `fallbacks`: array of strings (optional). Fallback models for this specific agent.
+
+### Verification Commands (`verification`)
+
+Controls the commands the autonomy loop runs before Oracle verification.
+
+*   `commandChecks`: array of `{ name, command }` pairs used as the global fallback.
+*   `projectOverrides`: record keyed by absolute project root/worktree path. Each entry contains
+    its own `commandChecks` array for that project.
+
+Resolution order:
+
+1. Project-local `.opencode/config.json` (or similar)
+2. Global `verification.projectOverrides[<project-root>]`
+3. Global `verification.commandChecks`
+4. Auto-detected defaults from the project package manager
 
 ### Orchestrator Settings (`orchestrator`)
 

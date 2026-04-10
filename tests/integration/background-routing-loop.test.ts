@@ -1,11 +1,31 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { LoopController } from "../../src/autonomy/controller";
+import type { OracleBridge } from "../../src/autonomy/oracle-bridge";
 import { VerificationHandler } from "../../src/autonomy/verification";
 import { BackgroundManager } from "../../src/background/manager";
 import { BACKGROUND_TASKS_SCHEMA_STATEMENTS } from "../../src/background/schema";
 import { classifyTask } from "../../src/routing/classifier";
 import { makeRoutingDecision } from "../../src/routing/engine";
+
+const immediateOracleBridge: OracleBridge = {
+	async requestOracleConsultation(request) {
+		return {
+			sessionId: "oracle-session-integration",
+			attemptId: "oracle-attempt-integration",
+			parentSessionId: request.parentSessionId ?? "missing-parent",
+		};
+	},
+	async checkOracleResult() {
+		return {
+			status: "verified",
+			summary: "Oracle approved the completion.",
+			rawEvidence:
+				"<promise>VERIFIED</promise>\nVERDICT: VERIFIED\nSUMMARY: Oracle approved the completion.",
+			attemptId: "oracle-attempt-integration",
+		};
+	},
+};
 
 function createTestDb(): Database {
 	const db = new Database(":memory:");
@@ -153,6 +173,7 @@ describe("Integration: background + routing + loop lifecycle", () => {
 
 	test("autonomy loop iterates until completion signal detected", async () => {
 		const alwaysPassVerification = new VerificationHandler({
+			commandChecks: [{ name: "tests", command: "run-tests" }],
 			runCommand: async () => ({ exitCode: 0, output: "ok" }),
 		});
 
@@ -160,7 +181,9 @@ describe("Integration: background + routing + loop lifecycle", () => {
 			maxIterations: 5,
 			verifyOnComplete: true,
 			cooldownMs: 0,
+			sessionId: "integration-loop-session",
 			verificationHandler: alwaysPassVerification,
+			oracleBridge: immediateOracleBridge,
 		});
 
 		const context = controller.start("Implement feature X");
@@ -178,10 +201,14 @@ describe("Integration: background + routing + loop lifecycle", () => {
 		expect(iter2.currentIteration).toBe(2);
 
 		// Iteration 3: signal completion
-		const iter3 = await controller.iterate("all tasks completed");
-		expect(iter3.state).toBe("complete");
+		const iter3 = await controller.iterate("<promise>DONE</promise>");
+		expect(iter3.state).toBe("oracle_verification_pending");
 		expect(iter3.verificationResults).toHaveLength(1);
 		expect(iter3.verificationResults[0].passed).toBe(true);
+
+		const iter4 = await controller.iterate("poll oracle");
+		expect(iter4.state).toBe("complete");
+		expect(iter4.oracleVerification?.status).toBe("verified");
 	});
 
 	test("routing + background + loop: end-to-end lifecycle", async () => {
@@ -223,7 +250,7 @@ describe("Integration: background + routing + loop lifecycle", () => {
 
 		controller.start("JWT auth middleware implementation");
 		const iterResult = await controller.iterate(
-			`Background task completed: ${backgroundResult}. All tasks completed.`,
+			`Background task completed: ${backgroundResult}\n<promise>DONE</promise>`,
 		);
 		expect(iterResult.state).toBe("complete");
 
