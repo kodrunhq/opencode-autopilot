@@ -247,4 +247,72 @@ describe("graph indexer", () => {
 		expect(importsAfter[0]?.from_id).toBe("src/main.ts:1:src/main.ts");
 		expect(importsAfter[0]?.to_id).toBe("src/utils.ts:1:src/utils.ts");
 	});
+
+	test("indexProject preserves extends edge when base file changes", async () => {
+		await mkdir(join(tempDir, "src"), { recursive: true });
+		await writeFile(
+			join(tempDir, "src", "base.ts"),
+			`export class BaseService { method(): void {} }\n`,
+		);
+		await writeFile(
+			join(tempDir, "src", "derived.ts"),
+			`import { BaseService } from "./base";\nexport class ChildService extends BaseService {}\n`,
+		);
+
+		await indexProject(db, "proj-1", tempDir, ["src/base.ts", "src/derived.ts"]);
+
+		const extendsBefore = db
+			.query("SELECT from_id, to_id FROM graph_edges WHERE project_id = ? AND type = 'extends'")
+			.all("proj-1") as Array<{ from_id: string; to_id: string }>;
+		expect(extendsBefore).toHaveLength(1);
+
+		await writeFile(
+			join(tempDir, "src", "base.ts"),
+			`export class BaseService { method(): void { console.log("hi"); } }\n`,
+		);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["src/base.ts", "src/derived.ts"]);
+		expect(result.filesIndexed).toBe(1);
+		expect(result.filesSkipped).toBe(1);
+
+		const extendsAfter = db
+			.query("SELECT from_id, to_id FROM graph_edges WHERE project_id = ? AND type = 'extends'")
+			.all("proj-1") as Array<{ from_id: string; to_id: string }>;
+		expect(extendsAfter).toHaveLength(1);
+		expect(extendsAfter[0]?.to_id).toBe(extendsBefore[0]?.to_id);
+	});
+
+	test("indexProject preserves implements edge when interface file changes", async () => {
+		await mkdir(join(tempDir, "src"), { recursive: true });
+		await writeFile(
+			join(tempDir, "src", "types.ts"),
+			`export interface Logger { log(msg: string): void }\n`,
+		);
+		await writeFile(
+			join(tempDir, "src", "service.ts"),
+			`import { Logger } from "./types";\nexport class AppService implements Logger { log(msg: string): void {} }\n`,
+		);
+
+		await indexProject(db, "proj-1", tempDir, ["src/types.ts", "src/service.ts"]);
+
+		const implBefore = db
+			.query("SELECT from_id, to_id FROM graph_edges WHERE project_id = ? AND type = 'implements'")
+			.all("proj-1") as Array<{ from_id: string; to_id: string }>;
+		expect(implBefore).toHaveLength(1);
+
+		await writeFile(
+			join(tempDir, "src", "types.ts"),
+			`export interface Logger { log(msg: string): void; error(msg: string): void }\n`,
+		);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["src/types.ts", "src/service.ts"]);
+		expect(result.filesIndexed).toBe(1);
+		expect(result.filesSkipped).toBe(1);
+
+		const implAfter = db
+			.query("SELECT from_id, to_id FROM graph_edges WHERE project_id = ? AND type = 'implements'")
+			.all("proj-1") as Array<{ from_id: string; to_id: string }>;
+		expect(implAfter).toHaveLength(1);
+		expect(implAfter[0]?.to_id).toBe(implBefore[0]?.to_id);
+	});
 });
