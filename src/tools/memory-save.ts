@@ -13,6 +13,9 @@ interface MemorySaveArgs {
 	readonly reasoning?: string;
 	readonly tags?: readonly string[];
 	readonly scope?: MemoryScope;
+	readonly topicGroup?: string;
+	readonly topic?: string;
+	readonly sourceKind?: "curated" | "raw_attachment";
 }
 
 function resolveProjectId(projectRoot: string, db: Database): string | null {
@@ -56,6 +59,9 @@ export function memorySaveCore(
 				scope,
 				projectId,
 				sourceSession: sessionId ?? null,
+				topicGroup: args.topicGroup,
+				topic: args.topic,
+				sourceKind: args.sourceKind,
 				confidence: undefined,
 			},
 			resolvedDb,
@@ -73,6 +79,9 @@ export function memorySaveCore(
 				confidence: memory.confidence,
 				evidenceCount: memory.evidenceCount,
 				status: memory.status,
+				topicGroup: memory.topicGroup,
+				topic: memory.topic,
+				sourceKind: memory.sourceKind,
 			},
 		};
 	} catch (error: unknown) {
@@ -104,6 +113,22 @@ export const ocMemorySave = tool({
 			.max(10)
 			.optional()
 			.describe("Tags for categorization (e.g., ['typescript', 'testing'])"),
+		topicGroup: tool.schema
+			.string()
+			.min(1)
+			.max(200)
+			.optional()
+			.describe("Topic group for categorization (e.g., 'testing', 'architecture')"),
+		topic: tool.schema
+			.string()
+			.min(1)
+			.max(200)
+			.optional()
+			.describe("Specific topic within the group (e.g., 'vitest-config', 'api-design')"),
+		sourceKind: tool.schema
+			.enum(["curated", "raw_attachment"])
+			.optional()
+			.describe("Source kind: curated (default, model-selected) or raw_attachment"),
 		scope: tool.schema
 			.enum(["project", "user"])
 			.default("user")

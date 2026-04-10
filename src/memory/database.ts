@@ -6,6 +6,19 @@ import { getAutopilotDbPath } from "../utils/paths";
 
 let db: Database | null = null;
 
+function addColumnIfNotExists(
+	db: Database,
+	table: string,
+	column: string,
+	definition: string,
+): void {
+	const row = db.query(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+	const exists = row.some((col) => col.name === column);
+	if (!exists) {
+		db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+	}
+}
+
 /**
  * Run all CREATE TABLE / CREATE INDEX / CREATE TRIGGER migrations.
  * Idempotent via IF NOT EXISTS.
@@ -152,6 +165,15 @@ export function initMemoryDb(database: Database): void {
 		FOREIGN KEY (project_id) REFERENCES projects(id)
 	)`);
 
+	addColumnIfNotExists(database, "memories", "topic_group", "TEXT DEFAULT NULL");
+	addColumnIfNotExists(database, "memories", "topic", "TEXT DEFAULT NULL");
+	addColumnIfNotExists(
+		database,
+		"memories",
+		"source_kind",
+		"TEXT NOT NULL DEFAULT 'curated' CHECK(source_kind IN ('curated','raw_attachment'))",
+	);
+
 	database.run(`CREATE TABLE IF NOT EXISTS memory_evidence (
 		id TEXT PRIMARY KEY,
 		memory_id INTEGER NOT NULL,
@@ -193,6 +215,15 @@ export function initMemoryDb(database: Database): void {
 	database.run(`CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories(kind, status)`);
 	database.run(`CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status)`);
 	database.run(`CREATE INDEX IF NOT EXISTS idx_memories_text_id ON memories(text_id)`);
+	database.run(
+		`CREATE INDEX IF NOT EXISTS idx_memories_topic_group ON memories(topic_group, status)`,
+	);
+	database.run(
+		`CREATE INDEX IF NOT EXISTS idx_memories_topic ON memories(topic_group, topic, status)`,
+	);
+	database.run(
+		`CREATE INDEX IF NOT EXISTS idx_memories_source_kind ON memories(source_kind, status)`,
+	);
 	database.run(
 		`CREATE INDEX IF NOT EXISTS idx_memory_evidence_memory ON memory_evidence(memory_id)`,
 	);

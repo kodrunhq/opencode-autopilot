@@ -48,3 +48,6 @@ last_version_feedback.md
 supermemory/
 claude-supermemory/
 .omx/
+kernel.db
+kernel.db-shm
+kernel.db-wal

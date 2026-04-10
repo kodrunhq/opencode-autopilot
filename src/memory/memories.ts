@@ -24,6 +24,9 @@ interface MemoryRow {
 	readonly confidence: number;
 	readonly evidence_count: number;
 	readonly tags: string | null;
+	readonly topic_group: string | null;
+	readonly topic: string | null;
+	readonly source_kind: string;
 	readonly source_session: string | null;
 	readonly status: string;
 	readonly supersedes_memory_id: string | null;
@@ -51,10 +54,19 @@ export interface SaveMemoryInput {
 	readonly summary: string;
 	readonly reasoning?: string | null;
 	readonly tags?: readonly string[];
+	readonly topicGroup?: string | null;
+	readonly topic?: string | null;
+	readonly sourceKind?: "curated" | "raw_attachment";
 	readonly scope?: MemoryScope;
 	readonly projectId?: string | null;
 	readonly sourceSession?: string | null;
 	readonly confidence?: number;
+}
+
+export interface MemorySearchFilters {
+	readonly topicGroup?: string;
+	readonly topic?: string;
+	readonly sourceKind?: "curated" | "raw_attachment";
 }
 
 function resolveDb(db?: Database): Database {
@@ -95,6 +107,11 @@ function rowToMemory(row: MemoryRow): Memory {
 		confidence: row.confidence,
 		evidenceCount: row.evidence_count,
 		tags: parseTags(row.tags),
+		topicGroup: row.topic_group ?? null,
+		topic: row.topic ?? null,
+		sourceKind: (["curated", "raw_attachment"].includes(row.source_kind)
+			? row.source_kind
+			: "curated") as "curated" | "raw_attachment",
 		sourceSession: row.source_session,
 		status: row.status,
 		supersedesMemoryId: row.supersedes_memory_id,
@@ -186,6 +203,9 @@ export function saveMemory(input: SaveMemoryInput, db?: Database): Memory {
 			reasoning: input.reasoning ?? null,
 			confidence,
 			tags: input.tags ?? [],
+			topicGroup: input.topicGroup ?? null,
+			topic: input.topic ?? null,
+			sourceKind: input.sourceKind ?? "curated",
 			sourceSession: input.sourceSession ?? null,
 		});
 
@@ -196,7 +216,14 @@ export function saveMemory(input: SaveMemoryInput, db?: Database): Memory {
 		d,
 	);
 	if (duplicate) {
-		const merged = mergeIntoExisting(duplicate, validated.content, validated.confidence, d);
+		const merged = mergeIntoExisting(
+			duplicate,
+			validated.content,
+			validated.confidence,
+			d,
+			validated.topicGroup,
+			validated.topic,
+		);
 		if (merged.id === undefined) {
 			throw new Error("Merged memory is missing an id");
 		}
@@ -240,6 +267,9 @@ export function saveMemory(input: SaveMemoryInput, db?: Database): Memory {
 					number,
 					string,
 					string | null,
+					string | null,
+					"curated" | "raw_attachment",
+					string | null,
 					string,
 					string,
 					string,
@@ -256,11 +286,14 @@ export function saveMemory(input: SaveMemoryInput, db?: Database): Memory {
 					confidence,
 					evidence_count,
 					tags,
+					topic_group,
+					topic,
+					source_kind,
 					source_session,
 					created_at,
 					last_updated,
 					last_accessed
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				RETURNING id`,
 			)
 			.get(
@@ -274,6 +307,9 @@ export function saveMemory(input: SaveMemoryInput, db?: Database): Memory {
 				validated.confidence,
 				1,
 				JSON.stringify(validated.tags),
+				validated.topicGroup ?? null,
+				validated.topic ?? null,
+				validated.sourceKind ?? "curated",
 				validated.sourceSession,
 				now,
 				now,
@@ -309,12 +345,28 @@ export function searchMemories(
 	projectId: string | null,
 	limit = MAX_MEMORIES_PER_QUERY,
 	db?: Database,
+	filters?: MemorySearchFilters,
 ): Array<Memory & { ftsRank: number }> {
 	const d = resolveDb(db);
 	const safeFtsQuery = `"${query.replace(/"/g, '""')}"`;
 	const projectFilter = projectId === null ? "AND m.project_id IS NULL" : "AND m.project_id = ?";
-	const params: Array<string | number> =
-		projectId === null ? [safeFtsQuery, limit] : [safeFtsQuery, projectId, limit];
+	const topicGroupFilter = filters?.topicGroup ? "AND m.topic_group = ?" : "";
+	const topicFilter = filters?.topic ? "AND m.topic = ?" : "";
+	const sourceKindFilter = filters?.sourceKind ? "AND m.source_kind = ?" : "";
+	const params: Array<string | number> = [safeFtsQuery];
+	if (projectId !== null) {
+		params.push(projectId);
+	}
+	if (filters?.topicGroup) {
+		params.push(filters.topicGroup);
+	}
+	if (filters?.topic) {
+		params.push(filters.topic);
+	}
+	if (filters?.sourceKind) {
+		params.push(filters.sourceKind);
+	}
+	params.push(limit);
 
 	const rows = d
 		.query(
@@ -324,6 +376,9 @@ export function searchMemories(
 			 WHERE memories_fts MATCH ?
 			   AND m.status = 'active'
 			   ${projectFilter}
+			   ${topicGroupFilter}
+			   ${topicFilter}
+			   ${sourceKindFilter}
 			 ORDER BY fts_rank
 			 LIMIT ?`,
 		)
@@ -339,8 +394,12 @@ export function getActiveMemories(
 	projectId: string | null,
 	limit = MAX_MEMORIES_PER_QUERY,
 	db?: Database,
+	filters?: MemorySearchFilters,
 ): readonly Memory[] {
 	const d = resolveDb(db);
+	const topicGroupFilter = filters?.topicGroup ? "AND topic_group = ?" : "";
+	const topicFilter = filters?.topic ? "AND topic = ?" : "";
+	const sourceKindFilter = filters?.sourceKind ? "AND source_kind = ?" : "";
 	const rows = (
 		projectId === null
 			? d
@@ -349,20 +408,37 @@ export function getActiveMemories(
 						 FROM memories
 						 WHERE status = 'active'
 						   AND project_id IS NULL
+						   ${topicGroupFilter}
+						   ${topicFilter}
+						   ${sourceKindFilter}
 						 ORDER BY last_updated DESC, id DESC
 						 LIMIT ?`,
 					)
-					.all(limit)
+					.all(
+						...(filters?.topicGroup ? [filters.topicGroup] : []),
+						...(filters?.topic ? [filters.topic] : []),
+						...(filters?.sourceKind ? [filters.sourceKind] : []),
+						limit,
+					)
 			: d
 					.query(
 						`SELECT *
 						 FROM memories
 						 WHERE status = 'active'
 						   AND project_id = ?
+						   ${topicGroupFilter}
+						   ${topicFilter}
+						   ${sourceKindFilter}
 						 ORDER BY last_updated DESC, id DESC
 						 LIMIT ?`,
 					)
-					.all(projectId, limit)
+					.all(
+						projectId,
+						...(filters?.topicGroup ? [filters.topicGroup] : []),
+						...(filters?.topic ? [filters.topic] : []),
+						...(filters?.sourceKind ? [filters.sourceKind] : []),
+						limit,
+					)
 	) as MemoryRow[];
 
 	return Object.freeze(rows.map(rowToMemory));

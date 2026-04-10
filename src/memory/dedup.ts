@@ -17,6 +17,9 @@ interface MemoryRow {
 	readonly confidence: number;
 	readonly evidence_count: number;
 	readonly tags: string | null;
+	readonly topic_group: string | null;
+	readonly topic: string | null;
+	readonly source_kind: string;
 	readonly source_session: string | null;
 	readonly status: string;
 	readonly supersedes_memory_id: string | null;
@@ -56,6 +59,11 @@ function rowToMemory(row: MemoryRow): Memory {
 		confidence: row.confidence,
 		evidenceCount: row.evidence_count,
 		tags: parseTags(row.tags),
+		topicGroup: row.topic_group ?? null,
+		topic: row.topic ?? null,
+		sourceKind: (["curated", "raw_attachment"].includes(row.source_kind)
+			? row.source_kind
+			: "curated") as "curated" | "raw_attachment",
 		sourceSession: row.source_session,
 		status: row.status,
 		supersedesMemoryId: row.supersedes_memory_id,
@@ -182,6 +190,8 @@ export function mergeIntoExisting(
 	newContent: string,
 	newConfidence: number,
 	db?: Database,
+	newTopicGroup?: string | null,
+	newTopic?: string | null,
 ): Memory {
 	const parsedMemory = memorySchema.parse(existingMemory);
 	if (parsedMemory.id === undefined) {
@@ -211,6 +221,16 @@ export function mergeIntoExisting(
 			 WHERE id = ?`,
 			[updatedContent, updatedConfidence, updatedLastUpdated, currentRow.id],
 		);
+
+		const updatedTopicGroup = currentMemory.topicGroup ?? newTopicGroup ?? null;
+		const updatedTopic = currentMemory.topic ?? newTopic ?? null;
+		if (updatedTopicGroup !== currentRow.topic_group || updatedTopic !== currentRow.topic) {
+			d.run("UPDATE memories SET topic_group = ?, topic = ? WHERE id = ?", [
+				updatedTopicGroup,
+				updatedTopic,
+				currentRow.id,
+			]);
+		}
 
 		const updatedRow = d
 			.query("SELECT * FROM memories WHERE id = ?")

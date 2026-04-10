@@ -53,3 +53,6 @@ export const DEFAULT_MEMORY_CONFIDENCE = 0.8;
 export const MAX_MEMORY_CONTENT_LENGTH = 4000;
 export const MAX_MEMORY_SUMMARY_LENGTH = 500;
 export const MAX_MEMORY_TAGS = 10;
+export const MEMORY_SOURCE_KINDS = ["curated", "raw_attachment"] as const;
+export const MAX_MEMORY_TOPIC_GROUP_LENGTH = 200;
+export const MAX_MEMORY_TOPIC_LENGTH = 200;

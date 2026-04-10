@@ -5,6 +5,7 @@ import type {
 	memorySaveInputSchema,
 	memorySchema,
 	memoryScopeSchema,
+	memorySourceKindSchema,
 	memoryStatusSchema,
 	observationSchema,
 	observationTypeSchema,
@@ -23,6 +24,7 @@ export type PreferenceEvidence = z.infer<typeof preferenceEvidenceSchema>;
 
 export type MemoryKind = z.infer<typeof memoryKindSchema>;
 export type MemoryScope = z.infer<typeof memoryScopeSchema>;
+export type MemorySourceKind = z.infer<typeof memorySourceKindSchema>;
 export type MemoryStatus = z.infer<typeof memoryStatusSchema>;
 export type Memory = z.infer<typeof memorySchema>;
 export type MemoryEvidence = z.infer<typeof memoryEvidenceSchema>;

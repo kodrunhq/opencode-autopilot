@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { tool } from "@opencode-ai/plugin";
 import { getMemoryDb } from "../memory/database";
+import type { MemorySearchFilters } from "../memory/memories";
 import { getActiveMemories, searchMemories } from "../memory/memories";
 import type { MemoryKind } from "../memory/types";
 import { resolveProjectIdentitySync } from "../projects/resolve";
@@ -10,6 +11,9 @@ interface MemorySearchArgs {
 	readonly kind?: MemoryKind;
 	readonly scope?: "project" | "user" | "all";
 	readonly limit?: number;
+	readonly topicGroup?: string;
+	readonly topic?: string;
+	readonly sourceKind?: "curated" | "raw_attachment";
 }
 
 function resolveProjectId(projectRoot: string, db: Database): string | null {
@@ -33,6 +37,11 @@ export function memorySearchCore(
 		const resolvedDb = db ?? getMemoryDb();
 		const limit = args.limit ?? 20;
 		const scope = args.scope ?? "all";
+		const filters: MemorySearchFilters = {
+			topicGroup: args.topicGroup,
+			topic: args.topicGroup ? args.topic : undefined,
+			sourceKind: args.sourceKind,
+		};
 
 		const projectId =
 			scope === "project" || scope === "all" ? resolveProjectId(projectRoot, resolvedDb) : null;
@@ -42,10 +51,10 @@ export function memorySearchCore(
 		if (args.query && args.query.trim().length > 0) {
 			const projectMemories =
 				scope !== "user" && projectId
-					? searchMemories(args.query, projectId, limit, resolvedDb)
+					? searchMemories(args.query, projectId, limit, resolvedDb, filters)
 					: [];
 			const userMemories =
-				scope !== "project" ? searchMemories(args.query, null, limit, resolvedDb) : [];
+				scope !== "project" ? searchMemories(args.query, null, limit, resolvedDb, filters) : [];
 
 			const combined = [...projectMemories, ...userMemories];
 			const deduped = new Map<number | undefined, (typeof combined)[number]>();
@@ -69,13 +78,18 @@ export function memorySearchCore(
 				confidence: m.confidence,
 				evidenceCount: m.evidenceCount,
 				tags: m.tags,
+				topicGroup: m.topicGroup,
+				topic: m.topic,
+				sourceKind: m.sourceKind,
 				lastUpdated: m.lastUpdated,
 			}));
 		} else {
 			const projectMemories =
-				scope !== "user" && projectId ? [...getActiveMemories(projectId, limit, resolvedDb)] : [];
+				scope !== "user" && projectId
+					? [...getActiveMemories(projectId, limit, resolvedDb, filters)]
+					: [];
 			const userMemories =
-				scope !== "project" ? [...getActiveMemories(null, limit, resolvedDb)] : [];
+				scope !== "project" ? [...getActiveMemories(null, limit, resolvedDb, filters)] : [];
 
 			const combined = [...projectMemories, ...userMemories];
 			const deduped = new Map<number | undefined, (typeof combined)[number]>();
@@ -99,6 +113,9 @@ export function memorySearchCore(
 				confidence: m.confidence,
 				evidenceCount: m.evidenceCount,
 				tags: m.tags,
+				topicGroup: m.topicGroup,
+				topic: m.topic,
+				sourceKind: m.sourceKind,
 				lastUpdated: m.lastUpdated,
 			}));
 		}
@@ -125,6 +142,12 @@ export const ocMemorySearch = tool({
 			.enum(["preference", "decision", "project_fact", "mistake", "workflow_rule"])
 			.optional()
 			.describe("Filter by memory kind"),
+		topicGroup: tool.schema.string().min(1).max(200).optional().describe("Filter by topic group"),
+		topic: tool.schema.string().min(1).max(200).optional().describe("Filter by topic within group"),
+		sourceKind: tool.schema
+			.enum(["curated", "raw_attachment"])
+			.optional()
+			.describe("Filter by source kind: curated (model-selected) or raw_attachment"),
 		scope: tool.schema
 			.enum(["project", "user", "all"])
 			.default("all")

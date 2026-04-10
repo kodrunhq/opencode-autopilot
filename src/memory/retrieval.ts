@@ -273,6 +273,7 @@ interface BuildMemoryContextV2Options {
 	readonly projectMemories: readonly Memory[];
 	readonly userMemories: readonly Memory[];
 	readonly tokenBudget?: number;
+	readonly groupByTopicGroup?: boolean;
 }
 
 export function buildMemoryContextV2(options: BuildMemoryContextV2Options): string {
@@ -282,6 +283,7 @@ export function buildMemoryContextV2(options: BuildMemoryContextV2Options): stri
 		projectMemories,
 		userMemories,
 		tokenBudget = DEFAULT_INJECTION_BUDGET,
+		groupByTopicGroup = false,
 	} = options;
 
 	const allMemories = [...projectMemories, ...userMemories];
@@ -309,10 +311,36 @@ export function buildMemoryContextV2(options: BuildMemoryContextV2Options): stri
 
 		const label = KIND_LABELS[kind];
 		let section = `\n### ${label}\n`;
-		for (const mem of mems) {
-			const scope = mem.scope === "user" ? " _(user-wide)_" : "";
-			const line = `- ${mem.summary}${scope}\n`;
-			section += line;
+
+		if (groupByTopicGroup) {
+			const byTopicGroup = new Map<string | null, Memory[]>();
+			for (const mem of mems) {
+				const key = mem.topicGroup ?? null;
+				const existing = byTopicGroup.get(key);
+				if (existing) {
+					existing.push(mem);
+				} else {
+					byTopicGroup.set(key, [mem]);
+				}
+			}
+
+			for (const [topicGroup, topicGroupMemories] of byTopicGroup) {
+				if (topicGroup !== null) {
+					section += `\n**${topicGroup}**\n`;
+				}
+				for (const mem of topicGroupMemories) {
+					const scope = mem.scope === "user" ? " _(user-wide)_" : "";
+					const topicSuffix = mem.topic && topicGroup !== null ? ` [${mem.topic}]` : "";
+					const line = `- ${mem.summary}${topicSuffix}${scope}\n`;
+					section += line;
+				}
+			}
+		} else {
+			for (const mem of mems) {
+				const scope = mem.scope === "user" ? " _(user-wide)_" : "";
+				const line = `- ${mem.summary}${scope}\n`;
+				section += line;
+			}
 		}
 
 		if (totalChars + section.length > charBudget) break;

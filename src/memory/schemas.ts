@@ -4,8 +4,11 @@ import {
 	MAX_MEMORY_CONTENT_LENGTH,
 	MAX_MEMORY_SUMMARY_LENGTH,
 	MAX_MEMORY_TAGS,
+	MAX_MEMORY_TOPIC_GROUP_LENGTH,
+	MAX_MEMORY_TOPIC_LENGTH,
 	MEMORY_KINDS,
 	MEMORY_SCOPES,
+	MEMORY_SOURCE_KINDS,
 	MEMORY_STATUSES,
 	OBSERVATION_TYPES,
 } from "./constants";
@@ -79,6 +82,8 @@ export const memoryScopeSchema = z.enum(MEMORY_SCOPES);
 
 export const memoryStatusSchema = z.enum(MEMORY_STATUSES);
 
+export const memorySourceKindSchema = z.enum(MEMORY_SOURCE_KINDS);
+
 export const memoryTagsSchema = z.array(z.string().min(1).max(50)).max(MAX_MEMORY_TAGS).default([]);
 
 export const memorySchema = z.object({
@@ -97,6 +102,9 @@ export const memorySchema = z.object({
 	status: memoryStatusSchema.default("active"),
 	supersedesMemoryId: z.string().nullable().default(null),
 	accessCount: z.number().int().min(0).default(0),
+	topicGroup: z.string().min(1).max(MAX_MEMORY_TOPIC_GROUP_LENGTH).nullable().default(null),
+	topic: z.string().min(1).max(MAX_MEMORY_TOPIC_LENGTH).nullable().default(null),
+	sourceKind: memorySourceKindSchema.default("curated"),
 	createdAt: z.string(),
 	lastUpdated: z.string(),
 	lastAccessed: z.string(),
@@ -119,4 +127,7 @@ export const memorySaveInputSchema = z.object({
 	reasoning: z.string().nullable().optional(),
 	tags: memoryTagsSchema.optional(),
 	scope: memoryScopeSchema.optional(),
+	topicGroup: z.string().min(1).max(MAX_MEMORY_TOPIC_GROUP_LENGTH).optional(),
+	topic: z.string().min(1).max(MAX_MEMORY_TOPIC_LENGTH).optional(),
+	sourceKind: memorySourceKindSchema.optional(),
 });
