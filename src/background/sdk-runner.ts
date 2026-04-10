@@ -6,6 +6,7 @@ export interface BackgroundSdkOperations {
 		sessionId: string,
 		model: string | undefined,
 		parts: ReadonlyArray<{ type: "text"; text: string }>,
+		agent?: string,
 	) => Promise<void>;
 }
 
@@ -31,10 +32,17 @@ export function createSdkRunner(
 			model: task.model,
 		});
 
-		await sdk.promptAsync(task.sessionId, model, parts);
+		await sdk.promptAsync(task.sessionId, model, parts, task.agent ?? undefined);
+
+		logger.info("Background task prompt dispatched", {
+			backgroundTaskId: task.id,
+			sessionId: task.sessionId,
+			agent: task.agent,
+			note: "prompt delivered to session; agent execution is asynchronous",
+		});
 
 		const agentLabel = task.agent ? ` via ${task.agent}` : "";
 		const modelLabel = task.model ? ` (${task.model})` : "";
-		return `Dispatched${agentLabel}${modelLabel}: ${task.description}`;
+		return `Dispatched${agentLabel}${modelLabel}: ${task.description} (prompt delivered; agent runs async in session)`;
 	};
 }

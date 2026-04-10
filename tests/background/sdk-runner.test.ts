@@ -60,7 +60,9 @@ describe("createSdkRunner", () => {
 			new AbortController().signal,
 		);
 
-		expect(result).toBe("Dispatched via planner (gpt-5.4): plan work");
+		expect(result).toBe(
+			"Dispatched via planner (gpt-5.4): plan work (prompt delivered; agent runs async in session)",
+		);
 	});
 
 	test("returns message without agent label when agent is null", async () => {
@@ -74,7 +76,9 @@ describe("createSdkRunner", () => {
 			new AbortController().signal,
 		);
 
-		expect(result).toBe("Dispatched (gpt-5.4): plan work");
+		expect(result).toBe(
+			"Dispatched (gpt-5.4): plan work (prompt delivered; agent runs async in session)",
+		);
 	});
 
 	test("returns message without model label when model is null", async () => {
@@ -88,7 +92,9 @@ describe("createSdkRunner", () => {
 			new AbortController().signal,
 		);
 
-		expect(result).toBe("Dispatched via planner: plan work");
+		expect(result).toBe(
+			"Dispatched via planner: plan work (prompt delivered; agent runs async in session)",
+		);
 	});
 
 	test("throws immediately when signal is already aborted", async () => {

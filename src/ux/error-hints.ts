@@ -65,7 +65,7 @@ const REMEDIATION_HINTS = Object.freeze([
 	},
 	{
 		pattern: /slot.*full|no.*slot|max.*concurrent/i,
-		hint: "All background task slots are occupied. Wait for running tasks to complete or increase maxSlots in config.",
+		hint: "All background task slots are occupied. Wait for running tasks to complete or increase maxConcurrent in config.",
 	},
 	{
 		pattern: /dependency.*not.*met|blocked.*task/i,
@@ -81,7 +81,7 @@ const PHASE_HINTS: Readonly<Record<string, string>> = Object.freeze({
 	ARCHITECT:
 		"ARCHITECT phase failed. Architecture proposals could not be generated — try providing clearer requirements.",
 	EXPLORE:
-		"EXPLORE phase failed. This phase is reserved for future use — it can safely be skipped.",
+		"EXPLORE phase failed. Local codebase exploration could not complete — check project root access and ARCHITECT artifacts.",
 	PLAN: "PLAN phase failed. Task decomposition encountered issues — check that the architecture document is well-formed.",
 	BUILD:
 		"BUILD phase failed. Implementation hit errors — check test output and review findings for details.",

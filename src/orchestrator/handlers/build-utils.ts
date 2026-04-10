@@ -1,7 +1,7 @@
 import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
 import type { BranchLifecycle, BuildProgress, Task } from "../types";
-import { createWorktree } from "./branch-pr";
+import { createWorktree, recordWorktreePath } from "./branch-pr";
 import type { DispatchResult } from "./types";
 import { AGENT_NAMES } from "./types";
 
@@ -194,6 +194,7 @@ export async function buildParallelDispatch(
 	runId?: string,
 	maxParallel: number = DEFAULT_MAX_PARALLEL_TASKS,
 	currentInProgressCount = 0,
+	lifecycle?: BranchLifecycle,
 	useWorktrees = false,
 	projectRoot?: string,
 	sessionId?: string,
@@ -247,6 +248,13 @@ export async function buildParallelDispatch(
 			}),
 		);
 
+		let updatedLifecycle = lifecycle;
+		for (const { worktreeInfo } of worktrees) {
+			updatedLifecycle = updatedLifecycle
+				? recordWorktreePath(updatedLifecycle, worktreeInfo.path)
+				: updatedLifecycle;
+		}
+
 		const agents = await Promise.all(
 			worktrees.map(async ({ task, worktreeInfo }) => {
 				const basePrompt = await buildTaskPrompt(task, artifactDir, runId, mode);
@@ -275,6 +283,7 @@ export async function buildParallelDispatch(
 					currentTasks: [...allInProgressIds],
 					currentWave: wave,
 				},
+				...(updatedLifecycle ? { branchLifecycle: cloneBranchLifecycle(updatedLifecycle) } : {}),
 			},
 		} satisfies DispatchResult);
 	}

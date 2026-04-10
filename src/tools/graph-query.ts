@@ -8,6 +8,7 @@ import { tool } from "@opencode-ai/plugin";
 import { findDefinitions, findDependents, findImports, getModuleOutline } from "../graph/query";
 import { openKernelDb } from "../kernel/database";
 import { resolveProjectIdentitySync } from "../projects/resolve";
+import { getProjectArtifactDir } from "../utils/paths";
 
 interface GraphQueryArgs {
 	readonly action: "find_definitions" | "find_imports" | "find_dependents" | "get_outline";
@@ -23,7 +24,7 @@ export async function graphQueryCore(args: GraphQueryArgs): Promise<{
 }> {
 	try {
 		const projectRoot = args.projectRoot ?? process.cwd();
-		const db = openKernelDb(projectRoot, { readonly: true });
+		const db = openKernelDb(getProjectArtifactDir(projectRoot), { readonly: true });
 
 		const resolved = resolveProjectIdentitySync(projectRoot, {
 			db,

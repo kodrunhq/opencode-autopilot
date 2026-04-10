@@ -25,6 +25,7 @@ import {
 import { getLogger } from "../logging/domains";
 import { loadState as loadPipelineState } from "../orchestrator/state";
 import { REVIEW_AGENTS, SPECIALIZED_AGENTS } from "../review/agents/index";
+import { collectDiffEvidence, type ReviewScope } from "../review/diff-evidence";
 import {
 	createEmptyMemory,
 	loadReviewMemory,
@@ -33,6 +34,7 @@ import {
 } from "../review/memory";
 import type { ReviewState } from "../review/pipeline";
 import { advancePipeline } from "../review/pipeline";
+import { sanitizeTemplateContent } from "../review/sanitize";
 import { reviewFindingsEnvelopeSchema, reviewStateSchema } from "../review/schemas";
 import { selectAgents } from "../review/selection";
 import { detectStackTags } from "../review/stack-gate";
@@ -40,7 +42,7 @@ import { ensureDir, isEnoentError } from "../utils/fs-helpers";
 import { getProjectArtifactDir } from "../utils/paths";
 
 interface ReviewArgs {
-	readonly scope?: string;
+	readonly scope?: ReviewScope;
 	readonly filter?: string;
 	readonly directory?: string;
 	readonly findings?: string;
@@ -71,7 +73,7 @@ async function getChangedFiles(
 				args = ["diff", "--name-only"];
 				break;
 			case "branch":
-				args = ["diff-tree", "--no-commit-id", "--name-only", "--root", "-r", "HEAD"];
+				args = ["diff", "--name-only", "HEAD"];
 				break;
 			case "directory":
 				args = directory ? ["diff", "--name-only", "--", directory] : ["diff", "--name-only"];
@@ -167,7 +169,7 @@ export async function clearReviewState(artifactDir: string): Promise<void> {
  * Start a new review -- detect stacks, select agents, and build stage 1 dispatch prompts.
  */
 async function startNewReview(
-	scope: string,
+	scope: ReviewScope,
 	projectRoot: string,
 	options?: { readonly filter?: string; readonly directory?: string },
 ): Promise<{
@@ -199,11 +201,25 @@ async function startNewReview(
 	const selection = selectAgents(detectedStacks, diffAnalysis, allCandidates, { seed });
 
 	const selectedNames = selection.selected.map((a) => a.name);
+	const { diff: diffContent, changedFiles: evidenceFiles } = await collectDiffEvidence(
+		projectRoot,
+		scope,
+		options?.directory,
+	);
+	const rawDiffEvidence =
+		diffContent.length > 0 ? sanitizeTemplateContent(diffContent) : `[Scope: ${scope}]`;
 
-	// Build stage 1 prompts (specialist review with diff placeholder)
+	const changedFilesSummary =
+		evidenceFiles.length > 0
+			? `\n\nChanged files (${evidenceFiles.length}):\n${evidenceFiles.map((f) => `- ${f}`).join("\n")}`
+			: "";
+
+	const diffEvidence = `${rawDiffEvidence}${changedFilesSummary}`;
+
+	// Build stage 1 prompts with real diff evidence.
 	const agentPrompts = selection.selected.map((agent) => {
 		const prompt = agent.prompt
-			.replace("{{DIFF}}", `[Diff for scope: ${scope}]`)
+			.replace("{{DIFF}}", diffEvidence)
 			.replace("{{PRIOR_FINDINGS}}", "No prior findings yet.")
 			.replace("{{MEMORY}}", "");
 		return Object.freeze({ name: agent.name, prompt });
@@ -214,6 +230,7 @@ async function startNewReview(
 		selectedAgentNames: selectedNames,
 		accumulatedFindings: [],
 		scope,
+		diffEvidence,
 		startedAt: new Date().toISOString(),
 	};
 
@@ -354,7 +371,7 @@ export const ocReview = tool({
 			.optional()
 			.describe("JSON findings from previously dispatched review agents"),
 	},
-	async execute(args) {
-		return reviewCore(args, process.cwd());
+	async execute(args, context) {
+		return reviewCore(args, context.directory);
 	},
 });

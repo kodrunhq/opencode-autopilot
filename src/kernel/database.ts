@@ -1,17 +1,13 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { getAutopilotDbPath, isProjectArtifactDir } from "../utils/paths";
+import { getAutopilotDbPath } from "../utils/paths";
 import { runKernelMigrations } from "./migrations";
 
 export const KERNEL_DB_FILE = "kernel.db";
 
 export function getKernelDbPath(artifactDirOrProjectRoot?: string): string {
-	if (
-		typeof artifactDirOrProjectRoot === "string" &&
-		artifactDirOrProjectRoot.length > 0 &&
-		!isProjectArtifactDir(artifactDirOrProjectRoot)
-	) {
+	if (typeof artifactDirOrProjectRoot === "string" && artifactDirOrProjectRoot.length > 0) {
 		return join(artifactDirOrProjectRoot, KERNEL_DB_FILE);
 	}
 

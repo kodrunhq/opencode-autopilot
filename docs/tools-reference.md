@@ -1,6 +1,6 @@
 # Tools Reference
 
-This document provides a complete reference for all tools provided by the OpenCode Autopilot plugin.
+This document provides a reference hub for the 39 tools provided by the OpenCode Autopilot plugin.
 
 ## Overview
 
@@ -26,12 +26,15 @@ Tools use Zod schemas for strict argument validation. If a tool is called with i
 | **Review** | `oc_review` |
 | **Configuration** | `oc_configure` |
 | **Creation** | `oc_create_agent`, `oc_create_skill`, `oc_create_command` |
-| **Management** | `oc_background`, `oc_loop`, `oc_delegate`, `oc_recover` |
+| **Management** | `oc_background`, `oc_loop`, `oc_delegate`, `oc_recover`, `oc_route` |
 | **Diagnostics** | `oc_doctor`, `oc_forensics`, `oc_logs`, `oc_session_stats`, `oc_pipeline_report`, `oc_summary`, `oc_stocktake` |
+| **Code Intelligence** | `oc_graph_index`, `oc_graph_query`, `oc_lsp_goto_definition`, `oc_lsp_find_references`, `oc_lsp_symbols`, `oc_lsp_diagnostics`, `oc_lsp_prepare_rename`, `oc_lsp_rename` |
 | **Editing** | `oc_hashline_edit` |
-| **Memory** | `oc_memory_status`, `oc_memory_preferences` |
+| **Memory** | `oc_memory_status`, `oc_memory_preferences`, `oc_memory_save`, `oc_memory_search`, `oc_memory_forget` |
 | **Docs** | `oc_update_docs` |
 | **Testing** | `oc_mock_fallback` |
+
+Detailed sections below cover the core tools most users touch directly; the category table above is the authoritative full inventory of all 39 registered tools.
 
 ---
 

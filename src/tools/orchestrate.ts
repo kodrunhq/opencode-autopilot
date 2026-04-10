@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { tool } from "@opencode-ai/plugin";
+import { loadConfig } from "../config";
 import { getLogger } from "../logging/domains";
 import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
@@ -617,15 +618,18 @@ async function injectLessonContext(
  */
 async function injectSkillContext(
 	prompt: string,
-	projectRoot?: string,
+	projectRoot: string,
 	phase?: string,
 ): Promise<string> {
 	try {
 		const baseDir = getGlobalConfigDir();
-		const ctx = await loadAdaptiveSkillContext(baseDir, projectRoot ?? process.cwd(), {
+		const config = await loadConfig();
+		const mcpEnabled = config?.mcp?.enabled ?? false;
+		const ctx = await loadAdaptiveSkillContext(baseDir, projectRoot, {
 			phase,
 			budget: 1500,
 			mode: "summary",
+			mcpEnabled,
 		});
 		if (ctx) return prompt + ctx;
 	} catch (err) {
@@ -1182,7 +1186,10 @@ async function processHandlerResult(
 			}
 
 			// Phase started toast
-			const nextAgent = AGENT_NAMES[nextPhase as keyof typeof AGENT_NAMES] ?? "unknown";
+			const nextAgent =
+				nextPhase === "EXPLORE"
+					? "local analysis"
+					: (AGENT_NAMES[nextPhase as keyof typeof AGENT_NAMES] ?? "unknown");
 			void getNotificationManager()?.info(
 				`Phase ${nextPhase} Started`,
 				`Executing agent ${nextAgent}`,
@@ -1585,7 +1592,7 @@ export const ocOrchestrate = tool({
 				"Set to true to abandon the current pipeline run. Clears pending dispatches and sets status to INTERRUPTED. Use when a dispatch result is unavailable (crashed agent, closed TUI, dead subagent).",
 			),
 	},
-	async execute(args) {
-		return orchestrateCore(args, getProjectArtifactDir(process.cwd()));
+	async execute(args, context) {
+		return orchestrateCore(args, getProjectArtifactDir(context.directory));
 	},
 });

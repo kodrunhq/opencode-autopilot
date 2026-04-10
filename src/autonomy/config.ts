@@ -5,7 +5,7 @@ export interface AutonomyDefaults {
 }
 
 export const AUTONOMY_DEFAULTS: AutonomyDefaults = Object.freeze({
-	maxIterations: 100,
+	maxIterations: 10,
 	maxVerificationAttempts: 3,
 	hardMaxIterations: 100,
 });

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const MAX_DIFF_EVIDENCE_SIZE = 60_000;
+
 export const SEVERITIES = Object.freeze(["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const);
 
 export const VERDICTS = Object.freeze(["CLEAN", "APPROVED", "CONCERNS", "BLOCKED"] as const);
@@ -62,6 +64,7 @@ export const reviewStateSchema = z.object({
 	selectedAgentNames: z.array(z.string().max(128)).max(32),
 	accumulatedFindings: z.array(reviewFindingSchema).max(500),
 	scope: z.string().max(4096),
+	diffEvidence: z.string().max(MAX_DIFF_EVIDENCE_SIZE).optional(),
 	startedAt: z.string().max(128),
 });
 

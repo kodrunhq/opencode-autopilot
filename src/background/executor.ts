@@ -104,7 +104,7 @@ export async function executeTask(
 	logger?.info("Background task started", { backgroundTaskId: task.id });
 
 	const controller = new AbortController();
-	const timeoutMs = deps.timeoutMs ?? 1_000;
+	const timeoutMs = deps.timeoutMs ?? 300_000;
 	const executionDelayMs = deps.executionDelayMs ?? 10;
 	const wait = deps.wait ?? defaultWait;
 	const run = deps.run ?? getDefaultRunner(wait, executionDelayMs);

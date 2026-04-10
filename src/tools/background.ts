@@ -1,10 +1,14 @@
 import type { Database } from "bun:sqlite";
+import { Database as SqliteDatabase } from "bun:sqlite";
 import { tool } from "@opencode-ai/plugin";
 import { z } from "zod";
 import { BackgroundManager } from "../background/manager";
 import { type BackgroundSdkOperations, createSdkRunner } from "../background/sdk-runner";
+import { loadConfig } from "../config";
 import { openKernelDb } from "../kernel/database";
+import { runKernelMigrations } from "../kernel/migrations";
 import type { TaskStatus } from "../types/background";
+import { getProjectArtifactDir } from "../utils/paths";
 
 const backgroundActionSchema = z.enum(["spawn", "status", "list", "cancel", "result"]);
 
@@ -19,19 +23,55 @@ interface BackgroundToolOptions {
 }
 
 let defaultManager: BackgroundManager | null = null;
+let defaultManagerDb: Database | null = null;
+let defaultManagerCacheKey: string | null = null;
 let backgroundSdkOps: BackgroundSdkOperations | null = null;
 
 export function setBackgroundSdkOperations(ops: BackgroundSdkOperations): void {
 	backgroundSdkOps = ops;
 }
 
-function getDefaultManager(): BackgroundManager {
-	if (defaultManager) {
+function createEphemeralKernelDb(): Database {
+	const db = new SqliteDatabase(":memory:");
+	db.run("PRAGMA foreign_keys=ON");
+	db.run("PRAGMA busy_timeout=5000");
+	db.run("PRAGMA journal_mode=WAL");
+	runKernelMigrations(db);
+	return db;
+}
+
+function openConfiguredBackgroundDb(projectRoot: string, persistence: boolean): Database {
+	return persistence ? openKernelDb(getProjectArtifactDir(projectRoot)) : createEphemeralKernelDb();
+}
+
+async function getDefaultManager(projectRoot: string): Promise<BackgroundManager> {
+	const config = await loadConfig();
+	const persistence = config?.background?.persistence ?? true;
+	const maxConcurrent = config?.background?.maxConcurrent;
+	const usesSdkRunner = backgroundSdkOps !== null;
+	const cacheKey = `${projectRoot}:${persistence ? "persistent" : "memory"}:${String(maxConcurrent ?? "default")}:${usesSdkRunner ? "sdk" : "stub"}`;
+
+	if (defaultManager && defaultManagerCacheKey === cacheKey) {
 		return defaultManager;
 	}
 
+	if (defaultManager) {
+		try {
+			await defaultManager.dispose();
+		} catch {
+			// Best-effort disposal: old manager may have running tasks.
+		}
+		defaultManagerDb?.close();
+	}
+
 	const runTask = backgroundSdkOps ? createSdkRunner(backgroundSdkOps) : undefined;
-	defaultManager = new BackgroundManager({ db: openKernelDb(), runTask });
+	defaultManagerDb = openConfiguredBackgroundDb(projectRoot, persistence);
+	defaultManager = new BackgroundManager({
+		db: defaultManagerDb,
+		maxConcurrent,
+		runTask,
+	});
+	defaultManagerCacheKey = cacheKey;
 	return defaultManager;
 }
 
@@ -43,9 +83,20 @@ export async function backgroundCore(
 	action: z.infer<typeof backgroundActionSchema>,
 	options: BackgroundToolOptions = {},
 	db?: Database,
+	projectRoot: string = process.cwd(),
 ): Promise<string> {
+	const config = db === undefined ? await loadConfig() : null;
+	if (db === undefined && action === "spawn" && config?.background?.enabled === false) {
+		return JSON.stringify({
+			action: "error",
+			message: "Background task execution is disabled by config.",
+		});
+	}
+
 	const isTransientManager = db !== undefined;
-	const manager = isTransientManager ? new BackgroundManager({ db }) : getDefaultManager();
+	const manager = isTransientManager
+		? new BackgroundManager({ db })
+		: await getDefaultManager(projectRoot);
 
 	try {
 		switch (action) {
@@ -94,6 +145,7 @@ export async function backgroundCore(
 						`Task ID: ${task.id}`,
 						`Status: ${task.status}`,
 						`Description: ${task.description}`,
+						...(task.result ? [`Result: ${task.result}`] : []),
 					]),
 				});
 			}
@@ -102,7 +154,10 @@ export async function backgroundCore(
 				const tasks = manager.list(options.sessionId, options.status);
 				const taskLines =
 					tasks.length > 0
-						? tasks.map((task) => `${task.id} | ${task.status} | ${task.description}`)
+						? tasks.map((task) => {
+								const resultSuffix = task.result ? ` | ${task.result}` : "";
+								return `${task.id} | ${task.status} | ${task.description}${resultSuffix}`;
+							})
 						: ["No background tasks found."];
 				return JSON.stringify({
 					action: "background_list",
@@ -183,14 +238,19 @@ export const ocBackground = tool({
 		{ action, sessionId, taskId, description, category, agent, priority, status },
 		context,
 	) {
-		return backgroundCore(action, {
-			sessionId: sessionId ?? context.sessionID,
-			taskId,
-			description,
-			category,
-			agent,
-			priority,
-			status,
-		});
+		return backgroundCore(
+			action,
+			{
+				sessionId: sessionId ?? context.sessionID,
+				taskId,
+				description,
+				category,
+				agent,
+				priority,
+				status,
+			},
+			undefined,
+			context.directory,
+		);
 	},
 });
