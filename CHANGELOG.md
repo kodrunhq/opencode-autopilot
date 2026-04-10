@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.29.3](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.29.2...opencode-autopilot-v1.29.3) (2026-04-10)
+
+
+### Bug Fixes
+
+* keep runtime check available during local bundling ([a972b84](https://github.com/kodrunhq/opencode-autopilot/commit/a972b84bab7747efe03e35695f93797c5775c79c))
+* keep runtime check available during local bundling ([99446b8](https://github.com/kodrunhq/opencode-autopilot/commit/99446b854700770738f86a2c155f36bf58e27dbe))
+
 ## [1.29.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.29.1...opencode-autopilot-v1.29.2) (2026-04-10)
 
 
