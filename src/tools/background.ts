@@ -154,7 +154,10 @@ export async function backgroundCore(
 				const tasks = manager.list(options.sessionId, options.status);
 				const taskLines =
 					tasks.length > 0
-						? tasks.map((task) => `${task.id} | ${task.status} | ${task.description}`)
+						? tasks.map((task) => {
+								const resultSuffix = task.result ? ` | ${task.result}` : "";
+								return `${task.id} | ${task.status} | ${task.description}${resultSuffix}`;
+							})
 						: ["No background tasks found."];
 				return JSON.stringify({
 					action: "background_list",
