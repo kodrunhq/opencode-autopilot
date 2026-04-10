@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.31.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.30.0...opencode-autopilot-v1.31.0) (2026-04-10)
+
+
+### Features
+
+* add memory structural metadata and SQLite code graph MVP ([d6af3ca](https://github.com/kodrunhq/opencode-autopilot/commit/d6af3ca30e4ae54fb1b4755ea06b58a8e9e5b290))
+
+
+### Bug Fixes
+
+* address Copilot PR review comments ([a6b6687](https://github.com/kodrunhq/opencode-autopilot/commit/a6b6687684cad3a9a4693697d04a0bb9b2f7faf0))
+
 ## [1.30.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.29.3...opencode-autopilot-v1.30.0) (2026-04-10)
 
 
