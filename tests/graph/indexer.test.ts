@@ -171,4 +171,46 @@ describe("graph indexer", () => {
 			to_id: "src/utils.ts:1:src/utils.ts",
 		});
 	});
+
+	test("indexProject only re-resolves edges for changed files", async () => {
+		await mkdir(join(tempDir, "src"), { recursive: true });
+		await writeFile(
+			join(tempDir, "src", "a.ts"),
+			`import { b } from "./b";\nexport function a(): void { b(); }\n`,
+		);
+		await writeFile(
+			join(tempDir, "src", "b.ts"),
+			`import { c } from "./c";\nexport function b(): void { c(); }\n`,
+		);
+		await writeFile(join(tempDir, "src", "c.ts"), `export function c(): void {}\n`);
+
+		await indexProject(db, "proj-1", tempDir, ["src/a.ts", "src/b.ts", "src/c.ts"]);
+
+		const importsBefore = db
+			.query("SELECT COUNT(*) as cnt FROM graph_edges WHERE project_id = ? AND type = 'imports'")
+			.get("proj-1") as { cnt: number };
+		expect(importsBefore.cnt).toBe(2);
+
+		await writeFile(
+			join(tempDir, "src", "a.ts"),
+			`import { b } from "./b";\nexport function a(): void { b(); b(); }\n`,
+		);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["src/a.ts", "src/b.ts", "src/c.ts"]);
+		expect(result.filesIndexed).toBe(1);
+		expect(result.filesSkipped).toBe(2);
+
+		const importsAfter = db
+			.query("SELECT COUNT(*) as cnt FROM graph_edges WHERE project_id = ? AND type = 'imports'")
+			.get("proj-1") as { cnt: number };
+		expect(importsAfter.cnt).toBe(2);
+
+		const bEdges = db
+			.query(
+				"SELECT from_id, to_id FROM graph_edges WHERE project_id = ? AND from_id LIKE '%b.ts%' AND type = 'imports'",
+			)
+			.all("proj-1") as Array<{ from_id: string; to_id: string }>;
+		expect(bEdges).toHaveLength(1);
+		expect(bEdges[0]?.to_id).toBe("src/c.ts:1:src/c.ts");
+	});
 });

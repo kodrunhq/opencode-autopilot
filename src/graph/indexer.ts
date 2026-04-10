@@ -227,7 +227,7 @@ export async function indexProject(
 	}
 
 	const supportedFilePaths = filePaths.filter((filePath) => isGraphSupportedFile(filePath));
-	const indexedProjectFiles = new Map<string, ParsedProjectFile>();
+	const changedFiles: ParsedProjectFile[] = [];
 	const errors: Array<{ filePath: string; error: string }> = [];
 	let filesIndexed = 0;
 	let filesSkipped = 0;
@@ -238,7 +238,6 @@ export async function indexProject(
 
 		try {
 			const file = await readIndexedFile(absolutePath, relativePath);
-			indexedProjectFiles.set(relativePath, file);
 
 			const record = getFileIndexRecord(db, projectId, relativePath);
 			if (!needsReindex(record, file.mtimeMs, file.contentHash)) {
@@ -253,6 +252,7 @@ export async function indexProject(
 				parserVersion: GRAPH_PARSER_VERSION,
 				indexSchemaVersion: GRAPH_INDEX_SCHEMA_VERSION,
 			});
+			changedFiles.push(file);
 			filesIndexed += 1;
 		} catch (error) {
 			errors.push({
@@ -274,16 +274,15 @@ export async function indexProject(
 			}
 
 			removeFileGraph(db, projectId, record.filePath);
-			indexedProjectFiles.delete(record.filePath);
 			filesRemoved += 1;
 		}
 	}
 
-	if (errors.length === 0 && indexedProjectFiles.size > 0) {
+	if (errors.length === 0 && changedFiles.length > 0) {
 		const allIndexedPaths = new Set(
 			getIndexedFiles(db, projectId).map((record) => record.filePath),
 		);
-		rebuildResolvedModuleEdges(db, projectId, [...indexedProjectFiles.values()], allIndexedPaths);
+		rebuildResolvedModuleEdges(db, projectId, changedFiles, allIndexedPaths);
 	}
 
 	return Object.freeze({
