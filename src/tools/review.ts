@@ -201,14 +201,23 @@ async function startNewReview(
 	const selection = selectAgents(detectedStacks, diffAnalysis, allCandidates, { seed });
 
 	const selectedNames = selection.selected.map((a) => a.name);
-	const { diff: diffContent } = await collectDiffEvidence(projectRoot, scope, options?.directory);
+	const { diff: diffContent, changedFiles: evidenceFiles } = await collectDiffEvidence(
+		projectRoot,
+		scope,
+		options?.directory,
+	);
 	const diffEvidence =
 		diffContent.length > 0 ? sanitizeTemplateContent(diffContent) : `[Scope: ${scope}]`;
+
+	const changedFilesSummary =
+		evidenceFiles.length > 0
+			? `\n\nChanged files (${evidenceFiles.length}):\n${evidenceFiles.map((f) => `- ${f}`).join("\n")}`
+			: "";
 
 	// Build stage 1 prompts with real diff evidence.
 	const agentPrompts = selection.selected.map((agent) => {
 		const prompt = agent.prompt
-			.replace("{{DIFF}}", diffEvidence)
+			.replace("{{DIFF}}", `${diffEvidence}${changedFilesSummary}`)
 			.replace("{{PRIOR_FINDINGS}}", "No prior findings yet.")
 			.replace("{{MEMORY}}", "");
 		return Object.freeze({ name: agent.name, prompt });
@@ -360,7 +369,7 @@ export const ocReview = tool({
 			.optional()
 			.describe("JSON findings from previously dispatched review agents"),
 	},
-	async execute(args) {
-		return reviewCore(args, process.cwd());
+	async execute(args, context) {
+		return reviewCore(args, context.directory);
 	},
 });

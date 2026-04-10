@@ -337,7 +337,8 @@ const plugin: Plugin = async (input) => {
 				return { providerID, modelID };
 			}
 
-			return { providerID: "", modelID: resolvedModel };
+			// No provider prefix — let the session use its default model.
+			return undefined;
 		},
 		promptAsync: async (
 			sessionId: string,
