@@ -60,7 +60,9 @@ function createDefaultCommandRunnerForProject(
 	}
 
 	return async (command: string): Promise<CommandExecutionResult> => {
-		const proc = Bun.spawn(["bash", "-lc", command], {
+		const isWindows = typeof process !== "undefined" && process.platform === "win32";
+		const spawnArgs = isWindows ? ["cmd", "/c", command] : ["bash", "-lc", command];
+		const proc = Bun.spawn(spawnArgs, {
 			cwd: projectRoot,
 			stdout: "pipe",
 			stderr: "pipe",

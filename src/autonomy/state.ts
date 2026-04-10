@@ -97,6 +97,10 @@ export class LoopStateMachine {
 	}
 
 	retireContextSignal(signal: string, replacement: string): void {
+		if (replacement.includes(signal)) {
+			throw new Error(`retireContextSignal: replacement must not contain the signal (${signal})`);
+		}
+
 		let changed = false;
 		const accumulatedContext = this.context.accumulatedContext.map((entry) => {
 			if (!entry.includes(signal)) {

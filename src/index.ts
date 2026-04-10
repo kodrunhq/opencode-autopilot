@@ -350,7 +350,7 @@ const plugin: Plugin = async (input) => {
 						parentID: parentSessionId,
 						title: `Oracle verification ${attemptId}`,
 					},
-					query: { directory: process.cwd() },
+					query: { directory: projectRoot },
 				});
 				const oracleSessionId = createdSession.data?.id;
 				if (typeof oracleSessionId !== "string" || oracleSessionId.trim().length === 0) {
@@ -363,7 +363,7 @@ const plugin: Plugin = async (input) => {
 						agent: "oracle",
 						parts: [{ type: "text", text: prompt }],
 					},
-					query: { directory: process.cwd() },
+					query: { directory: projectRoot },
 				});
 
 				return {
@@ -376,7 +376,7 @@ const plugin: Plugin = async (input) => {
 				try {
 					const response = await client.session.messages({
 						path: { id: sessionId },
-						query: { directory: process.cwd() },
+						query: { directory: projectRoot },
 					});
 					const messages = (response.data ?? []) as ReadonlyArray<{
 						parts?: readonly { type?: string; text?: string }[];

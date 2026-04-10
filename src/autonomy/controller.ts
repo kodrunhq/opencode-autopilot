@@ -52,8 +52,7 @@ function maxOracleAttemptsMessage(maxAttempts: number): string {
 	return `Oracle verification exceeded maximum attempts (${maxAttempts}). Manual review required.`;
 }
 
-const RETIRED_WORKER_COMPLETION_PROMISE =
-	"<promise>DONE</promise> (retired after Oracle rejection)";
+const RETIRED_WORKER_COMPLETION_PROMISE = "<promise>RETIRED_DONE</promise>";
 
 export class LoopController {
 	private machine: LoopStateMachine;
