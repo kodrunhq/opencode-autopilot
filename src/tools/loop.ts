@@ -88,7 +88,8 @@ export const ocLoop = tool({
 			.optional()
 			.describe("Result of the current iteration for the iterate action"),
 	},
-	async execute({ action, taskDescription, maxIterations, iterationResult }) {
-		return loopCore(action, { taskDescription, maxIterations, iterationResult });
+	async execute({ action, taskDescription, maxIterations, iterationResult }, context) {
+		const controller = getLoopController(context.sessionID);
+		return loopCore(action, { taskDescription, maxIterations, iterationResult }, controller);
 	},
 });

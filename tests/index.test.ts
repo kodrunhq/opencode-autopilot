@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import plugin from "../src/index";
+import type { LoopContext } from "../src/autonomy/types";
+import { VerificationHandler } from "../src/autonomy/verification";
+import { createDefaultConfig } from "../src/config";
+import plugin, { buildVerificationHandlerDeps } from "../src/index";
 
 describe("plugin entry point", () => {
 	type PluginInput = Parameters<typeof plugin>[0];
@@ -31,6 +34,20 @@ describe("plugin entry point", () => {
 		serverUrl: new URL("http://localhost:3000"),
 		$: {} as PluginInput["$"],
 	} satisfies PluginInput;
+
+	function createContext(): LoopContext {
+		return {
+			taskDescription: "verify project scope",
+			maxIterations: 1,
+			currentIteration: 1,
+			state: "verifying",
+			startedAt: new Date().toISOString(),
+			lastIterationAt: null,
+			accumulatedContext: [],
+			verificationResults: [],
+			oracleVerification: null,
+		};
+	}
 
 	test("default export is a function", () => {
 		expect(typeof plugin).toBe("function");
@@ -151,6 +168,47 @@ describe("plugin entry point", () => {
 		];
 		expect(transformHook).toBeDefined();
 		expect(typeof transformHook).toBe("function");
+	});
+
+	test("wires verification command overrides from runtime config", () => {
+		const config = {
+			...createDefaultConfig(),
+			verification: {
+				commandChecks: [{ name: "tests", command: "bun run test" }],
+				projectOverrides: {},
+			},
+		};
+
+		const deps = buildVerificationHandlerDeps("/tmp/project", config);
+
+		expect(deps.projectRoot).toBe("/tmp/project");
+		expect(deps.config).toBe(config);
+	});
+
+	test("runtime verification handler uses the project-specific override", async () => {
+		const projectRoot = "/tmp/project-a";
+		const config = {
+			...createDefaultConfig(),
+			verification: {
+				commandChecks: [{ name: "tests", command: "global-check" }],
+				projectOverrides: {
+					[projectRoot]: { commandChecks: [{ name: "tests", command: "project-check" }] },
+				},
+			},
+		};
+		const commands: string[] = [];
+		const handler = new VerificationHandler({
+			...buildVerificationHandlerDeps(projectRoot, config),
+			runCommand: async (command) => {
+				commands.push(command);
+				return { exitCode: 0, output: "ok" };
+			},
+		});
+
+		const result = await handler.verify(createContext());
+
+		expect(commands).toEqual(["project-check"]);
+		expect(result.passed).toBe(true);
 	});
 
 	test("returns tool.execute.before hook", async () => {

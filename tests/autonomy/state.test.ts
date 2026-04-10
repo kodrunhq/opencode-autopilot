@@ -11,6 +11,9 @@ describe("LoopStateMachine", () => {
 		machine.transition("verifying");
 		expect(machine.getContext().state).toBe("verifying");
 
+		machine.transition("oracle_verification_pending");
+		expect(machine.getContext().state).toBe("oracle_verification_pending");
+
 		machine.transition("running");
 		machine.transition("complete");
 		expect(machine.getContext().state).toBe("complete");
@@ -46,5 +49,24 @@ describe("LoopStateMachine", () => {
 		machine.addContext("second pass");
 
 		expect(machine.getContext().accumulatedContext).toEqual(["first pass", "second pass"]);
+	});
+
+	test("stores oracle verification state", () => {
+		const machine = new LoopStateMachine(3);
+		machine.setOracleVerification({
+			status: "pending",
+			sessionId: "oracle-123",
+			attemptCount: 1,
+			maxAttempts: 3,
+			lastResultSummary: "Needs one more fix",
+		});
+
+		expect(machine.getContext().oracleVerification).toEqual({
+			status: "pending",
+			sessionId: "oracle-123",
+			attemptCount: 1,
+			maxAttempts: 3,
+			lastResultSummary: "Needs one more fix",
+		});
 	});
 });

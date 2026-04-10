@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LoopController } from "../../src/autonomy/controller";
+import type { OracleBridge } from "../../src/autonomy/oracle-bridge";
 import { VerificationHandler } from "../../src/autonomy/verification";
 import { BackgroundManager } from "../../src/background/manager";
 import { BACKGROUND_TASKS_SCHEMA_STATEMENTS } from "../../src/background/schema";
@@ -15,6 +16,25 @@ import { classifyError } from "../../src/recovery/classifier";
 import { RecoveryOrchestrator } from "../../src/recovery/orchestrator";
 import { makeRoutingDecision } from "../../src/routing/engine";
 import { orchestrateCore } from "../../src/tools/orchestrate";
+
+const immediateOracleBridge: OracleBridge = {
+	async requestOracleConsultation(request) {
+		return {
+			sessionId: "oracle-session-full-pipeline",
+			attemptId: "oracle-attempt-full-pipeline",
+			parentSessionId: request.parentSessionId ?? "missing-parent",
+		};
+	},
+	async checkOracleResult() {
+		return {
+			status: "verified",
+			summary: "Oracle approved completion.",
+			rawEvidence:
+				"<promise>VERIFIED</promise>\nVERDICT: VERIFIED\nSUMMARY: Oracle approved completion.",
+			attemptId: "oracle-attempt-full-pipeline",
+		};
+	},
+};
 
 function createTestDb(): Database {
 	const db = new Database(":memory:");
@@ -128,7 +148,7 @@ describe("Integration: full pipeline v7 — all subsystems active", () => {
 
 		controller.start("Auth middleware");
 		const loopResult = await controller.iterate(
-			`Background completed: ${taskResult}. All tasks completed.`,
+			`Background completed: ${taskResult}\n<promise>DONE</promise>`,
 		);
 		expect(loopResult.state).toBe("complete");
 
@@ -232,9 +252,10 @@ describe("Integration: full pipeline v7 — all subsystems active", () => {
 	test("loop controller handles verification failure and retries", async () => {
 		let verifyCallCount = 0;
 		const conditionalVerifier = new VerificationHandler({
+			commandChecks: [{ name: "lint", command: "run-lint" }],
 			runCommand: async () => {
 				verifyCallCount += 1;
-				if (verifyCallCount <= 2) {
+				if (verifyCallCount <= 1) {
 					return { exitCode: 1, output: "lint errors found" };
 				}
 				return { exitCode: 0, output: "ok" };
@@ -245,22 +266,28 @@ describe("Integration: full pipeline v7 — all subsystems active", () => {
 			maxIterations: 10,
 			verifyOnComplete: true,
 			cooldownMs: 0,
+			sessionId: "full-pipeline-session",
 			verificationHandler: conditionalVerifier,
+			oracleBridge: immediateOracleBridge,
 		});
 
 		controller.start("Fix lint errors");
 
 		// First iteration signals completion → verification fails
-		const iter1 = await controller.iterate("all tasks completed");
+		const iter1 = await controller.iterate("<promise>DONE</promise>");
 		expect(iter1.state).toBe("running"); // Back to running after failed verification
 		expect(iter1.verificationResults).toHaveLength(1);
 		expect(iter1.verificationResults[0].passed).toBe(false);
 
 		// Second iteration: fix applied, signals completion → verification passes
-		const iter2 = await controller.iterate("fixed 3 lint errors. all tasks completed");
-		expect(iter2.state).toBe("complete");
+		const iter2 = await controller.iterate("fixed 3 lint errors. <promise>DONE</promise>");
+		expect(iter2.state).toBe("oracle_verification_pending");
 		expect(iter2.verificationResults).toHaveLength(2);
 		expect(iter2.verificationResults[1].passed).toBe(true);
+
+		const iter3 = await controller.iterate("poll oracle");
+		expect(iter3.state).toBe("complete");
+		expect(iter3.oracleVerification?.status).toBe("verified");
 	});
 
 	test("recovery orchestrator tracks multi-error session history", () => {

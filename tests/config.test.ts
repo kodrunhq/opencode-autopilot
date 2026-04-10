@@ -69,6 +69,12 @@ describe("createDefaultConfig", () => {
 		expect(config.confidence.thresholds.proceed).toBe("MEDIUM");
 		expect(config.confidence.thresholds.abort).toBe("LOW");
 	});
+
+	test("verification defaults: command checks start empty", () => {
+		const config = createDefaultConfig();
+		expect(config.verification.commandChecks).toEqual([]);
+		expect(config.verification.projectOverrides).toEqual({});
+	});
 });
 
 describe("saveConfig and loadConfig round-trip", () => {
@@ -101,6 +107,8 @@ describe("saveConfig and loadConfig round-trip", () => {
 		expect(parsed.fallback).toBeDefined();
 		expect(parsed.groups).toBeDefined();
 		expect(parsed.overrides).toBeDefined();
+		expect(parsed.verification).toBeDefined();
+		expect(parsed.verification.projectOverrides).toBeDefined();
 
 		const loaded = await loadConfig(configPath);
 		expect(loaded).toEqual(config);
@@ -164,6 +172,7 @@ describe("v1 to v7 migration", () => {
 		expect(result?.confidence.thresholds.abort).toBe("LOW");
 		expect(result?.fallback.enabled).toBe(true);
 		expect(result?.fallback.maxFallbackAttempts).toBe(10);
+		expect(result?.verification.projectOverrides).toEqual({});
 	});
 
 	test("loadConfig on a v1 JSON file writes migrated v5 back to disk", async () => {
@@ -179,6 +188,7 @@ describe("v1 to v7 migration", () => {
 		expect(raw.fallback).toBeDefined();
 		expect(raw.groups).toBeDefined();
 		expect(raw.overrides).toBeDefined();
+		expect(raw.verification.projectOverrides).toBeDefined();
 	});
 });
 
@@ -237,6 +247,7 @@ describe("v2 to v5 migration", () => {
 		expect(result?.fallback.timeoutSeconds).toBe(30);
 		expect(result?.groups).toEqual({});
 		expect(result?.overrides).toEqual({});
+		expect(result?.verification.projectOverrides).toEqual({});
 	});
 
 	test("loadConfig on a v2 JSON file writes migrated v5 back to disk", async () => {
@@ -273,6 +284,7 @@ describe("v2 to v5 migration", () => {
 		expect(raw.fallback.enabled).toBe(true);
 		expect(raw.groups).toBeDefined();
 		expect(raw.overrides).toBeDefined();
+		expect(raw.verification.projectOverrides).toBeDefined();
 	});
 });
 

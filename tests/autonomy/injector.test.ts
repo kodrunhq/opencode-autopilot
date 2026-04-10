@@ -44,4 +44,40 @@ describe("createLoopInjector", () => {
 			loopInjectorConstants.LOOP_CONTEXT_CHAR_BUDGET,
 		);
 	});
+
+	test("uses the session-specific controller when resolving injected context", async () => {
+		const sessionOneController = new LoopController({
+			verifyOnComplete: false,
+			sessionId: "sess-1",
+		});
+		sessionOneController.start("Session one task", { verifyOnComplete: false });
+		await sessionOneController.iterate("session one progress");
+
+		const sessionTwoController = new LoopController({
+			verifyOnComplete: false,
+			sessionId: "sess-2",
+		});
+		sessionTwoController.start("Session two task", { verifyOnComplete: false });
+		await sessionTwoController.iterate("session two progress");
+
+		const injector = createLoopInjector((sessionID) => {
+			if (sessionID === "sess-1") {
+				return sessionOneController;
+			}
+
+			if (sessionID === "sess-2") {
+				return sessionTwoController;
+			}
+
+			return null;
+		});
+		const output = { system: [] as string[] };
+
+		await injector({ sessionID: "sess-2" }, output);
+
+		expect(output.system).toHaveLength(1);
+		expect(output.system[0]).toContain("Current iteration: 1 of 100");
+		expect(output.system[0]).toContain("session two progress");
+		expect(output.system[0]).not.toContain("session one progress");
+	});
 });

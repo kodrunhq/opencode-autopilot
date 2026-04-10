@@ -33,13 +33,23 @@ function buildLoopContext(controller: LoopController): string {
 	return truncate(baseContext, LOOP_CONTEXT_CHAR_BUDGET);
 }
 
-export function createLoopInjector(controller: LoopController) {
-	return async (_input: LoopInjectorInput, output: LoopInjectorOutput): Promise<void> => {
-		if (controller.getStatus().state === "idle") {
+type LoopControllerResolver = (sessionID?: string) => LoopController | null;
+
+export function createLoopInjector(controller: LoopController | LoopControllerResolver) {
+	const resolveController: LoopControllerResolver =
+		typeof controller === "function" ? controller : () => controller;
+
+	return async (input: LoopInjectorInput, output: LoopInjectorOutput): Promise<void> => {
+		const resolvedController = resolveController(input.sessionID);
+		if (!resolvedController) {
 			return;
 		}
 
-		const loopContext = buildLoopContext(controller);
+		if (resolvedController.getStatus().state === "idle") {
+			return;
+		}
+
+		const loopContext = buildLoopContext(resolvedController);
 		output.system.push(loopContext);
 	};
 }

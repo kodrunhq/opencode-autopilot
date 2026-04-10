@@ -1,8 +1,9 @@
 import type { Config, Plugin } from "@opencode-ai/plugin";
 import { configHook } from "./agents";
-import { getLoopController } from "./autonomy";
+import { deleteLoopController, getLoopController } from "./autonomy";
 import { createLoopInjector } from "./autonomy/injector";
-import { isFirstLoad, loadConfig, notificationsDefaults } from "./config";
+import { VerificationHandler, type VerificationHandlerDeps } from "./autonomy/verification";
+import { isFirstLoad, loadConfig, notificationsDefaults, type PluginConfig } from "./config";
 import { createCompactionHandler, createContextInjector } from "./context";
 import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
@@ -115,6 +116,50 @@ import { TaskToastManager } from "./ux/task-toast-manager";
 
 let openCodeConfig: Config | null = null;
 
+function extractSessionIdFromProperties(properties: unknown): string | null {
+	if (!properties || typeof properties !== "object") {
+		return null;
+	}
+
+	const props = properties as Record<string, unknown>;
+	if (typeof props.sessionID === "string") {
+		return props.sessionID;
+	}
+
+	if (typeof props.sessionId === "string") {
+		return props.sessionId;
+	}
+
+	const info = props.info as Record<string, unknown> | undefined;
+	if (!info) {
+		return null;
+	}
+
+	if (typeof info.id === "string") {
+		return info.id;
+	}
+
+	if (typeof info.sessionID === "string") {
+		return info.sessionID;
+	}
+
+	if (typeof info.sessionId === "string") {
+		return info.sessionId;
+	}
+
+	return null;
+}
+
+export function buildVerificationHandlerDeps(
+	projectRoot: string,
+	config: PluginConfig | null,
+): VerificationHandlerDeps {
+	return {
+		projectRoot,
+		config,
+	};
+}
+
 let processHandlersRegistered = false;
 function registerProcessHandlers() {
 	if (processHandlersRegistered) return;
@@ -164,6 +209,10 @@ const plugin: Plugin = async (input) => {
 	// Load config for first-load detection and fallback settings
 	const config = await loadConfig();
 	const fallbackConfig = config?.fallback ?? fallbackDefaults;
+	const projectRoot = input.worktree ?? input.directory ?? process.cwd();
+	const verificationHandler = new VerificationHandler(
+		buildVerificationHandlerDeps(projectRoot, config),
+	);
 
 	// Self-healing health checks on every load (non-blocking, <100ms target)
 	runHealthChecks().catch(() => {
@@ -285,6 +334,67 @@ const plugin: Plugin = async (input) => {
 	};
 	setBackgroundSdkOperations(backgroundSdkOps);
 	setDelegateSdkOperations(backgroundSdkOps);
+
+	const getSessionLoopController = (sessionId: string) =>
+		getLoopController(sessionId, {
+			sessionId,
+			logger: getLogger("autonomy", "controller"),
+			verificationHandler,
+			dispatchOracleTask: async ({ attemptId, parentSessionId, prompt }) => {
+				if (!parentSessionId) {
+					throw new Error("No active session available for Oracle dispatch");
+				}
+
+				const createdSession = await client.session.create({
+					body: {
+						parentID: parentSessionId,
+						title: `Oracle verification ${attemptId}`,
+					},
+					query: { directory: projectRoot },
+				});
+				const oracleSessionId = createdSession.data?.id;
+				if (typeof oracleSessionId !== "string" || oracleSessionId.trim().length === 0) {
+					throw new Error("Oracle dispatch did not return a valid session ID");
+				}
+
+				await client.session.promptAsync({
+					path: { id: oracleSessionId },
+					body: {
+						agent: "oracle",
+						parts: [{ type: "text", text: prompt }],
+					},
+					query: { directory: projectRoot },
+				});
+
+				return {
+					sessionId: oracleSessionId,
+					attemptId,
+					parentSessionId,
+				};
+			},
+			readOracleSessionMessages: async ({ sessionId }) => {
+				try {
+					const response = await client.session.messages({
+						path: { id: sessionId },
+						query: { directory: projectRoot },
+					});
+					const messages = (response.data ?? []) as ReadonlyArray<{
+						parts?: readonly { type?: string; text?: string }[];
+					}>;
+
+					return messages
+						.map((message) =>
+							(message.parts ?? [])
+								.filter((part) => part.type === "text" && typeof part.text === "string")
+								.map((part) => part.text ?? "")
+								.join("\n"),
+						)
+						.filter((message) => message.trim().length > 0);
+				} catch {
+					return [];
+				}
+			},
+		});
 
 	const manager = new FallbackManager({
 		config: fallbackConfig,
@@ -418,7 +528,9 @@ const plugin: Plugin = async (input) => {
 		totalBudget: 4000,
 	});
 	const compactionHandler = createCompactionHandler(contextInjector);
-	const loopInjector = createLoopInjector(getLoopController());
+	const loopInjector = createLoopInjector((sessionID) =>
+		sessionID ? getSessionLoopController(sessionID) : null,
+	);
 	const agentSkillInjector = createAgentSkillInjector({ baseDir: getGlobalConfigDir() });
 
 	// --- MCP lifecycle manager (lazy — servers start when skills with mcp: config activate) ---
@@ -624,32 +736,11 @@ const plugin: Plugin = async (input) => {
 				mcpManager.stopAll().catch(() => {});
 				// Clean up intent tracking for this session
 				// Extract session ID from multiple possible locations
-				const props = event.properties as Record<string, unknown> | undefined;
-				let sessionID: string | undefined;
-
-				if (props) {
-					// Direct properties
-					if (typeof props.sessionID === "string") {
-						sessionID = props.sessionID;
-					} else if (typeof props.sessionId === "string") {
-						sessionID = props.sessionId;
-					} else {
-						// Check nested info object
-						const info = props.info as Record<string, unknown> | undefined;
-						if (info) {
-							if (typeof info.id === "string") {
-								sessionID = info.id;
-							} else if (typeof info.sessionID === "string") {
-								sessionID = info.sessionID;
-							} else if (typeof info.sessionId === "string") {
-								sessionID = info.sessionId;
-							}
-						}
-					}
-				}
+				const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
 
 				if (sessionID) {
 					clearIntentSession(sessionID);
+					deleteLoopController(sessionID);
 				}
 			}
 		},
