@@ -26,105 +26,104 @@ function makeSkill(
 	};
 }
 
-describe("detectProjectStackTags", () => {
-	let tempDir: string;
-
-	it("detects javascript and typescript from package.json and tsconfig.json", async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
-		await writeFile(join(tempDir, "package.json"), "{}");
-		await writeFile(join(tempDir, "tsconfig.json"), "{}");
-
-		const tags = await detectProjectStackTags(tempDir);
-		expect(tags).toContain("javascript");
-		expect(tags).toContain("typescript");
-
+async function withTempDir(run: (tempDir: string) => Promise<void>): Promise<void> {
+	const tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
+	try {
+		await run(tempDir);
+	} finally {
 		await rm(tempDir, { recursive: true, force: true });
+	}
+}
+
+describe("detectProjectStackTags", () => {
+	it("detects javascript and typescript from package.json and tsconfig.json", async () => {
+		await withTempDir(async (tempDir) => {
+			await writeFile(join(tempDir, "package.json"), "{}");
+			await writeFile(join(tempDir, "tsconfig.json"), "{}");
+
+			const tags = await detectProjectStackTags(tempDir);
+			expect(tags).toContain("javascript");
+			expect(tags).toContain("typescript");
+		});
 	});
 
 	it("returns empty array for directory with no manifest files", async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
-		const tags = await detectProjectStackTags(tempDir);
-		expect(tags).toEqual([]);
-		await rm(tempDir, { recursive: true, force: true });
+		await withTempDir(async (tempDir) => {
+			const tags = await detectProjectStackTags(tempDir);
+			expect(tags).toEqual([]);
+		});
 	});
 
 	it("detects go from go.mod", async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
-		await writeFile(join(tempDir, "go.mod"), "module test");
+		await withTempDir(async (tempDir) => {
+			await writeFile(join(tempDir, "go.mod"), "module test");
 
-		const tags = await detectProjectStackTags(tempDir);
-		expect(tags).toContain("go");
-
-		await rm(tempDir, { recursive: true, force: true });
+			const tags = await detectProjectStackTags(tempDir);
+			expect(tags).toContain("go");
+		});
 	});
 
 	it("detects csharp from .csproj file via extension matching", async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
-		await writeFile(join(tempDir, "MyProject.csproj"), "<Project />");
+		await withTempDir(async (tempDir) => {
+			await writeFile(join(tempDir, "MyProject.csproj"), "<Project />");
 
-		const tags = await detectProjectStackTags(tempDir);
-		expect(tags).toContain("csharp");
-
-		await rm(tempDir, { recursive: true, force: true });
+			const tags = await detectProjectStackTags(tempDir);
+			expect(tags).toContain("csharp");
+		});
 	});
 
 	it("detects csharp from .sln file via extension matching", async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
-		await writeFile(join(tempDir, "MySolution.sln"), "");
+		await withTempDir(async (tempDir) => {
+			await writeFile(join(tempDir, "MySolution.sln"), "");
 
-		const tags = await detectProjectStackTags(tempDir);
-		expect(tags).toContain("csharp");
-
-		await rm(tempDir, { recursive: true, force: true });
+			const tags = await detectProjectStackTags(tempDir);
+			expect(tags).toContain("csharp");
+		});
 	});
 
 	it("detects java from pom.xml", async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
-		await writeFile(join(tempDir, "pom.xml"), "<project />");
+		await withTempDir(async (tempDir) => {
+			await writeFile(join(tempDir, "pom.xml"), "<project />");
 
-		const tags = await detectProjectStackTags(tempDir);
-		expect(tags).toContain("java");
-
-		await rm(tempDir, { recursive: true, force: true });
+			const tags = await detectProjectStackTags(tempDir);
+			expect(tags).toContain("java");
+		});
 	});
 
 	it("deduplicates tags when both .csproj and .sln are present", async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
-		await writeFile(join(tempDir, "MyProject.csproj"), "<Project />");
-		await writeFile(join(tempDir, "MySolution.sln"), "");
+		await withTempDir(async (tempDir) => {
+			await writeFile(join(tempDir, "MyProject.csproj"), "<Project />");
+			await writeFile(join(tempDir, "MySolution.sln"), "");
 
-		const tags = await detectProjectStackTags(tempDir);
-		const csharpCount = tags.filter((t) => t === "csharp").length;
-		expect(csharpCount).toBe(1);
-
-		await rm(tempDir, { recursive: true, force: true });
+			const tags = await detectProjectStackTags(tempDir);
+			const csharpCount = tags.filter((t) => t === "csharp").length;
+			expect(csharpCount).toBe(1);
+		});
 	});
 
 	it("handles mixed project with both package.json and .csproj", async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
-		await writeFile(join(tempDir, "package.json"), "{}");
-		await writeFile(join(tempDir, "MyProject.csproj"), "<Project />");
+		await withTempDir(async (tempDir) => {
+			await writeFile(join(tempDir, "package.json"), "{}");
+			await writeFile(join(tempDir, "MyProject.csproj"), "<Project />");
 
-		const tags = await detectProjectStackTags(tempDir);
-		expect(tags).toContain("javascript");
-		expect(tags).toContain("csharp");
-
-		await rm(tempDir, { recursive: true, force: true });
+			const tags = await detectProjectStackTags(tempDir);
+			expect(tags).toContain("javascript");
+			expect(tags).toContain("csharp");
+		});
 	});
 
 	it("preserves MANIFEST_TAGS results when readdir fails on a non-directory path", async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "stack-test-"));
-		await writeFile(join(tempDir, "package.json"), "{}");
+		await withTempDir(async (tempDir) => {
+			await writeFile(join(tempDir, "package.json"), "{}");
 
-		// Pass a file as projectRoot — readdir will throw ENOTDIR,
-		// but MANIFEST_TAGS results (javascript) should survive
-		const filePath = join(tempDir, "package.json");
-		const tags = await detectProjectStackTags(filePath);
-		// access(filePath) for package.json would succeed since the path IS package.json,
-		// but the key point is readdir failure doesn't crash or clear prior results
-		expect(Array.isArray(tags)).toBe(true);
-
-		await rm(tempDir, { recursive: true, force: true });
+			// Pass a file as projectRoot — readdir will throw ENOTDIR,
+			// but MANIFEST_TAGS results (javascript) should survive
+			const filePath = join(tempDir, "package.json");
+			const tags = await detectProjectStackTags(filePath);
+			// access(filePath) for package.json would succeed since the path IS package.json,
+			// but the key point is readdir failure doesn't crash or clear prior results
+			expect(Array.isArray(tags)).toBe(true);
+		});
 	});
 });
 

@@ -46,6 +46,8 @@ This registers the plugin in `opencode.json` and creates a starter config. Then 
 
 ### Option C: Manual setup
 
+This path requires Bun on `PATH`. The published CLI entrypoints use a Bun shebang and the plugin uses Bun-specific APIs.
+
 **Install:**
 
 ```bash
@@ -61,6 +63,8 @@ npm install -g @kodrunhq/opencode-autopilot
 ```
 
 Launch OpenCode. The plugin auto-installs agents, skills, and commands on first load and shows a welcome toast.
+
+If you cannot or do not want to install Bun globally, use the GitHub Release local bundle path below instead of the npm global CLI path.
 
 ### Option D: GitHub Release (corporate)
 

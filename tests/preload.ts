@@ -1,38 +1,43 @@
 /**
- * Test Isolation Harness - Auto-injects isolated temp directories for all tests
+ * Test Isolation Harness - Auto-injects isolated temp directories for all tests.
  *
- * This harness enforces test isolation at the framework level to prevent:
- * - Race conditions from shared temp directories
- * - Environment pollution from parent directories
- * - Flaky tests due to concurrent file operations
- *
- * Every test automatically gets:
- * - A unique temp directory via mkdtemp + randomUUID
- * - Automatic cleanup after test completion
- * - process.env.TEST_TEMP_DIR set to the isolated directory
+ * Cleanup happens once at process exit instead of after each test. Bun can run
+ * tests concurrently, so eager global cleanup can delete temp dirs that sibling
+ * tests are still using.
  */
 
-import { afterEach, beforeEach } from "bun:test";
+import { beforeEach } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { rmSync } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const tempDirs: string[] = [];
+const tempDirs = new Set<string>();
+let cleanupRegistered = false;
+
+function cleanupTempDirsSync(): void {
+	for (const dir of tempDirs) {
+		try {
+			rmSync(dir, { recursive: true, force: true });
+		} catch {
+			// Ignore cleanup errors - test isolation is best-effort
+		}
+	}
+	tempDirs.clear();
+}
+
+function ensureCleanupRegistered(): void {
+	if (cleanupRegistered) {
+		return;
+	}
+	cleanupRegistered = true;
+	process.once("exit", cleanupTempDirsSync);
+}
 
 beforeEach(async () => {
+	ensureCleanupRegistered();
 	const dir = await mkdtemp(join(tmpdir(), `test-${randomUUID()}-`));
-	tempDirs.push(dir);
+	tempDirs.add(dir);
 	process.env.TEST_TEMP_DIR = dir;
-});
-
-afterEach(async () => {
-	await Promise.all(
-		tempDirs.map((dir) =>
-			rm(dir, { recursive: true, force: true }).catch(() => {
-				// Ignore cleanup errors - test isolation is best-effort
-			}),
-		),
-	);
-	tempDirs.length = 0;
 });

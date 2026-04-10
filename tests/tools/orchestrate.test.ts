@@ -254,6 +254,57 @@ describe("orchestrateCore", () => {
 		expect(parsed.action).toBe("complete");
 	});
 
+	test("starts a fresh run when the previous pipeline is already completed", async () => {
+		const state = createInitialState("old idea");
+		await saveState(
+			{
+				...state,
+				currentPhase: null,
+				status: "COMPLETED",
+			},
+			tempDir,
+		);
+
+		const result = await orchestrateCore({ idea: "new idea", intent: "implementation" }, tempDir);
+		const parsed = JSON.parse(result);
+
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.phase).toBe("RECON");
+		expect(parsed.prompt).toContain("new idea");
+
+		const saved = await loadState(tempDir);
+		expect(saved?.idea).toBe("new idea");
+		expect(saved?.status).toBe("IN_PROGRESS");
+		expect(saved?.currentPhase).toBe("RECON");
+	});
+
+	test("starts a fresh run when the previous pipeline was interrupted", async () => {
+		const state = createInitialState("abandoned idea");
+		await saveState(
+			{
+				...state,
+				status: "INTERRUPTED",
+				pendingDispatches: [],
+			},
+			tempDir,
+		);
+
+		const result = await orchestrateCore(
+			{ idea: "replacement idea", intent: "implementation" },
+			tempDir,
+		);
+		const parsed = JSON.parse(result);
+
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.phase).toBe("RECON");
+		expect(parsed.prompt).toContain("replacement idea");
+
+		const saved = await loadState(tempDir);
+		expect(saved?.idea).toBe("replacement idea");
+		expect(saved?.status).toBe("IN_PROGRESS");
+		expect(saved?.currentPhase).toBe("RECON");
+	});
+
 	test("returns error when raw string result is provided instead of typed envelope", async () => {
 		const first = JSON.parse(
 			await orchestrateCore({ idea: "typed only", intent: "implementation" }, tempDir),
@@ -311,6 +362,39 @@ describe("orchestrateCore", () => {
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed.phase).toBe("RECON");
 		expect(parsed.agent).toBe("oc-researcher");
+	});
+
+	test("completed pipeline can be replaced by a new implementation idea", async () => {
+		const completed = createInitialState("old idea");
+		await saveState({ ...completed, currentPhase: null, status: "COMPLETED" }, tempDir);
+
+		const result = await orchestrateCore({ idea: "new idea", intent: "implementation" }, tempDir);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.phase).toBe("RECON");
+
+		const state = await loadState(tempDir);
+		expect(state?.idea).toBe("new idea");
+		expect(state?.status).toBe("IN_PROGRESS");
+		expect(state?.currentPhase).toBe("RECON");
+	});
+
+	test("interrupted pipeline can be replaced by a new implementation idea", async () => {
+		const interrupted = createInitialState("stuck idea");
+		await saveState({ ...interrupted, status: "INTERRUPTED", pendingDispatches: [] }, tempDir);
+
+		const result = await orchestrateCore(
+			{ idea: "replacement idea", intent: "implementation" },
+			tempDir,
+		);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("dispatch");
+		expect(parsed.phase).toBe("RECON");
+
+		const state = await loadState(tempDir);
+		expect(state?.idea).toBe("replacement idea");
+		expect(state?.status).toBe("IN_PROGRESS");
+		expect(state?.currentPhase).toBe("RECON");
 	});
 
 	test("rejects omitted intent with E_INTENT_REQUIRED", async () => {
@@ -479,8 +563,9 @@ describe("active pipeline intent guard", () => {
 			tempDir,
 		);
 		const parsed = JSON.parse(result);
-		expect(parsed.code).not.toBe("E_INTENT_REQUIRED");
-		expect(parsed.code).not.toBe("E_INTENT_NOT_IMPLEMENTATION");
+		expect(parsed.action).toBe("error");
+		expect(parsed.code).toBe("E_ACTIVE_RUN_EXISTS");
+		expect(parsed.message).toContain("abandon: true");
 	});
 
 	test("rejects new idea without intent on active pipeline", async () => {

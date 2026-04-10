@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,7 +11,7 @@ describe("installAssets", () => {
 	let targetDir: string;
 
 	beforeEach(async () => {
-		const base = join(tmpdir(), `opencode-installer-test-${Date.now()}`);
+		const base = await mkdtemp(join(tmpdir(), "opencode-installer-test-"));
 		sourceDir = join(base, "assets");
 		targetDir = join(base, "target");
 		await mkdir(join(sourceDir, "agents"), { recursive: true });
@@ -51,6 +51,37 @@ describe("installAssets", () => {
 		// Verify user's content was NOT overwritten
 		const content = await readFile(join(targetDir, "agents", "existing.md"), "utf-8");
 		expect(content).toBe("user customized content");
+	});
+
+	test("updates managed command files when bundled content changes", async () => {
+		const sourceContent = "---\n# opencode-autopilot\n---\nnew bundled content";
+		await writeFile(join(sourceDir, "commands", "managed.md"), sourceContent);
+		await mkdir(join(targetDir, "commands"), { recursive: true });
+		await writeFile(
+			join(targetDir, "commands", "managed.md"),
+			"---\n# opencode-autopilot\n---\nold bundled content",
+		);
+
+		const result = await installAssets(sourceDir, targetDir);
+
+		expect(result.copied).toContain("commands/managed.md");
+		const content = await readFile(join(targetDir, "commands", "managed.md"), "utf-8");
+		expect(content).toBe(sourceContent);
+	});
+
+	test("preserves customized command files without installer marker", async () => {
+		await writeFile(
+			join(sourceDir, "commands", "managed.md"),
+			"---\n# opencode-autopilot\n---\nnew",
+		);
+		await mkdir(join(targetDir, "commands"), { recursive: true });
+		await writeFile(join(targetDir, "commands", "managed.md"), "my custom command");
+
+		const result = await installAssets(sourceDir, targetDir);
+
+		expect(result.skipped).toContain("commands/managed.md");
+		const content = await readFile(join(targetDir, "commands", "managed.md"), "utf-8");
+		expect(content).toBe("my custom command");
 	});
 
 	test("copies command files", async () => {

@@ -1,4 +1,4 @@
-import { access, copyFile, open, readdir, unlink } from "node:fs/promises";
+import { access, copyFile, open, readdir, readFile, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { copyIfMissing, ensureDir, isEnoentError } from "./utils/fs-helpers";
 import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
@@ -54,6 +54,18 @@ interface ListEntriesResult {
 	readonly error: string | null;
 }
 
+async function pathExists(path: string): Promise<boolean> {
+	try {
+		await access(path);
+		return true;
+	} catch (error: unknown) {
+		if (isEnoentError(error)) {
+			return false;
+		}
+		throw error;
+	}
+}
+
 async function listEntries(dirPath: string): Promise<ListEntriesResult> {
 	try {
 		const entries = await readdir(dirPath, { withFileTypes: true });
@@ -70,10 +82,47 @@ async function listEntries(dirPath: string): Promise<ListEntriesResult> {
 	}
 }
 
+async function haveSameContent(source: string, target: string): Promise<boolean> {
+	const [sourceContent, targetContent] = await Promise.all([
+		readFile(source, "utf-8"),
+		readFile(target, "utf-8"),
+	]);
+	return sourceContent === targetContent;
+}
+
+async function syncAsset(
+	source: string,
+	target: string,
+	options?: { readonly overwriteManaged?: boolean },
+): Promise<{ readonly copied: boolean }> {
+	if (!options?.overwriteManaged) {
+		return copyIfMissing(source, target);
+	}
+
+	if (!(await pathExists(target))) {
+		await ensureDir(dirname(target));
+		await copyFile(source, target);
+		return { copied: true };
+	}
+
+	if (await haveSameContent(source, target)) {
+		return { copied: false };
+	}
+
+	if (!(await hasInstallerMarker(target))) {
+		return { copied: false };
+	}
+
+	await ensureDir(dirname(target));
+	await copyFile(source, target);
+	return { copied: true };
+}
+
 async function processFiles(
 	sourceDir: string,
 	targetDir: string,
 	category: string,
+	options?: { readonly overwriteManaged?: boolean },
 ): Promise<InstallResult> {
 	const copied: string[] = [];
 	const skipped: string[] = [];
@@ -93,7 +142,7 @@ async function processFiles(
 		const target = join(targetDir, relativePath);
 
 		try {
-			const result = await copyIfMissing(source, target);
+			const result = await syncAsset(source, target, options);
 			if (result.copied) {
 				copied.push(relativePath);
 			} else {
@@ -108,7 +157,11 @@ async function processFiles(
 	return { copied, skipped, errors };
 }
 
-async function processSkills(sourceDir: string, targetDir: string): Promise<InstallResult> {
+async function processSkills(
+	sourceDir: string,
+	targetDir: string,
+	options?: { readonly overwriteManaged?: boolean },
+): Promise<InstallResult> {
 	const copied: string[] = [];
 	const skipped: string[] = [];
 	const errors: string[] = [];
@@ -136,7 +189,7 @@ async function processSkills(sourceDir: string, targetDir: string): Promise<Inst
 			const target = join(targetDir, relativePath);
 
 			try {
-				const result = await copyIfMissing(source, target);
+				const result = await syncAsset(source, target, options);
 				if (result.copied) {
 					copied.push(relativePath);
 				} else {
@@ -237,9 +290,9 @@ export async function installAssets(
 	const forceUpdate = await forceUpdateAssets(assetsDir, targetDir);
 
 	const [agents, commands, skills, templates] = await Promise.all([
-		processFiles(assetsDir, targetDir, "agents"),
-		processFiles(assetsDir, targetDir, "commands"),
-		processSkills(assetsDir, targetDir),
+		processFiles(assetsDir, targetDir, "agents", { overwriteManaged: true }),
+		processFiles(assetsDir, targetDir, "commands", { overwriteManaged: true }),
+		processSkills(assetsDir, targetDir, { overwriteManaged: true }),
 		processFiles(assetsDir, targetDir, "templates"),
 	]);
 
