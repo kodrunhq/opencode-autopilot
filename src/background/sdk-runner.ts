@@ -6,6 +6,7 @@ export interface BackgroundSdkOperations {
 		sessionId: string,
 		model: string | undefined,
 		parts: ReadonlyArray<{ type: "text"; text: string }>,
+		agent?: string,
 	) => Promise<void>;
 }
 
@@ -31,7 +32,7 @@ export function createSdkRunner(
 			model: task.model,
 		});
 
-		await sdk.promptAsync(task.sessionId, model, parts);
+		await sdk.promptAsync(task.sessionId, model, parts, task.agent ?? undefined);
 
 		const agentLabel = task.agent ? ` via ${task.agent}` : "";
 		const modelLabel = task.model ? ` (${task.model})` : "";

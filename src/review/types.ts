@@ -21,7 +21,12 @@ export type ReviewReport = z.infer<typeof reviewReportSchema>;
 export type ReviewConfig = z.infer<typeof reviewConfigSchema>;
 export type FalsePositive = z.infer<typeof falsePositiveSchema>;
 export type ReviewMemory = z.infer<typeof reviewMemorySchema>;
-export type ReviewState = z.infer<typeof reviewStateSchema>;
+
+interface ReviewStateFields {
+	readonly diffEvidence?: string;
+}
+
+export type ReviewState = z.infer<typeof reviewStateSchema> & ReviewStateFields;
 
 export type AgentCategory = "core" | "parallel" | "sequenced";
 

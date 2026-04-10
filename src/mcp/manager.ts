@@ -65,6 +65,18 @@ function createInternalServer(skillName: string, config: SkillMcpConfig): Intern
 	};
 }
 
+/**
+ * MCP lifecycle manager.
+ *
+ * CURRENT STATUS: This is a CONFIG-ONLY inventory manager.
+ * It validates MCP server configurations and tracks state,
+ * but does NOT spawn processes, open transports, or perform
+ * MCP protocol negotiation. Real process lifecycle will be
+ * added when OpenCode's host-managed MCP capabilities are
+ * integrated.
+ *
+ * Do NOT treat healthCheck() as proof of a running server.
+ */
 export class McpLifecycleManager {
 	private readonly healthCheckTimeoutMs: number;
 

@@ -76,7 +76,7 @@ describe("createLoopInjector", () => {
 		await injector({ sessionID: "sess-2" }, output);
 
 		expect(output.system).toHaveLength(1);
-		expect(output.system[0]).toContain("Current iteration: 1 of 100");
+		expect(output.system[0]).toContain("Current iteration: 1 of 10");
 		expect(output.system[0]).toContain("session two progress");
 		expect(output.system[0]).not.toContain("session one progress");
 	});

@@ -161,7 +161,7 @@ For detailed guides on every subsystem, see the **[full documentation](docs/READ
 | [Agents](docs/agents.md) | Complete catalog of all agents and model groups |
 | [Code Review](docs/code-review.md) | 13-agent adversarial review pipeline |
 | [Configuration](docs/configuration.md) | v7 configuration schema reference |
-| [Tools Reference](docs/tools-reference.md) | All 33 `oc_*` tools |
+| [Tools Reference](docs/tools-reference.md) | All 39 `oc_*` tools |
 | [CLI Reference](docs/cli-reference.md) | `install`, `configure`, `doctor`, and `inspect` commands |
 | [Memory System](docs/memory-system.md) | Dual-scope project and user preference memory |
 | [Model Fallback](docs/model-fallback.md) | Automatic fallback chains and session recovery |
@@ -212,19 +212,21 @@ The installer warns when adversarial pairs share a model family:
   },
   "overrides": {},
   "background": {
-    "maxSlots": 5,
-    "defaultTimeout": 300000
+	"enabled": false,
+	"maxConcurrent": 5,
+	"persistence": true
   },
   "routing": {
-    "defaultCategory": "unspecified"
+	"enabled": false,
+	"categories": {}
   },
   "recovery": {
     "maxRetries": 3,
     "strategies": ["retry", "fallback", "checkpoint"]
   },
   "mcp": {
-    "enabled": true,
-    "timeout": 30000
+	"enabled": false,
+	"skills": {}
   }
 }
 ```
@@ -255,7 +257,7 @@ IDEA --> RECON --> CHALLENGE --> ARCHITECT --> EXPLORE --> PLAN --> BUILD --> SH
 | **RECON** | oc-researcher | Domain research, feasibility assessment, technology landscape |
 | **CHALLENGE** | oc-challenger | Proposes ambitious enhancements to the original idea |
 | **ARCHITECT** | oc-architect x N | Multiple design proposals debated by oc-critic; depth scales with confidence |
-| **EXPLORE** | -- | Reserved for speculative analysis (future) |
+| **EXPLORE** | local analysis | Scans the repository structure to surface risk areas, tech debt indicators, and implementation patterns |
 | **PLAN** | oc-planner | Decomposes architecture into wave-scheduled tasks (max 300-line diffs each) |
 | **BUILD** | oc-implementer | Implements code with inline review; 3-strike limit on CRITICAL findings |
 | **SHIP** | oc-shipper | Generates walkthrough, architectural decisions, and changelog |
@@ -342,19 +344,21 @@ Config lives at `~/.config/opencode/opencode-autopilot.json`. Run `bunx @kodrunh
 | `confidence.thresholds.proceed` | `HIGH`, `MEDIUM`, `LOW` | `MEDIUM` |
 | `confidence.thresholds.abort` | `HIGH`, `MEDIUM`, `LOW` | `LOW` |
 | `fallback.enabled` | `true` / `false` | `true` |
-| `background.maxSlots` | `1`-`10` | `5` |
-| `background.defaultTimeout` | milliseconds | `300000` |
-| `routing.defaultCategory` | category string | `"unspecified"` |
+| `background.enabled` | `true` / `false` | `false` |
+| `background.maxConcurrent` | `1`-`50` | `5` |
+| `background.persistence` | `true` / `false` | `true` |
+| `routing.enabled` | `true` / `false` | `false` |
+| `routing.categories` | category override map | `{}` |
 | `recovery.maxRetries` | `1`-`10` | `3` |
 | `recovery.strategies` | array of strategy names | `["retry", "fallback", "checkpoint"]` |
-| `mcp.enabled` | `true` / `false` | `true` |
-| `mcp.timeout` | milliseconds | `30000` |
+| `mcp.enabled` | `true` / `false` | `false` |
+| `mcp.skills` | skill-to-MCP config map | `{}` |
 
 Config auto-migrates across schema versions (v1 -> v2 -> v3 -> v4 -> v5 -> v6 -> v7).
 
 ## Tools
 
-The plugin registers 33 tools, all prefixed with `oc_` to avoid conflicts with OpenCode built-ins:
+The plugin registers 39 tools, all prefixed with `oc_` to avoid conflicts with OpenCode built-ins:
 
 | Tool | Purpose |
 |------|---------|
@@ -366,6 +370,8 @@ The plugin registers 33 tools, all prefixed with `oc_` to avoid conflicts with O
 | `oc_confidence` | Confidence ledger management |
 | `oc_plan` | Query task waves and status counts |
 | `oc_forensics` | Diagnose pipeline failures (recoverable vs. terminal) |
+| `oc_graph_index` | Index a local code graph for symbol and dependency lookup |
+| `oc_graph_query` | Query the local code graph for definitions, imports, dependents, and outlines |
 | `oc_create_agent` | Create custom agents in-session |
 | `oc_create_skill` | Create custom skills in-session |
 | `oc_create_command` | Create custom commands in-session |
@@ -377,6 +383,7 @@ The plugin registers 33 tools, all prefixed with `oc_` to avoid conflicts with O
 | `oc_quick` | Quick-mode pipeline bypass for trivial tasks |
 | `oc_hashline_edit` | Hash-anchored line edits with FNV-1a verification |
 | `oc_logs` | Query structured session logs |
+| `oc_route` | Validate intent classification and return routing instructions |
 | `oc_session_stats` | Session statistics and token usage |
 | `oc_pipeline_report` | Generate pipeline execution report |
 | `oc_summary` | Session summary generation |
@@ -385,6 +392,9 @@ The plugin registers 33 tools, all prefixed with `oc_` to avoid conflicts with O
 | `oc_update_docs` | Detect docs affected by code changes |
 | `oc_memory_status` | Memory system status and statistics |
 | `oc_memory_preferences` | Manage user preference observations |
+| `oc_memory_save` | Save durable project or user memories for later sessions |
+| `oc_memory_search` | Search saved memories by text, kind, or topic |
+| `oc_memory_forget` | Soft-delete obsolete or incorrect memories |
 | `oc_lsp_goto_definition` | Jump to symbol definition via LSP |
 | `oc_lsp_find_references` | Find all references to a symbol via LSP |
 | `oc_lsp_symbols` | Document or workspace symbol search via LSP |
@@ -448,7 +458,7 @@ src/
 |   +-- session-summary.ts   End-of-session summary generation
 +-- mcp/                     MCP (Model Context Protocol) skill integration
 |   +-- types.ts             MCP server and tool type definitions
-|   +-- manager.ts           MCP server lifecycle management
+|   +-- manager.ts           MCP config inventory and state tracking (no process lifecycle yet)
 |   +-- scope-filter.ts      Scope-based MCP server filtering
 +-- kernel/                  Database primitives and concurrency
 |   +-- transaction.ts       SQLite transactions with retry on SQLITE_BUSY

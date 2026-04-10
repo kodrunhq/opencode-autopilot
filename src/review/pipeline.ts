@@ -88,10 +88,11 @@ export function advancePipeline(
 			// Stage 2 -> 3: Build red-team + product-thinker prompts
 			const condensed = sanitizeTemplateContent(accumulated.map(condenseFinding).join("\n"));
 			const sanitizedScope2 = sanitizeTemplateContent(currentState.scope);
+			const diffEvidence = currentState.diffEvidence ?? sanitizedScope2;
 			const stage3Prompts = STAGE3_AGENTS.map((agent) => ({
 				name: agent.name,
 				prompt: agent.prompt
-					.replace("{{DIFF}}", sanitizedScope2)
+					.replace("{{DIFF}}", diffEvidence)
 					.replace("{{PRIOR_FINDINGS}}", condensed)
 					.replace("{{MEMORY}}", ""),
 			}));

@@ -59,7 +59,7 @@ import {
 	createRecoveryOrchestratorWithDb,
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
-import { AGENT_REGISTRY } from "./registry/model-groups";
+import { AGENT_REGISTRY, ALL_GROUP_IDS } from "./registry/model-groups";
 import {
 	clearIntentSession,
 	enforceIntentGate,
@@ -180,7 +180,8 @@ function registerProcessHandlers() {
 
 const plugin: Plugin = async (input) => {
 	const client = input.client;
-	initLoggers(process.cwd());
+	const projectRoot = input.worktree ?? input.directory ?? process.cwd();
+	initLoggers(projectRoot);
 	registerProcessHandlers();
 
 	// Self-healing asset installation on every load
@@ -193,7 +194,7 @@ const plugin: Plugin = async (input) => {
 	// The promise is stored so oc_configure "start" can await it (with timeout).
 	try {
 		const discoveryPromise = client.provider
-			.list({ query: { directory: process.cwd() } })
+			.list({ query: { directory: projectRoot } })
 			.then((providerResponse) => {
 				const providerData = providerResponse.data;
 				if (providerData?.all) {
@@ -211,7 +212,6 @@ const plugin: Plugin = async (input) => {
 	// Load config for first-load detection and fallback settings
 	const config = await loadConfig();
 	const fallbackConfig = config?.fallback ?? fallbackDefaults;
-	const projectRoot = input.worktree ?? input.directory ?? process.cwd();
 	const verificationHandler = new VerificationHandler(
 		buildVerificationHandlerDeps(projectRoot, config),
 	);
@@ -261,7 +261,7 @@ const plugin: Plugin = async (input) => {
 		getSessionMessages: async (sessionID) => {
 			const response = await client.session.messages({
 				path: { id: sessionID },
-				query: { directory: process.cwd() },
+				query: { directory: projectRoot },
 			});
 			// Extract parts from the last non-assistant message for replay
 			const messages = (response.data ?? []) as ReadonlyArray<{
@@ -276,7 +276,7 @@ const plugin: Plugin = async (input) => {
 				path: { id: sessionID },
 				// biome-ignore lint/suspicious/noExplicitAny: MessagePart is a superset of SDK part types
 				body: { model, parts: parts as any },
-				query: { directory: process.cwd() },
+				query: { directory: projectRoot },
 			});
 		},
 		showToast: async (title, message, variant, duration) => {
@@ -300,7 +300,7 @@ const plugin: Plugin = async (input) => {
 			try {
 				const response = await client.session.messages({
 					path: { id: sessionID },
-					query: { directory: process.cwd() },
+					query: { directory: projectRoot },
 				});
 				const messages = (response.data ?? []) as ReadonlyArray<{
 					role?: string;
@@ -321,17 +321,47 @@ const plugin: Plugin = async (input) => {
 
 	// --- Background task SDK wiring (enables real dispatch via promptAsync) ---
 	const backgroundSdkOps = {
+		resolveModel: (
+			model: string | undefined,
+		): { readonly providerID: string; readonly modelID: string } | undefined => {
+			if (!model) {
+				return undefined;
+			}
+
+			const resolvedModel = ALL_GROUP_IDS.includes(model as (typeof ALL_GROUP_IDS)[number])
+				? (config?.groups[model]?.primary ?? model)
+				: model;
+
+			if (resolvedModel.includes("/")) {
+				const [providerID, modelID] = resolvedModel.split("/", 2);
+				return { providerID, modelID };
+			}
+
+			return { providerID: "", modelID: resolvedModel };
+		},
 		promptAsync: async (
 			sessionId: string,
 			model: string | undefined,
 			parts: ReadonlyArray<{ type: "text"; text: string }>,
+			agent?: string,
 		) => {
-			const modelSpec = model ? { providerID: "", modelID: model } : undefined;
-			await sdkOps.promptAsync(
-				sessionId,
-				modelSpec as { readonly providerID: string; readonly modelID: string },
-				parts as readonly import("./orchestrator/fallback").MessagePart[],
-			);
+			const modelSpec = backgroundSdkOps.resolveModel(model);
+			const body: Record<string, unknown> = {};
+			if (modelSpec) {
+				body.model = modelSpec;
+			}
+			if (agent) {
+				body.agent = agent;
+			}
+
+			await client.session.prompt({
+				body: {
+					...body,
+					parts: [...parts],
+				},
+				path: { id: sessionId },
+				query: { directory: projectRoot },
+			});
 		},
 	};
 	setBackgroundSdkOperations(backgroundSdkOps);
@@ -498,15 +528,15 @@ const plugin: Plugin = async (input) => {
 	};
 
 	const memoryCaptureHandler = memoryConfig.enabled
-		? createMemoryCaptureHandler({ getDb: () => getMemoryDb(), projectRoot: process.cwd() })
+		? createMemoryCaptureHandler({ getDb: () => getMemoryDb(), projectRoot })
 		: null;
 	const memoryChatMessageHandler = memoryConfig.enabled
-		? createMemoryChatMessageHandler({ getDb: () => getMemoryDb(), projectRoot: process.cwd() })
+		? createMemoryChatMessageHandler({ getDb: () => getMemoryDb(), projectRoot })
 		: null;
 
 	const memoryInjector = memoryConfig.enabled
 		? createMemoryInjector({
-				projectRoot: process.cwd(),
+				projectRoot,
 				tokenBudget: memoryConfig.injectionBudget,
 				halfLifeDays: memoryConfig.decayHalfLifeDays,
 				getDb: () => getMemoryDb(),
@@ -526,7 +556,7 @@ const plugin: Plugin = async (input) => {
 	}
 
 	const contextInjector = createContextInjector({
-		projectRoot: process.cwd(),
+		projectRoot,
 		totalBudget: 4000,
 	});
 	const compactionHandler = createCompactionHandler(contextInjector);
@@ -548,12 +578,12 @@ const plugin: Plugin = async (input) => {
 		writeSessionLog: async (sessionData) => {
 			if (!sessionData) return;
 			await writeSessionLog({
-				projectRoot: process.cwd(),
+				projectRoot,
 				sessionId: sessionData.sessionId,
 				startedAt: sessionData.startedAt,
 				events: sessionData.events.map((event) =>
 					createForensicEvent({
-						projectRoot: process.cwd(),
+						projectRoot,
 						domain: "session",
 						timestamp: event.timestamp,
 						sessionId: event.sessionId,

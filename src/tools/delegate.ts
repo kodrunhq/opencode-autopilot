@@ -1,16 +1,18 @@
 import type { Database } from "bun:sqlite";
+import { Database as SqliteDatabase } from "bun:sqlite";
 import { join } from "node:path";
 import { tool } from "@opencode-ai/plugin";
 import { BackgroundManager } from "../background/manager";
 import { type BackgroundSdkOperations, createSdkRunner } from "../background/sdk-runner";
 import { loadConfig } from "../config";
 import { openKernelDb } from "../kernel/database";
+import { runKernelMigrations } from "../kernel/migrations";
 import { makeRoutingDecision } from "../routing";
 import { getCategoryDefinition } from "../routing/categories";
 import { buildMultiSkillContext } from "../skills/adaptive-injector";
 import { loadAllSkills } from "../skills/loader";
 import { type Category, CategoryConfigSchema, CategorySchema } from "../types/routing";
-import { getGlobalConfigDir } from "../utils/paths";
+import { getGlobalConfigDir, getProjectArtifactDir } from "../utils/paths";
 
 function buildDisplayText(input: {
 	readonly task: string;
@@ -40,6 +42,7 @@ function buildDisplayText(input: {
 interface DelegateCoreOptions {
 	readonly sessionId?: string;
 	readonly spawn?: boolean;
+	readonly projectRoot?: string;
 }
 
 interface ResolvedRouting {
@@ -99,6 +102,8 @@ function resolveRoutingDecision(
 }
 
 let defaultDelegateManager: BackgroundManager | null = null;
+let defaultDelegateManagerDb: Database | null = null;
+let defaultDelegateManagerCacheKey: string | null = null;
 let delegateSdkOps: BackgroundSdkOperations | null = null;
 let skillCachePromise: Promise<ReadonlyMap<string, import("../skills/loader").LoadedSkill>> | null =
 	null;
@@ -138,15 +143,47 @@ async function buildDelegationSkillContext(skillNames: readonly string[]): Promi
 	}
 }
 
-function getDelegateManager(db?: Database): BackgroundManager {
+function createEphemeralKernelDb(): Database {
+	const db = new SqliteDatabase(":memory:");
+	db.run("PRAGMA foreign_keys=ON");
+	db.run("PRAGMA busy_timeout=5000");
+	db.run("PRAGMA journal_mode=WAL");
+	runKernelMigrations(db);
+	return db;
+}
+
+function openConfiguredDelegateDb(projectRoot: string, persistence: boolean): Database {
+	return persistence ? openKernelDb(getProjectArtifactDir(projectRoot)) : createEphemeralKernelDb();
+}
+
+async function getDelegateManager(
+	projectRoot: string,
+	config: Awaited<ReturnType<typeof loadConfig>>,
+	db?: Database,
+): Promise<BackgroundManager> {
 	if (db) {
 		return new BackgroundManager({ db });
 	}
-	if (defaultDelegateManager) {
+	const persistence = config?.background?.persistence ?? true;
+	const maxConcurrent = config?.background?.maxConcurrent;
+	const usesSdkRunner = delegateSdkOps !== null;
+	const cacheKey = `${projectRoot}:${persistence ? "persistent" : "memory"}:${String(maxConcurrent ?? "default")}:${usesSdkRunner ? "sdk" : "stub"}`;
+
+	if (defaultDelegateManager && defaultDelegateManagerCacheKey === cacheKey) {
 		return defaultDelegateManager;
 	}
+	if (defaultDelegateManager) {
+		await defaultDelegateManager.dispose();
+		defaultDelegateManagerDb?.close();
+	}
 	const runTask = delegateSdkOps ? createSdkRunner(delegateSdkOps) : undefined;
-	defaultDelegateManager = new BackgroundManager({ db: openKernelDb(), runTask });
+	defaultDelegateManagerDb = openConfiguredDelegateDb(projectRoot, persistence);
+	defaultDelegateManager = new BackgroundManager({
+		db: defaultDelegateManagerDb,
+		maxConcurrent,
+		runTask,
+	});
+	defaultDelegateManagerCacheKey = cacheKey;
 	return defaultDelegateManager;
 }
 
@@ -183,14 +220,15 @@ export async function delegateCore(
 		});
 	}
 
-	const shouldSpawn = options?.spawn !== false;
+	const shouldSpawn =
+		options?.spawn !== false && (db !== undefined || config?.background?.enabled !== false);
 	let taskId: string | undefined;
 
 	if (shouldSpawn) {
 		const skillContext = await buildDelegationSkillContext(routing.skills);
 		const enrichedDescription = skillContext ? `${task}${skillContext}` : task;
 
-		const manager = getDelegateManager(db);
+		const manager = await getDelegateManager(options?.projectRoot ?? process.cwd(), config, db);
 		const sessionId = options?.sessionId ?? "delegate-session";
 		taskId = manager.spawn(sessionId, enrichedDescription, {
 			category: routing.category,
@@ -239,6 +277,7 @@ export const ocDelegate = tool({
 	async execute(args, context) {
 		return delegateCore(args.task, args.category, undefined, {
 			sessionId: context.sessionID,
+			projectRoot: context.directory,
 			spawn: args.spawn,
 		});
 	},

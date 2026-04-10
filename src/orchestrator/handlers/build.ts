@@ -226,6 +226,7 @@ export const handleBuild: PhaseHandler = async (
 				state.runId,
 				maxParallel,
 				inProgressTasks.length,
+				initialBranchLifecycle,
 				useWorktrees,
 				projectRoot,
 				state.runId,
@@ -413,6 +414,7 @@ export const handleBuild: PhaseHandler = async (
 				state.runId,
 				maxParallel,
 				inProgressInWave.length,
+				updatedBranchLifecycle,
 			);
 			return mergeDispatchWithLifecycle(dispatchResult, updatedBranchLifecycle);
 		}
@@ -480,6 +482,7 @@ export const handleBuild: PhaseHandler = async (
 		state.runId,
 		maxParallel,
 		inProgressTasks.length,
+		initialBranchLifecycle,
 		useWorktrees,
 		projectRoot,
 		state.runId,
