@@ -1,6 +1,7 @@
 import { BACKGROUND_TASKS_SCHEMA_STATEMENTS } from "../background/schema";
+import { GRAPH_SCHEMA_STATEMENTS } from "../graph/schema";
 
-export const KERNEL_SCHEMA_VERSION = 4;
+export const KERNEL_SCHEMA_VERSION = 5;
 
 export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 	`CREATE TABLE IF NOT EXISTS pipeline_runs (
@@ -126,5 +127,6 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 		state_json TEXT NOT NULL,
 		updated_at TEXT NOT NULL
 	)`,
+	...GRAPH_SCHEMA_STATEMENTS,
 	...BACKGROUND_TASKS_SCHEMA_STATEMENTS,
 ]);

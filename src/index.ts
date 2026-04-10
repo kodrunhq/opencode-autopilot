@@ -80,6 +80,8 @@ import { ocCreateSkill } from "./tools/create-skill";
 import { ocDelegate, setDelegateSdkOperations } from "./tools/delegate";
 import { ocDoctor, setOpenCodeConfig as setDoctorOpenCodeConfig } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
+import { ocGraphIndex } from "./tools/graph-index";
+import { ocGraphQuery } from "./tools/graph-query";
 import { ocHashlineEdit } from "./tools/hashline-edit";
 import { ocLogs } from "./tools/logs";
 import { ocLoop } from "./tools/loop";
@@ -639,6 +641,8 @@ const plugin: Plugin = async (input) => {
 		oc_quick: ocQuick,
 		oc_recover: ocRecover,
 		oc_forensics: ocForensics,
+		oc_graph_index: ocGraphIndex,
+		oc_graph_query: ocGraphQuery,
 		oc_hashline_edit: ocHashlineEdit,
 		oc_review: ocReview,
 		oc_route: ocRoute,

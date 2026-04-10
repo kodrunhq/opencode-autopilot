@@ -1,0 +1,128 @@
+import { Database } from "bun:sqlite";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { indexFile, indexProject } from "../../src/graph/indexer";
+import { GRAPH_SCHEMA_STATEMENTS } from "../../src/graph/schema";
+
+function setupDb(): Database {
+	const db = new Database(":memory:");
+	db.run("PRAGMA foreign_keys=ON");
+	for (const statement of GRAPH_SCHEMA_STATEMENTS) {
+		db.run(statement);
+	}
+	return db;
+}
+
+describe("graph indexer", () => {
+	let db: Database;
+	let tempDir: string;
+
+	beforeEach(async () => {
+		db = setupDb();
+		tempDir = await mkdtemp(join(tmpdir(), `graph-indexer-test-${randomUUID()}-`));
+	});
+
+	afterEach(async () => {
+		db.close();
+		await rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("indexes a TypeScript file", async () => {
+		await writeFile(
+			join(tempDir, "hello.ts"),
+			`export function greet(name: string): string { return "Hello, " + name; }\n`,
+		);
+
+		const result = await indexFile(db, "proj-1", join(tempDir, "hello.ts"), "hello.ts");
+		expect(result.indexed).toBe(true);
+		expect(result.error).toBeUndefined();
+
+		const nodes = db.query("SELECT * FROM graph_nodes WHERE project_id = ?").all("proj-1");
+		expect(nodes.length).toBeGreaterThan(0);
+	});
+
+	test("skips unchanged files on reindex", async () => {
+		await writeFile(join(tempDir, "hello.ts"), `export function greet(): void {}\n`);
+
+		const firstResult = await indexFile(db, "proj-1", join(tempDir, "hello.ts"), "hello.ts");
+		expect(firstResult.indexed).toBe(true);
+
+		const secondResult = await indexFile(db, "proj-1", join(tempDir, "hello.ts"), "hello.ts");
+		expect(secondResult.indexed).toBe(false);
+	});
+
+	test("skips unsupported files", async () => {
+		await writeFile(join(tempDir, "style.css"), ".foo { color: red; }\n");
+
+		const result = await indexFile(db, "proj-1", join(tempDir, "style.css"), "style.css");
+		expect(result.indexed).toBe(false);
+	});
+
+	test("indexProject indexes multiple files", async () => {
+		await mkdir(join(tempDir, "src"), { recursive: true });
+		await writeFile(join(tempDir, "src", "a.ts"), `export function a(): void {}\n`);
+		await writeFile(join(tempDir, "src", "b.ts"), `export class B { method(): void {} }\n`);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["src/a.ts", "src/b.ts"]);
+		expect(result.filesIndexed).toBe(2);
+		expect(result.errors.length).toBe(0);
+	});
+
+	test("indexProject removes deleted files", async () => {
+		await writeFile(join(tempDir, "a.ts"), `export function a(): void {}\n`);
+		await writeFile(join(tempDir, "b.ts"), `export function b(): void {}\n`);
+
+		await indexProject(db, "proj-1", tempDir, ["a.ts", "b.ts"]);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["a.ts"]);
+		expect(result.filesRemoved).toBe(1);
+	});
+
+	test("indexProject resolves relative imports to file nodes", async () => {
+		await mkdir(join(tempDir, "src"), { recursive: true });
+		await writeFile(
+			join(tempDir, "src", "main.ts"),
+			`import { helper } from "./utils";\nexport function run(): void { helper(); }\n`,
+		);
+		await writeFile(join(tempDir, "src", "utils.ts"), `export function helper(): void {}\n`);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["src/main.ts", "src/utils.ts"]);
+		expect(result.errors).toHaveLength(0);
+
+		const imports = db
+			.query(
+				`SELECT e.from_id, e.to_id, target.file_path AS target_path
+				 FROM graph_edges e
+				 INNER JOIN graph_nodes target ON target.id = e.to_id
+				 WHERE e.project_id = ? AND e.type = 'imports'`,
+			)
+			.all("proj-1") as Array<{ from_id: string; to_id: string; target_path: string }>;
+
+		expect(imports).toHaveLength(1);
+		expect(imports[0]?.from_id).toBe("src/main.ts:1:src/main.ts");
+		expect(imports[0]?.to_id).toBe("src/utils.ts:1:src/utils.ts");
+		expect(imports[0]?.target_path).toBe("src/utils.ts");
+	});
+
+	test("indexProject uses index files for module resolution", async () => {
+		await mkdir(join(tempDir, "src", "lib"), { recursive: true });
+		await writeFile(
+			join(tempDir, "src", "main.ts"),
+			`import { helper } from "./lib";\nexport function run(): void { helper(); }\n`,
+		);
+		await writeFile(join(tempDir, "src", "lib", "index.ts"), `export function helper(): void {}\n`);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["src/main.ts", "src/lib/index.ts"]);
+		expect(result.errors).toHaveLength(0);
+
+		const imports = db
+			.query("SELECT to_id FROM graph_edges WHERE project_id = ? AND type = 'imports'")
+			.all("proj-1") as Array<{ to_id: string }>;
+
+		expect(imports).toHaveLength(1);
+		expect(imports[0]?.to_id).toBe("src/lib/index.ts:1:src/lib/index.ts");
+	});
+});
