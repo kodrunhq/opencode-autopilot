@@ -188,4 +188,182 @@ describe("graph repository", () => {
 		expect(files.length).toBe(2);
 		expect(files.map((file) => file.filePath)).toEqual(["src/a.ts", "src/b.ts"]);
 	});
+
+	test("replaceFileGraph resolves implements edges by node name", () => {
+		const interfaceNodes: readonly GraphNode[] = Object.freeze([
+			Object.freeze({
+				id: "src/types.ts:1:src/types.ts",
+				type: "file",
+				name: "src/types.ts",
+				filePath: "src/types.ts",
+				byteStart: 0,
+				byteEnd: 30,
+				lineStart: 1,
+				lineEnd: 1,
+				hash: "types-file",
+			}),
+			Object.freeze({
+				id: "src/types.ts:1:Logger",
+				type: "interface",
+				name: "Logger",
+				filePath: "src/types.ts",
+				byteStart: 0,
+				byteEnd: 20,
+				lineStart: 1,
+				lineEnd: 1,
+				hash: "logger-iface",
+			}),
+		]);
+		const classNodes: readonly GraphNode[] = Object.freeze([
+			Object.freeze({
+				id: "src/service.ts:1:src/service.ts",
+				type: "file",
+				name: "src/service.ts",
+				filePath: "src/service.ts",
+				byteStart: 0,
+				byteEnd: 40,
+				lineStart: 1,
+				lineEnd: 1,
+				hash: "service-file",
+			}),
+			Object.freeze({
+				id: "src/service.ts:1:AppService",
+				type: "class",
+				name: "AppService",
+				filePath: "src/service.ts",
+				byteStart: 0,
+				byteEnd: 25,
+				lineStart: 1,
+				lineEnd: 1,
+				hash: "service-class",
+			}),
+		]);
+
+		replaceFileGraph(db, "proj-1", "src/types.ts", interfaceNodes, [], {
+			mtimeMs: 1000,
+			contentHash: "types",
+			parserVersion: 1,
+			indexSchemaVersion: 1,
+		});
+		replaceFileGraph(
+			db,
+			"proj-1",
+			"src/service.ts",
+			classNodes,
+			[
+				Object.freeze({
+					from: "src/service.ts:1:AppService",
+					to: "Logger",
+					type: "implements",
+				}),
+			],
+			{
+				mtimeMs: 2000,
+				contentHash: "service",
+				parserVersion: 1,
+				indexSchemaVersion: 1,
+			},
+		);
+
+		const edges = db
+			.query("SELECT from_id, to_id, type FROM graph_edges WHERE project_id = ?")
+			.all("proj-1") as Array<{ from_id: string; to_id: string; type: string }>;
+
+		expect(edges).toEqual([
+			{
+				from_id: "src/service.ts:1:AppService",
+				to_id: "src/types.ts:1:Logger",
+				type: "implements",
+			},
+		]);
+	});
+
+	test("replaceFileGraph resolves heritage edges by node name", () => {
+		const nodes: readonly GraphNode[] = Object.freeze([
+			Object.freeze({
+				id: "src/base.ts:1:src/base.ts",
+				type: "file",
+				name: "src/base.ts",
+				filePath: "src/base.ts",
+				byteStart: 0,
+				byteEnd: 30,
+				lineStart: 1,
+				lineEnd: 1,
+				hash: "base-file",
+			}),
+			Object.freeze({
+				id: "src/base.ts:1:BaseService",
+				type: "class",
+				name: "BaseService",
+				filePath: "src/base.ts",
+				byteStart: 0,
+				byteEnd: 20,
+				lineStart: 1,
+				lineEnd: 1,
+				hash: "base-class",
+			}),
+		]);
+		const derivedNodes: readonly GraphNode[] = Object.freeze([
+			Object.freeze({
+				id: "src/derived.ts:1:src/derived.ts",
+				type: "file",
+				name: "src/derived.ts",
+				filePath: "src/derived.ts",
+				byteStart: 0,
+				byteEnd: 40,
+				lineStart: 1,
+				lineEnd: 1,
+				hash: "derived-file",
+			}),
+			Object.freeze({
+				id: "src/derived.ts:1:UserService",
+				type: "class",
+				name: "UserService",
+				filePath: "src/derived.ts",
+				byteStart: 0,
+				byteEnd: 25,
+				lineStart: 1,
+				lineEnd: 1,
+				hash: "derived-class",
+			}),
+		]);
+
+		replaceFileGraph(db, "proj-1", "src/base.ts", nodes, [], {
+			mtimeMs: 1000,
+			contentHash: "base",
+			parserVersion: 1,
+			indexSchemaVersion: 1,
+		});
+		replaceFileGraph(
+			db,
+			"proj-1",
+			"src/derived.ts",
+			derivedNodes,
+			[
+				Object.freeze({
+					from: "src/derived.ts:1:UserService",
+					to: "BaseService",
+					type: "extends",
+				}),
+			],
+			{
+				mtimeMs: 2000,
+				contentHash: "derived",
+				parserVersion: 1,
+				indexSchemaVersion: 1,
+			},
+		);
+
+		const edges = db
+			.query("SELECT from_id, to_id, type FROM graph_edges WHERE project_id = ?")
+			.all("proj-1") as Array<{ from_id: string; to_id: string; type: string }>;
+
+		expect(edges).toEqual([
+			{
+				from_id: "src/derived.ts:1:UserService",
+				to_id: "src/base.ts:1:BaseService",
+				type: "extends",
+			},
+		]);
+	});
 });

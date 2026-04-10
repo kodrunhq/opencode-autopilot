@@ -222,6 +222,9 @@ export function initMemoryDb(database: Database): void {
 		`CREATE INDEX IF NOT EXISTS idx_memories_topic ON memories(topic_group, topic, status)`,
 	);
 	database.run(
+		`CREATE INDEX IF NOT EXISTS idx_memories_source_kind ON memories(source_kind, status)`,
+	);
+	database.run(
 		`CREATE INDEX IF NOT EXISTS idx_memory_evidence_memory ON memory_evidence(memory_id)`,
 	);
 

@@ -158,6 +158,66 @@ describe("memory metadata persistence", () => {
 		expect(results[0]?.topic).toBe("unit");
 	});
 
+	test("searchMemories filters by sourceKind", () => {
+		saveMemory(
+			{
+				kind: "project_fact",
+				content: "Build uses Bun runtime for execution",
+				summary: "Bun build runtime",
+				sourceKind: "curated",
+			},
+			db,
+		);
+
+		saveMemory(
+			{
+				kind: "project_fact",
+				content: "Raw log output from CI build",
+				summary: "CI build log",
+				sourceKind: "raw_attachment",
+			},
+			db,
+		);
+
+		const curatedResults = searchMemories("build", null, 10, db, { sourceKind: "curated" });
+		expect(curatedResults.length).toBe(1);
+		expect(curatedResults[0]?.sourceKind).toBe("curated");
+
+		const rawResults = searchMemories("build", null, 10, db, { sourceKind: "raw_attachment" });
+		expect(rawResults.length).toBe(1);
+		expect(rawResults[0]?.sourceKind).toBe("raw_attachment");
+	});
+
+	test("getActiveMemories filters by sourceKind", () => {
+		saveMemory(
+			{
+				kind: "project_fact",
+				content: "PostgreSQL for primary store",
+				summary: "PostgreSQL primary",
+				sourceKind: "curated",
+			},
+			db,
+		);
+
+		saveMemory(
+			{
+				kind: "project_fact",
+				content: "PostgreSQL raw schema dump attached",
+				summary: "Schema dump",
+				sourceKind: "raw_attachment",
+			},
+			db,
+		);
+
+		const curated = getActiveMemories(null, 10, db, { sourceKind: "curated" });
+		expect(curated.length).toBe(1);
+		expect(curated[0]?.sourceKind).toBe("curated");
+
+		const raw = getActiveMemories(null, 10, db, { sourceKind: "raw_attachment" });
+		expect(raw.length).toBe(1);
+		expect(raw[0]?.sourceKind).toBe("raw_attachment");
+	});
+
 	test("getActiveMemories filters by topicGroup", () => {
 		saveMemory(
 			{

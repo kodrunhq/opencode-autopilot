@@ -127,30 +127,39 @@ function resolveModulePath(
 function rebuildResolvedModuleEdges(
 	db: Database,
 	projectId: string,
-	projectFiles: readonly ParsedProjectFile[],
+	changedFiles: readonly ParsedProjectFile[],
+	allIndexedPaths: ReadonlySet<string>,
 ): void {
+	if (changedFiles.length === 0) {
+		return;
+	}
+
 	db.run("BEGIN");
 
 	try {
-		db.run("DELETE FROM graph_edges WHERE project_id = ? AND type IN ('imports', 'exports')", [
-			projectId,
-		]);
+		const deleteEdgesForFile = db.prepare(
+			"DELETE FROM graph_edges WHERE project_id = ? AND from_id = ? AND type IN ('imports', 'exports')",
+		);
+
+		for (const changedFile of changedFiles) {
+			const sourceFileId = `${changedFile.filePath}:1:${changedFile.filePath}`;
+			deleteEdgesForFile.run(projectId, sourceFileId);
+		}
 
 		const insertEdge = db.prepare(
 			"INSERT OR IGNORE INTO graph_edges (from_id, to_id, type, project_id) VALUES (?, ?, ?, ?)",
 		);
-		const projectFileSet = new Set(projectFiles.map((file) => file.filePath));
 
-		for (const projectFile of projectFiles) {
-			const parsed = parseFile(projectFile.sourceText, projectFile.filePath);
-			const sourceFileId = `${projectFile.filePath}:1:${projectFile.filePath}`;
+		for (const changedFile of changedFiles) {
+			const parsed = parseFile(changedFile.sourceText, changedFile.filePath);
+			const sourceFileId = `${changedFile.filePath}:1:${changedFile.filePath}`;
 
 			for (const edge of parsed.edges) {
 				if (edge.type !== "imports" && edge.type !== "exports") {
 					continue;
 				}
 
-				const resolvedPath = resolveModulePath(projectFile.filePath, edge.to, projectFileSet);
+				const resolvedPath = resolveModulePath(changedFile.filePath, edge.to, allIndexedPaths);
 				if (!resolvedPath) {
 					continue;
 				}
@@ -211,24 +220,25 @@ export async function indexProject(
 	projectId: string,
 	projectRoot: string,
 	filePaths: readonly string[],
-	options?: { readonly force?: boolean },
+	options?: { readonly force?: boolean; readonly cleanupMissing?: boolean },
 ): Promise<IndexResult> {
 	if (options?.force) {
 		clearProjectGraph(db, projectId);
 	}
 
 	const supportedFilePaths = filePaths.filter((filePath) => isGraphSupportedFile(filePath));
-	const indexedProjectFiles: ParsedProjectFile[] = [];
+	const indexedProjectFiles = new Map<string, ParsedProjectFile>();
 	const errors: Array<{ filePath: string; error: string }> = [];
 	let filesIndexed = 0;
 	let filesSkipped = 0;
+	const shouldCleanupMissing = options?.force || options?.cleanupMissing === true;
 
 	for (const relativePath of supportedFilePaths) {
 		const absolutePath = join(projectRoot, relativePath);
 
 		try {
 			const file = await readIndexedFile(absolutePath, relativePath);
-			indexedProjectFiles.push(file);
+			indexedProjectFiles.set(relativePath, file);
 
 			const record = getFileIndexRecord(db, projectId, relativePath);
 			if (!needsReindex(record, file.mtimeMs, file.contentHash)) {
@@ -252,21 +262,28 @@ export async function indexProject(
 		}
 	}
 
-	const indexedFiles = getIndexedFiles(db, projectId);
-	const filePathSet = new Set(filePaths);
 	let filesRemoved = 0;
 
-	for (const record of indexedFiles) {
-		if (filePathSet.has(record.filePath)) {
-			continue;
-		}
+	if (shouldCleanupMissing) {
+		const indexedFiles = getIndexedFiles(db, projectId);
+		const filePathSet = new Set(filePaths);
 
-		removeFileGraph(db, projectId, record.filePath);
-		filesRemoved += 1;
+		for (const record of indexedFiles) {
+			if (filePathSet.has(record.filePath)) {
+				continue;
+			}
+
+			removeFileGraph(db, projectId, record.filePath);
+			indexedProjectFiles.delete(record.filePath);
+			filesRemoved += 1;
+		}
 	}
 
-	if (errors.length === 0) {
-		rebuildResolvedModuleEdges(db, projectId, indexedProjectFiles);
+	if (errors.length === 0 && indexedProjectFiles.size > 0) {
+		const allIndexedPaths = new Set(
+			getIndexedFiles(db, projectId).map((record) => record.filePath),
+		);
+		rebuildResolvedModuleEdges(db, projectId, [...indexedProjectFiles.values()], allIndexedPaths);
 	}
 
 	return Object.freeze({

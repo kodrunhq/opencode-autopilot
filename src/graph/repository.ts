@@ -109,18 +109,35 @@ export function replaceFileGraph(
 		}
 
 		const hasNode = db.prepare("SELECT 1 FROM graph_nodes WHERE id = ? LIMIT 1");
+		const resolveNodeIdByName = db.prepare(
+			"SELECT id FROM graph_nodes WHERE project_id = ? AND name = ? LIMIT 1",
+		);
 		const insertEdge = db.prepare(
 			"INSERT OR IGNORE INTO graph_edges (from_id, to_id, type, project_id) VALUES (?, ?, ?, ?)",
 		);
 
 		for (const edge of edges) {
 			const fromNode = hasNode.get(edge.from) as Record<string, unknown> | null;
-			const toNode = hasNode.get(edge.to) as Record<string, unknown> | null;
-			if (!fromNode || !toNode) {
+			if (!fromNode) {
 				continue;
 			}
 
-			insertEdge.run(edge.from, edge.to, edge.type, projectId);
+			const toNode = hasNode.get(edge.to) as Record<string, unknown> | null;
+			const resolvedTargetId =
+				edge.type === "extends" || edge.type === "implements"
+					? ((toNode ? edge.to : undefined) ??
+						((resolveNodeIdByName.get(projectId, edge.to) as Record<string, unknown> | null)?.id as
+							| string
+							| undefined))
+					: toNode
+						? edge.to
+						: undefined;
+
+			if (!resolvedTargetId) {
+				continue;
+			}
+
+			insertEdge.run(edge.from, resolvedTargetId, edge.type, projectId);
 		}
 
 		db.run("COMMIT");

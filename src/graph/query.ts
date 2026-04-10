@@ -36,10 +36,15 @@ function freezeQueryResult<T>(data: T, staleFiles: readonly string[], fallbackHi
 	const normalizedStaleFiles = Object.freeze([...staleFiles]);
 	return Object.freeze({
 		data,
-		stale: normalizedStaleFiles.length > 0,
+		stale: normalizedStaleFiles.length > 0 || fallbackHint !== null,
 		staleFiles: normalizedStaleFiles,
 		fallbackHint,
 	});
+}
+
+function isProjectIndexed(db: Database, projectId: string): boolean {
+	const row = db.query("SELECT 1 FROM graph_files WHERE project_id = ? LIMIT 1").get(projectId);
+	return row !== null;
 }
 
 /** Check if a specific file's index is stale. */
@@ -101,6 +106,14 @@ export async function findDefinitions(
 	projectRoot: string,
 	name: string,
 ): Promise<GraphQueryResult<readonly SymbolHit[]>> {
+	if (!isProjectIndexed(db, projectId)) {
+		return freezeQueryResult(
+			[] as readonly SymbolHit[],
+			[],
+			"Graph not indexed. Use oc_lsp_symbols, oc_lsp_goto_definition, oc_lsp_find_references, or grep.",
+		);
+	}
+
 	const rows = db
 		.query(
 			`SELECT name, type, file_path, byte_start, byte_end, line_start, line_end
@@ -155,6 +168,14 @@ export async function findImports(
 	projectRoot: string,
 	filePath: string,
 ): Promise<GraphQueryResult<readonly FileEdge[]>> {
+	if (!isProjectIndexed(db, projectId)) {
+		return freezeQueryResult(
+			[] as readonly FileEdge[],
+			[],
+			"Graph not indexed. Use oc_lsp_symbols, oc_lsp_goto_definition, oc_lsp_find_references, or grep.",
+		);
+	}
+
 	const fileId = `${filePath}:1:${filePath}`;
 	const rows = db
 		.query(
@@ -196,6 +217,14 @@ export async function findDependents(
 	projectRoot: string,
 	filePath: string,
 ): Promise<GraphQueryResult<readonly FileEdge[]>> {
+	if (!isProjectIndexed(db, projectId)) {
+		return freezeQueryResult(
+			[] as readonly FileEdge[],
+			[],
+			"Graph not indexed. Use oc_lsp_symbols, oc_lsp_goto_definition, oc_lsp_find_references, or grep.",
+		);
+	}
+
 	const fileId = `${filePath}:1:${filePath}`;
 	const rows = db
 		.query(
@@ -242,6 +271,14 @@ export async function getModuleOutline(
 	projectRoot: string,
 	filePath: string,
 ): Promise<GraphQueryResult<readonly SymbolHit[]>> {
+	if (!isProjectIndexed(db, projectId)) {
+		return freezeQueryResult(
+			[] as readonly SymbolHit[],
+			[],
+			"Graph not indexed. Use oc_lsp_symbols, oc_lsp_goto_definition, oc_lsp_find_references, or grep.",
+		);
+	}
+
 	const rows = db
 		.query(
 			`SELECT name, type, file_path, byte_start, byte_end, line_start, line_end

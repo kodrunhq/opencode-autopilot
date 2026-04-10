@@ -13,6 +13,7 @@ interface MemorySearchArgs {
 	readonly limit?: number;
 	readonly topicGroup?: string;
 	readonly topic?: string;
+	readonly sourceKind?: "curated" | "raw_attachment";
 }
 
 function resolveProjectId(projectRoot: string, db: Database): string | null {
@@ -39,6 +40,7 @@ export function memorySearchCore(
 		const filters: MemorySearchFilters = {
 			topicGroup: args.topicGroup,
 			topic: args.topic,
+			sourceKind: args.sourceKind,
 		};
 
 		const projectId =
@@ -142,6 +144,10 @@ export const ocMemorySearch = tool({
 			.describe("Filter by memory kind"),
 		topicGroup: tool.schema.string().min(1).max(200).optional().describe("Filter by topic group"),
 		topic: tool.schema.string().min(1).max(200).optional().describe("Filter by topic within group"),
+		sourceKind: tool.schema
+			.enum(["curated", "raw_attachment"])
+			.optional()
+			.describe("Filter by source kind: curated (model-selected) or raw_attachment"),
 		scope: tool.schema
 			.enum(["project", "user", "all"])
 			.default("all")

@@ -71,13 +71,30 @@ describe("graph indexer", () => {
 		expect(result.errors.length).toBe(0);
 	});
 
-	test("indexProject removes deleted files", async () => {
+	test("indexProject keeps previously indexed files during incremental reindex", async () => {
 		await writeFile(join(tempDir, "a.ts"), `export function a(): void {}\n`);
 		await writeFile(join(tempDir, "b.ts"), `export function b(): void {}\n`);
 
 		await indexProject(db, "proj-1", tempDir, ["a.ts", "b.ts"]);
 
 		const result = await indexProject(db, "proj-1", tempDir, ["a.ts"]);
+		expect(result.filesRemoved).toBe(0);
+
+		const indexedFiles = db
+			.query("SELECT file_path FROM graph_files WHERE project_id = ? ORDER BY file_path")
+			.all("proj-1") as Array<{ file_path: string }>;
+		expect(indexedFiles.map((file) => file.file_path)).toEqual(["a.ts", "b.ts"]);
+	});
+
+	test("indexProject removes omitted files when cleanupMissing is enabled", async () => {
+		await writeFile(join(tempDir, "a.ts"), `export function a(): void {}\n`);
+		await writeFile(join(tempDir, "b.ts"), `export function b(): void {}\n`);
+
+		await indexProject(db, "proj-1", tempDir, ["a.ts", "b.ts"]);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["a.ts"], {
+			cleanupMissing: true,
+		});
 		expect(result.filesRemoved).toBe(1);
 	});
 
@@ -124,5 +141,34 @@ describe("graph indexer", () => {
 
 		expect(imports).toHaveLength(1);
 		expect(imports[0]?.to_id).toBe("src/lib/index.ts:1:src/lib/index.ts");
+	});
+
+	test("indexProject rebuilds module edges using all indexed files", async () => {
+		await mkdir(join(tempDir, "src"), { recursive: true });
+		await writeFile(
+			join(tempDir, "src", "main.ts"),
+			`import { helper } from "./utils";\nexport function run(): void { helper(); }\n`,
+		);
+		await writeFile(join(tempDir, "src", "utils.ts"), `export function helper(): void {}\n`);
+
+		await indexProject(db, "proj-1", tempDir, ["src/main.ts", "src/utils.ts"]);
+
+		await writeFile(
+			join(tempDir, "src", "main.ts"),
+			`import { helper } from "./utils";\nexport function run(): void { helper(); helper(); }\n`,
+		);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["src/main.ts"]);
+		expect(result.errors).toHaveLength(0);
+
+		const imports = db
+			.query("SELECT from_id, to_id FROM graph_edges WHERE project_id = ? AND type = 'imports'")
+			.all("proj-1") as Array<{ from_id: string; to_id: string }>;
+
+		expect(imports).toHaveLength(1);
+		expect(imports[0]).toEqual({
+			from_id: "src/main.ts:1:src/main.ts",
+			to_id: "src/utils.ts:1:src/utils.ts",
+		});
 	});
 });

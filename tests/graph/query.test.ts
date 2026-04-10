@@ -297,8 +297,71 @@ describe("graph query", () => {
 	});
 
 	test("findDefinitions returns empty for no matches", async () => {
+		// Index a file first so the project is considered indexed.
+		await writeIndexedGraphFile(
+			db,
+			"proj-1",
+			tempDir,
+			"src/existing.ts",
+			"export class Existing {}\n",
+			[
+				Object.freeze({
+					id: "src/existing.ts:1:src/existing.ts",
+					type: "file",
+					name: "src/existing.ts",
+					filePath: "src/existing.ts",
+					byteStart: 0,
+					byteEnd: 26,
+					lineStart: 1,
+					lineEnd: 1,
+					hash: "existing-file-hash",
+				}),
+				Object.freeze({
+					id: "src/existing.ts:1:Existing",
+					type: "class",
+					name: "Existing",
+					filePath: "src/existing.ts",
+					byteStart: 7,
+					byteEnd: 25,
+					lineStart: 1,
+					lineEnd: 1,
+					hash: "existing-class-hash",
+				}),
+			],
+			[],
+		);
+
 		const result = await findDefinitions(db, "proj-1", tempDir, "NonExistent");
 		expect(result.data.length).toBe(0);
 		expect(result.stale).toBe(false);
+		expect(result.fallbackHint).toBeNull();
+	});
+
+	test("findDefinitions returns stale fallback for unindexed project", async () => {
+		const result = await findDefinitions(db, "proj-unindexed", tempDir, "Anything");
+		expect(result.data.length).toBe(0);
+		expect(result.stale).toBe(true);
+		expect(result.fallbackHint).not.toBeNull();
+	});
+
+	test("findImports returns stale fallback for unindexed project", async () => {
+		const result = await findImports(db, "proj-unindexed", tempDir, "src/main.ts");
+		expect(result.data.length).toBe(0);
+		expect(result.stale).toBe(true);
+		expect(result.fallbackHint).not.toBeNull();
+	});
+
+	test("findDependents returns stale fallback for unindexed project", async () => {
+		const result = await findDependents(db, "proj-unindexed", tempDir, "src/utils.ts");
+		expect(result.data.length).toBe(0);
+		expect(result.stale).toBe(true);
+		expect(result.fallbackHint).not.toBeNull();
+	});
+
+	test("getModuleOutline returns stale fallback for unindexed project", async () => {
+		const result = await getModuleOutline(db, "proj-unindexed", tempDir, "src/mod.ts");
+		expect(result.data.length).toBe(0);
+		expect(result.stale).toBe(true);
+		expect(result.fallbackHint).not.toBeNull();
 	});
 });

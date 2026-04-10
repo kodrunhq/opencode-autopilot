@@ -66,6 +66,7 @@ export interface SaveMemoryInput {
 export interface MemorySearchFilters {
 	readonly topicGroup?: string;
 	readonly topic?: string;
+	readonly sourceKind?: "curated" | "raw_attachment";
 }
 
 function resolveDb(db?: Database): Database {
@@ -351,6 +352,7 @@ export function searchMemories(
 	const projectFilter = projectId === null ? "AND m.project_id IS NULL" : "AND m.project_id = ?";
 	const topicGroupFilter = filters?.topicGroup ? "AND m.topic_group = ?" : "";
 	const topicFilter = filters?.topic ? "AND m.topic = ?" : "";
+	const sourceKindFilter = filters?.sourceKind ? "AND m.source_kind = ?" : "";
 	const params: Array<string | number> = [safeFtsQuery];
 	if (projectId !== null) {
 		params.push(projectId);
@@ -360,6 +362,9 @@ export function searchMemories(
 	}
 	if (filters?.topic) {
 		params.push(filters.topic);
+	}
+	if (filters?.sourceKind) {
+		params.push(filters.sourceKind);
 	}
 	params.push(limit);
 
@@ -373,6 +378,7 @@ export function searchMemories(
 			   ${projectFilter}
 			   ${topicGroupFilter}
 			   ${topicFilter}
+			   ${sourceKindFilter}
 			 ORDER BY fts_rank
 			 LIMIT ?`,
 		)
@@ -393,6 +399,7 @@ export function getActiveMemories(
 	const d = resolveDb(db);
 	const topicGroupFilter = filters?.topicGroup ? "AND topic_group = ?" : "";
 	const topicFilter = filters?.topic ? "AND topic = ?" : "";
+	const sourceKindFilter = filters?.sourceKind ? "AND source_kind = ?" : "";
 	const rows = (
 		projectId === null
 			? d
@@ -403,12 +410,14 @@ export function getActiveMemories(
 						   AND project_id IS NULL
 						   ${topicGroupFilter}
 						   ${topicFilter}
+						   ${sourceKindFilter}
 						 ORDER BY last_updated DESC, id DESC
 						 LIMIT ?`,
 					)
 					.all(
 						...(filters?.topicGroup ? [filters.topicGroup] : []),
 						...(filters?.topic ? [filters.topic] : []),
+						...(filters?.sourceKind ? [filters.sourceKind] : []),
 						limit,
 					)
 			: d
@@ -419,6 +428,7 @@ export function getActiveMemories(
 						   AND project_id = ?
 						   ${topicGroupFilter}
 						   ${topicFilter}
+						   ${sourceKindFilter}
 						 ORDER BY last_updated DESC, id DESC
 						 LIMIT ?`,
 					)
@@ -426,6 +436,7 @@ export function getActiveMemories(
 						projectId,
 						...(filters?.topicGroup ? [filters.topicGroup] : []),
 						...(filters?.topic ? [filters.topic] : []),
+						...(filters?.sourceKind ? [filters.sourceKind] : []),
 						limit,
 					)
 	) as MemoryRow[];
