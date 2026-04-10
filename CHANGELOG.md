@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.30.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.29.3...opencode-autopilot-v1.30.0) (2026-04-10)
+
+
+### Features
+
+* implement Oracle ULW verification loop ([7795d4e](https://github.com/kodrunhq/opencode-autopilot/commit/7795d4eacd9aad1c172c7070921d521bdf24576d))
+* implement Oracle ULW verification loop ([1465465](https://github.com/kodrunhq/opencode-autopilot/commit/1465465b546f0f985cdf0fafbe61e2aeb8137400))
+
+
+### Bug Fixes
+
+* address Copilot PR review comments ([cd14e67](https://github.com/kodrunhq/opencode-autopilot/commit/cd14e6736cec45c1b6a81f27ce6a7f5bb1e5a81e))
+
 ## [1.29.3](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.29.2...opencode-autopilot-v1.29.3) (2026-04-10)
 
 
