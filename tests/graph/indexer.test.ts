@@ -213,4 +213,38 @@ describe("graph indexer", () => {
 		expect(bEdges).toHaveLength(1);
 		expect(bEdges[0]?.to_id).toBe("src/c.ts:1:src/c.ts");
 	});
+
+	test("indexProject preserves inbound import edges when target file changes", async () => {
+		await mkdir(join(tempDir, "src"), { recursive: true });
+		await writeFile(
+			join(tempDir, "src", "main.ts"),
+			`import { helper } from "./utils";\nexport function run(): void { helper(); }\n`,
+		);
+		await writeFile(join(tempDir, "src", "utils.ts"), `export function helper(): void {}\n`);
+
+		await indexProject(db, "proj-1", tempDir, ["src/main.ts", "src/utils.ts"]);
+
+		const importsBefore = db
+			.query("SELECT from_id, to_id FROM graph_edges WHERE project_id = ? AND type = 'imports'")
+			.all("proj-1") as Array<{ from_id: string; to_id: string }>;
+		expect(importsBefore).toHaveLength(1);
+		expect(importsBefore[0]?.from_id).toBe("src/main.ts:1:src/main.ts");
+		expect(importsBefore[0]?.to_id).toBe("src/utils.ts:1:src/utils.ts");
+
+		await writeFile(
+			join(tempDir, "src", "utils.ts"),
+			`export function helper(): void { console.log("hi"); }\n`,
+		);
+
+		const result = await indexProject(db, "proj-1", tempDir, ["src/main.ts", "src/utils.ts"]);
+		expect(result.filesIndexed).toBe(1);
+		expect(result.filesSkipped).toBe(1);
+
+		const importsAfter = db
+			.query("SELECT from_id, to_id FROM graph_edges WHERE project_id = ? AND type = 'imports'")
+			.all("proj-1") as Array<{ from_id: string; to_id: string }>;
+		expect(importsAfter).toHaveLength(1);
+		expect(importsAfter[0]?.from_id).toBe("src/main.ts:1:src/main.ts");
+		expect(importsAfter[0]?.to_id).toBe("src/utils.ts:1:src/utils.ts");
+	});
 });

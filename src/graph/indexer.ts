@@ -124,16 +124,60 @@ function resolveModulePath(
 	return null;
 }
 
+function findAffectedImporters(
+	db: Database,
+	projectId: string,
+	changedFilePaths: ReadonlySet<string>,
+): readonly string[] {
+	if (changedFilePaths.size === 0) {
+		return [];
+	}
+
+	const allEdges = db
+		.query(
+			`SELECT e.from_id, source.file_path AS from_path, target.file_path AS to_path
+			 FROM graph_edges e
+			 INNER JOIN graph_nodes source ON source.id = e.from_id
+			 INNER JOIN graph_nodes target ON target.id = e.to_id
+			 WHERE e.project_id = ? AND e.type = 'imports'`,
+		)
+		.all(projectId) as Array<{ from_id: string; from_path: string; to_path: string }>;
+
+	const affectedImporters = new Set<string>();
+	for (const edge of allEdges) {
+		if (changedFilePaths.has(edge.to_path)) {
+			affectedImporters.add(edge.from_path);
+		}
+	}
+
+	return [...affectedImporters];
+}
+
+async function readAffectedImporterFiles(
+	projectRoot: string,
+	importerPaths: readonly string[],
+): Promise<readonly ParsedProjectFile[]> {
+	const files = await Promise.all(
+		importerPaths.map(async (filePath) => {
+			const absolutePath = join(projectRoot, filePath);
+			return readIndexedFile(absolutePath, filePath);
+		}),
+	);
+	return Object.freeze(files);
+}
+
 function rebuildResolvedModuleEdges(
 	db: Database,
 	projectId: string,
 	changedFiles: readonly ParsedProjectFile[],
+	affectedImporters: readonly ParsedProjectFile[],
 	allIndexedPaths: ReadonlySet<string>,
 ): void {
-	if (changedFiles.length === 0) {
+	if (changedFiles.length === 0 && affectedImporters.length === 0) {
 		return;
 	}
 
+	const filesToReResolve = [...changedFiles, ...affectedImporters];
 	db.run("BEGIN");
 
 	try {
@@ -141,8 +185,8 @@ function rebuildResolvedModuleEdges(
 			"DELETE FROM graph_edges WHERE project_id = ? AND from_id = ? AND type IN ('imports', 'exports')",
 		);
 
-		for (const changedFile of changedFiles) {
-			const sourceFileId = `${changedFile.filePath}:1:${changedFile.filePath}`;
+		for (const file of filesToReResolve) {
+			const sourceFileId = `${file.filePath}:1:${file.filePath}`;
 			deleteEdgesForFile.run(projectId, sourceFileId);
 		}
 
@@ -150,16 +194,16 @@ function rebuildResolvedModuleEdges(
 			"INSERT OR IGNORE INTO graph_edges (from_id, to_id, type, project_id) VALUES (?, ?, ?, ?)",
 		);
 
-		for (const changedFile of changedFiles) {
-			const parsed = parseFile(changedFile.sourceText, changedFile.filePath);
-			const sourceFileId = `${changedFile.filePath}:1:${changedFile.filePath}`;
+		for (const file of filesToReResolve) {
+			const parsed = parseFile(file.sourceText, file.filePath);
+			const sourceFileId = `${file.filePath}:1:${file.filePath}`;
 
 			for (const edge of parsed.edges) {
 				if (edge.type !== "imports" && edge.type !== "exports") {
 					continue;
 				}
 
-				const resolvedPath = resolveModulePath(changedFile.filePath, edge.to, allIndexedPaths);
+				const resolvedPath = resolveModulePath(file.filePath, edge.to, allIndexedPaths);
 				if (!resolvedPath) {
 					continue;
 				}
@@ -227,11 +271,13 @@ export async function indexProject(
 	}
 
 	const supportedFilePaths = filePaths.filter((filePath) => isGraphSupportedFile(filePath));
-	const changedFiles: ParsedProjectFile[] = [];
 	const errors: Array<{ filePath: string; error: string }> = [];
 	let filesIndexed = 0;
 	let filesSkipped = 0;
 	const shouldCleanupMissing = options?.force || options?.cleanupMissing === true;
+
+	const needsReindexPaths = new Set<string>();
+	const changedFiles: ParsedProjectFile[] = [];
 
 	for (const relativePath of supportedFilePaths) {
 		const absolutePath = join(projectRoot, relativePath);
@@ -245,18 +291,31 @@ export async function indexProject(
 				continue;
 			}
 
-			const parsed = parseFile(file.sourceText, relativePath);
-			replaceFileGraph(db, projectId, relativePath, parsed.nodes, parsed.edges, {
+			needsReindexPaths.add(relativePath);
+			changedFiles.push(file);
+		} catch (error) {
+			errors.push({
+				filePath: relativePath,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
+	const affectedImporterPaths = findAffectedImporters(db, projectId, needsReindexPaths);
+
+	for (const file of changedFiles) {
+		try {
+			const parsed = parseFile(file.sourceText, file.filePath);
+			replaceFileGraph(db, projectId, file.filePath, parsed.nodes, parsed.edges, {
 				mtimeMs: file.mtimeMs,
 				contentHash: file.contentHash,
 				parserVersion: GRAPH_PARSER_VERSION,
 				indexSchemaVersion: GRAPH_INDEX_SCHEMA_VERSION,
 			});
-			changedFiles.push(file);
 			filesIndexed += 1;
 		} catch (error) {
 			errors.push({
-				filePath: relativePath,
+				filePath: file.filePath,
 				error: error instanceof Error ? error.message : String(error),
 			});
 		}
@@ -282,7 +341,15 @@ export async function indexProject(
 		const allIndexedPaths = new Set(
 			getIndexedFiles(db, projectId).map((record) => record.filePath),
 		);
-		rebuildResolvedModuleEdges(db, projectId, changedFiles, allIndexedPaths);
+		const changedFilePaths = new Set(changedFiles.map((file) => file.filePath));
+		const unaffectedImporterPaths = affectedImporterPaths.filter(
+			(path) => !changedFilePaths.has(path),
+		);
+		const affectedImporterFiles = await readAffectedImporterFiles(
+			projectRoot,
+			unaffectedImporterPaths,
+		);
+		rebuildResolvedModuleEdges(db, projectId, changedFiles, affectedImporterFiles, allIndexedPaths);
 	}
 
 	return Object.freeze({
