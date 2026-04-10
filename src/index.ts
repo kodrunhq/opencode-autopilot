@@ -58,8 +58,8 @@ import {
 	createRecoveryOrchestratorWithDb,
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
-import { AGENT_REGISTRY, ALL_GROUP_IDS } from "./registry/model-groups";
 import { clearIntentSession, resetIntentForUserMessage } from "./routing/intent-gate";
+import { AGENT_REGISTRY, ALL_GROUP_IDS } from "./registry/model-groups";
 import { createAgentSkillInjector } from "./skills/agent-injector";
 import { ocBackground, setBackgroundSdkOperations } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";

@@ -141,7 +141,6 @@ function hasDirectoryName(directories: ReadonlySet<string>, target: string): boo
 
 	return false;
 }
-
 function buildRiskAreas(scan: ScanState): readonly string[] {
 	const riskAreas: string[] = [];
 	const directories = scan.keyDirectories;
@@ -231,6 +230,14 @@ function buildRelevantPatterns(scan: ScanState): readonly string[] {
 
 	if (hasDirectoryName(directories, "docs")) {
 		patterns.push("Documentation lives alongside code changes in docs/.");
+	}
+
+	if (hasDirectoryName(directories, "scripts")) {
+		patterns.push("Automation scripts detected; build/release workflows may have additional dependencies.");
+	}
+
+	if (directories.has(".github")) {
+		patterns.push("Repository configuration includes .github metadata; CI and policy checks are likely important.");
 	}
 
 	if (manifests.has("package.json") || manifests.has("bun.lock") || manifests.has("bun.lockb")) {

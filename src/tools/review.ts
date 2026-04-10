@@ -215,7 +215,6 @@ async function startNewReview(
 			: "";
 
 	const diffEvidence = `${rawDiffEvidence}${changedFilesSummary}`;
-
 	// Build stage 1 prompts with real diff evidence.
 	const agentPrompts = selection.selected.map((agent) => {
 		const prompt = agent.prompt
