@@ -145,6 +145,7 @@ export async function backgroundCore(
 						`Task ID: ${task.id}`,
 						`Status: ${task.status}`,
 						`Description: ${task.description}`,
+						...(task.result ? [`Result: ${task.result}`] : []),
 					]),
 				});
 			}

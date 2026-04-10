@@ -206,7 +206,7 @@ async function startNewReview(
 		scope,
 		options?.directory,
 	);
-	const diffEvidence =
+	const rawDiffEvidence =
 		diffContent.length > 0 ? sanitizeTemplateContent(diffContent) : `[Scope: ${scope}]`;
 
 	const changedFilesSummary =
@@ -214,10 +214,12 @@ async function startNewReview(
 			? `\n\nChanged files (${evidenceFiles.length}):\n${evidenceFiles.map((f) => `- ${f}`).join("\n")}`
 			: "";
 
+	const diffEvidence = `${rawDiffEvidence}${changedFilesSummary}`;
+
 	// Build stage 1 prompts with real diff evidence.
 	const agentPrompts = selection.selected.map((agent) => {
 		const prompt = agent.prompt
-			.replace("{{DIFF}}", `${diffEvidence}${changedFilesSummary}`)
+			.replace("{{DIFF}}", diffEvidence)
 			.replace("{{PRIOR_FINDINGS}}", "No prior findings yet.")
 			.replace("{{MEMORY}}", "");
 		return Object.freeze({ name: agent.name, prompt });
