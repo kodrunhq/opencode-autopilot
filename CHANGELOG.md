@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.31.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.0...opencode-autopilot-v1.31.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* address Oracle and Copilot review feedback ([b76b159](https://github.com/kodrunhq/opencode-autopilot/commit/b76b1591df56ed10fa32da4d581a1417af4eb933))
+* address Oracle verification blocking issues ([14f968d](https://github.com/kodrunhq/opencode-autopilot/commit/14f968daa1541938be33f096a6d7f3ef58afbda3))
+* comprehensive audit remediation - P0/P1 hardening ([6ed8711](https://github.com/kodrunhq/opencode-autopilot/commit/6ed871120e12360c924785ed0cc28821d70372a4))
+* comprehensive audit remediation — P0/P1 hardening ([98fadc4](https://github.com/kodrunhq/opencode-autopilot/commit/98fadc4ab25a940a24f8e7fc8a1adc4942c7905d))
+* include task result in background list displayText ([b89f451](https://github.com/kodrunhq/opencode-autopilot/commit/b89f45160834f6639cc4ec80b88dad8a507c6a5d))
+* persist changedFiles in review state, show result in background status ([32612cb](https://github.com/kodrunhq/opencode-autopilot/commit/32612cb9ac4a69eb2b9b43e97550e6b661c8dbda))
+
 ## [1.31.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.30.0...opencode-autopilot-v1.31.0) (2026-04-10)
 
 
