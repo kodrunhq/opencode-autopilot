@@ -7,11 +7,13 @@ export {
 	loadConfig,
 	memoryConfigSchema,
 	memoryDefaults,
+	migrateV6toV7,
 	orchestratorConfigSchema,
 	orchestratorDefaults,
 	type PluginConfig,
 	pluginConfigSchema,
 	saveConfig,
+	v7ConfigDefaults,
 } from "../config";
 // Re-export migration schemas and functions for backward compatibility
 export {
@@ -26,4 +28,4 @@ export {
 	pluginConfigSchemaV4,
 	pluginConfigSchemaV5,
 } from "./migrations";
-export { migrateV6toV7, type PluginConfigV7, v7ConfigDefaults } from "./v7";
+export type { PluginConfigV7 } from "./v7";
