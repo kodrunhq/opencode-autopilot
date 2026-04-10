@@ -173,7 +173,11 @@ async function getDelegateManager(
 		return defaultDelegateManager;
 	}
 	if (defaultDelegateManager) {
-		await defaultDelegateManager.dispose();
+		try {
+			await defaultDelegateManager.dispose();
+		} catch {
+			// Best-effort disposal: old manager may have running tasks.
+		}
 		defaultDelegateManagerDb?.close();
 	}
 	const runTask = delegateSdkOps ? createSdkRunner(delegateSdkOps) : undefined;

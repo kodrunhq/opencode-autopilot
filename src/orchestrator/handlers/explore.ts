@@ -132,14 +132,24 @@ function isTestPath(path: string): boolean {
 	return /(\/|^)(tests?|__tests__)(\/|$)|\.(test|spec)\./i.test(path);
 }
 
+function hasDirectoryName(directories: ReadonlySet<string>, target: string): boolean {
+	for (const directory of directories) {
+		if (directory === target || directory.split("/").includes(target)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 function buildRiskAreas(scan: ScanState): readonly string[] {
 	const riskAreas: string[] = [];
 	const directories = scan.keyDirectories;
 	const manifests = scan.manifestFiles;
 
 	if (
-		directories.has("migrations") ||
-		directories.has("prisma") ||
+		hasDirectoryName(directories, "migrations") ||
+		hasDirectoryName(directories, "prisma") ||
 		manifests.has("schema.prisma")
 	) {
 		riskAreas.push(
@@ -147,15 +157,15 @@ function buildRiskAreas(scan: ScanState): readonly string[] {
 		);
 	}
 
-	if (directories.has("scripts") || directories.has(".github")) {
+	if (hasDirectoryName(directories, "scripts") || hasDirectoryName(directories, ".github")) {
 		riskAreas.push(
 			"Automation scripts/CI config present — build and release workflows are high-impact change areas.",
 		);
 	}
 
 	if (
-		directories.has("infra") ||
-		directories.has("terraform") ||
+		hasDirectoryName(directories, "infra") ||
+		hasDirectoryName(directories, "terraform") ||
 		manifests.has("docker-compose.yml")
 	) {
 		riskAreas.push(
@@ -211,15 +221,15 @@ function buildRelevantPatterns(scan: ScanState): readonly string[] {
 	const directories = scan.keyDirectories;
 	const manifests = scan.manifestFiles;
 
-	if (directories.has("src")) {
+	if (hasDirectoryName(directories, "src")) {
 		patterns.push("Primary source code is organized under src/.");
 	}
 
-	if (directories.has("tests") || scan.testFiles > 0) {
+	if (hasDirectoryName(directories, "tests") || scan.testFiles > 0) {
 		patterns.push("Tests are present and separated from production code.");
 	}
 
-	if (directories.has("docs")) {
+	if (hasDirectoryName(directories, "docs")) {
 		patterns.push("Documentation lives alongside code changes in docs/.");
 	}
 

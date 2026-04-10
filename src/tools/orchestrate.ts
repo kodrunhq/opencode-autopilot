@@ -1186,7 +1186,10 @@ async function processHandlerResult(
 			}
 
 			// Phase started toast
-			const nextAgent = AGENT_NAMES[nextPhase as keyof typeof AGENT_NAMES] ?? "unknown";
+			const nextAgent =
+				nextPhase === "EXPLORE"
+					? "local analysis"
+					: (AGENT_NAMES[nextPhase as keyof typeof AGENT_NAMES] ?? "unknown");
 			void getNotificationManager()?.info(
 				`Phase ${nextPhase} Started`,
 				`Executing agent ${nextAgent}`,

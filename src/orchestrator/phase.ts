@@ -85,8 +85,8 @@ export function completePhase(state: Readonly<PipelineState>): PipelineState {
 
 /**
  * Skips the current phase (marks it SKIPPED) and advances to the next one.
- * Use when a phase is not needed (e.g., EXPLORE reserved for future use,
- * or CHALLENGE skipped in high-confidence scenarios).
+ * Use when a phase is not needed (e.g., CHALLENGE skipped in
+ * high-confidence scenarios).
  * Returns a new state object (never mutates the input).
  * Throws if currentPhase is null.
  */

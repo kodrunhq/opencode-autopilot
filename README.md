@@ -161,7 +161,7 @@ For detailed guides on every subsystem, see the **[full documentation](docs/READ
 | [Agents](docs/agents.md) | Complete catalog of all agents and model groups |
 | [Code Review](docs/code-review.md) | 13-agent adversarial review pipeline |
 | [Configuration](docs/configuration.md) | v7 configuration schema reference |
-| [Tools Reference](docs/tools-reference.md) | All 39 `oc_*` tools |
+| [Tools Reference](docs/tools-reference.md) | Reference hub for the 39 registered `oc_*` tools |
 | [CLI Reference](docs/cli-reference.md) | `install`, `configure`, `doctor`, and `inspect` commands |
 | [Memory System](docs/memory-system.md) | Dual-scope project and user preference memory |
 | [Model Fallback](docs/model-fallback.md) | Automatic fallback chains and session recovery |
@@ -221,8 +221,8 @@ The installer warns when adversarial pairs share a model family:
 	"categories": {}
   },
   "recovery": {
-    "maxRetries": 3,
-    "strategies": ["retry", "fallback", "checkpoint"]
+    "enabled": true,
+    "maxRetries": 3
   },
   "mcp": {
 	"enabled": false,
@@ -349,8 +349,8 @@ Config lives at `~/.config/opencode/opencode-autopilot.json`. Run `bunx @kodrunh
 | `background.persistence` | `true` / `false` | `true` |
 | `routing.enabled` | `true` / `false` | `false` |
 | `routing.categories` | category override map | `{}` |
-| `recovery.maxRetries` | `1`-`10` | `3` |
-| `recovery.strategies` | array of strategy names | `["retry", "fallback", "checkpoint"]` |
+| `recovery.enabled` | `true` / `false` | `true` |
+| `recovery.maxRetries` | `0`-`10` | `3` |
 | `mcp.enabled` | `true` / `false` | `false` |
 | `mcp.skills` | skill-to-MCP config map | `{}` |
 

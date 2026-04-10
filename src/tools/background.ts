@@ -56,7 +56,11 @@ async function getDefaultManager(projectRoot: string): Promise<BackgroundManager
 	}
 
 	if (defaultManager) {
-		await defaultManager.dispose();
+		try {
+			await defaultManager.dispose();
+		} catch {
+			// Best-effort disposal: old manager may have running tasks.
+		}
 		defaultManagerDb?.close();
 	}
 

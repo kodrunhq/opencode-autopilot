@@ -73,7 +73,7 @@ async function getChangedFiles(
 				args = ["diff", "--name-only"];
 				break;
 			case "branch":
-				args = ["diff-tree", "--no-commit-id", "--name-only", "--root", "-r", "HEAD"];
+				args = ["diff", "--name-only", "HEAD"];
 				break;
 			case "directory":
 				args = directory ? ["diff", "--name-only", "--", directory] : ["diff", "--name-only"];

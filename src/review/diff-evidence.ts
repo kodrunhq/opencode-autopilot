@@ -20,7 +20,7 @@ function getDiffArgs(scope: ReviewScope, directory?: string): string[] {
 		case "unstaged":
 			return ["diff"];
 		case "branch":
-			return ["show", "--format=", "HEAD"];
+			return ["diff", "HEAD"];
 		case "directory":
 			return directory ? ["diff", "HEAD", "--", directory] : ["diff", "HEAD"];
 		case "all":
@@ -35,7 +35,7 @@ function getNameOnlyArgs(scope: ReviewScope, directory?: string): string[] {
 		case "unstaged":
 			return ["diff", "--name-only"];
 		case "branch":
-			return ["show", "--format=", "--name-only", "HEAD"];
+			return ["diff", "--name-only", "HEAD"];
 		case "directory":
 			return directory
 				? ["diff", "HEAD", "--name-only", "--", directory]
@@ -61,12 +61,14 @@ export async function collectDiffEvidence(
 		const { stdout } = await execFileAsync("git", getDiffArgs(scope, directory), {
 			cwd: projectRoot,
 			maxBuffer: 10 * 1024 * 1024,
+			timeout: 30_000,
 		});
 		diff = stdout;
 
 		const { stdout: filesOutput } = await execFileAsync("git", getNameOnlyArgs(scope, directory), {
 			cwd: projectRoot,
 			maxBuffer: 1024 * 1024,
+			timeout: 15_000,
 		});
 		changedFiles = filesOutput.trim().split("\n").filter(Boolean);
 	} catch {
