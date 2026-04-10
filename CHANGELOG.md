@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.29.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.29.1...opencode-autopilot-v1.29.2) (2026-04-10)
+
+
+### Bug Fixes
+
+* harden intent gating and surface real orchestrator progress ([484e41f](https://github.com/kodrunhq/opencode-autopilot/commit/484e41fe76a7eea7ee6ebc925079d9011fe03675))
+* restore audit foundation reliability ([67b9f8c](https://github.com/kodrunhq/opencode-autopilot/commit/67b9f8c018e0dfb655f06b23cd8fd5bcdc1e1813))
+* restore reliable validation and config exports ([443dbcb](https://github.com/kodrunhq/opencode-autopilot/commit/443dbcbc2492a0d8d602697b93cd8357e3bd39f5))
+
 ## [1.29.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.29.0...opencode-autopilot-v1.29.1) (2026-04-09)
 
 
