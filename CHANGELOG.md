@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.31.4](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.3...opencode-autopilot-v1.31.4) (2026-04-11)
+
+
+### Bug Fixes
+
+* implement route tickets and proxy logger for deterministic pipeline authorization ([4b98875](https://github.com/kodrunhq/opencode-autopilot/commit/4b98875ccd2c59b5e6fa3a56cda5fd0690a8c9fc))
+* resolve lint errors for CI ([fec982c](https://github.com/kodrunhq/opencode-autopilot/commit/fec982cade57410e1e5891272dcdd61e17531c52))
+* route tickets and proxy logger for deterministic pipeline authorization ([fd54e7b](https://github.com/kodrunhq/opencode-autopilot/commit/fd54e7bc0babe5cbb322fc0d55571ada4b430f96))
+
 ## [1.31.3](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.2...opencode-autopilot-v1.31.3) (2026-04-11)
 
 
