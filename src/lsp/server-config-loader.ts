@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseJsonc } from "../utils/opencode-config";
 import { getGlobalConfigDir } from "../utils/paths";
 import { BUILTIN_SERVERS } from "./server-definitions";
 import type { LspCapability, ResolvedServer } from "./types";
@@ -24,17 +25,10 @@ interface ServerWithSource extends ResolvedServer {
 	readonly source: ConfigSource;
 }
 
-const blockComments = /\/\*[\s\S]*?\*\//g;
-const lineComments = /^\s*\/\/.*$/gm;
-
-function parseJsonc<T>(content: string): T {
-	return JSON.parse(content.replace(blockComments, "").replace(lineComments, "")) as T;
-}
-
 export function loadJsonFile<T>(filePath: string): T | null {
 	if (!existsSync(filePath)) return null;
 	try {
-		return parseJsonc<T>(readFileSync(filePath, "utf-8"));
+		return parseJsonc(readFileSync(filePath, "utf-8")) as T;
 	} catch {
 		return null;
 	}
@@ -44,11 +38,12 @@ export function getConfigPaths(): Readonly<Record<ConfigSource, string>> {
 	const cwd = process.cwd();
 	const configDir = getGlobalConfigDir();
 	const localOpenCodeDir = join(cwd, ".opencode");
+	// Use .opencode.json (with leading dot) per current OpenCode standard
 	const opencodeCandidates = [
-		join(localOpenCodeDir, "opencode.json"),
-		join(localOpenCodeDir, "opencode.jsonc"),
-		join(configDir, "opencode.json"),
-		join(configDir, "opencode.jsonc"),
+		join(localOpenCodeDir, ".opencode.json"),
+		join(localOpenCodeDir, ".opencode.jsonc"),
+		join(configDir, ".opencode.json"),
+		join(configDir, ".opencode.jsonc"),
 	];
 	const opencode =
 		opencodeCandidates.find((candidate) => existsSync(candidate)) ?? opencodeCandidates[2];

@@ -109,7 +109,7 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 			location = "env-exact";
 		} else if (envConfigDir) {
 			// OPENCODE_CONFIG_DIR env var is set - create in that directory
-			jsonPath = join(envConfigDir, "opencode.json");
+			jsonPath = join(envConfigDir, ".opencode.json");
 			location = "env-dir";
 		} else {
 			// No env vars - use git root or global
@@ -318,12 +318,23 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 
 	const pluginVerification = await verifyPluginLoad();
 	if (pluginVerification.success) {
-		console.log(`  OpenCode can load plugin ${green("✓")}`);
-		if (pluginVerification.details) {
-			console.log(`    ${pluginVerification.details}`);
+		// Check if this is a real verification or just CLI accessibility
+		const isActuallyVerified = !pluginVerification.details?.includes("not verified");
+
+		if (isActuallyVerified) {
+			console.log(`  OpenCode CLI accessible ${green("✓")}`);
+			if (pluginVerification.details) {
+				console.log(`    ${pluginVerification.details}`);
+			}
+		} else {
+			console.log(`  OpenCode CLI accessible ${yellow("⚠")}`);
+			if (pluginVerification.details) {
+				console.log(`    ${pluginVerification.details}`);
+			}
+			// This is a warning, not a failure - plugin may still work
 		}
 	} else {
-		console.log(`  OpenCode can load plugin ${red("✗")}`);
+		console.log(`  OpenCode CLI accessible ${red("✗")}`);
 		console.log(`    ${pluginVerification.message}`);
 		if (pluginVerification.details) {
 			console.log(`    ${pluginVerification.details}`);

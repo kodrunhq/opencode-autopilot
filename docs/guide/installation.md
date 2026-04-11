@@ -64,7 +64,7 @@ fi
 bunx @kodrunhq/opencode-autopilot install
 ```
 
-This registers the plugin in opencode.json and creates a starter config.
+This registers the plugin in .opencode.json and creates a starter config.
 
 ### Step 3: Configure model assignments
 

@@ -42,7 +42,7 @@ The AI walks you through installation, model assignment for each agent group, an
 bunx @kodrunhq/opencode-autopilot install
 ```
 
-This registers the plugin in `opencode.json` and creates a starter config. Then run `bunx @kodrunhq/opencode-autopilot configure` to set up your model assignments.
+This registers the plugin in `.opencode.json` and creates a starter config. Then run `bunx @kodrunhq/opencode-autopilot configure` to set up your model assignments.
 
 ### Option C: Manual setup
 
@@ -54,7 +54,7 @@ This path requires Bun on `PATH`. The published CLI entrypoints use a Bun sheban
 npm install -g @kodrunhq/opencode-autopilot
 ```
 
-**Add to your OpenCode config** (`opencode.json`):
+**Add to your OpenCode config** (`.opencode.json`):
 
 ```json
 {
@@ -115,7 +115,7 @@ curl -fsSL https://github.com/kodrunhq/opencode-autopilot/releases/download/v1.2
    echo 'export { default } from "./opencode-autopilot/src/index";' > ~/.config/opencode/plugins/opencode-autopilot.ts
    ```
 
-Alternatively, add to your `opencode.json` with an absolute path:
+Alternatively, add to your `.opencode.json` with an absolute path:
 
 ```json
 {
@@ -330,7 +330,7 @@ Extend the plugin without leaving OpenCode:
 - **`/oc-new-skill`** -- Create a skill directory with domain knowledge
 - **`/oc-new-command`** -- Create a slash command (validates against built-in names)
 
-All created assets write to `~/.config/opencode/` and are available immediately.
+All created assets write to `~/.config/opencode/` and are available immediately after restarting the OpenCode session.
 
 ## Configuration
 

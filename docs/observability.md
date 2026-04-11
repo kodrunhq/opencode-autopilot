@@ -66,7 +66,7 @@ To prevent unbounded disk usage, the system implements a time-based retention po
 
 ## Health Diagnostics
 
-The `oc_doctor` tool runs a suite of 10 health checks to ensure the plugin is correctly configured and operational.
+The `oc_doctor` tool runs a suite of 11 health checks to ensure the plugin is correctly configured and operational.
 
 1.  **config-validity**: Verifies `opencode-autopilot.json` exists and passes schema validation.
 2.  **agent-injection**: Ensures all 13+ specialized agents are correctly registered in OpenCode.
@@ -78,6 +78,7 @@ The `oc_doctor` tool runs a suite of 10 health checks to ensure the plugin is co
 8.  **config-v7-fields**: Ensures modern configuration fields (background, routing, recovery, MCP) are present.
 9.  **routing-health**: Validates task routing categories and model group assignments.
 10. **mcp-health**: Checks the status of any active MCP (Model Context Protocol) servers.
+11. **lsp-servers**: Validates LSP server configuration and connectivity.
 
 ## Forensic Logging
 

@@ -6,6 +6,7 @@ import {
 	getInstallTargetPath,
 	parseJsonc,
 	resolveOpenCodeConfig,
+	verifyPluginLoad,
 } from "../../src/utils/opencode-config";
 
 describe("opencode-config", () => {
@@ -45,12 +46,36 @@ describe("opencode-config", () => {
 			const result = parseJsonc(jsonc);
 			expect(result).toEqual({ plugin: ["test"], version: 7 });
 		});
+
+		test("preserves commas inside strings", () => {
+			const jsonc = '{"msg": "a,}"}';
+			const result = parseJsonc(jsonc);
+			expect(result).toEqual({ msg: "a,}" });
+		});
+
+		test("preserves comment-like text inside strings", () => {
+			const jsonc = '{"code": "const x = 1; // not a comment"}';
+			const result = parseJsonc(jsonc);
+			expect(result).toEqual({ code: "const x = 1; // not a comment" });
+		});
+
+		test("handles complex nested structure with strings containing special chars", () => {
+			const jsonc = `{
+				"array": ["item,]", "another"],
+				"object": {"key": "value,}"},
+			}`;
+			const result = parseJsonc(jsonc);
+			expect(result).toEqual({
+				array: ["item,]", "another"],
+				object: { key: "value,}" },
+			});
+		});
 	});
 
 	describe("resolveOpenCodeConfig", () => {
 		test("finds project config in cwd", async () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
-			const configPath = join(tempDir, "opencode.json");
+			const configPath = join(tempDir, ".opencode.json");
 			await writeFile(configPath, '{"plugin": ["test"]}');
 
 			const result = await resolveOpenCodeConfig({ cwd: tempDir });
@@ -67,7 +92,7 @@ describe("opencode-config", () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
 			const gitDir = join(tempDir, ".git");
 			await mkdir(gitDir);
-			const configPath = join(tempDir, "opencode.json");
+			const configPath = join(tempDir, ".opencode.json");
 			await writeFile(configPath, '{"plugin": ["test"]}');
 
 			const subDir = join(tempDir, "src", "components");
@@ -82,9 +107,9 @@ describe("opencode-config", () => {
 			await rm(tempDir, { recursive: true, force: true });
 		});
 
-		test("finds opencode.jsonc files", async () => {
+		test("finds .opencode.jsonc files", async () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
-			const configPath = join(tempDir, "opencode.jsonc");
+			const configPath = join(tempDir, ".opencode.jsonc");
 			await writeFile(
 				configPath,
 				`{
@@ -126,7 +151,7 @@ describe("opencode-config", () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
 			const configDir = join(tempDir, "config-dir");
 			await mkdir(configDir);
-			const configPath = join(configDir, "opencode.json");
+			const configPath = join(configDir, ".opencode.json");
 			await writeFile(configPath, '{"plugin": ["dir-config"]}');
 
 			const originalEnv = process.env.OPENCODE_CONFIG_DIR;
@@ -150,7 +175,7 @@ describe("opencode-config", () => {
 			const result = await resolveOpenCodeConfig({ cwd: tempDir });
 
 			expect(result.location).toBe("global");
-			expect(result.path).toContain(".config/opencode/opencode.json");
+			expect(result.path).toContain(".config/opencode/.opencode.json");
 
 			await rm(tempDir, { recursive: true, force: true });
 		});
@@ -165,7 +190,7 @@ describe("opencode-config", () => {
 
 			const result = await getInstallTargetPath(subDir);
 
-			expect(result).toBe(join(tempDir, "opencode.json"));
+			expect(result).toBe(join(tempDir, ".opencode.json"));
 
 			await rm(tempDir, { recursive: true, force: true });
 		});
@@ -175,9 +200,38 @@ describe("opencode-config", () => {
 
 			const result = await getInstallTargetPath(tempDir);
 
-			expect(result).toContain(".config/opencode/opencode.json");
+			expect(result).toContain(".config/opencode/.opencode.json");
 
 			await rm(tempDir, { recursive: true, force: true });
+		});
+	});
+
+	describe("verifyPluginLoad", () => {
+		test("returns success when opencode CLI is accessible", async () => {
+			const result = await verifyPluginLoad();
+
+			// In CI/test environments without opencode, this will fail
+			// but we're testing the function structure, not requiring opencode to exist
+			expect(result).toHaveProperty("success");
+			expect(result).toHaveProperty("message");
+			expect(typeof result.success).toBe("boolean");
+			expect(typeof result.message).toBe("string");
+		});
+
+		test("returns honest message about verification limitations when successful", async () => {
+			const result = await verifyPluginLoad();
+
+			// The key requirement: message should NOT claim plugin loads successfully
+			// when we can only verify CLI accessibility
+			expect(result.message).not.toContain("plugin loads");
+			expect(result.message).not.toContain("working");
+
+			// Should mention CLI accessibility
+			if (result.success) {
+				expect(result.message.toLowerCase()).toContain("cli");
+				expect(result.details).toBeDefined();
+				expect(result.details).toContain("not verified");
+			}
 		});
 	});
 });

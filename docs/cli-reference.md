@@ -26,8 +26,8 @@ The `install` command sets up the plugin for use with OpenCode.
 
 **What it does:**
 *   Checks if the OpenCode CLI is installed on your system.
-*   Resolves OpenCode configuration following OpenCode's rules: checks `OPENCODE_CONFIG` env var, `OPENCODE_CONFIG_DIR` env var, project config (walking up from cwd to git root), then global config at `~/.config/opencode/opencode.json`.
-*   Creates a new `opencode.json` at the appropriate location if no config exists (at git root if in a repo, otherwise in global config).
+*   Resolves OpenCode configuration following OpenCode's rules: checks `OPENCODE_CONFIG` env var, `OPENCODE_CONFIG_DIR` env var, project config (walking up from cwd to git root), then global config at `~/.config/opencode/.opencode.json`.
+*   Creates a new `.opencode.json` at the appropriate location if no config exists (at git root if in a repo, otherwise in global config).
 *   Supports both JSON and JSONC (JSON with Comments) formats.
 *   Registers `@kodrunhq/opencode-autopilot` in the `plugin` array.
 *   Creates a starter configuration file at `~/.config/opencode/opencode-autopilot.json` if it does not exist.
@@ -61,7 +61,7 @@ The `doctor` command runs a suite of health diagnostics to ensure the plugin is 
 
 **What it does:**
 *   **System Checks**: Verifies OpenCode installation, plugin registration in OpenCode config (respecting `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, project config, and global config), and configuration file health.
-*   **Plugin Load Verification**: Attempts to verify that OpenCode can actually load the plugin (catches missing dependencies).
+*   **Plugin Load Verification**: Verifies OpenCode CLI accessibility (note: due to OpenCode architecture, actual plugin loading can only be verified by starting a TUI session).
 *   **Model Assignments**: Lists the primary and fallback models assigned to each agent group.
 *   **Adversarial Diversity**: Checks if adversarial pairs, like Architects and Challengers, use different model families to avoid confirmation bias.
 *   **Suggestions**: Provides actionable steps to fix any identified issues.

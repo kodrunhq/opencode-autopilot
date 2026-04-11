@@ -45,7 +45,7 @@ The fallback system classifies errors into the following types:
 
 Fallback chains are resolved using a two-tier hierarchy:
 
-1. **Per-Agent Overrides**: Defined in `opencode.json` under the agent's `fallback_models` field.
+1. **Per-Agent Overrides**: Defined in `.opencode.json` under the agent's `fallback_models` field.
 2. **Global Fallbacks**: Defined in the plugin configuration under `groups` or global `fallback_models`.
 
 The system normalizes these into a prioritized list of models for the fallback manager to iterate through.
