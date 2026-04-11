@@ -1,4 +1,6 @@
+import { Database as SqliteDatabase } from "bun:sqlite";
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import {
 	formatEvents,
 	formatLessons,
@@ -87,7 +89,23 @@ export async function inspectCliCore(
 			};
 		}
 
-		return { dbInput: globalDbPath, dbScope: "global (no project kernel.db found)" };
+		if (gitRoot) {
+			return { dbInput: globalDbPath, dbScope: "project (using global DB — no local kernel.db)" };
+		}
+
+		return { dbInput: globalDbPath, dbScope: "global" };
+	}
+
+	if (!parsed.help && parsed.error === null && parsed.view === null && parsed.pruneEphemeral) {
+		const pruneDbPath = options.dbPath ?? globalDbPath;
+		const pruned = pruneEphemeralProjects(pruneDbPath);
+		return makeOutput(
+			{ action: "prune_ephemeral", pruned, dbPath: pruneDbPath },
+			parsed.json,
+			parsed.json
+				? JSON.stringify({ action: "prune_ephemeral", pruned, dbPath: pruneDbPath }, null, 2)
+				: `Pruned ${pruned} ephemeral project records from ${pruneDbPath}`,
+		);
 	}
 
 	const verbose = parsed.verbose;
@@ -222,32 +240,56 @@ function resolveGitRoot(): string | null {
 	}
 }
 
+const EPHEMERAL_TEST_PREFIXES = Object.freeze([
+	"forensics-project-",
+	"review-tool-",
+	"lesson-test-",
+	"log-writer-",
+	"session-logs-",
+	"orchestrate-tool-test-",
+	"report-test-",
+	"stats-test-",
+	"replay-a-",
+	"cli-inspect-",
+	"kernel-test-",
+	"route-test-",
+	"memory-test-",
+	"inspect-scope-",
+	"lifecycle-test-",
+]);
+
 function isEphemeralPath(path: string): boolean {
 	if (path.startsWith("/var/folders/")) return true;
-	if (process.env.TMPDIR && path.startsWith(process.env.TMPDIR)) return true;
 	const segments = path.split("/");
 	const tmpIdx = segments.indexOf("tmp");
-	if (tmpIdx !== -1) {
-		const afterTmp = segments.slice(tmpIdx + 1).join("/");
-		if (afterTmp.length === 0) return false;
-		const ephemeralPrefixes = [
-			"forensics-project-",
-			"review-tool-",
-			"lesson-test-",
-			"log-writer-",
-			"session-logs-",
-			"orchestrate-tool-test-",
-			"report-test-",
-			"stats-test-",
-			"replay-a-",
-			"cli-inspect-",
-			"kernel-test-",
-			"route-test-",
-			"memory-test-",
-		];
-		for (const prefix of ephemeralPrefixes) {
-			if (afterTmp.startsWith(prefix)) return true;
-		}
+	if (tmpIdx === -1) return false;
+	const afterTmp = segments.slice(tmpIdx + 1).join("/");
+	if (afterTmp.length === 0) return false;
+	for (const prefix of EPHEMERAL_TEST_PREFIXES) {
+		if (afterTmp.startsWith(prefix)) return true;
 	}
 	return false;
+}
+
+function pruneEphemeralProjects(dbPath: string): number {
+	if (!existsSync(dbPath)) return 0;
+	const db = new SqliteDatabase(dbPath);
+	try {
+		const projects = db.query("SELECT id, path FROM projects").all() as Array<{
+			id: string;
+			path: string;
+		}>;
+		let count = 0;
+		for (const project of projects) {
+			if (isEphemeralPath(project.path)) {
+				db.run("DELETE FROM project_paths WHERE project_id = ?", [project.id]);
+				db.run("DELETE FROM project_git_fingerprints WHERE project_id = ?", [project.id]);
+				db.run("DELETE FROM projects WHERE id = ?", [project.id]);
+				count++;
+			}
+		}
+		return count;
+	} finally {
+		db.close();
+	}
 }
