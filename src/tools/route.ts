@@ -1,10 +1,13 @@
 import { tool } from "@opencode-ai/plugin";
+import { openKernelDb } from "../kernel/database";
+import { createRouteTicketRepository } from "../routing/route-ticket-repository";
 import {
 	getIntentRouting,
 	IntentClassificationSchema,
 	type IntentType,
 	IntentTypeSchema,
 } from "../routing/intent-types";
+import { getProjectArtifactDir } from "../utils/paths";
 
 function buildInstruction(
 	_intent: IntentType,
@@ -25,12 +28,21 @@ function buildSecondaryInstruction(
 	return `After completing the primary intent, follow up with: ${secondaryRouting.behavior} (via ${secondaryRouting.targetAgent})${intentHint}`;
 }
 
-export function routeCore(args: {
-	readonly primaryIntent: string;
-	readonly secondaryIntent?: string;
-	readonly reasoning: string;
-	readonly verbalization: string;
-}): string {
+interface RouteCoreContext {
+	sessionId: string;
+	messageId: string;
+	projectRoot: string;
+}
+
+export function routeCore(
+	args: {
+		readonly primaryIntent: string;
+		readonly secondaryIntent?: string;
+		readonly reasoning: string;
+		readonly verbalization: string;
+	},
+	context?: RouteCoreContext,
+): string {
 	const parsedPrimary = IntentTypeSchema.safeParse(args.primaryIntent);
 	if (!parsedPrimary.success) {
 		return JSON.stringify({
@@ -78,6 +90,36 @@ export function routeCore(args: {
 		instruction,
 	};
 
+	// Issue route ticket for pipeline-start authorization
+	if (context && routing.usePipeline && primary === "implementation") {
+		try {
+			const db = openKernelDb(context.projectRoot);
+			const repo = createRouteTicketRepository(db);
+
+			const ticket = repo.createTicket({
+				projectId: context.projectRoot,
+				sessionId: context.sessionId,
+				messageId: context.messageId,
+				intent: primary,
+				usePipeline: true,
+				metadata: {
+					reasoning: classification.data.reasoning,
+					verbalization: classification.data.verbalization,
+				},
+				ttlMinutes: 10,
+			});
+
+			db.close();
+
+			result.routeToken = ticket.routeToken;
+			result.routeTokenMode = "single_use";
+			result.routeTokenExpiresAt = ticket.expiresAt;
+		} catch {
+			// Ticket creation is best-effort; don't block routing if it fails
+			// The intent gate will still work via the legacy path
+		}
+	}
+
 	if (classification.data.secondaryIntent) {
 		const secondary = classification.data.secondaryIntent;
 		const secondaryRouting = getIntentRouting(secondary);
@@ -116,14 +158,21 @@ export const ocRoute = tool({
 				"Human-readable intent statement, e.g. 'I detect research intent — user asked how X works'",
 			),
 	},
-	execute(args) {
+	execute(args, context) {
 		return Promise.resolve(
-			routeCore({
-				primaryIntent: args.primaryIntent,
-				secondaryIntent: args.secondaryIntent,
-				reasoning: args.reasoning,
-				verbalization: args.verbalization,
-			}),
+			routeCore(
+				{
+					primaryIntent: args.primaryIntent,
+					secondaryIntent: args.secondaryIntent,
+					reasoning: args.reasoning,
+					verbalization: args.verbalization,
+				},
+				{
+					sessionId: context.sessionID,
+					messageId: context.messageID,
+					projectRoot: context.worktree ?? context.directory ?? process.cwd(),
+				},
+			),
 		);
 	},
 });
