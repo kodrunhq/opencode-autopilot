@@ -164,4 +164,60 @@ describe("CLI inspect scope", () => {
 		expect(result.output).toContain("real-project");
 		expect(result.output).toContain("forensics-project-abc");
 	});
+
+	test("hides macOS ephemeral test projects under /var/folders/.../T/", async () => {
+		const dbPath = getAutopilotDbPath(tempDir);
+		const db = openInitializedDb(dbPath);
+
+		try {
+			registerProject(
+				db,
+				"/var/folders/xx/xxxxxxxxxxx/T/forensics-project-abc",
+				"project-macos-ephemeral",
+			);
+			registerProject(db, "/var/folders/xx/xxxxxxxxxxx/T/real-project", "project-macos-real");
+		} finally {
+			db.close();
+		}
+
+		// prune-ephemeral exercises isEphemeralPath() directly
+		const result = await inspectCliCore(["--prune-ephemeral", "--json"], { dbPath });
+		const parsed = JSON.parse(result.output) as {
+			action: string;
+			pruned: number;
+		};
+
+		expect(result.isError).toBe(false);
+		expect(parsed.action).toBe("prune_ephemeral");
+		expect(parsed.pruned).toBe(1);
+
+		// Verify the remaining project is the non-ephemeral one
+		const remaining = await inspectCliCore(["projects"], { dbPath });
+		expect(remaining.output).not.toContain("forensics-project-abc");
+		expect(remaining.output).toContain("real-project");
+	});
+
+	test("prune-ephemeral without view returns prune result, not help", async () => {
+		const dbPath = getAutopilotDbPath(tempDir);
+		const db = openInitializedDb(dbPath);
+
+		try {
+			registerProject(db, "/tmp/forensics-project-old", "project-to-prune");
+			registerProject(db, "/home/user/keep-project", "project-keep");
+		} finally {
+			db.close();
+		}
+
+		const result = await inspectCliCore(["--prune-ephemeral", "--json"], { dbPath });
+		const parsed = JSON.parse(result.output) as {
+			action: string;
+			pruned: number;
+			dbPath: string;
+		};
+
+		expect(result.isError).toBe(false);
+		expect(parsed.action).toBe("prune_ephemeral");
+		expect(parsed.pruned).toBe(1);
+		expect(parsed.dbPath).toBe(dbPath);
+	});
 });

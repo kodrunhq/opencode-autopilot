@@ -281,9 +281,11 @@ const EPHEMERAL_TEST_PREFIXES = Object.freeze([
 	"lifecycle-test-",
 ]);
 
+const TEMP_DIR_NAMES = Object.freeze(["tmp", "T"]);
+
 function isEphemeralPath(path: string): boolean {
 	const segments = path.split("/");
-	const tmpIdx = segments.indexOf("tmp");
+	const tmpIdx = segments.findIndex((s) => (TEMP_DIR_NAMES as readonly string[]).includes(s));
 	if (tmpIdx === -1) return false;
 	const afterTmp = segments.slice(tmpIdx + 1).join("/");
 	if (afterTmp.length === 0) return false;
