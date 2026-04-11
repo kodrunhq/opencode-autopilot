@@ -82,9 +82,7 @@ export function createRouteTicketRepository(db: Database) {
 	}
 
 	function getTicketByToken(routeToken: string): RouteTicket | null {
-		const row = db
-			.query(selectRawTicket)
-			.get(routeToken) as RawRouteTicket | null;
+		const row = db.query(selectRawTicket).get(routeToken) as RawRouteTicket | null;
 		return row ? parseTicket(row) : null;
 	}
 

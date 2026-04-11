@@ -58,7 +58,6 @@ import {
 	createRecoveryOrchestratorWithDb,
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
-import { clearIntentSession, resetIntentForUserMessage } from "./routing/intent-gate";
 import { AGENT_REGISTRY, ALL_GROUP_IDS } from "./registry/model-groups";
 import { createAgentSkillInjector } from "./skills/agent-injector";
 import { ocBackground, setBackgroundSdkOperations } from "./tools/background";
@@ -777,20 +776,20 @@ const plugin: Plugin = async (input) => {
 				await chatMessageHandler(hookInput, output);
 			}
 		},
-			"tool.execute.before": async (
-				input: { tool: string; sessionID: string; callID: string },
-				output: { args: unknown },
-			) => {
-				obsToolBeforeHandler({ ...input, args: output.args });
-				const hashAnchoredResult = hashAnchoredEnforcementHandler(
-					{ ...input, args: output.args },
-					output,
-				);
-				if (hashAnchoredResult.args !== output.args) {
-					output.args = hashAnchoredResult.args;
-					}
-				},
-			"tool.execute.after": async (
+		"tool.execute.before": async (
+			input: { tool: string; sessionID: string; callID: string },
+			output: { args: unknown },
+		) => {
+			obsToolBeforeHandler({ ...input, args: output.args });
+			const hashAnchoredResult = hashAnchoredEnforcementHandler(
+				{ ...input, args: output.args },
+				output,
+			);
+			if (hashAnchoredResult.args !== output.args) {
+				output.args = hashAnchoredResult.args;
+			}
+		},
+		"tool.execute.after": async (
 			hookInput: {
 				readonly tool: string;
 				readonly sessionID: string;

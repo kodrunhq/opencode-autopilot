@@ -41,11 +41,11 @@ import {
 	updatePersistedState,
 } from "../orchestrator/state";
 import type { Phase, PipelineState } from "../orchestrator/types";
+import { resolveProjectIdentitySync } from "../projects/resolve";
 import { getIntentRouting, type IntentType, IntentTypeSchema } from "../routing/intent-types";
 import { createRouteTicketRepository } from "../routing/route-ticket-repository";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
-import { resolveProjectIdentitySync } from "../projects/resolve";
 import {
 	getGlobalConfigDir,
 	getProjectArtifactDir,
@@ -1283,11 +1283,11 @@ export async function orchestrateCore(
 						});
 						await db.close();
 						if (!validationResult.valid) {
-								return JSON.stringify({
-									action: "error",
-									code: mapRouteTokenValidationError(validationResult.reason),
-									message: `Invalid or expired route token: ${validationResult.reason}. Call oc_route first to obtain a valid route token, then pass it to oc_orchestrate.`,
-								});
+							return JSON.stringify({
+								action: "error",
+								code: mapRouteTokenValidationError(validationResult.reason),
+								message: `Invalid or expired route token: ${validationResult.reason}. Call oc_route first to obtain a valid route token, then pass it to oc_orchestrate.`,
+							});
 						}
 					} catch {
 						// Database/project setup may not exist in all contexts
