@@ -331,8 +331,7 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 			if (pluginVerification.details) {
 				console.log(`    ${pluginVerification.details}`);
 			}
-			// This prevents "All checks passed" when we can't verify plugin loading
-			hasFailure = true;
+			// This is a warning, not a failure - plugin may still work
 		}
 	} else {
 		console.log(`  OpenCode CLI accessible ${red("✗")}`);

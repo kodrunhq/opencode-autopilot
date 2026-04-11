@@ -208,6 +208,6 @@ cat <<EOF
 The plugin is auto-discoverable via the shim at:
   ${SHIM_PATH}
 
-Alternatively, add to your opencode.json:
+Alternatively, add to your .opencode.json:
   { "plugin": ["file://${INSTALL_DIR}/src/index.ts"] }
 EOF
