@@ -7,7 +7,7 @@ import {
 } from "../orchestrator/phase";
 import { phaseSchema } from "../orchestrator/schemas";
 import { loadState, saveState, updatePersistedState } from "../orchestrator/state";
-import { getProjectArtifactDir } from "../utils/paths";
+import { resolveProjectContext } from "../utils/project-context";
 
 interface PhaseArgs {
 	readonly subcommand: string;
@@ -107,7 +107,11 @@ export const ocPhase = tool({
 		from: tool.schema.string().optional().describe("Source phase for validate subcommand"),
 		to: tool.schema.string().optional().describe("Target phase for validate subcommand"),
 	},
-	async execute(args) {
-		return phaseCore(args, getProjectArtifactDir(process.cwd()));
+	async execute(args, context) {
+		const projectContext = resolveProjectContext({
+			directory: context.directory,
+			worktree: context.worktree,
+		});
+		return phaseCore(args, projectContext.artifactDir);
 	},
 });

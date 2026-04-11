@@ -1,6 +1,6 @@
 import { tool } from "@opencode-ai/plugin";
 import { appendDecision, loadState, patchState, saveState } from "../orchestrator/state";
-import { getProjectArtifactDir } from "../utils/paths";
+import { resolveProjectContext } from "../utils/project-context";
 
 const PATCHABLE_FIELDS = ["status", "arenaConfidence", "exploreTriggered"] as const;
 
@@ -106,7 +106,11 @@ export const ocState = tool({
 		decision: tool.schema.string().optional().describe("Decision text for append-decision"),
 		rationale: tool.schema.string().optional().describe("Rationale text for append-decision"),
 	},
-	async execute(args) {
-		return stateCore(args, getProjectArtifactDir(process.cwd()));
+	async execute(args, context) {
+		const projectContext = resolveProjectContext({
+			directory: context.directory,
+			worktree: context.worktree,
+		});
+		return stateCore(args, projectContext.artifactDir);
 	},
 });

@@ -1,7 +1,26 @@
 import { BACKGROUND_TASKS_SCHEMA_STATEMENTS } from "../background/schema";
 import { GRAPH_SCHEMA_STATEMENTS } from "../graph/schema";
 
-export const KERNEL_SCHEMA_VERSION = 5;
+export const KERNEL_SCHEMA_VERSION = 6;
+
+export const ROUTE_TICKETS_SCHEMA = Object.freeze([
+	`CREATE TABLE IF NOT EXISTS route_tickets (
+		route_token TEXT PRIMARY KEY,
+		project_id TEXT NOT NULL,
+		session_id TEXT NOT NULL,
+		message_id TEXT NOT NULL,
+		intent TEXT NOT NULL,
+		use_pipeline INTEGER NOT NULL,
+		issued_at TEXT NOT NULL,
+		expires_at TEXT NOT NULL,
+		consumed_at TEXT,
+		metadata_json TEXT NOT NULL,
+		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_route_tickets_session_message ON route_tickets(session_id, message_id, issued_at DESC)`,
+	`CREATE INDEX IF NOT EXISTS idx_route_tickets_project ON route_tickets(project_id, issued_at DESC)`,
+	`CREATE INDEX IF NOT EXISTS idx_route_tickets_unconsumed ON route_tickets(consumed_at, expires_at)`,
+]);
 
 export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 	`CREATE TABLE IF NOT EXISTS pipeline_runs (
@@ -127,6 +146,7 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 		state_json TEXT NOT NULL,
 		updated_at TEXT NOT NULL
 	)`,
+	...ROUTE_TICKETS_SCHEMA,
 	...GRAPH_SCHEMA_STATEMENTS,
 	...BACKGROUND_TASKS_SCHEMA_STATEMENTS,
 ]);
