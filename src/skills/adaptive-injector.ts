@@ -104,9 +104,11 @@ export async function detectProjectStackTags(projectRoot: string): Promise<reado
 		entries = new Set(await readdir(projectRoot));
 	} catch (error: unknown) {
 		if (!isEnoentError(error)) {
-			console.error(
-				"[adaptive-injector] readdir failed for project root, skipping stack detection:",
-				error instanceof Error ? error.message : String(error),
+			getLogger("skills", "adaptive-injector").warn(
+				"readdir failed for project root, skipping stack detection",
+				{
+					error: error instanceof Error ? error.message : String(error),
+				},
 			);
 		}
 		return [];

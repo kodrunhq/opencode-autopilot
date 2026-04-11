@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { getAutopilotDbPath } from "../utils/paths";
+import { getAutopilotDbPath, getProjectArtifactDir } from "../utils/paths";
 import { runKernelMigrations } from "./migrations";
 
 export const KERNEL_DB_FILE = "kernel.db";
@@ -38,4 +38,17 @@ export function openKernelDb(
 	}
 
 	return database;
+}
+
+/**
+ * Open the project-scoped kernel database at `<repo>/.opencode-autopilot/kernel.db`.
+ * This is the ONLY valid way to open a kernel DB for project-scoped operations.
+ * Never pass projectRoot directly into openKernelDb().
+ */
+export function openProjectKernelDb(
+	projectRoot: string,
+	options?: { readonly?: boolean },
+): Database {
+	const artifactDir = getProjectArtifactDir(projectRoot);
+	return openKernelDb(artifactDir, options);
 }

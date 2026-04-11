@@ -19,6 +19,8 @@ export interface ParsedInspectArgs {
 	readonly type: string | null;
 	readonly help: boolean;
 	readonly error: string | null;
+	readonly global: boolean;
+	readonly pruneEphemeral: boolean;
 }
 
 const INSPECT_VIEWS: readonly InspectView[] = Object.freeze([
@@ -52,6 +54,8 @@ export function inspectUsage(): string {
 		"",
 		"Options:",
 		"  --project <ref>              Project id, path, or unique name",
+		"  --global                     Use global database (default: current project)",
+		"  --prune-ephemeral            Remove ephemeral test/temp project records from DB",
 		"  --run-id <id>                Filter events by run id",
 		"  --session-id <id>            Filter events by session id",
 		"  --type <type>                Filter events by type",
@@ -81,6 +85,8 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 	let type: string | null = null;
 	let help = false;
 	let error: string | null = null;
+	let global = false;
+	let pruneEphemeral = false;
 
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -94,6 +100,14 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 		}
 		if (arg === "--verbose") {
 			verbose = true;
+			continue;
+		}
+		if (arg === "--global") {
+			global = true;
+			continue;
+		}
+		if (arg === "--prune-ephemeral") {
+			pruneEphemeral = true;
 			continue;
 		}
 		if (arg === "--project") {
@@ -161,7 +175,7 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 		break;
 	}
 
-	if (!help && error === null && view === null) {
+	if (!help && error === null && view === null && !pruneEphemeral) {
 		help = true;
 	}
 	if (
@@ -172,5 +186,18 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 		error = `${view} view requires --project <ref> or a positional project reference.`;
 	}
 
-	return { view, json, verbose, projectRef, limit, runId, sessionId, type, help, error };
+	return {
+		view,
+		json,
+		verbose,
+		projectRef,
+		limit,
+		runId,
+		sessionId,
+		type,
+		help,
+		error,
+		global,
+		pruneEphemeral,
+	};
 }

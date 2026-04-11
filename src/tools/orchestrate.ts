@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { tool } from "@opencode-ai/plugin";
 import { loadConfig } from "../config";
-import { openKernelDb } from "../kernel/database";
+import { type openKernelDb, openProjectKernelDb } from "../kernel/database";
 import { getLogger } from "../logging/domains";
 import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
@@ -1273,12 +1273,11 @@ export async function orchestrateCore(
 				if (context.projectRoot) {
 					let db: ReturnType<typeof openKernelDb> | null = null;
 					try {
-						db = await openKernelDb(context.projectRoot);
+						db = openProjectKernelDb(context.projectRoot);
 						const routeTicketRepo = createRouteTicketRepository(db);
 						const project = resolveProjectIdentitySync(context.projectRoot, { db });
 						const validationResult = routeTicketRepo.validateAndConsumeTicket(args.routeToken, {
 							sessionId: context.sessionId,
-							messageId: context.messageId ?? "",
 							projectId: project.id,
 							intent: args.intent ?? "implementation",
 						});
@@ -1289,10 +1288,13 @@ export async function orchestrateCore(
 								message: `Invalid or expired route token: ${validationResult.reason}. Call oc_route first to obtain a valid route token, then pass it to oc_orchestrate.`,
 							});
 						}
-					} catch {
-						// Database/project setup may not exist in all contexts
-						// For now, allow the pipeline to proceed if we can't validate
-						// This maintains backward compatibility while enabling validation where supported
+					} catch (validationError) {
+						db?.close();
+						return JSON.stringify({
+							action: "error",
+							code: "E_ROUTE_TOKEN_VALIDATION_FAILED",
+							message: `Route ticket validation failed: ${validationError instanceof Error ? validationError.message : String(validationError)}. Ensure the project kernel database is accessible.`,
+						});
 					} finally {
 						db?.close();
 					}

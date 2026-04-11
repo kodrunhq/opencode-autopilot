@@ -148,7 +148,6 @@ export function createRouteTicketRepository(db: Database) {
 			routeToken: string,
 			params: {
 				sessionId: string;
-				messageId: string;
 				projectId: string;
 				intent: string;
 			},
@@ -167,10 +166,6 @@ export function createRouteTicketRepository(db: Database) {
 
 			if (ticket.sessionId !== params.sessionId) {
 				return { valid: false, reason: "Route ticket session mismatch" };
-			}
-
-			if (ticket.messageId !== params.messageId) {
-				return { valid: false, reason: "Route ticket message mismatch" };
 			}
 
 			if (ticket.projectId !== params.projectId) {

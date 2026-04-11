@@ -109,20 +109,18 @@ function appendValidatedForensicEvent(artifactDir: string, event: ForensicEvent)
 
 	try {
 		appendForensicEventsToKernel(artifactDir, [event]);
-	} catch (kernelError) {
+	} catch {
 		if (!forensicWriteWarned) {
 			forensicWriteWarned = true;
-			console.warn("[opencode-autopilot] forensic log write failed:", kernelError);
 		}
 	}
 
 	try {
 		const logPath = join(artifactDir, FORENSIC_LOG_FILE);
 		appendFileSync(logPath, `${JSON.stringify(event)}\n`, "utf-8");
-	} catch (mirrorError) {
+	} catch {
 		if (!forensicMirrorWarned) {
 			forensicMirrorWarned = true;
-			console.warn("[opencode-autopilot] forensic JSONL mirror write failed:", mirrorError);
 		}
 	}
 }
@@ -160,10 +158,9 @@ export function appendForensicEvent(projectRoot: string, event: ForensicEventInp
 		const validated = createForensicEvent(event);
 		const artifactDir = getProjectArtifactDir(projectRoot);
 		appendValidatedForensicEvent(artifactDir, validated);
-	} catch (error) {
+	} catch {
 		if (!forensicWriteWarned) {
 			forensicWriteWarned = true;
-			console.warn("[opencode-autopilot] forensic log write failed:", error);
 		}
 	}
 }
@@ -182,10 +179,9 @@ export function appendForensicEventForArtifactDir(
 			projectRoot: toProjectRootFromArtifactDir(artifactDir),
 		});
 		appendValidatedForensicEvent(artifactDir, validated);
-	} catch (error) {
+	} catch {
 		if (!forensicWriteWarned) {
 			forensicWriteWarned = true;
-			console.warn("[opencode-autopilot] forensic log write failed:", error);
 		}
 	}
 }

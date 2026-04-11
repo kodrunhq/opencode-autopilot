@@ -14,11 +14,7 @@ export function registerLspManagerProcessCleanup(options: CleanupOptions): LspPr
 	const listeners: Array<readonly ["exit" | NodeJS.Signals, () => void]> = [];
 	const stopAll = async (): Promise<void> => {
 		await Promise.allSettled(
-			[...options.getClients()].map(([, managed]) =>
-				managed.client.stop().catch((error) => {
-					console.error("[lsp-process-cleanup] stop failed", error);
-				}),
-			),
+			[...options.getClients()].map(([, managed]) => managed.client.stop().catch(() => {})),
 		);
 		options.clearClients();
 		options.clearCleanupInterval();
@@ -31,9 +27,7 @@ export function registerLspManagerProcessCleanup(options: CleanupOptions): LspPr
 		void stopAll();
 	});
 	const signalListener = () => {
-		void stopAll().catch((error) =>
-			console.error("[lsp-process-cleanup] signal cleanup failed", error),
-		);
+		void stopAll().catch(() => {});
 	};
 	register("SIGINT", signalListener);
 	register("SIGTERM", signalListener);

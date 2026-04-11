@@ -24,6 +24,9 @@ function addColumnIfNotExists(
  * Idempotent via IF NOT EXISTS.
  */
 export function initMemoryDb(database: Database): void {
+	// Keep project registry tables in the global DB for cross-project discovery
+	// and compatibility reads. Project-scoped callers must still pass their
+	// project kernel DB explicitly when resolving identity.
 	runProjectRegistryMigrations(database);
 
 	database.run(`CREATE TABLE IF NOT EXISTS observations (

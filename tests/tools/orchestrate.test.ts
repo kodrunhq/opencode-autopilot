@@ -578,6 +578,63 @@ describe("integration: routeCore → orchestrateCore", () => {
 		expect(started.phase).toBe("RECON");
 	});
 
+	test("route ticket is single-use — second orchestrate call with same token is rejected", async () => {
+		const routeContext = {
+			sessionID: "session-route-token-single-use",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-single-use",
+		} as unknown as Parameters<typeof ocRoute.execute>[1];
+
+		const route = JSON.parse(
+			await ocRoute.execute(
+				{
+					primaryIntent: "implementation",
+					reasoning: "User asked for a feature",
+					verbalization: "I detect implementation intent",
+				},
+				routeContext,
+			),
+		);
+
+		const orchestrateContext = {
+			sessionID: routeContext.sessionID,
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-single-use",
+		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+		const first = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add implementation details",
+					intent: "implementation",
+					routeToken: route.requiredPipelineArgs.routeToken,
+				},
+				orchestrateContext,
+			),
+		);
+		expect(first.action).not.toBe("error");
+
+		await rm(join(tempDir, ".opencode-autopilot"), { recursive: true, force: true });
+
+		const second = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add implementation details again",
+					intent: "implementation",
+					routeToken: route.requiredPipelineArgs.routeToken,
+				},
+				orchestrateContext,
+			),
+		);
+
+		expect(second.action).toBe("error");
+		expect(["E_ROUTE_TOKEN_CONSUMED", "E_ROUTE_TOKEN_INVALID", "E_INVALID_ROUTE_TOKEN"]).toContain(
+			second.code,
+		);
+	});
+
 	test("oc_orchestrate rejects missing routeToken and reports token error", async () => {
 		const context = {
 			sessionID: "session-route-token-missing",
@@ -641,7 +698,100 @@ describe("integration: routeCore → orchestrateCore", () => {
 		expect(mismatch.code).toBe("E_ROUTE_TOKEN_MISMATCH");
 	});
 
-	test("oc_orchestrate rejects routeToken when called without the original message context", async () => {
+	test("route ticket rejects session mismatch", async () => {
+		const routeContext = {
+			sessionID: "session-A",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-session-mismatch",
+		} as unknown as Parameters<typeof ocRoute.execute>[1];
+
+		const route = JSON.parse(
+			await ocRoute.execute(
+				{
+					primaryIntent: "implementation",
+					reasoning: "User asked for a feature",
+					verbalization: "I detect implementation intent",
+				},
+				routeContext,
+			),
+		);
+
+		const mismatchedContext = {
+			sessionID: "session-B",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-session-mismatch",
+		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+		const result = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add session-bound route ticket checks",
+					intent: "implementation",
+					routeToken: route.requiredPipelineArgs.routeToken,
+				},
+				mismatchedContext,
+			),
+		);
+
+		expect(result.action).toBe("error");
+		expect(result.code).toContain("MISMATCH");
+		expect(result.message.toLowerCase()).toContain("session");
+	});
+
+	test("route ticket rejects project mismatch (different worktree/directory)", async () => {
+		const routeContext = {
+			sessionID: "session-project-mismatch",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-project-mismatch",
+		} as unknown as Parameters<typeof ocRoute.execute>[1];
+
+		const route = JSON.parse(
+			await ocRoute.execute(
+				{
+					primaryIntent: "implementation",
+					reasoning: "User asked for a feature",
+					verbalization: "I detect implementation intent",
+				},
+				routeContext,
+			),
+		);
+
+		// Create a SECOND temp dir to simulate a different project
+		const otherDir = await mkdtemp(join(tmpdir(), "orchestrate-tool-test-other-"));
+
+		try {
+			const mismatchedContext = {
+				sessionID: routeContext.sessionID, // Same session
+				directory: otherDir,
+				worktree: otherDir, // DIFFERENT project root
+				messageID: "route-msg-project-mismatch",
+			} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+			const result = JSON.parse(
+				await ocOrchestrate.execute(
+					{
+						idea: "add cross-project check",
+						intent: "implementation",
+						routeToken: route.requiredPipelineArgs.routeToken,
+					},
+					mismatchedContext,
+				),
+			);
+
+			expect(result.action).toBe("error");
+			// When using a different project dir, a different kernel DB is opened.
+			// The ticket doesn't exist in that DB, so we get INVALID rather than MISMATCH.
+			expect(result.code).toBe("E_INVALID_ROUTE_TOKEN");
+			expect(result.message.toLowerCase()).toContain("route ticket not found");
+		} finally {
+			await rm(otherDir, { recursive: true, force: true });
+		}
+	});
+
+	test("oc_orchestrate accepts routeToken when called without the original message context (messageId is not validated)", async () => {
 		const routeContext = {
 			sessionID: "session-route-token-msg",
 			directory: tempDir,
@@ -666,7 +816,7 @@ describe("integration: routeCore → orchestrateCore", () => {
 			worktree: tempDir,
 		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
 
-		const mismatch = JSON.parse(
+		const result = JSON.parse(
 			await ocOrchestrate.execute(
 				{
 					idea: "add user settings",
@@ -677,8 +827,46 @@ describe("integration: routeCore → orchestrateCore", () => {
 			),
 		);
 
-		expect(mismatch.action).toBe("error");
-		expect(mismatch.code).toBe("E_ROUTE_TOKEN_MISMATCH");
+		expect(result.action).not.toBe("error");
+	});
+
+	test("route ticket succeeds across different messageId", async () => {
+		const routeContext = {
+			sessionID: "session-route-token-different-message",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "msg-1",
+		} as unknown as Parameters<typeof ocRoute.execute>[1];
+
+		const route = JSON.parse(
+			await ocRoute.execute(
+				{
+					primaryIntent: "implementation",
+					reasoning: "User asked for a feature",
+					verbalization: "I detect implementation intent",
+				},
+				routeContext,
+			),
+		);
+
+		const contextWithoutMessage = {
+			sessionID: routeContext.sessionID,
+			directory: tempDir,
+			worktree: tempDir,
+		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+		const result = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add account preferences",
+					intent: "implementation",
+					routeToken: route.requiredPipelineArgs.routeToken,
+				},
+				contextWithoutMessage,
+			),
+		);
+
+		expect(result.action).not.toBe("error");
 	});
 
 	test("routeToken cannot start a second run while another run is active", async () => {

@@ -37,7 +37,12 @@ interface ProjectFingerprintRow {
 	readonly last_updated: string;
 }
 
-function resolveDb(db?: Database): Database {
+/**
+ * Project-scoped callers must pass their project kernel DB explicitly.
+ * Falling back to the global memory DB is reserved for cross-project discovery
+ * and legacy compatibility callers that intentionally operate globally.
+ */
+function resolveProjectRegistryDb(db?: Database): Database {
 	return db ?? getMemoryDb();
 }
 
@@ -95,7 +100,7 @@ function rowToProjectFingerprint(row: ProjectFingerprintRow): ProjectGitFingerpr
 
 export function upsertProjectRecord(project: ProjectRecord, db?: Database): ProjectRecord {
 	const validated = projectRecordSchema.parse(project);
-	const d = resolveDb(db);
+	const d = resolveProjectRegistryDb(db);
 	const firstSeenAt = validated.firstSeenAt ?? validated.lastUpdated;
 
 	withWriteTransaction(d, () => {
@@ -131,13 +136,13 @@ export function upsertProjectRecord(project: ProjectRecord, db?: Database): Proj
 }
 
 export function getProjectById(projectId: string, db?: Database): ProjectRecord | null {
-	const d = resolveDb(db);
+	const d = resolveProjectRegistryDb(db);
 	const row = d.query("SELECT * FROM projects WHERE id = ?").get(projectId) as ProjectRow | null;
 	return row ? rowToProject(row) : null;
 }
 
 export function getProjectByCurrentPath(path: string, db?: Database): ProjectRecord | null {
-	const d = resolveDb(db);
+	const d = resolveProjectRegistryDb(db);
 	const row = d.query("SELECT * FROM projects WHERE path = ?").get(path) as ProjectRow | null;
 	return row ? rowToProject(row) : null;
 }
@@ -148,7 +153,7 @@ export function getProjectByAnyPath(path: string, db?: Database): ProjectRecord 
 		return current;
 	}
 
-	const d = resolveDb(db);
+	const d = resolveProjectRegistryDb(db);
 	const row = d
 		.query(
 			`SELECT p.*
@@ -163,7 +168,7 @@ export function getProjectByAnyPath(path: string, db?: Database): ProjectRecord 
 }
 
 export function listProjectPaths(projectId: string, db?: Database): readonly ProjectPathRecord[] {
-	const d = resolveDb(db);
+	const d = resolveProjectRegistryDb(db);
 	const rows = d
 		.query(
 			`SELECT *
@@ -182,7 +187,7 @@ export function setProjectCurrentPath(
 	seenAt: string,
 	db?: Database,
 ): ProjectRecord {
-	const d = resolveDb(db);
+	const d = resolveProjectRegistryDb(db);
 	const existing = getProjectById(projectId, d);
 	if (existing === null) {
 		throw new Error(`Unknown project id: ${projectId}`);
@@ -205,7 +210,7 @@ export function upsertProjectGitFingerprint(
 	db?: Database,
 ): ProjectGitFingerprint {
 	const validated = gitFingerprintInputSchema.parse(fingerprint);
-	const d = resolveDb(db);
+	const d = resolveProjectRegistryDb(db);
 
 	d.run(
 		`INSERT INTO project_git_fingerprints (
@@ -234,7 +239,7 @@ export function getProjectsByGitFingerprint(
 	normalizedRemoteUrl: string,
 	db?: Database,
 ): readonly ProjectRecord[] {
-	const d = resolveDb(db);
+	const d = resolveProjectRegistryDb(db);
 	const rows = d
 		.query(
 			`SELECT DISTINCT p.*
@@ -251,7 +256,7 @@ export function listProjectGitFingerprints(
 	projectId: string,
 	db?: Database,
 ): readonly ProjectGitFingerprint[] {
-	const d = resolveDb(db);
+	const d = resolveProjectRegistryDb(db);
 	const rows = d
 		.query(
 			`SELECT *
