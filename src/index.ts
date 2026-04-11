@@ -727,14 +727,6 @@ const plugin: Plugin = async (input) => {
 					if (tokens && typeof tokens.input === "number") {
 						contextWarningMonitor.checkUtilization(tokens.input, 200_000);
 					}
-
-					const role = info.role as string | undefined;
-					if (role === "user") {
-						const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
-						if (sessionID) {
-							resetIntentForUserMessage(sessionID);
-						}
-					}
 				}
 			}
 
@@ -756,7 +748,6 @@ const plugin: Plugin = async (input) => {
 				mcpManager.stopAll().catch(() => {});
 				const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
 				if (sessionID) {
-					clearIntentSession(sessionID);
 					deleteLoopController(sessionID);
 				}
 			}
@@ -786,21 +777,20 @@ const plugin: Plugin = async (input) => {
 				await chatMessageHandler(hookInput, output);
 			}
 		},
-		"tool.execute.before": async (
-			input: { tool: string; sessionID: string; callID: string },
-			output: { args: unknown },
-		) => {
-			obsToolBeforeHandler({ ...input, args: output.args });
-
-			const hashAnchoredResult = hashAnchoredEnforcementHandler(
-				{ ...input, args: output.args },
-				output,
-			);
-			if (hashAnchoredResult.args !== output.args) {
-				output.args = hashAnchoredResult.args;
-			}
-		},
-		"tool.execute.after": async (
+			"tool.execute.before": async (
+				input: { tool: string; sessionID: string; callID: string },
+				output: { args: unknown },
+			) => {
+				obsToolBeforeHandler({ ...input, args: output.args });
+				const hashAnchoredResult = hashAnchoredEnforcementHandler(
+					{ ...input, args: output.args },
+					output,
+				);
+				if (hashAnchoredResult.args !== output.args) {
+					output.args = hashAnchoredResult.args;
+					}
+				},
+			"tool.execute.after": async (
 			hookInput: {
 				readonly tool: string;
 				readonly sessionID: string;
