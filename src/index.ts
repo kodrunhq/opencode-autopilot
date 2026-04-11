@@ -80,8 +80,6 @@ import { ocCreateSkill } from "./tools/create-skill";
 import { ocDelegate, setDelegateSdkOperations } from "./tools/delegate";
 import { ocDoctor, setOpenCodeConfig as setDoctorOpenCodeConfig } from "./tools/doctor";
 import { ocForensics } from "./tools/forensics";
-import { ocGraphIndex } from "./tools/graph-index";
-import { ocGraphQuery } from "./tools/graph-query";
 import { ocHashlineEdit } from "./tools/hashline-edit";
 import { ocLogs } from "./tools/logs";
 import { ocLoop } from "./tools/loop";
@@ -104,6 +102,7 @@ import { ocState } from "./tools/state";
 import { ocStocktake } from "./tools/stocktake";
 import { ocSummary } from "./tools/summary";
 import { ocUpdateDocs } from "./tools/update-docs";
+import { ocGraphIndexLazy, ocGraphQueryLazy } from "./tools/graph-lazy";
 import { getGlobalConfigDir } from "./utils/paths";
 import { ContextWarningMonitor } from "./ux/context-warnings";
 import { getRemediationHint } from "./ux/error-hints";
@@ -650,6 +649,7 @@ const plugin: Plugin = async (input) => {
 	});
 	const obsToolBeforeHandler = createToolExecuteBeforeHandler(toolStartTimes);
 	const obsToolAfterHandler = createObsToolAfterHandler(eventStore, toolStartTimes);
+
 	const tools = {
 		oc_background: ocBackground,
 		oc_configure: ocConfigure,
@@ -672,8 +672,8 @@ const plugin: Plugin = async (input) => {
 		oc_quick: ocQuick,
 		oc_recover: ocRecover,
 		oc_forensics: ocForensics,
-		oc_graph_index: ocGraphIndex,
-		oc_graph_query: ocGraphQuery,
+		oc_graph_index: ocGraphIndexLazy,
+		oc_graph_query: ocGraphQueryLazy,
 		oc_hashline_edit: ocHashlineEdit,
 		oc_review: ocReview,
 		oc_route: ocRoute,

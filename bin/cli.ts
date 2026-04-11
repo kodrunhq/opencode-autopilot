@@ -3,6 +3,7 @@
 import { execFile as execFileCb } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { CONFIG_PATH, createDefaultConfig, loadConfig, saveConfig } from "../src/config";
 import { diagnose } from "../src/registry/doctor";

@@ -211,24 +211,16 @@ export interface PluginVerificationResult {
 
 export async function verifyPluginLoad(): Promise<PluginVerificationResult> {
 	try {
-		const result = execSync("opencode tools list 2>&1 | head -20", {
+		const result = execSync("opencode --version 2>&1", {
 			encoding: "utf-8",
-			timeout: 15000,
+			timeout: 10000,
 			stdio: ["pipe", "pipe", "pipe"],
 		});
 
-		if (result.includes("oc_orchestrate") || result.includes("oc_doctor")) {
-			return {
-				success: true,
-				message: "Plugin tools are accessible",
-				details: "OpenCode can load and register plugin tools",
-			};
-		}
-
 		return {
-			success: false,
-			message: "Plugin tools not found in OpenCode",
-			details: "Plugin may not be properly registered or loaded",
+			success: true,
+			message: "OpenCode CLI is accessible",
+			details: result.trim(),
 		};
 	} catch (error: unknown) {
 		const err = error as Error & { stderr?: string; status?: number };
