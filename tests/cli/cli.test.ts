@@ -27,18 +27,13 @@ describe("CLI install", () => {
 	});
 
 	test.skip("creates .opencode.json at git root when no env vars set", async () => {
+		// Create git repo in tempDir
 		await mkdir(join(tempDir, ".git"));
 
 		const originalEnv = process.env.OPENCODE_CONFIG;
 		const originalEnvDir = process.env.OPENCODE_CONFIG_DIR;
-		const originalHome = process.env.HOME;
-		const originalUserProfile = process.env.USERPROFILE;
-		const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
 
-		// Set HOME to tempDir to isolate from real config
-		process.env.HOME = tempDir;
-		process.env.USERPROFILE = tempDir;
-		process.env.XDG_CONFIG_HOME = join(tempDir, ".config");
+		// Ensure no env vars that would override project config detection
 		delete process.env.OPENCODE_CONFIG;
 		delete process.env.OPENCODE_CONFIG_DIR;
 
@@ -50,9 +45,6 @@ describe("CLI install", () => {
 		} finally {
 			process.env.OPENCODE_CONFIG = originalEnv;
 			process.env.OPENCODE_CONFIG_DIR = originalEnvDir;
-			process.env.HOME = originalHome;
-			process.env.USERPROFILE = originalUserProfile;
-			process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
 		}
 	});
 
