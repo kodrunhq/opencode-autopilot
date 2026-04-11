@@ -1,9 +1,10 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { execSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { inspectCliCore } from "../../bin/inspect";
 import { runKernelMigrations } from "../../src/kernel/migrations";
 import { initMemoryDb } from "../../src/memory/database";
@@ -12,11 +13,13 @@ import { resolveProjectIdentitySync } from "../../src/projects/resolve";
 import { getAutopilotDbPath, getProjectArtifactDir } from "../../src/utils/paths";
 
 const NOW = "2026-04-05T12:00:00.000Z";
+const INSPECT_MODULE_URL = new URL("../../bin/inspect.ts", import.meta.url).href;
 
 interface InspectProjectsResponse {
 	readonly action: "inspect_projects";
 	readonly dbPath: string;
 	readonly dbScope: string;
+	readonly note?: string;
 	readonly projects: readonly Array<{
 		readonly id: string;
 		readonly name: string;
@@ -56,6 +59,25 @@ function registerProject(db: Database, projectRoot: string, projectId: string): 
 		readGitFingerprint: () => null,
 		createProjectId: () => projectId,
 	}).id;
+}
+
+function runInspectProjectsJsonInSubprocess(homeDir: string): InspectProjectsResponse {
+	const script = [
+		`const { inspectCliCore } = await import(${JSON.stringify(INSPECT_MODULE_URL)});`,
+		'const result = await inspectCliCore(["projects", "--json"]);',
+		"process.stdout.write(result.output);",
+	].join(" ");
+
+	const output = execSync(`bun --eval ${JSON.stringify(script)}`, {
+		encoding: "utf-8",
+		env: {
+			...process.env,
+			HOME: homeDir,
+		},
+		stdio: ["pipe", "pipe", "pipe"],
+	});
+
+	return JSON.parse(output) as InspectProjectsResponse;
 }
 
 describe("CLI inspect scope", () => {
@@ -145,6 +167,88 @@ describe("CLI inspect scope", () => {
 		expect(parsed.action).toBe("inspect_memory");
 		expect(parsed.overview.stats.totalObservations).toBe(1);
 		expect(parsed.overview.recentObservations[0]?.summary).toBe("global observation");
+	});
+
+	test("inspect projects defaults to current-project scope inside git repo", async () => {
+		const gitRepoDir = await mkdtemp(join(tmpdir(), "repo-under-test-"));
+		const gitRepoName = basename(gitRepoDir);
+		const homeDir = await mkdtemp(join(tmpdir(), "home-under-test-"));
+		const originalHome = process.env.HOME;
+		const originalCwd = process.cwd();
+
+		try {
+			execSync("git init", { cwd: gitRepoDir, stdio: "pipe" });
+
+			process.env.HOME = homeDir;
+			const globalDbPath = getAutopilotDbPath(join(homeDir, ".config", "opencode"));
+			mkdirSync(dirname(globalDbPath), { recursive: true });
+
+			const db = openInitializedDb(globalDbPath);
+			try {
+				registerProject(db, gitRepoDir, "current-repo-project");
+				registerProject(db, "/home/user/other-project", "other-project");
+			} finally {
+				db.close();
+			}
+
+			process.chdir(gitRepoDir);
+
+			const parsed = runInspectProjectsJsonInSubprocess(homeDir);
+
+			expect(parsed.action).toBe("inspect_projects");
+			expect(parsed.dbPath).toBe(globalDbPath);
+			expect(parsed.note).toBe("Showing current repo project. Use --global to list all projects.");
+			expect(parsed.projects).toHaveLength(1);
+			expect(parsed.projects[0]?.name).toBe(gitRepoName);
+			expect(parsed.projects[0]?.path).toBe(gitRepoDir);
+			expect(parsed.projects[0]?.id).toBe("current-repo-project");
+			expect(JSON.stringify(parsed)).not.toContain("other-project");
+		} finally {
+			process.chdir(originalCwd);
+			process.env.HOME = originalHome;
+			await rm(gitRepoDir, { recursive: true, force: true });
+			await rm(homeDir, { recursive: true, force: true });
+		}
+	});
+
+	test("inspect projects filters ephemeral test projects by default", async () => {
+		const gitRepoDir = await mkdtemp(join(tmpdir(), "repo-under-test-"));
+		const homeDir = await mkdtemp(join(tmpdir(), "home-under-test-"));
+		const originalHome = process.env.HOME;
+		const originalCwd = process.cwd();
+
+		try {
+			execSync("git init", { cwd: gitRepoDir, stdio: "pipe" });
+
+			process.env.HOME = homeDir;
+			const globalDbPath = getAutopilotDbPath(join(homeDir, ".config", "opencode"));
+			mkdirSync(dirname(globalDbPath), { recursive: true });
+
+			const db = openInitializedDb(globalDbPath);
+			try {
+				registerProject(db, "/tmp/forensics-project-abc", "ephemeral-test");
+				registerProject(db, "/tmp/review-tool-xyz", "ephemeral-review");
+				registerProject(db, "/home/user/real-project", "real-project");
+			} finally {
+				db.close();
+			}
+
+			process.chdir(gitRepoDir);
+
+			const parsed = runInspectProjectsJsonInSubprocess(homeDir);
+
+			expect(parsed.action).toBe("inspect_projects");
+			expect(parsed.dbPath).toBe(globalDbPath);
+			expect(parsed.note).toBe(
+				"No project record found for current repo in the selected database. Use --global to list all projects.",
+			);
+			expect(parsed.projects).toHaveLength(0);
+		} finally {
+			process.chdir(originalCwd);
+			process.env.HOME = originalHome;
+			await rm(gitRepoDir, { recursive: true, force: true });
+			await rm(homeDir, { recursive: true, force: true });
+		}
 	});
 
 	test("inspect projects does not filter ephemeral when explicit dbPath is provided", async () => {

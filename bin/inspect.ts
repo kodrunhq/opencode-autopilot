@@ -125,12 +125,10 @@ export async function inspectCliCore(
 				if (currentRepoProject !== undefined) {
 					projects = [currentRepoProject];
 					scopeNote = "Showing current repo project. Use --global to list all projects.";
-				} else if (!projectKernelExists) {
-					scopeNote =
-						"No local kernel.db found; showing all projects. Use --global to confirm global scope.";
 				} else {
+					projects = [];
 					scopeNote =
-						"Current repo project was not found in the selected database; showing all projects.";
+						"No project record found for current repo in the selected database. Use --global to list all projects.";
 				}
 			}
 			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
@@ -299,15 +297,34 @@ function pruneEphemeralProjects(dbPath: string): number {
 	if (!existsSync(dbPath)) return 0;
 	const db = new SqliteDatabase(dbPath);
 	try {
+		db.run("PRAGMA foreign_keys = ON");
 		const projects = db.query("SELECT id, path FROM projects").all() as Array<{
 			id: string;
 			path: string;
 		}>;
+		const projectScopedTables = [
+			"pipeline_runs",
+			"route_tickets",
+			"forensic_events",
+			"active_review_state",
+			"project_review_memory",
+			"project_lesson_memory",
+			"run_tasks",
+			"run_pending_dispatches",
+			"background_tasks",
+			"project_paths",
+			"project_git_fingerprints",
+		];
 		let count = 0;
 		for (const project of projects) {
 			if (isEphemeralPath(project.path)) {
-				db.run("DELETE FROM project_paths WHERE project_id = ?", [project.id]);
-				db.run("DELETE FROM project_git_fingerprints WHERE project_id = ?", [project.id]);
+				for (const table of projectScopedTables) {
+					try {
+						db.run(`DELETE FROM ${table} WHERE project_id = ?`, [project.id]);
+					} catch {
+						// Table may not exist in this DB — skip
+					}
+				}
 				db.run("DELETE FROM projects WHERE id = ?", [project.id]);
 				count++;
 			}
