@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import {
 	formatEvents,
 	formatLessons,
+	formatMemories,
 	formatMemoryOverview,
 	formatPaths,
 	formatPreferences,
@@ -16,11 +17,12 @@ import {
 	getProjectDetails,
 	listEvents,
 	listLessons,
+	listMemories,
 	listPreferences,
 	listProjects,
 	listRuns,
 } from "../src/inspect/repository";
-import { kernelDbExists } from "../src/kernel/database";
+import { resolveKernelDbPathFromProject } from "../src/kernel/database";
 import { getAutopilotDbPath, getProjectArtifactDir } from "../src/utils/paths";
 import { inspectUsage, parseInspectArgs } from "./inspect-args";
 
@@ -67,7 +69,11 @@ export async function inspectCliCore(
 	const globalDbPath = getAutopilotDbPath();
 	const gitRoot = resolveGitRoot();
 	const projectArtifactDir = gitRoot ? getProjectArtifactDir(gitRoot) : null;
-	const projectKernelExists = projectArtifactDir !== null && kernelDbExists(projectArtifactDir);
+	const projectKernelPathInfo = gitRoot ? resolveKernelDbPathFromProject(gitRoot) : null;
+	const projectKernelExists =
+		projectArtifactDir !== null &&
+		projectKernelPathInfo !== null &&
+		existsSync(projectKernelPathInfo.path);
 
 	function resolveDbInput(view: string): { dbInput: string | undefined; dbScope: string } {
 		if (options.dbPath) {
@@ -77,15 +83,21 @@ export async function inspectCliCore(
 			return { dbInput: globalDbPath, dbScope: "global" };
 		}
 
-		const globalScopedViews = ["memory", "preferences"];
+		const globalScopedViews = ["memory", "memories", "preferences"];
 		if (globalScopedViews.includes(view)) {
 			return { dbInput: globalDbPath, dbScope: "global" };
 		}
 
-		if (projectKernelExists && projectArtifactDir) {
+		if (projectKernelExists && projectArtifactDir && projectKernelPathInfo) {
+			const scopeLabel =
+				projectKernelPathInfo.kind === "legacy"
+					? "project (legacy kernel.db at repo root)"
+					: projectKernelPathInfo.kind === "migrated"
+						? "project (migrated legacy kernel.db)"
+						: "project";
 			return {
-				dbInput: `${projectArtifactDir}/kernel.db`,
-				dbScope: "project",
+				dbInput: projectKernelPathInfo.path,
+				dbScope: scopeLabel,
 			};
 		}
 
@@ -222,11 +234,30 @@ export async function inspectCliCore(
 		case "memory": {
 			const { dbInput, dbScope } = resolveDbInput("memory");
 			const overview = getMemoryOverview(dbInput);
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
+			const header = `DB scope: ${dbScope} (${dbInput})\n\n`;
 			return makeOutput(
 				{ action: "inspect_memory", overview },
 				parsed.json,
 				`${header}${formatMemoryOverview(overview, verbose)}`,
+			);
+		}
+		case "memories": {
+			const { dbInput, dbScope } = resolveDbInput("memories");
+			const memories = listMemories(
+				{
+					projectRef: parsed.projectRef ?? undefined,
+					kind: parsed.kind ?? undefined,
+					scope: parsed.scope ?? undefined,
+					query: parsed.query ?? undefined,
+					limit: parsed.limit,
+				},
+				dbInput,
+			);
+			const header = `DB scope: ${dbScope} (${dbInput})\n\n`;
+			return makeOutput(
+				{ action: "inspect_memories", memories },
+				parsed.json,
+				`${header}${formatMemories(memories, verbose)}`,
 			);
 		}
 		case null:

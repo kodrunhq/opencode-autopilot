@@ -264,14 +264,15 @@ export function savePipelineStateToKernel(
 			for (const pending of validated.pendingDispatches) {
 				db.run(
 					`INSERT INTO run_pending_dispatches (
-						run_id,
-						dispatch_id,
-						phase,
-						agent,
-						issued_at,
-						result_kind,
-						task_id
-					) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+					run_id,
+					dispatch_id,
+					phase,
+					agent,
+					issued_at,
+					result_kind,
+					task_id,
+					session_id
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 					[
 						validated.runId,
 						pending.dispatchId,
@@ -280,6 +281,7 @@ export function savePipelineStateToKernel(
 						pending.issuedAt,
 						pending.resultKind,
 						pending.taskId,
+						pending.sessionId ?? null,
 					],
 				);
 			}

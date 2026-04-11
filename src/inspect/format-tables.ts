@@ -2,6 +2,7 @@ import { renderTable } from "./formatter-helpers";
 import type {
 	InspectEventSummary,
 	InspectLessonSummary,
+	InspectMemorySummary,
 	InspectPreferenceSummary,
 	InspectProjectDetails,
 	InspectProjectSummary,
@@ -31,7 +32,7 @@ function formatEvidenceSummary(preference: InspectPreferenceSummary): string {
 
 export function formatProjectsTable(projects: readonly InspectProjectSummary[]): string {
 	return renderTable(
-		["Project", "Current Path", "Updated", "Runs", "Events", "Lessons"],
+		["Project", "Current Path", "Updated", "Runs", "Events", "Lessons", "Memories"],
 		projects.map((project) => [
 			project.name,
 			project.path,
@@ -39,8 +40,9 @@ export function formatProjectsTable(projects: readonly InspectProjectSummary[]):
 			String(project.runCount),
 			String(project.eventCount),
 			String(project.lessonCount),
+			String(project.memoryCount),
 		]),
-		{ minWidths: [12, 20, 20, 4, 6, 7] },
+		{ minWidths: [12, 20, 20, 4, 6, 7, 8] },
 	);
 }
 
@@ -136,4 +138,18 @@ export function formatPathsTable(details: InspectProjectDetails): string {
 
 export function summarizePreferenceEvidence(preference: InspectPreferenceSummary): string {
 	return formatEvidenceSummary(preference);
+}
+
+export function formatMemoriesTable(memories: readonly InspectMemorySummary[]): string {
+	return renderTable(
+		["Kind", "Scope", "Project", "Summary", "Updated"],
+		memories.map((memory) => [
+			memory.kind,
+			memory.scope,
+			memory.projectName ?? "global",
+			memory.summary,
+			memory.lastUpdated,
+		]),
+		{ minWidths: [10, 8, 12, 32, 20] },
+	);
 }

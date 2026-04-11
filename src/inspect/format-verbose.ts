@@ -2,6 +2,7 @@ import { formatTimestamp, indentLines, renderTable, wrapText } from "./formatter
 import type {
 	InspectEventSummary,
 	InspectLessonSummary,
+	InspectMemorySummary,
 	InspectMemoryOverview,
 	InspectPreferenceSummary,
 	InspectRunSummary,
@@ -117,6 +118,34 @@ export function formatVerbosePreferences(preferences: readonly InspectPreference
 		lines.push("Evidence:");
 		lines.push(...formatEvidenceDetail(preference));
 		lines.push(`Updated: ${preference.lastUpdated}`);
+		lines.push("");
+	}
+
+	return lines.join("\n").trimEnd();
+}
+
+export function formatVerboseMemories(memories: readonly InspectMemorySummary[]): string {
+	if (memories.length === 0) {
+		return "No memories found. Memories are stored by memory tools or capture heuristics.";
+	}
+
+	const lines = ["Memories", ""];
+	for (const memory of memories) {
+		lines.push(
+			`[${memory.kind}/${memory.scope}] ${memory.projectName ?? "global"} | ${formatTimestamp(memory.lastUpdated)}`,
+		);
+		lines.push(...indentLines([`Summary: ${memory.summary}`]));
+		lines.push(...indentLines(wrapText(memory.content)));
+		if (memory.tags) {
+			lines.push(...indentLines([`Tags: ${memory.tags}`]));
+		}
+		lines.push(
+			...indentLines([
+				`Confidence: ${memory.confidence}`,
+				`Evidence: ${memory.evidenceCount}`,
+				`Accesses: ${memory.lastAccessed}`,
+			]),
+		);
 		lines.push("");
 	}
 

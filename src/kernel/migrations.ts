@@ -88,6 +88,7 @@ const REBUILD_DDLS: Readonly<Record<string, string>> = Object.freeze({
 		issued_at TEXT NOT NULL,
 		result_kind TEXT NOT NULL,
 		task_id TEXT,
+		session_id TEXT,
 		PRIMARY KEY (run_id, dispatch_id),
 		FOREIGN KEY (run_id) REFERENCES pipeline_runs(run_id) ON DELETE CASCADE
 	)`,
@@ -145,6 +146,39 @@ function migrateTaskIdToText(database: Database): void {
 	rebuildTableWithTextTaskId(database, "forensic_events");
 }
 
+function ensureSessionIdOnPendingDispatches(database: Database): void {
+	if (!tableExists(database, "run_pending_dispatches")) return;
+	if (columnExists(database, "run_pending_dispatches", "session_id")) return;
+
+	const rebuildTable = `_rebuild_run_pending_dispatches`;
+	database.run(`DROP TABLE IF EXISTS ${rebuildTable}`);
+	database.run(REBUILD_DDLS.run_pending_dispatches);
+	database.run(
+		`INSERT INTO ${rebuildTable} (
+			run_id,
+			dispatch_id,
+			phase,
+			agent,
+			issued_at,
+			result_kind,
+			task_id,
+			session_id
+		)
+		SELECT
+			run_id,
+			dispatch_id,
+			phase,
+			agent,
+			issued_at,
+			result_kind,
+			CAST(task_id AS TEXT) AS task_id,
+			NULL AS session_id
+		FROM run_pending_dispatches`,
+	);
+	database.run("DROP TABLE run_pending_dispatches");
+	database.run(`ALTER TABLE ${rebuildTable} RENAME TO run_pending_dispatches`);
+}
+
 function backfillBackgroundTaskColumns(database: Database): void {
 	if (!tableExists(database, "background_tasks")) {
 		return;
@@ -199,6 +233,7 @@ export function runKernelMigrations(database: Database): void {
 
 	backfillProjectAwareColumns(database);
 	migrateTaskIdToText(database);
+	ensureSessionIdOnPendingDispatches(database);
 	backfillBackgroundTaskColumns(database);
 
 	if (currentVersion < KERNEL_SCHEMA_VERSION) {

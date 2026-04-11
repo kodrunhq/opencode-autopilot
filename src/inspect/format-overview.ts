@@ -35,6 +35,7 @@ export function formatProjectDetails(details: InspectProjectDetails, _verbose = 
 		`Events: ${project.eventCount}`,
 		`Lessons: ${project.lessonCount}`,
 		`Observations: ${project.observationCount}`,
+		`Memories: ${project.memoryCount}`,
 		"",
 		"Paths:",
 		...(paths.length === 0
@@ -62,6 +63,7 @@ export function formatMemoryOverview(overview: InspectMemoryOverview, verbose = 
 		`Total observations: ${overview.stats.totalObservations}`,
 		`Total projects: ${overview.stats.totalProjects}`,
 		`Total preferences: ${overview.stats.totalPreferences}`,
+		`Total memories: ${overview.stats.totalMemories}`,
 		`Storage size: ${overview.stats.storageSizeKb} KB`,
 		"",
 		"Observations by type:",

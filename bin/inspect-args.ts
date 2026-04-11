@@ -6,7 +6,8 @@ type InspectView =
 	| "events"
 	| "lessons"
 	| "preferences"
-	| "memory";
+	| "memory"
+	| "memories";
 
 export interface ParsedInspectArgs {
 	readonly view: InspectView | null;
@@ -17,6 +18,9 @@ export interface ParsedInspectArgs {
 	readonly runId: string | null;
 	readonly sessionId: string | null;
 	readonly type: string | null;
+	readonly kind: string | null;
+	readonly scope: string | null;
+	readonly query: string | null;
 	readonly help: boolean;
 	readonly error: string | null;
 	readonly global: boolean;
@@ -32,6 +36,7 @@ const INSPECT_VIEWS: readonly InspectView[] = Object.freeze([
 	"lessons",
 	"preferences",
 	"memory",
+	"memories",
 ]);
 
 function isInspectView(value: string): value is InspectView {
@@ -51,6 +56,7 @@ export function inspectUsage(): string {
 		"  lessons [--project <ref>]    List stored lessons",
 		"  preferences                  List stored preferences",
 		"  memory                       Show memory overview",
+		"  memories [--project <ref>]   List stored memories",
 		"",
 		"Options:",
 		"  --project <ref>              Project id, path, or unique name",
@@ -59,6 +65,9 @@ export function inspectUsage(): string {
 		"  --run-id <id>                Filter events by run id",
 		"  --session-id <id>            Filter events by session id",
 		"  --type <type>                Filter events by type",
+		"  --kind <kind>                Filter memories by kind",
+		"  --scope <scope>              Filter memories by scope (project|user)",
+		"  --query <text>               Text search memories (uses FTS when available)",
 		"  --limit <n>                  Limit rows (default: 20 for runs, 50 elsewhere)",
 		"  --verbose                    Show full content and expanded detail blocks",
 		"  --json                       Emit JSON output",
@@ -83,6 +92,9 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 	let runId: string | null = null;
 	let sessionId: string | null = null;
 	let type: string | null = null;
+	let kind: string | null = null;
+	let scope: string | null = null;
+	let query: string | null = null;
 	let help = false;
 	let error: string | null = null;
 	let global = false;
@@ -156,6 +168,33 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 			index += 1;
 			continue;
 		}
+		if (arg === "--kind") {
+			kind = args[index + 1] ?? null;
+			if (kind === null) {
+				error = "Missing value for --kind.";
+				break;
+			}
+			index += 1;
+			continue;
+		}
+		if (arg === "--scope") {
+			scope = args[index + 1] ?? null;
+			if (scope === null) {
+				error = "Missing value for --scope.";
+				break;
+			}
+			index += 1;
+			continue;
+		}
+		if (arg === "--query") {
+			query = args[index + 1] ?? null;
+			if (query === null) {
+				error = "Missing value for --query.";
+				break;
+			}
+			index += 1;
+			continue;
+		}
 		if (view === null) {
 			if (isInspectView(arg)) {
 				view = arg;
@@ -195,6 +234,9 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 		runId,
 		sessionId,
 		type,
+		kind,
+		scope,
+		query,
 		help,
 		error,
 		global,

@@ -71,8 +71,11 @@ const ORCHESTRATE_ERROR_CODES = Object.freeze({
 	DUPLICATE_RESULT: "E_DUPLICATE_RESULT",
 	DUPLICATE_DISPATCH: "E_DUPLICATE_DISPATCH",
 	PENDING_RESULT_REQUIRED: "E_PENDING_RESULT_REQUIRED",
+	STALE_PENDING_DISPATCH: "E_STALE_PENDING_DISPATCH",
 	RESULT_KIND_MISMATCH: "E_RESULT_KIND_MISMATCH",
 });
+
+const STALE_PENDING_DISPATCH_MS = 15 * 60 * 1000;
 
 function mapRouteTokenValidationError(reason: string | undefined): string {
 	switch (reason) {
@@ -378,7 +381,7 @@ async function startFreshRun(idea: string, artifactDir: string): Promise<string>
 
 	const handler = PHASE_HANDLERS[newState.currentPhase as Phase];
 	const handlerResult = await handler(newState, artifactDir, undefined, undefined);
-	return processHandlerResult(handlerResult, newState, artifactDir);
+	return processHandlerResult(handlerResult, newState, artifactDir, undefined);
 }
 
 /**
@@ -821,6 +824,7 @@ async function processHandlerResult(
 	handlerResult: DispatchResult,
 	state: Readonly<PipelineState>,
 	artifactDir: string,
+	contextSessionId?: string,
 ): Promise<string> {
 	const normalizedResult = ensureDispatchIdentity(handlerResult, state);
 
@@ -856,7 +860,7 @@ async function processHandlerResult(
 		}
 		const freshHandler = PHASE_HANDLERS.BUILD;
 		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
-		return processHandlerResult(freshResult, currentState, artifactDir);
+		return processHandlerResult(freshResult, currentState, artifactDir, contextSessionId);
 	}
 
 	// When concurrent completions both try to replenish the same pending task,
@@ -870,7 +874,7 @@ async function processHandlerResult(
 	) {
 		const freshHandler = PHASE_HANDLERS.BUILD;
 		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
-		return processHandlerResult(freshResult, currentState, artifactDir);
+		return processHandlerResult(freshResult, currentState, artifactDir, contextSessionId);
 	}
 
 	switch (normalizedResult.action) {
@@ -925,6 +929,7 @@ async function processHandlerResult(
 				issuedAt: new Date().toISOString(),
 				resultKind: normalizedResult.expectedResultKind ?? "phase_output",
 				taskId: normalizedResult.taskId ?? null,
+				sessionId: contextSessionId ?? null,
 			};
 
 			// Log the dispatch event before any inline-review or context injection
@@ -999,7 +1004,7 @@ async function processHandlerResult(
 					const nextResult = await handler(withInlineResult, artifactDir, reviewPayloadText, {
 						envelope: inlinedEnvelope,
 					});
-					return processHandlerResult(nextResult, withInlineResult, artifactDir);
+					return processHandlerResult(nextResult, withInlineResult, artifactDir, contextSessionId);
 				}
 				// State unavailable or pipeline completed after inline review — return complete
 				return JSON.stringify({
@@ -1088,6 +1093,7 @@ async function processHandlerResult(
 					issuedAt: new Date().toISOString(),
 					resultKind: entry.resultKind ?? inferExpectedResultKindForAgent(entry.agent),
 					taskId: entry.taskId ?? null,
+					sessionId: contextSessionId ?? null,
 				})) ?? [];
 
 			const progress = buildUserProgress(currentState, normalizedResult.progress, attempt);
@@ -1225,7 +1231,7 @@ async function processHandlerResult(
 			// Invoke the next phase handler immediately
 			const nextHandler = PHASE_HANDLERS[nextPhase];
 			const nextResult = await nextHandler(advanced, artifactDir, undefined, undefined);
-			return processHandlerResult(nextResult, advanced, artifactDir);
+			return processHandlerResult(nextResult, advanced, artifactDir, contextSessionId);
 		}
 
 		default:
@@ -1249,6 +1255,51 @@ export async function orchestrateCore(
 ): Promise<string> {
 	try {
 		let state = await loadState(artifactDir);
+		const contextSessionId = context?.sessionId;
+
+		// Auto-finalize stale pending dispatches where the spawned session died without returning.
+		if (state && state.pendingDispatches.length > 0 && args.result === undefined) {
+			const now = Date.now();
+			const staleDispatches = state.pendingDispatches.filter((pending) => {
+				const issued = Date.parse(pending.issuedAt);
+				return Number.isFinite(issued) && now - issued > STALE_PENDING_DISPATCH_MS;
+			});
+			if (staleDispatches.length > 0) {
+				const failureContext = {
+					failedPhase: state.currentPhase ?? staleDispatches[0]?.phase ?? "RECON",
+					failedAgent: staleDispatches[0]?.agent ?? null,
+					errorMessage: `Pending dispatch stale for more than ${Math.round(
+						STALE_PENDING_DISPATCH_MS / 60000,
+					)} minutes: ${staleDispatches
+						.map((d) => `${d.phase}/${d.agent}#${d.dispatchId}`)
+						.join(", ")}`.slice(0, 4096),
+					timestamp: new Date(now).toISOString(),
+					lastSuccessfulPhase: state.phases.filter((p) => p.status === "DONE").pop()?.name ?? null,
+				};
+
+				state = await updatePersistedState(artifactDir, state, (current) =>
+					patchState(current, {
+						status: "INTERRUPTED" as const,
+						pendingDispatches: [],
+						failureContext,
+					}),
+				);
+
+				logOrchestrationEvent(artifactDir, {
+					timestamp: new Date(now).toISOString(),
+					phase: failureContext.failedPhase,
+					action: "error",
+					agent: failureContext.failedAgent,
+					message: `${ORCHESTRATE_ERROR_CODES.STALE_PENDING_DISPATCH}: ${failureContext.errorMessage}`,
+				});
+
+				return JSON.stringify({
+					action: "error",
+					code: ORCHESTRATE_ERROR_CODES.STALE_PENDING_DISPATCH,
+					message: failureContext.errorMessage,
+				});
+			}
+		}
 
 		// No state and no idea -> error
 		if (state === null && !args.idea) {
@@ -1515,7 +1566,7 @@ export async function orchestrateCore(
 							if (state.currentPhase !== null) {
 								const retryHandler = PHASE_HANDLERS[state.currentPhase];
 								const retryResult = await retryHandler(state, artifactDir, undefined, undefined);
-								return processHandlerResult(retryResult, state, artifactDir);
+								return processHandlerResult(retryResult, state, artifactDir, contextSessionId);
 							}
 						}
 
@@ -1596,7 +1647,7 @@ export async function orchestrateCore(
 				handlerInputResult,
 				phaseHandlerContext,
 			);
-			return processHandlerResult(handlerResult, state, artifactDir);
+			return processHandlerResult(handlerResult, state, artifactDir, contextSessionId);
 		}
 
 		return JSON.stringify({ action: "error", message: "Unexpected state" });

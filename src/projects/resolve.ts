@@ -1,7 +1,8 @@
 import type { Database } from "bun:sqlite";
 import { execFile as execFileCb, execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import { basename, normalize } from "node:path";
+import { realpathSync } from "node:fs";
 import { promisify } from "node:util";
 import {
 	getProjectByAnyPath,
@@ -21,6 +22,25 @@ export interface ProjectResolverDeps {
 	readonly now?: () => string;
 	readonly createProjectId?: () => string;
 	readonly readGitFingerprint?: (projectRoot: string) => Promise<GitFingerprintInput | null>;
+}
+
+function normalizeProjectRoot(projectRoot: string): string {
+	try {
+		return realpathSync(projectRoot);
+	} catch {
+		return normalize(projectRoot);
+	}
+}
+
+function computeDeterministicProjectId(
+	projectRoot: string,
+	fingerprint: GitFingerprintInput | null,
+): string {
+	const root = normalizeProjectRoot(projectRoot);
+	const key = fingerprint
+		? `git:${fingerprint.normalizedRemoteUrl}#${fingerprint.defaultBranch ?? ""}`
+		: `path:${root}`;
+	return `proj_${createHash("sha256").update(key).digest("hex").slice(0, 24)}`;
 }
 
 export function normalizeGitRemoteUrl(remoteUrl: string): string | null {
@@ -144,10 +164,12 @@ export async function resolveProjectIdentity(
 	deps: ProjectResolverDeps = {},
 ): Promise<ProjectRecord> {
 	const now = deps.now ?? (() => new Date().toISOString());
-	const createProjectId = deps.createProjectId ?? (() => randomUUID());
-	const readGitFingerprint = deps.readGitFingerprint ?? readProjectGitFingerprint;
 	const seenAt = now();
 	const projectName = basename(projectRoot);
+	const readGitFingerprint = deps.readGitFingerprint ?? readProjectGitFingerprint;
+	const fingerprint = await readGitFingerprint(projectRoot);
+	const createProjectId =
+		deps.createProjectId ?? (() => computeDeterministicProjectId(projectRoot, fingerprint));
 
 	const current = getProjectByCurrentPath(projectRoot, deps.db);
 	if (current !== null) {
@@ -159,9 +181,9 @@ export async function resolveProjectIdentity(
 			},
 			deps.db,
 		);
-		const fingerprint = await readGitFingerprint(projectRoot);
-		if (fingerprint !== null) {
-			upsertProjectGitFingerprint(updated.id, fingerprint, seenAt, deps.db);
+		const currentFingerprint = fingerprint ?? (await readGitFingerprint(projectRoot));
+		if (currentFingerprint !== null) {
+			upsertProjectGitFingerprint(updated.id, currentFingerprint, seenAt, deps.db);
 		}
 		return updated;
 	}
@@ -169,14 +191,13 @@ export async function resolveProjectIdentity(
 	const historical = getProjectByAnyPath(projectRoot, deps.db);
 	if (historical !== null) {
 		const updated = setProjectCurrentPath(historical.id, projectRoot, projectName, seenAt, deps.db);
-		const fingerprint = await readGitFingerprint(projectRoot);
-		if (fingerprint !== null) {
-			upsertProjectGitFingerprint(updated.id, fingerprint, seenAt, deps.db);
+		const currentFingerprint = fingerprint ?? (await readGitFingerprint(projectRoot));
+		if (currentFingerprint !== null) {
+			upsertProjectGitFingerprint(updated.id, currentFingerprint, seenAt, deps.db);
 		}
 		return updated;
 	}
 
-	const fingerprint = await readGitFingerprint(projectRoot);
 	if (fingerprint !== null) {
 		const matches = getProjectsByGitFingerprint(fingerprint.normalizedRemoteUrl, deps.db);
 		if (matches.length === 1) {
@@ -213,11 +234,13 @@ export function resolveProjectIdentitySync(
 	deps: SyncProjectResolverDeps = {},
 ): ProjectRecord {
 	const now = deps.now ?? (() => new Date().toISOString());
-	const createProjectId = deps.createProjectId ?? (() => randomUUID());
-	const readGitFingerprint = deps.readGitFingerprint ?? readProjectGitFingerprintSync;
 	const allowCreate = deps.allowCreate ?? true;
 	const seenAt = now();
 	const projectName = basename(projectRoot);
+	const readGitFingerprint = deps.readGitFingerprint ?? readProjectGitFingerprintSync;
+	const fingerprint = readGitFingerprint(projectRoot);
+	const createProjectId =
+		deps.createProjectId ?? (() => computeDeterministicProjectId(projectRoot, fingerprint));
 
 	const current = getProjectByCurrentPath(projectRoot, deps.db);
 	if (current !== null) {
@@ -233,7 +256,6 @@ export function resolveProjectIdentitySync(
 			},
 			deps.db,
 		);
-		const fingerprint = readGitFingerprint(projectRoot);
 		if (fingerprint !== null) {
 			upsertProjectGitFingerprint(updated.id, fingerprint, seenAt, deps.db);
 		}
@@ -247,14 +269,12 @@ export function resolveProjectIdentitySync(
 		}
 
 		const updated = setProjectCurrentPath(historical.id, projectRoot, projectName, seenAt, deps.db);
-		const fingerprint = readGitFingerprint(projectRoot);
 		if (fingerprint !== null) {
 			upsertProjectGitFingerprint(updated.id, fingerprint, seenAt, deps.db);
 		}
 		return updated;
 	}
 
-	const fingerprint = readGitFingerprint(projectRoot);
 	if (fingerprint !== null) {
 		const matches = getProjectsByGitFingerprint(fingerprint.normalizedRemoteUrl, deps.db);
 		if (matches.length === 1) {

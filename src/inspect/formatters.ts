@@ -1,6 +1,7 @@
 export {
 	formatEvents,
 	formatLessons,
+	formatMemories,
 	formatPreferences,
 	formatRuns,
 } from "./format-lists";

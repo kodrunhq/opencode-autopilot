@@ -1,14 +1,93 @@
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, renameSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { getAutopilotDbPath, getProjectArtifactDir } from "../utils/paths";
 import { runKernelMigrations } from "./migrations";
 
 export const KERNEL_DB_FILE = "kernel.db";
 
+const LEGACY_KERNEL_FILES = Object.freeze([
+	KERNEL_DB_FILE,
+	`${KERNEL_DB_FILE}-wal`,
+	`${KERNEL_DB_FILE}-shm`,
+]);
+
+function resolveArtifactDir(path: string): string {
+	if (basename(path) === ".opencode-autopilot") {
+		return path;
+	}
+
+	const artifactDir = getProjectArtifactDir(path);
+	const legacyKernelPath = join(path, KERNEL_DB_FILE);
+	const artifactKernelPath = join(artifactDir, KERNEL_DB_FILE);
+
+	// If a legacy root-level kernel exists, migrate it into the artifact directory.
+	if (existsSync(legacyKernelPath) && !existsSync(artifactKernelPath)) {
+		mkdirSync(artifactDir, { recursive: true });
+		for (const file of LEGACY_KERNEL_FILES) {
+			const legacyFile = join(path, file);
+			if (existsSync(legacyFile)) {
+				renameSync(legacyFile, join(artifactDir, file));
+			}
+		}
+		return artifactDir;
+	}
+
+	return artifactDir;
+}
+
+export function detectLegacyKernelDb(projectRoot: string): string | null {
+	const legacyPath = join(projectRoot, KERNEL_DB_FILE);
+	return existsSync(legacyPath) ? legacyPath : null;
+}
+
+export function migrateLegacyKernelDb(projectRoot: string): string | null {
+	const legacyPath = detectLegacyKernelDb(projectRoot);
+	if (!legacyPath) return null;
+
+	const artifactDir = getProjectArtifactDir(projectRoot);
+	const target = join(artifactDir, KERNEL_DB_FILE);
+	mkdirSync(artifactDir, { recursive: true });
+
+	if (existsSync(target)) {
+		return target;
+	}
+
+	for (const file of LEGACY_KERNEL_FILES) {
+		const legacyFile = join(projectRoot, file);
+		if (existsSync(legacyFile)) {
+			renameSync(legacyFile, join(artifactDir, file));
+		}
+	}
+	return target;
+}
+
+export function resolveKernelDbPathFromProject(
+	projectRoot: string,
+	options?: { migrateLegacy?: boolean },
+): { path: string; kind: "artifact" | "legacy" | "migrated" | "missing" } {
+	const artifactDir = getProjectArtifactDir(projectRoot);
+	const artifactPath = join(artifactDir, KERNEL_DB_FILE);
+	if (existsSync(artifactPath)) {
+		return { path: artifactPath, kind: "artifact" };
+	}
+
+	const legacyPath = detectLegacyKernelDb(projectRoot);
+	if (legacyPath) {
+		if (options?.migrateLegacy) {
+			const migrated = migrateLegacyKernelDb(projectRoot);
+			return { path: migrated ?? artifactPath, kind: "migrated" };
+		}
+		return { path: legacyPath, kind: "legacy" };
+	}
+
+	return { path: artifactPath, kind: "missing" };
+}
+
 export function getKernelDbPath(artifactDirOrProjectRoot?: string): string {
 	if (typeof artifactDirOrProjectRoot === "string" && artifactDirOrProjectRoot.length > 0) {
-		return join(artifactDirOrProjectRoot, KERNEL_DB_FILE);
+		const artifactDir = resolveArtifactDir(artifactDirOrProjectRoot);
+		return join(artifactDir, KERNEL_DB_FILE);
 	}
 
 	return getAutopilotDbPath();
@@ -49,6 +128,7 @@ export function openProjectKernelDb(
 	projectRoot: string,
 	options?: { readonly?: boolean },
 ): Database {
+	migrateLegacyKernelDb(projectRoot);
 	const artifactDir = getProjectArtifactDir(projectRoot);
 	return openKernelDb(artifactDir, options);
 }

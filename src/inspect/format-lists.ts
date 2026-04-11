@@ -1,18 +1,21 @@
 import {
 	formatEventsTable,
 	formatLessonsTable,
+	formatMemoriesTable,
 	formatPreferencesTable,
 	formatRunsTable,
 } from "./format-tables";
 import {
 	formatVerboseEvents,
 	formatVerboseLessons,
+	formatVerboseMemories,
 	formatVerbosePreferences,
 	formatVerboseRuns,
 } from "./format-verbose";
 import type {
 	InspectEventSummary,
 	InspectLessonSummary,
+	InspectMemorySummary,
 	InspectPreferenceSummary,
 	InspectRunSummary,
 } from "./repository";
@@ -62,4 +65,15 @@ export function formatPreferences(
 	}
 
 	return ["Preferences", "", formatPreferencesTable(preferences)].join("\n");
+}
+
+export function formatMemories(memories: readonly InspectMemorySummary[], verbose = false): string {
+	if (verbose) {
+		return formatVerboseMemories(memories);
+	}
+	if (memories.length === 0) {
+		return "No memories found. Memories are stored by memory tools or capture heuristics.";
+	}
+
+	return ["Memories", "", formatMemoriesTable(memories)].join("\n");
 }

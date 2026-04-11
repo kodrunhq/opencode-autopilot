@@ -86,6 +86,7 @@ export const pendingDispatchSchema = z.object({
 		.union([z.number().int().positive(), z.string().min(1).max(128)])
 		.nullable()
 		.default(null),
+	sessionId: z.string().max(256).nullable().default(null),
 });
 
 export const failureContextSchema = z.object({
