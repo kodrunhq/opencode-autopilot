@@ -318,9 +318,21 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 
 	const pluginVerification = await verifyPluginLoad();
 	if (pluginVerification.success) {
-		console.log(`  OpenCode CLI accessible ${green("✓")}`);
-		if (pluginVerification.details) {
-			console.log(`    ${pluginVerification.details}`);
+		// Check if this is a real verification or just CLI accessibility
+		const isActuallyVerified = !pluginVerification.details?.includes("not verified");
+
+		if (isActuallyVerified) {
+			console.log(`  OpenCode CLI accessible ${green("✓")}`);
+			if (pluginVerification.details) {
+				console.log(`    ${pluginVerification.details}`);
+			}
+		} else {
+			console.log(`  OpenCode CLI accessible ${yellow("⚠")}`);
+			if (pluginVerification.details) {
+				console.log(`    ${pluginVerification.details}`);
+			}
+			// This prevents "All checks passed" when we can't verify plugin loading
+			hasFailure = true;
 		}
 	} else {
 		console.log(`  OpenCode CLI accessible ${red("✗")}`);

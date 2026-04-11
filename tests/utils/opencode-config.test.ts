@@ -51,7 +51,7 @@ describe("opencode-config", () => {
 	describe("resolveOpenCodeConfig", () => {
 		test("finds project config in cwd", async () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
-			const configPath = join(tempDir, "opencode.json");
+			const configPath = join(tempDir, ".opencode.json");
 			await writeFile(configPath, '{"plugin": ["test"]}');
 
 			const result = await resolveOpenCodeConfig({ cwd: tempDir });
@@ -68,7 +68,7 @@ describe("opencode-config", () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
 			const gitDir = join(tempDir, ".git");
 			await mkdir(gitDir);
-			const configPath = join(tempDir, "opencode.json");
+			const configPath = join(tempDir, ".opencode.json");
 			await writeFile(configPath, '{"plugin": ["test"]}');
 
 			const subDir = join(tempDir, "src", "components");
@@ -83,9 +83,9 @@ describe("opencode-config", () => {
 			await rm(tempDir, { recursive: true, force: true });
 		});
 
-		test("finds opencode.jsonc files", async () => {
+		test("finds .opencode.jsonc files", async () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
-			const configPath = join(tempDir, "opencode.jsonc");
+			const configPath = join(tempDir, ".opencode.jsonc");
 			await writeFile(
 				configPath,
 				`{
@@ -127,7 +127,7 @@ describe("opencode-config", () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
 			const configDir = join(tempDir, "config-dir");
 			await mkdir(configDir);
-			const configPath = join(configDir, "opencode.json");
+			const configPath = join(configDir, ".opencode.json");
 			await writeFile(configPath, '{"plugin": ["dir-config"]}');
 
 			const originalEnv = process.env.OPENCODE_CONFIG_DIR;
@@ -151,7 +151,7 @@ describe("opencode-config", () => {
 			const result = await resolveOpenCodeConfig({ cwd: tempDir });
 
 			expect(result.location).toBe("global");
-			expect(result.path).toContain(".config/opencode/opencode.json");
+			expect(result.path).toContain(".config/opencode/.opencode.json");
 
 			await rm(tempDir, { recursive: true, force: true });
 		});
@@ -166,7 +166,7 @@ describe("opencode-config", () => {
 
 			const result = await getInstallTargetPath(subDir);
 
-			expect(result).toBe(join(tempDir, "opencode.json"));
+			expect(result).toBe(join(tempDir, ".opencode.json"));
 
 			await rm(tempDir, { recursive: true, force: true });
 		});
@@ -176,7 +176,7 @@ describe("opencode-config", () => {
 
 			const result = await getInstallTargetPath(tempDir);
 
-			expect(result).toContain(".config/opencode/opencode.json");
+			expect(result).toContain(".config/opencode/.opencode.json");
 
 			await rm(tempDir, { recursive: true, force: true });
 		});
