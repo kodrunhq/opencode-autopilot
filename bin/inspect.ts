@@ -302,27 +302,31 @@ function pruneEphemeralProjects(dbPath: string): number {
 			id: string;
 			path: string;
 		}>;
-		const projectScopedTables = [
+		const tablesWithProjectIdFk = [
+			"preference_evidence",
+			"preference_records",
+			"observations",
+			"memories",
 			"pipeline_runs",
 			"route_tickets",
 			"forensic_events",
 			"active_review_state",
 			"project_review_memory",
 			"project_lesson_memory",
-			"run_tasks",
-			"run_pending_dispatches",
-			"background_tasks",
+			"graph_edges",
+			"graph_nodes",
+			"graph_files",
 			"project_paths",
 			"project_git_fingerprints",
 		];
 		let count = 0;
 		for (const project of projects) {
 			if (isEphemeralPath(project.path)) {
-				for (const table of projectScopedTables) {
+				for (const table of tablesWithProjectIdFk) {
 					try {
 						db.run(`DELETE FROM ${table} WHERE project_id = ?`, [project.id]);
 					} catch {
-						// Table may not exist in this DB — skip
+						// Table may not exist in this DB
 					}
 				}
 				db.run("DELETE FROM projects WHERE id = ?", [project.id]);
