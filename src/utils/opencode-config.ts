@@ -37,7 +37,7 @@ export function parseJsonc(content: string): unknown {
 		if (char === '"' && !inString) {
 			// If entering a string and we have a pending comma, add it first
 			if (pendingCommaPos >= 0) {
-				result = result.slice(0, pendingCommaPos) + "," + result.slice(pendingCommaPos);
+				result = `${result.slice(0, pendingCommaPos)},${result.slice(pendingCommaPos)}`;
 				pendingCommaPos = -1;
 			}
 			inString = true;
@@ -106,7 +106,7 @@ export function parseJsonc(content: string): unknown {
 
 		// Any other character: add pending comma if exists, then add character
 		if (pendingCommaPos >= 0) {
-			result = result.slice(0, pendingCommaPos) + "," + result.slice(pendingCommaPos);
+			result = `${result.slice(0, pendingCommaPos)},${result.slice(pendingCommaPos)}`;
 			pendingCommaPos = -1;
 		}
 		result += char;

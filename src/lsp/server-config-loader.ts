@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getGlobalConfigDir } from "../utils/paths";
 import { parseJsonc } from "../utils/opencode-config";
+import { getGlobalConfigDir } from "../utils/paths";
 import { BUILTIN_SERVERS } from "./server-definitions";
 import type { LspCapability, ResolvedServer } from "./types";
 
