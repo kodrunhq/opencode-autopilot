@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.3](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.2...opencode-autopilot-v1.31.3) (2026-04-11)
+
+
+### Bug Fixes
+
+* critical audit findings - make verification honest ([0f7e501](https://github.com/kodrunhq/opencode-autopilot/commit/0f7e501434531e80381b50db1ac8aa2bb04d0676))
+
 ## [1.31.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.1...opencode-autopilot-v1.31.2) (2026-04-11)
 
 
