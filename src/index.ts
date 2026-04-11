@@ -60,11 +60,6 @@ import {
 	getDefaultRecoveryOrchestrator,
 } from "./recovery/index";
 import { AGENT_REGISTRY, ALL_GROUP_IDS } from "./registry/model-groups";
-import {
-	clearIntentSession,
-	enforceIntentGate,
-	resetIntentForUserMessage,
-} from "./routing/intent-gate";
 import { createAgentSkillInjector } from "./skills/agent-injector";
 import { ocBackground, setBackgroundSdkOperations } from "./tools/background";
 import { ocConfidence } from "./tools/confidence";
@@ -512,7 +507,6 @@ const plugin: Plugin = async (input) => {
 	const antiSlopHandler = createAntiSlopHandler({ showToast: sdkOps.showToast });
 	const hashAnchoredEnforcementHandler = createHashAnchoredEnforcementHandler();
 	const hashlineReadEnhancerHandler = createHashlineReadEnhancerHandler();
-	const intentStorageHandler = createIntentStorageHandler();
 	const keywordDetectorHandler = createKeywordDetectorHandler({ showToast: sdkOps.showToast });
 	const preemptiveCompactionHandler = createPreemptiveCompactionHandler({
 		showToast: sdkOps.showToast,
@@ -733,23 +727,6 @@ const plugin: Plugin = async (input) => {
 					if (tokens && typeof tokens.input === "number") {
 						contextWarningMonitor.checkUtilization(tokens.input, 200_000);
 					}
-
-					// Detect user messages and reset intent tracking
-					const role = info.role as string | undefined;
-					if (role === "user") {
-						// Extract session ID from properties
-						let sessionID: string | undefined;
-						if (typeof props.sessionID === "string") {
-							sessionID = props.sessionID;
-						} else if (typeof info.sessionID === "string") {
-							sessionID = info.sessionID;
-						} else if (typeof info.id === "string") {
-							sessionID = info.id;
-						}
-						if (sessionID) {
-							resetIntentForUserMessage(sessionID);
-						}
-					}
 				}
 			}
 
@@ -769,12 +746,8 @@ const plugin: Plugin = async (input) => {
 
 			if (event.type === "session.deleted") {
 				mcpManager.stopAll().catch(() => {});
-				// Clean up intent tracking for this session
-				// Extract session ID from multiple possible locations
 				const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
-
 				if (sessionID) {
-					clearIntentSession(sessionID);
 					deleteLoopController(sessionID);
 				}
 			}
@@ -816,11 +789,6 @@ const plugin: Plugin = async (input) => {
 			);
 			if (hashAnchoredResult.args !== output.args) {
 				output.args = hashAnchoredResult.args;
-			}
-
-			const { allowed, reason } = enforceIntentGate(input.tool, input.sessionID, output.args);
-			if (!allowed) {
-				throw new Error(`Intent gate blocked ${input.tool}: ${reason}`);
 			}
 		},
 		"tool.execute.after": async (
@@ -865,13 +833,6 @@ const plugin: Plugin = async (input) => {
 
 			try {
 				await keywordDetectorHandler(hookInput, output);
-			} catch {
-				// best-effort
-			}
-
-			// Intent classification storage (best-effort, non-blocking)
-			try {
-				await intentStorageHandler(hookInput, output);
 			} catch {
 				// best-effort
 			}
