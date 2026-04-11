@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // Import the functions under test
@@ -26,7 +26,9 @@ describe("CLI install", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("creates opencode.json when it does not exist", async () => {
+	test("creates opencode.json when it does not exist (in project with git root)", async () => {
+		await mkdir(join(tempDir, ".git"));
+
 		await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
 
 		const content = JSON.parse(await readFile(join(tempDir, "opencode.json"), "utf-8"));

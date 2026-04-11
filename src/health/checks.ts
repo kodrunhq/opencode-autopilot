@@ -589,17 +589,20 @@ export async function memoryHealthCheck(baseDir?: string): Promise<HealthResult>
 
 /** Expected command files that should exist in the commands directory. */
 const EXPECTED_COMMANDS: readonly string[] = Object.freeze([
-	"oc-tdd",
-	"oc-review-pr",
 	"oc-brainstorm",
-	"oc-write-plan",
-	"oc-stocktake",
-	"oc-update-docs",
+	"oc-doctor",
 	"oc-new-agent",
-	"oc-new-skill",
 	"oc-new-command",
+	"oc-new-skill",
 	"oc-quick",
+	"oc-refactor",
 	"oc-review-agents",
+	"oc-review-pr",
+	"oc-security-audit",
+	"oc-stocktake",
+	"oc-tdd",
+	"oc-update-docs",
+	"oc-write-plan",
 ]);
 
 /**

@@ -3,13 +3,18 @@
 import { execFile as execFileCb } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { promisify } from "node:util";
 import { CONFIG_PATH, createDefaultConfig, loadConfig, saveConfig } from "../src/config";
 import { diagnose } from "../src/registry/doctor";
 import { ALL_GROUP_IDS, DIVERSITY_RULES, GROUP_DEFINITIONS } from "../src/registry/model-groups";
 import type { GroupId } from "../src/registry/types";
 import { fileExists } from "../src/utils/fs-helpers";
+import {
+	parseJsonc,
+	type ResolvedConfig,
+	resolveOpenCodeConfig,
+	verifyPluginLoad,
+} from "../src/utils/opencode-config";
 import { runConfigure } from "./configure-tui";
 import { runInspect } from "./inspect";
 
@@ -22,18 +27,13 @@ const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 
-// ── Types ───────────────────────────────────────────────────────────
-
 export interface CliOptions {
 	readonly cwd?: string;
 	readonly noTui?: boolean;
 	readonly configDir?: string;
 }
 
-// ── Constants ───────────────────────────────────────────────────────
-
 const PLUGIN_NAME = "@kodrunhq/opencode-autopilot";
-const OPENCODE_JSON = "opencode.json";
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -72,24 +72,28 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 		console.log(`  ${yellow("⚠")} OpenCode not found — install from https://opencode.ai`);
 	}
 
-	// 2. Locate or create opencode.json
-	const jsonPath = join(cwd, OPENCODE_JSON);
+	// 2. Resolve OpenCode config using proper resolution rules
+	const resolvedConfig = await resolveOpenCodeConfig({ cwd });
+	const jsonPath = resolvedConfig.path;
 	let opencodeJson: { plugin?: string[]; [key: string]: unknown };
 
-	if (await fileExists(jsonPath)) {
-		const raw = await readFile(jsonPath, "utf-8");
+	if (resolvedConfig.exists && resolvedConfig.content) {
+		opencodeJson = resolvedConfig.content as typeof opencodeJson;
+		console.log(`  ${green("✓")} Found ${resolvedConfig.location} config: ${jsonPath}`);
+	} else if (resolvedConfig.exists) {
 		try {
-			opencodeJson = JSON.parse(raw) as typeof opencodeJson;
+			const raw = await readFile(jsonPath, "utf-8");
+			opencodeJson = parseJsonc(raw) as typeof opencodeJson;
+			console.log(`  ${green("✓")} Found ${resolvedConfig.location} config: ${jsonPath}`);
 		} catch {
 			console.error(
-				`  ${red("✗")} ${OPENCODE_JSON} contains invalid JSON. Please fix it and try again.`,
+				`  ${red("✗")} Config file contains invalid JSON/JSONC. Please fix it and try again.`,
 			);
 			process.exit(1);
 		}
-		console.log(`  ${green("✓")} Found ${OPENCODE_JSON}`);
 	} else {
 		opencodeJson = { plugin: [] };
-		console.log(`  ${green("✓")} Created ${OPENCODE_JSON}`);
+		console.log(`  ${green("✓")} Will create ${resolvedConfig.location} config: ${jsonPath}`);
 	}
 
 	// 3. Register plugin (idempotent)
@@ -105,7 +109,7 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 		const tmpJsonPath = `${jsonPath}.tmp.${randomBytes(8).toString("hex")}`;
 		await writeFile(tmpJsonPath, JSON.stringify(opencodeJson, null, 2), "utf-8");
 		await rename(tmpJsonPath, jsonPath);
-		console.log(`  ${green("✓")} Plugin registered`);
+		console.log(`  ${green("✓")} Plugin registered in ${resolvedConfig.location} config`);
 	}
 
 	// 4. Create starter config (skip if exists)
@@ -140,12 +144,15 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 async function printSystemChecks(
 	cwd: string,
 	configPath: string,
-): Promise<{ hasFailure: boolean; config: Awaited<ReturnType<typeof loadConfig>> }> {
+): Promise<{
+	hasFailure: boolean;
+	config: Awaited<ReturnType<typeof loadConfig>>;
+	resolvedOpenCodeConfig: ResolvedConfig;
+}> {
 	let hasFailure = false;
 
 	console.log(bold("System"));
 
-	// 1. OpenCode installed
 	const version = await checkOpenCodeInstalled();
 	if (version) {
 		console.log(`  OpenCode installed      ${green("✓")} ${version}`);
@@ -156,36 +163,24 @@ async function printSystemChecks(
 		hasFailure = true;
 	}
 
-	// 2. Plugin registered
-	const jsonPath = join(cwd, OPENCODE_JSON);
-	if (await fileExists(jsonPath)) {
-		try {
-			const raw = await readFile(jsonPath, "utf-8");
-			const parsed = JSON.parse(raw) as { plugin?: string[] };
-			if (Array.isArray(parsed.plugin) && parsed.plugin.includes(PLUGIN_NAME)) {
-				console.log(`  Plugin registered       ${green("✓")} ${OPENCODE_JSON}`);
-			} else {
-				console.log(`  Plugin registered       ${red("✗")} not in ${OPENCODE_JSON} — run install`);
-				hasFailure = true;
-			}
-		} catch (error: unknown) {
-			if (error instanceof SyntaxError) {
-				console.log(
-					`  Plugin registered       ${red("✗")} invalid ${OPENCODE_JSON} — fix JSON syntax`,
-				);
-			} else {
-				console.log(
-					`  Plugin registered       ${red("✗")} could not read ${OPENCODE_JSON}: ${error instanceof Error ? error.message : String(error)}`,
-				);
-			}
+	const resolvedConfig = await resolveOpenCodeConfig({ cwd });
+
+	if (resolvedConfig.exists && resolvedConfig.content) {
+		const parsed = resolvedConfig.content as { plugin?: string[] };
+		if (Array.isArray(parsed.plugin) && parsed.plugin.includes(PLUGIN_NAME)) {
+			console.log(`  Plugin registered       ${green("✓")} ${resolvedConfig.location} config`);
+		} else {
+			console.log(`  Plugin registered       ${red("✗")} not in config — run install`);
 			hasFailure = true;
 		}
+	} else if (resolvedConfig.exists) {
+		console.log(`  Plugin registered       ${red("✗")} invalid config — fix JSON/JSONC syntax`);
+		hasFailure = true;
 	} else {
-		console.log(`  Plugin registered       ${red("✗")} ${OPENCODE_JSON} not found — run install`);
+		console.log(`  Plugin registered       ${red("✗")} no config found — run install`);
 		hasFailure = true;
 	}
 
-	// 3. Config file exists + schema valid
 	const config = await loadConfig(configPath);
 	if (config) {
 		console.log(`  Config file             ${green("✓")} found`);
@@ -195,7 +190,6 @@ async function printSystemChecks(
 		hasFailure = true;
 	}
 
-	// 4. Setup completed
 	if (config) {
 		if (config.configured) {
 			console.log(`  Setup completed         ${green("✓")} configured: true`);
@@ -207,7 +201,7 @@ async function printSystemChecks(
 		}
 	}
 
-	return { hasFailure, config };
+	return { hasFailure, config, resolvedOpenCodeConfig: resolvedConfig };
 }
 
 function printModelAssignments(result: ReturnType<typeof diagnose>): void {
@@ -285,15 +279,31 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 	console.log("─────────────────────────");
 	console.log("");
 
-	const { hasFailure, config } = await printSystemChecks(cwd, configPath);
+	const { hasFailure: systemHasFailure, config } = await printSystemChecks(cwd, configPath);
+	let hasFailure = systemHasFailure;
 
-	// Run shared diagnosis logic
 	const result = diagnose(config);
 
 	printModelAssignments(result);
 	printDiversityResults(result, config);
 
-	// ── Summary ────────────────────────────────────────────────
+	console.log("");
+	console.log(bold("Plugin Load Verification"));
+
+	const pluginVerification = await verifyPluginLoad();
+	if (pluginVerification.success) {
+		console.log(`  OpenCode can load plugin ${green("✓")}`);
+		if (pluginVerification.details) {
+			console.log(`    ${pluginVerification.details}`);
+		}
+	} else {
+		console.log(`  OpenCode can load plugin ${red("✗")}`);
+		console.log(`    ${pluginVerification.message}`);
+		if (pluginVerification.details) {
+			console.log(`    ${pluginVerification.details}`);
+		}
+		hasFailure = true;
+	}
 
 	console.log("");
 	if (hasFailure) {

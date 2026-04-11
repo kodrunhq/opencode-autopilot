@@ -408,7 +408,7 @@ The plugin registers 39 tools, all prefixed with `oc_` to avoid conflicts with O
 src/
 +-- index.ts                 Plugin entry -- registers tools, hooks, fallback handlers
 +-- config.ts                Zod-validated config with v1->v7 migration chain
-+-- installer.ts             Self-healing asset copier (COPYFILE_EXCL, never overwrites)
++-- installer.ts             Self-healing asset copier (COPYFILE_EXCL, overwrites installer-managed files only)
 +-- registry/
 |   +-- types.ts             GroupId, AgentEntry, GroupDefinition, DiversityRule, ...
 |   +-- model-groups.ts      AGENT_REGISTRY, GROUP_DEFINITIONS, DIVERSITY_RULES
@@ -482,7 +482,7 @@ bin/
 - **Atomic writes** -- all file operations use tmp + rename with crypto-random suffixes
 - **Immutable state** -- deep-frozen data, spread operators, readonly arrays
 - **Bidirectional validation** -- Zod parse on read AND write
-- **Self-healing assets** -- bundled files copy on load, never overwrite user customizations
+- **Self-healing assets** -- bundled files copy on load, overwrite installer-managed files, never overwrite user customizations
 
 ## Contributing
 
