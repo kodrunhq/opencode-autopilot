@@ -96,9 +96,25 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 			process.exit(1);
 		}
 	} else {
-		jsonPath = await getInstallTargetPath(cwd);
+		// No existing config - determine where to create it
+		// Priority: OPENCODE_CONFIG env var > OPENCODE_CONFIG_DIR env var > git root > global
+		const envConfigPath = process.env.OPENCODE_CONFIG;
+		const envConfigDir = process.env.OPENCODE_CONFIG_DIR;
+
+		if (envConfigPath) {
+			// OPENCODE_CONFIG env var is set - create at that exact path
+			jsonPath = envConfigPath;
+			location = "env-exact";
+		} else if (envConfigDir) {
+			// OPENCODE_CONFIG_DIR env var is set - create in that directory
+			jsonPath = join(envConfigDir, "opencode.json");
+			location = "env-dir";
+		} else {
+			// No env vars - use git root or global
+			jsonPath = await getInstallTargetPath(cwd);
+			location = jsonPath.includes(".config/opencode") ? "global" : "project";
+		}
 		opencodeJson = { plugin: [] };
-		location = jsonPath.includes(".config/opencode") ? "global" : "project";
 		console.log(`  ${green("✓")} Will create ${location} config: ${jsonPath}`);
 	}
 

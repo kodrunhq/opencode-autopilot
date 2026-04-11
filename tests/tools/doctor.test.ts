@@ -82,17 +82,20 @@ describe("doctorCore", () => {
 		const commandsDir = join(tempDir, "commands");
 		await mkdir(commandsDir, { recursive: true });
 		const expectedCommands = [
-			"oc-tdd",
-			"oc-review-pr",
 			"oc-brainstorm",
-			"oc-write-plan",
-			"oc-stocktake",
-			"oc-update-docs",
+			"oc-doctor",
 			"oc-new-agent",
-			"oc-new-skill",
 			"oc-new-command",
+			"oc-new-skill",
 			"oc-quick",
+			"oc-refactor",
 			"oc-review-agents",
+			"oc-review-pr",
+			"oc-security-audit",
+			"oc-stocktake",
+			"oc-tdd",
+			"oc-update-docs",
+			"oc-write-plan",
 		];
 		for (const cmd of expectedCommands) {
 			await writeFile(

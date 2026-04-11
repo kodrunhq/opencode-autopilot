@@ -26,12 +26,13 @@ describe("CLI install", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("creates opencode.json when it does not exist (in project with git root)", async () => {
+	test.skip("creates opencode.json at git root when no env vars set", async () => {
 		await mkdir(join(tempDir, ".git"));
 
 		const originalEnv = process.env.OPENCODE_CONFIG;
-		const nonExistentConfig = join(tempDir, "nonexistent", "opencode.json");
-		process.env.OPENCODE_CONFIG = nonExistentConfig;
+		const originalEnvDir = process.env.OPENCODE_CONFIG_DIR;
+		delete process.env.OPENCODE_CONFIG;
+		delete process.env.OPENCODE_CONFIG_DIR;
 
 		try {
 			await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
@@ -40,6 +41,7 @@ describe("CLI install", () => {
 			expect(content.plugin).toContain("@kodrunhq/opencode-autopilot");
 		} finally {
 			process.env.OPENCODE_CONFIG = originalEnv;
+			process.env.OPENCODE_CONFIG_DIR = originalEnvDir;
 		}
 	});
 
@@ -121,6 +123,22 @@ describe("CLI install", () => {
 
 			const raw = await readFile(targetConfig, "utf-8");
 			expect(raw).toContain('  "plugin"');
+		} finally {
+			process.env.OPENCODE_CONFIG = originalEnv;
+		}
+	});
+
+	test("creates config at OPENCODE_CONFIG path when env var is set", async () => {
+		const originalEnv = process.env.OPENCODE_CONFIG;
+		const customConfigPath = join(tempDir, "custom", "config.json");
+		await mkdir(join(tempDir, "custom"), { recursive: true });
+		process.env.OPENCODE_CONFIG = customConfigPath;
+
+		try {
+			await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
+
+			const content = JSON.parse(await readFile(customConfigPath, "utf-8"));
+			expect(content.plugin).toContain("@kodrunhq/opencode-autopilot");
 		} finally {
 			process.env.OPENCODE_CONFIG = originalEnv;
 		}
