@@ -26,8 +26,10 @@ The `install` command sets up the plugin for use with OpenCode.
 
 **What it does:**
 *   Checks if the OpenCode CLI is installed on your system.
-*   Locates or creates an `opencode.json` file in the current directory.
-*   Registers `@kodrunhq/opencode-autopilot` in the `plugin` array of `opencode.json`.
+*   Resolves OpenCode configuration following OpenCode's rules: checks `OPENCODE_CONFIG` env var, `OPENCODE_CONFIG_DIR` env var, project config (walking up from cwd to git root), then global config at `~/.config/opencode/opencode.json`.
+*   Creates a new `opencode.json` at the appropriate location if no config exists (at git root if in a repo, otherwise in global config).
+*   Supports both JSON and JSONC (JSON with Comments) formats.
+*   Registers `@kodrunhq/opencode-autopilot` in the `plugin` array.
 *   Creates a starter configuration file at `~/.config/opencode/opencode-autopilot.json` if it does not exist.
 
 **Usage:**
@@ -58,7 +60,8 @@ bunx @kodrunhq/opencode-autopilot configure
 The `doctor` command runs a suite of health diagnostics to ensure the plugin is correctly set up.
 
 **What it does:**
-*   **System Checks**: Verifies OpenCode installation, plugin registration in `opencode.json`, and configuration file health.
+*   **System Checks**: Verifies OpenCode installation, plugin registration in OpenCode config (respecting `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, project config, and global config), and configuration file health.
+*   **Plugin Load Verification**: Attempts to verify that OpenCode can actually load the plugin (catches missing dependencies).
 *   **Model Assignments**: Lists the primary and fallback models assigned to each agent group.
 *   **Adversarial Diversity**: Checks if adversarial pairs, like Architects and Challengers, use different model families to avoid confirmation bias.
 *   **Suggestions**: Provides actionable steps to fix any identified issues.

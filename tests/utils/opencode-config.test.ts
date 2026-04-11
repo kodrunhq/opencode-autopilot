@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-	getPluginRegistrationPath,
+	getInstallTargetPath,
 	parseJsonc,
 	resolveOpenCodeConfig,
 } from "../../src/utils/opencode-config";
@@ -42,7 +42,8 @@ describe("opencode-config", () => {
 				"plugin": ["test",],
 				"version": 7,
 			}`;
-			expect(() => parseJsonc(jsonc)).toThrow();
+			const result = parseJsonc(jsonc);
+			expect(result).toEqual({ plugin: ["test"], version: 7 });
 		});
 	});
 
@@ -155,23 +156,24 @@ describe("opencode-config", () => {
 		});
 	});
 
-	describe("getPluginRegistrationPath", () => {
-		test("returns project config path when project config exists", async () => {
+	describe("getInstallTargetPath", () => {
+		test("returns git root path when in a git repository", async () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
-			const configPath = join(tempDir, "opencode.json");
-			await writeFile(configPath, '{"plugin": []}');
+			await mkdir(join(tempDir, ".git"));
+			const subDir = join(tempDir, "src", "components");
+			await mkdir(subDir, { recursive: true });
 
-			const result = await getPluginRegistrationPath(tempDir);
+			const result = await getInstallTargetPath(subDir);
 
-			expect(result).toBe(configPath);
+			expect(result).toBe(join(tempDir, "opencode.json"));
 
 			await rm(tempDir, { recursive: true, force: true });
 		});
 
-		test("returns global config path when no project config exists", async () => {
+		test("returns global config path when not in a git repository", async () => {
 			const tempDir = await mkdtemp(join(tmpdir(), "config-test-"));
 
-			const result = await getPluginRegistrationPath(tempDir);
+			const result = await getInstallTargetPath(tempDir);
 
 			expect(result).toContain(".config/opencode/opencode.json");
 

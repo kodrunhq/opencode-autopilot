@@ -10,6 +10,7 @@ import { ALL_GROUP_IDS, DIVERSITY_RULES, GROUP_DEFINITIONS } from "../src/regist
 import type { GroupId } from "../src/registry/types";
 import { fileExists } from "../src/utils/fs-helpers";
 import {
+	getInstallTargetPath,
 	parseJsonc,
 	type ResolvedConfig,
 	resolveOpenCodeConfig,
@@ -64,7 +65,6 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 	console.log("─────────────────────────");
 	console.log("");
 
-	// 1. Check OpenCode installed (warn but don't fail)
 	const version = await checkOpenCodeInstalled();
 	if (version) {
 		console.log(`  ${green("✓")} OpenCode installed: ${version}`);
@@ -72,19 +72,23 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 		console.log(`  ${yellow("⚠")} OpenCode not found — install from https://opencode.ai`);
 	}
 
-	// 2. Resolve OpenCode config using proper resolution rules
 	const resolvedConfig = await resolveOpenCodeConfig({ cwd });
-	const jsonPath = resolvedConfig.path;
+	let jsonPath: string;
 	let opencodeJson: { plugin?: string[]; [key: string]: unknown };
+	let location: string;
 
 	if (resolvedConfig.exists && resolvedConfig.content) {
+		jsonPath = resolvedConfig.path;
 		opencodeJson = resolvedConfig.content as typeof opencodeJson;
-		console.log(`  ${green("✓")} Found ${resolvedConfig.location} config: ${jsonPath}`);
+		location = resolvedConfig.location;
+		console.log(`  ${green("✓")} Found ${location} config: ${jsonPath}`);
 	} else if (resolvedConfig.exists) {
+		jsonPath = resolvedConfig.path;
 		try {
 			const raw = await readFile(jsonPath, "utf-8");
 			opencodeJson = parseJsonc(raw) as typeof opencodeJson;
-			console.log(`  ${green("✓")} Found ${resolvedConfig.location} config: ${jsonPath}`);
+			location = resolvedConfig.location;
+			console.log(`  ${green("✓")} Found ${location} config: ${jsonPath}`);
 		} catch {
 			console.error(
 				`  ${red("✗")} Config file contains invalid JSON/JSONC. Please fix it and try again.`,
@@ -92,11 +96,12 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 			process.exit(1);
 		}
 	} else {
+		jsonPath = await getInstallTargetPath(cwd);
 		opencodeJson = { plugin: [] };
-		console.log(`  ${green("✓")} Will create ${resolvedConfig.location} config: ${jsonPath}`);
+		location = jsonPath.includes(".config/opencode") ? "global" : "project";
+		console.log(`  ${green("✓")} Will create ${location} config: ${jsonPath}`);
 	}
 
-	// 3. Register plugin (idempotent)
 	const existingPlugins: string[] = Array.isArray(opencodeJson.plugin) ? opencodeJson.plugin : [];
 
 	if (existingPlugins.includes(PLUGIN_NAME)) {
@@ -109,10 +114,9 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 		const tmpJsonPath = `${jsonPath}.tmp.${randomBytes(8).toString("hex")}`;
 		await writeFile(tmpJsonPath, JSON.stringify(opencodeJson, null, 2), "utf-8");
 		await rename(tmpJsonPath, jsonPath);
-		console.log(`  ${green("✓")} Plugin registered in ${resolvedConfig.location} config`);
+		console.log(`  ${green("✓")} Plugin registered in ${location} config`);
 	}
 
-	// 4. Create starter config (skip if exists)
 	if (await fileExists(configPath)) {
 		const config = await loadConfig(configPath);
 		if (config?.configured) {
@@ -126,7 +130,6 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 		console.log(`  ${green("✓")} Created starter config`);
 	}
 
-	// 5. Print next steps
 	console.log("");
 	console.log(bold("Next steps:"));
 	console.log("");

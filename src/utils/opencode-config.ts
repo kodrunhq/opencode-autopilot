@@ -23,13 +23,16 @@ function stripJsonComments(jsonc: string): string {
 	return result;
 }
 
-/** Parse JSONC content, stripping comments first */
-export function parseJsonc(content: string): unknown {
-	const stripped = stripJsonComments(content);
-	return JSON.parse(stripped);
+function stripTrailingCommas(json: string): string {
+	return json.replace(/,(\s*[}\]])/g, "$1");
 }
 
-/** Try to find git root from a starting directory */
+export function parseJsonc(content: string): unknown {
+	const withoutComments = stripJsonComments(content);
+	const withoutTrailingCommas = stripTrailingCommas(withoutComments);
+	return JSON.parse(withoutTrailingCommas);
+}
+
 async function findGitRoot(startDir: string): Promise<string | null> {
 	let current = resolve(startDir);
 	const visited = new Set<string>();
@@ -240,22 +243,12 @@ export async function resolveOpenCodeConfig(options: ResolveOptions = {}): Promi
 	};
 }
 
-/**
- * Get the appropriate config path for plugin registration.
- *
- * This prefers project-level configs but falls back to global config
- * when no project config exists. This matches user expectations:
- * - In a project: register in project's opencode.json
- * - Not in a project: register in ~/.config/opencode/opencode.json
- */
-export async function getPluginRegistrationPath(cwd?: string): Promise<string> {
-	// First try to find project config
-	const projectConfig = await findProjectConfig(cwd ?? process.cwd());
-	if (projectConfig) {
-		return projectConfig;
+export async function getInstallTargetPath(cwd?: string): Promise<string> {
+	const resolvedCwd = cwd ?? process.cwd();
+	const gitRoot = await findGitRoot(resolvedCwd);
+	if (gitRoot) {
+		return join(gitRoot, "opencode.json");
 	}
-
-	// Fall back to global config
 	return getGlobalConfigPath();
 }
 

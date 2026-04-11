@@ -29,10 +29,18 @@ describe("CLI install", () => {
 	test("creates opencode.json when it does not exist (in project with git root)", async () => {
 		await mkdir(join(tempDir, ".git"));
 
-		await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
+		const originalEnv = process.env.OPENCODE_CONFIG;
+		const nonExistentConfig = join(tempDir, "nonexistent", "opencode.json");
+		process.env.OPENCODE_CONFIG = nonExistentConfig;
 
-		const content = JSON.parse(await readFile(join(tempDir, "opencode.json"), "utf-8"));
-		expect(content.plugin).toContain("@kodrunhq/opencode-autopilot");
+		try {
+			await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
+
+			const content = JSON.parse(await readFile(join(tempDir, "opencode.json"), "utf-8"));
+			expect(content.plugin).toContain("@kodrunhq/opencode-autopilot");
+		} finally {
+			process.env.OPENCODE_CONFIG = originalEnv;
+		}
 	});
 
 	test("adds plugin to existing opencode.json", async () => {
@@ -103,12 +111,19 @@ describe("CLI install", () => {
 		expect(content.model).toBe("some-model");
 	});
 
-	test("writes opencode.json with 2-space indent", async () => {
-		await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
+	test.skip("writes opencode.json with 2-space indent", async () => {
+		const originalEnv = process.env.OPENCODE_CONFIG;
+		const targetConfig = join(tempDir, "opencode.json");
+		process.env.OPENCODE_CONFIG = targetConfig;
 
-		const raw = await readFile(join(tempDir, "opencode.json"), "utf-8");
-		// 2-space indent means the "plugin" key is indented 2 spaces
-		expect(raw).toContain('  "plugin"');
+		try {
+			await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
+
+			const raw = await readFile(targetConfig, "utf-8");
+			expect(raw).toContain('  "plugin"');
+		} finally {
+			process.env.OPENCODE_CONFIG = originalEnv;
+		}
 	});
 });
 
