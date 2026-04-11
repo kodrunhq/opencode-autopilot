@@ -40,7 +40,7 @@ class PreInitBuffer {
 
 const preInitBuffer = new PreInitBuffer();
 
-let _rootLogger: Logger | null = null;
+let rootLogger: Logger | null = null;
 let isInitialized = false;
 
 const preInitSink: LogSink = {
@@ -62,7 +62,7 @@ const directProxySink = new DirectProxySink();
 export function initLoggers(projectRoot: string, sinks?: readonly LogSink[]): void {
 	const resolvedSinks = sinks ?? [createForensicSink(projectRoot)];
 	const multiplexSink = new MultiplexSink(resolvedSinks);
-	_rootLogger = new BaseLogger(multiplexSink, { domain: "system" });
+	rootLogger = new BaseLogger(multiplexSink, { domain: "system" });
 	isInitialized = true;
 	activeSink = multiplexSink;
 
@@ -98,7 +98,7 @@ export function isLoggerInitialized(): boolean {
  * Reset logger state (for testing only).
  */
 export function resetLoggerState(): void {
-	_rootLogger = null;
+	rootLogger = null;
 	isInitialized = false;
 	activeSink = preInitSink;
 }
