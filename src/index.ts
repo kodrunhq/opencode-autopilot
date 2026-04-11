@@ -743,14 +743,14 @@ const plugin: Plugin = async (input) => {
 
 			await compactionHandler({ event });
 
-			if (event.type === "session.deleted") {
-				mcpManager.stopAll().catch(() => {});
-				const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
-				if (sessionID) {
-					deleteLoopController(sessionID);
+				if (event.type === "session.deleted") {
+					mcpManager.stopAll().catch(() => {});
+					const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
+					if (sessionID) {
+						deleteLoopController(sessionID);
+					}
 				}
-			}
-		},
+			},
 		config: async (cfg: Config) => {
 			openCodeConfig = cfg;
 			setOpenCodeConfig(cfg);

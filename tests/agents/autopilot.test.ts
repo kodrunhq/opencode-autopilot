@@ -161,6 +161,10 @@ describe("autopilot prompt — Oracle-identified gaps", () => {
 		expect(prompt).toContain('intent set to "implementation"');
 	});
 
+	test("prompt instructs passing routeToken to oc_orchestrate", () => {
+		expect(prompt).toContain("routeToken");
+	});
+
 	test("prompt states pipeline requires intent classification", () => {
 		expect(prompt).toContain("pipeline REQUIRES intent");
 	});

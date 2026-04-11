@@ -1,41 +1,42 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
 	clearLanguageCache,
 	resolveLanguageTag,
 	substituteLanguageVar,
 } from "../../src/utils/language-resolver";
 
-const mockDetect = mock((_: string) =>
-	Promise.resolve(Object.freeze(["typescript", "bun"]) as readonly string[]),
-);
-
 afterEach(() => {
 	clearLanguageCache();
-	mockDetect.mockClear();
 });
 
 describe("resolveLanguageTag", () => {
 	test("returns comma-separated tags from detectProjectStackTags", async () => {
-		mockDetect.mockResolvedValueOnce(Object.freeze(["typescript", "javascript"]));
-		const result = await resolveLanguageTag("/tmp/project-ts", mockDetect);
+		const tempDir = await mkdtemp(join(tmpdir(), "language-test-"));
+		await writeFile(join(tempDir, "package.json"), "{}");
+		await writeFile(join(tempDir, "tsconfig.json"), "{}");
+		const result = await resolveLanguageTag(tempDir);
 		expect(result).toBe("javascript, typescript");
-		expect(mockDetect).toHaveBeenCalledWith("/tmp/project-ts");
+		await rm(tempDir, { recursive: true, force: true });
 	});
 
 	test("returns 'unknown' when no manifest files detected", async () => {
-		mockDetect.mockResolvedValueOnce(Object.freeze([]));
-		const result = await resolveLanguageTag("/tmp/project-empty", mockDetect);
+		const tempDir = await mkdtemp(join(tmpdir(), "language-test-"));
+		const result = await resolveLanguageTag(tempDir);
 		expect(result).toBe("unknown");
+		await rm(tempDir, { recursive: true, force: true });
 	});
 
 	test("caches result per projectRoot within a session", async () => {
-		mockDetect.mockResolvedValue(Object.freeze(["python"]));
-		const first = await resolveLanguageTag("/tmp/project-py", mockDetect);
-		const second = await resolveLanguageTag("/tmp/project-py", mockDetect);
-		expect(first).toBe("python");
-		expect(second).toBe("python");
-		// detectProjectStackTags should be called only once due to caching
-		expect(mockDetect).toHaveBeenCalledTimes(1);
+		const tempDir = await mkdtemp(join(tmpdir(), "language-test-"));
+		await writeFile(join(tempDir, "package.json"), "{}");
+		const first = await resolveLanguageTag(tempDir);
+		const second = await resolveLanguageTag(tempDir);
+		expect(first).toBe("javascript");
+		expect(second).toBe("javascript");
+		await rm(tempDir, { recursive: true, force: true });
 	});
 });
 

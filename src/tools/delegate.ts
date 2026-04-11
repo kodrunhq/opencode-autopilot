@@ -89,7 +89,8 @@ function resolveRoutingDecision(
 		};
 	}
 
-	const decision = makeRoutingDecision(task, config?.routing);
+	const routingConfig = config?.routing?.enabled === false ? undefined : config?.routing;
+	const decision = makeRoutingDecision(task, routingConfig);
 	const definition = getCategoryDefinition(decision.category);
 	return {
 		category: decision.category,

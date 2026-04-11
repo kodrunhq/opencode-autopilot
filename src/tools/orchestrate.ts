@@ -1,7 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { tool } from "@opencode-ai/plugin";
 import { loadConfig } from "../config";
-import { openKernelDb } from "../kernel/database";
 import { getLogger } from "../logging/domains";
 import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
@@ -42,7 +41,7 @@ import {
 } from "../orchestrator/state";
 import type { Phase, PipelineState } from "../orchestrator/types";
 import { getIntentRouting, type IntentType, IntentTypeSchema } from "../routing/intent-types";
-import { createRouteTicketRepository } from "../routing/route-ticket-repository";
+import { consumeRouteToken } from "../routing/route-token";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
 import {
@@ -73,6 +72,32 @@ const ORCHESTRATE_ERROR_CODES = Object.freeze({
 	RESULT_KIND_MISMATCH: "E_RESULT_KIND_MISMATCH",
 	NO_STATE: "E_NO_STATE",
 });
+
+function resolveArtifactRoot(context: {
+	readonly directory?: string;
+	readonly worktree?: string;
+}): string {
+	if (typeof context.worktree === "string" && context.worktree.length > 0) {
+		return context.worktree;
+	}
+	if (typeof context.directory === "string" && context.directory.length > 0) {
+		return context.directory;
+	}
+	return process.cwd();
+}
+
+function shouldRequireRouteToken(
+	args: Readonly<OrchestrateArgs>,
+	state: PipelineState | null,
+): args is Readonly<OrchestrateArgs & { readonly idea: string; readonly intent: "implementation" }> {
+	return (
+		typeof args.idea === "string" &&
+		args.idea.length > 0 &&
+		args.intent === "implementation" &&
+		!args.result &&
+		(state === null || canStartFreshRun(state))
+	);
+}
 
 function createDispatchId(): string {
 	return `dispatch_${randomBytes(6).toString("hex")}`;
@@ -1234,43 +1259,8 @@ export async function orchestrateCore(
 			});
 		}
 
-		// No state but idea provided -> route token validation and intent guard
+		// No state but idea provided -> intent guard
 		if (state === null && args.idea) {
-			// Route token validation - only when context is provided (for test compatibility)
-			if (context) {
-				if (!args.routeToken) {
-					return JSON.stringify({
-						action: "error",
-						code: "E_ROUTE_TOKEN_REQUIRED",
-						message:
-							"Route token is required to start the pipeline. Call oc_route first to classify the user's intent and obtain a route token, then pass routeToken to oc_orchestrate.",
-					});
-				}
-				if (context.projectRoot) {
-					try {
-						const db = await openKernelDb(context.projectRoot);
-						const routeTicketRepo = createRouteTicketRepository(db);
-						const validationResult = routeTicketRepo.validateAndConsumeTicket(args.routeToken, {
-							sessionId: context.sessionId,
-							messageId: context.messageId,
-							projectId: context.projectRoot,
-							intent: args.intent ?? "implementation",
-						});
-						await db.close();
-						if (!validationResult.valid) {
-							return JSON.stringify({
-								action: "error",
-								code: "E_INVALID_ROUTE_TOKEN",
-								message: `Invalid or expired route token: ${validationResult.reason}. Call oc_route first to obtain a valid route token, then pass it to oc_orchestrate.`,
-							});
-						}
-					} catch {
-						// Database/project setup may not exist in all contexts
-						// For now, allow the pipeline to proceed if we can't validate
-						// This maintains backward compatibility while enabling validation where supported
-					}
-				}
-			}
 			if (!args.intent) {
 				return JSON.stringify({
 					action: "error",
@@ -1647,10 +1637,32 @@ export const ocOrchestrate = tool({
 			),
 	},
 	async execute(args, context) {
-		return orchestrateCore(args, getProjectArtifactDir(context.directory), {
-			sessionId: context.sessionID,
-			messageId: context.messageID,
-			projectRoot: context.worktree ?? context.directory ?? process.cwd(),
-		});
+		const root = resolveArtifactRoot(context);
+		const artifactDir = getProjectArtifactDir(root);
+		let state: PipelineState | null = null;
+		try {
+			state = await loadState(artifactDir);
+		} catch {
+			state = null;
+		}
+
+		if (shouldRequireRouteToken(args, state)) {
+			const validation = consumeRouteToken({
+				sessionID: context.sessionID,
+				projectRoot: root,
+				messageID: context.messageID,
+				intent: args.intent,
+				routeToken: args.routeToken,
+			});
+			if (!validation.ok) {
+				return JSON.stringify({
+					action: "error",
+					code: validation.code ?? "E_ROUTE_TOKEN_INVALID",
+					message: validation.message ?? "Invalid route token.",
+				});
+			}
+		}
+
+		return orchestrateCore(args, artifactDir);
 	},
 });

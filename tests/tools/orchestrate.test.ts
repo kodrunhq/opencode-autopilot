@@ -8,8 +8,8 @@ import { resetDedupCache } from "../../src/observability/forensic-log";
 import { getPhaseDir } from "../../src/orchestrator/artifacts";
 import { clearAllRetryState, recordRetryAttempt } from "../../src/orchestrator/dispatch-retry";
 import { createInitialState, loadState, saveState } from "../../src/orchestrator/state";
-import { orchestrateCore } from "../../src/tools/orchestrate";
-import { routeCore } from "../../src/tools/route";
+import { ocOrchestrate, orchestrateCore } from "../../src/tools/orchestrate";
+import { ocRoute, routeCore } from "../../src/tools/route";
 
 let tempDir: string;
 
@@ -532,6 +532,165 @@ describe("integration: routeCore → orchestrateCore", () => {
 		expect(pipeline.action).toBe("error");
 		expect(pipeline.code).toBe("E_INTENT_NOT_IMPLEMENTATION");
 		expect(pipeline.message).toContain("debugger");
+	});
+
+	test("oc_route returns routeToken for implementation route and oc_orchestrate accepts it", async () => {
+		const routeContext = {
+			sessionID: "session-route-token-1",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-1",
+		} as unknown as Parameters<typeof ocRoute.execute>[1];
+
+		const route = JSON.parse(
+			await ocRoute.execute(
+				{
+					primaryIntent: "implementation",
+					reasoning: "User asked for a feature",
+					verbalization: "I detect implementation intent",
+				},
+				routeContext,
+			),
+		);
+		expect(route.action).toBe("route");
+		expect(route.usePipeline).toBe(true);
+		expect(route.requiredPipelineArgs).toBeDefined();
+		expect(typeof route.requiredPipelineArgs.routeToken).toBe("string");
+
+		const orchestrateContext = {
+			sessionID: routeContext.sessionID,
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-1",
+		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+		const started = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add onboarding wizard",
+					intent: "implementation",
+					routeToken: route.requiredPipelineArgs.routeToken,
+				},
+				orchestrateContext,
+			),
+		);
+		expect(started.action).toBe("dispatch");
+		expect(started.phase).toBe("RECON");
+	});
+
+	test("oc_orchestrate rejects missing routeToken and reports token error", async () => {
+		const context = {
+			sessionID: "session-route-token-missing",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-2",
+		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+		const result = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add analytics panel",
+					intent: "implementation",
+				},
+				context,
+			),
+		);
+
+		expect(result.action).toBe("error");
+		expect(result.code).toBe("E_ROUTE_TOKEN_REQUIRED");
+	});
+
+	test("oc_orchestrate rejects routeToken from wrong session/project", async () => {
+		const firstRouteContext = {
+			sessionID: "session-route-token-wrong",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-3",
+		} as unknown as Parameters<typeof ocRoute.execute>[1];
+
+		const route = JSON.parse(
+			await ocRoute.execute(
+				{
+					primaryIntent: "implementation",
+					reasoning: "User asked for a feature",
+					verbalization: "I detect implementation intent",
+				},
+				firstRouteContext,
+			),
+		);
+		expect(route.action).toBe("route");
+
+		const wrongContext = {
+			sessionID: "session-route-token-wrong-bad",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-3",
+		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+		const mismatch = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add user profile page",
+					intent: "implementation",
+					routeToken: route.requiredPipelineArgs.routeToken,
+				},
+				wrongContext,
+			),
+		);
+		expect(mismatch.action).toBe("error");
+		expect(mismatch.code).toBe("E_ROUTE_TOKEN_MISMATCH");
+	});
+
+	test("routeToken is consumed after first implementation start", async () => {
+		const routeContext = {
+			sessionID: "session-route-token-consume",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-4",
+		} as unknown as Parameters<typeof ocRoute.execute>[1];
+
+		const route = JSON.parse(
+			await ocRoute.execute(
+				{
+					primaryIntent: "implementation",
+					reasoning: "User asked for a feature",
+					verbalization: "I detect implementation intent",
+				},
+				routeContext,
+			),
+		);
+
+		const context = {
+			sessionID: routeContext.sessionID,
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-4",
+		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+		const first = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add dark mode",
+					intent: "implementation",
+					routeToken: route.requiredPipelineArgs.routeToken,
+				},
+				context,
+			),
+		);
+		expect(first.action).toBe("dispatch");
+
+		const repeat = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add dark mode again",
+					intent: "implementation",
+					routeToken: route.requiredPipelineArgs.routeToken,
+				},
+				context,
+			),
+		);
+		expect(repeat.action).toBe("error");
+		expect(repeat.code).toBe("E_ROUTE_TOKEN_CONSUMED");
 	});
 });
 

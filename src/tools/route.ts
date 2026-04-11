@@ -1,19 +1,31 @@
 import { tool } from "@opencode-ai/plugin";
-import { openKernelDb } from "../kernel/database";
 import {
 	getIntentRouting,
 	IntentClassificationSchema,
 	type IntentType,
 	IntentTypeSchema,
 } from "../routing/intent-types";
-import { createRouteTicketRepository } from "../routing/route-ticket-repository";
+import { issueRouteToken } from "../routing/route-token";
+
+function resolveProjectRoot(context: {
+	readonly directory?: string;
+	readonly worktree?: string;
+}): string {
+	if (typeof context.worktree === "string" && context.worktree.length > 0) {
+		return context.worktree;
+	}
+	if (typeof context.directory === "string" && context.directory.length > 0) {
+		return context.directory;
+	}
+	return process.cwd();
+}
 
 function buildInstruction(
 	_intent: IntentType,
 	routing: Readonly<{ targetAgent: string; usePipeline: boolean; behavior: string }>,
 ): string {
 	if (routing.usePipeline) {
-		return `Proceed with oc_orchestrate (pass intent: "implementation") — full pipeline via ${routing.targetAgent}. ${routing.behavior}`;
+		return `Call oc_orchestrate with intent: "implementation" and routeToken from requiredPipelineArgs.routeToken - full pipeline via ${routing.targetAgent}. ${routing.behavior}`;
 	}
 	return `Route to ${routing.targetAgent} agent directly — no pipeline needed. ${routing.behavior}`;
 }
@@ -23,7 +35,9 @@ function buildSecondaryInstruction(
 	secondaryRouting: Readonly<{ targetAgent: string; usePipeline: boolean; behavior: string }>,
 ): string {
 	const intentHint =
-		secondary === "implementation" ? ' (pass intent: "implementation" to oc_orchestrate)' : "";
+		secondary === "implementation"
+			? ' (pass intent: "implementation" and routeToken from requiredPipelineArgs.routeToken to oc_orchestrate)'
+			: "";
 	return `After completing the primary intent, follow up with: ${secondaryRouting.behavior} (via ${secondaryRouting.targetAgent})${intentHint}`;
 }
 
@@ -89,34 +103,21 @@ export function routeCore(
 		instruction,
 	};
 
-	// Issue route ticket for pipeline-start authorization
 	if (context && routing.usePipeline && primary === "implementation") {
-		try {
-			const db = openKernelDb(context.projectRoot);
-			const repo = createRouteTicketRepository(db);
+		const token = issueRouteToken({
+			sessionID: context.sessionId,
+			projectRoot: context.projectRoot,
+			messageID: context.messageId,
+			intent: "implementation",
+		});
 
-			const ticket = repo.createTicket({
-				projectId: context.projectRoot,
-				sessionId: context.sessionId,
-				messageId: context.messageId,
-				intent: primary,
-				usePipeline: true,
-				metadata: {
-					reasoning: classification.data.reasoning,
-					verbalization: classification.data.verbalization,
-				},
-				ttlMinutes: 10,
-			});
-
-			db.close();
-
-			result.routeToken = ticket.routeToken;
-			result.routeTokenMode = "single_use";
-			result.routeTokenExpiresAt = ticket.expiresAt;
-		} catch {
-			// Ticket creation is best-effort; don't block routing if it fails
-			// The intent gate will still work via the legacy path
-		}
+		result.routeToken = token.token;
+		result.routeTokenMode = "single_use";
+		result.routeTokenExpiresAt = token.expiresAt;
+		result.requiredPipelineArgs = {
+			intent: "implementation",
+			routeToken: token.token,
+		};
 	}
 
 	if (classification.data.secondaryIntent) {
@@ -158,20 +159,19 @@ export const ocRoute = tool({
 			),
 	},
 	execute(args, context) {
-		return Promise.resolve(
-			routeCore(
-				{
-					primaryIntent: args.primaryIntent,
-					secondaryIntent: args.secondaryIntent,
-					reasoning: args.reasoning,
-					verbalization: args.verbalization,
-				},
-				{
-					sessionId: context.sessionID,
-					messageId: context.messageID,
-					projectRoot: context.worktree ?? context.directory ?? process.cwd(),
-				},
-			),
+		const result = routeCore(
+			{
+				primaryIntent: args.primaryIntent,
+				secondaryIntent: args.secondaryIntent,
+				reasoning: args.reasoning,
+				verbalization: args.verbalization,
+			},
+			{
+				sessionId: context.sessionID,
+				messageId: context.messageID,
+				projectRoot: resolveProjectRoot(context),
+			},
 		);
+		return Promise.resolve(result);
 	},
 });
