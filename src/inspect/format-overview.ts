@@ -66,6 +66,8 @@ export function formatMemoryOverview(overview: InspectMemoryOverview, verbose = 
 		`Total memories: ${overview.stats.totalMemories}`,
 		`Storage size: ${overview.stats.storageSizeKb} KB`,
 		"",
+		`Memories by kind: ${JSON.stringify(overview.stats.memoriesByKind)}`,
+		"",
 		"Observations by type:",
 		...Object.entries(overview.stats.observationsByType).map(
 			([type, count]) => `- ${type}: ${count}`,

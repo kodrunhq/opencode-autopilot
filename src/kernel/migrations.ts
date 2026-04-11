@@ -1,4 +1,7 @@
 import type { Database } from "bun:sqlite";
+import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
+import { normalize } from "node:path";
 import { runProjectRegistryMigrations } from "../projects/database";
 import { KERNEL_SCHEMA_STATEMENTS, KERNEL_SCHEMA_VERSION } from "./schema";
 
@@ -146,6 +149,55 @@ function migrateTaskIdToText(database: Database): void {
 	rebuildTableWithTextTaskId(database, "forensic_events");
 }
 
+function normalizeProjectRoot(projectRoot: string): string {
+	try {
+		return realpathSync(projectRoot);
+	} catch {
+		return normalize(projectRoot);
+	}
+}
+
+function computeDeterministicProjectId(projectRoot: string): string {
+	const root = normalizeProjectRoot(projectRoot);
+	return `proj_${createHash("sha256").update(`path:${root}`).digest("hex").slice(0, 24)}`;
+}
+
+function reconcileProjectIds(database: Database): void {
+	if (!tableExists(database, "projects")) return;
+
+	const rows = database.query("SELECT id, path FROM projects").all() as Array<{
+		id: string;
+		path: string;
+	}>;
+	const tablesWithProjectId = [
+		"pipeline_runs",
+		"forensic_events",
+		"active_review_state",
+		"project_review_memory",
+		"project_lesson_memory",
+		"project_paths",
+		"project_git_fingerprints",
+	];
+
+	for (const row of rows) {
+		const targetId = computeDeterministicProjectId(row.path);
+		if (targetId === row.id) continue;
+
+		database.run("BEGIN");
+		try {
+			for (const table of tablesWithProjectId) {
+				if (!tableExists(database, table)) continue;
+				database.run(`UPDATE ${table} SET project_id = ? WHERE project_id = ?`, [targetId, row.id]);
+			}
+			database.run("UPDATE projects SET id = ? WHERE id = ?", [targetId, row.id]);
+			database.run("COMMIT");
+		} catch (error) {
+			database.run("ROLLBACK");
+			throw error;
+		}
+	}
+}
+
 function ensureSessionIdOnPendingDispatches(database: Database): void {
 	if (!tableExists(database, "run_pending_dispatches")) return;
 	if (columnExists(database, "run_pending_dispatches", "session_id")) return;
@@ -235,6 +287,7 @@ export function runKernelMigrations(database: Database): void {
 	migrateTaskIdToText(database);
 	ensureSessionIdOnPendingDispatches(database);
 	backfillBackgroundTaskColumns(database);
+	// Project ID reconciliation is intentionally not automatic to avoid mutating live IDs unexpectedly.
 
 	if (currentVersion < KERNEL_SCHEMA_VERSION) {
 		database.run(`PRAGMA user_version = ${KERNEL_SCHEMA_VERSION}`);

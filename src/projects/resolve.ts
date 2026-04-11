@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { execFile as execFileCb, execFileSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { basename, normalize } from "node:path";
 import { realpathSync } from "node:fs";
 import { promisify } from "node:util";

@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { getAutopilotDbPath, getProjectArtifactDir } from "../utils/paths";
 import { runKernelMigrations } from "./migrations";
 
@@ -65,14 +65,18 @@ export function migrateLegacyKernelDb(projectRoot: string): string | null {
 export function resolveKernelDbPathFromProject(
 	projectRoot: string,
 	options?: { migrateLegacy?: boolean },
-): { path: string; kind: "artifact" | "legacy" | "migrated" | "missing" } {
+): { path: string; kind: "artifact" | "legacy" | "migrated" | "missing" | "artifact_with_legacy" } {
 	const artifactDir = getProjectArtifactDir(projectRoot);
 	const artifactPath = join(artifactDir, KERNEL_DB_FILE);
-	if (existsSync(artifactPath)) {
+	const hasArtifact = existsSync(artifactPath);
+	const legacyPath = detectLegacyKernelDb(projectRoot);
+	if (hasArtifact && legacyPath) {
+		return { path: artifactPath, kind: "artifact_with_legacy" };
+	}
+	if (hasArtifact) {
 		return { path: artifactPath, kind: "artifact" };
 	}
 
-	const legacyPath = detectLegacyKernelDb(projectRoot);
 	if (legacyPath) {
 		if (options?.migrateLegacy) {
 			const migrated = migrateLegacyKernelDb(projectRoot);
@@ -86,6 +90,11 @@ export function resolveKernelDbPathFromProject(
 
 export function getKernelDbPath(artifactDirOrProjectRoot?: string): string {
 	if (typeof artifactDirOrProjectRoot === "string" && artifactDirOrProjectRoot.length > 0) {
+		// If caller passed an explicit file path ending in kernel.db, honor it directly.
+		if (artifactDirOrProjectRoot.endsWith(KERNEL_DB_FILE)) {
+			return artifactDirOrProjectRoot;
+		}
+
 		const artifactDir = resolveArtifactDir(artifactDirOrProjectRoot);
 		return join(artifactDir, KERNEL_DB_FILE);
 	}

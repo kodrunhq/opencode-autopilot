@@ -94,7 +94,9 @@ export async function inspectCliCore(
 					? "project (legacy kernel.db at repo root)"
 					: projectKernelPathInfo.kind === "migrated"
 						? "project (migrated legacy kernel.db)"
-						: "project";
+						: projectKernelPathInfo.kind === "artifact_with_legacy"
+							? "project (artifact kernel.db in use; legacy kernel.db also present at repo root)"
+							: "project";
 			return {
 				dbInput: projectKernelPathInfo.path,
 				dbScope: scopeLabel,
@@ -121,6 +123,8 @@ export async function inspectCliCore(
 	}
 
 	const verbose = parsed.verbose;
+	const scopeHeader = (dbScope: string, dbInput: string): string =>
+		`DB scope: ${dbScope} (${dbInput})\n\n`;
 	switch (parsed.view) {
 		case "projects": {
 			const { dbInput, dbScope } = resolveDbInput("projects");
@@ -184,15 +188,19 @@ export async function inspectCliCore(
 			);
 		}
 		case "runs": {
-			const { dbInput } = resolveDbInput("runs");
+			const { dbInput, dbScope } = resolveDbInput("runs");
 			const runs = listRuns(
 				{ projectRef: parsed.projectRef ?? undefined, limit: parsed.limit },
 				dbInput,
 			);
-			return makeOutput({ action: "inspect_runs", runs }, parsed.json, formatRuns(runs, verbose));
+			return makeOutput(
+				{ action: "inspect_runs", runs, dbScope, dbPath: dbInput },
+				parsed.json,
+				`${scopeHeader(dbScope, dbInput)}${formatRuns(runs, verbose)}`,
+			);
 		}
 		case "events": {
-			const { dbInput } = resolveDbInput("events");
+			const { dbInput, dbScope } = resolveDbInput("events");
 			const events = listEvents(
 				{
 					projectRef: parsed.projectRef ?? undefined,
@@ -204,27 +212,27 @@ export async function inspectCliCore(
 				dbInput,
 			);
 			return makeOutput(
-				{ action: "inspect_events", events },
+				{ action: "inspect_events", events, dbScope, dbPath: dbInput },
 				parsed.json,
-				formatEvents(events, verbose),
+				`${scopeHeader(dbScope, dbInput)}${formatEvents(events, verbose)}`,
 			);
 		}
 		case "lessons": {
-			const { dbInput } = resolveDbInput("lessons");
+			const { dbInput, dbScope } = resolveDbInput("lessons");
 			const lessons = listLessons(
 				{ projectRef: parsed.projectRef ?? undefined, limit: parsed.limit },
 				dbInput,
 			);
 			return makeOutput(
-				{ action: "inspect_lessons", lessons },
+				{ action: "inspect_lessons", lessons, dbScope, dbPath: dbInput },
 				parsed.json,
-				formatLessons(lessons, verbose),
+				`${scopeHeader(dbScope, dbInput)}${formatLessons(lessons, verbose)}`,
 			);
 		}
 		case "preferences": {
 			const { dbInput, dbScope } = resolveDbInput("preferences");
 			const preferences = listPreferences(dbInput);
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
+			const header = scopeHeader(dbScope, dbInput);
 			return makeOutput(
 				{ action: "inspect_preferences", preferences },
 				parsed.json,
@@ -234,7 +242,7 @@ export async function inspectCliCore(
 		case "memory": {
 			const { dbInput, dbScope } = resolveDbInput("memory");
 			const overview = getMemoryOverview(dbInput);
-			const header = `DB scope: ${dbScope} (${dbInput})\n\n`;
+			const header = scopeHeader(dbScope, dbInput);
 			return makeOutput(
 				{ action: "inspect_memory", overview },
 				parsed.json,
@@ -253,7 +261,7 @@ export async function inspectCliCore(
 				},
 				dbInput,
 			);
-			const header = `DB scope: ${dbScope} (${dbInput})\n\n`;
+			const header = scopeHeader(dbScope, dbInput);
 			return makeOutput(
 				{ action: "inspect_memories", memories },
 				parsed.json,
