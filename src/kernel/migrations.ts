@@ -1,12 +1,17 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
-import { realpathSync } from "node:fs";
-import { normalize } from "node:path";
 import { runProjectRegistryMigrations } from "../projects/database";
+import { computeDeterministicProjectId } from "../projects/resolve";
+import type { GitFingerprintInput } from "../projects/types";
 import { KERNEL_SCHEMA_STATEMENTS, KERNEL_SCHEMA_VERSION } from "./schema";
 
-function columnExists(database: Database, tableName: string, columnName: string): boolean {
-	const columns = database.query(`PRAGMA table_info(${tableName})`).all() as Array<{
+function columnExists(
+	database: Database,
+	tableName: string,
+	columnName: string,
+): boolean {
+	const columns = database
+		.query(`PRAGMA table_info(${tableName})`)
+		.all() as Array<{
 		name?: string;
 	}>;
 	return columns.some((column) => column.name === columnName);
@@ -22,7 +27,9 @@ function tableExists(database: Database, tableName: string): boolean {
 function backfillProjectAwareColumns(database: Database): void {
 	if (!columnExists(database, "pipeline_runs", "project_id")) {
 		database.run("ALTER TABLE pipeline_runs ADD COLUMN project_id TEXT");
-		database.run("UPDATE pipeline_runs SET project_id = 'legacy-project' WHERE project_id IS NULL");
+		database.run(
+			"UPDATE pipeline_runs SET project_id = 'legacy-project' WHERE project_id IS NULL",
+		);
 	}
 
 	if (!columnExists(database, "active_review_state", "project_id")) {
@@ -33,14 +40,18 @@ function backfillProjectAwareColumns(database: Database): void {
 	}
 
 	if (!columnExists(database, "project_review_memory", "project_id")) {
-		database.run("ALTER TABLE project_review_memory ADD COLUMN project_id TEXT");
+		database.run(
+			"ALTER TABLE project_review_memory ADD COLUMN project_id TEXT",
+		);
 		database.run(
 			"UPDATE project_review_memory SET project_id = 'legacy-project' WHERE project_id IS NULL",
 		);
 	}
 
 	if (!columnExists(database, "project_lesson_memory", "project_id")) {
-		database.run("ALTER TABLE project_lesson_memory ADD COLUMN project_id TEXT");
+		database.run(
+			"ALTER TABLE project_lesson_memory ADD COLUMN project_id TEXT",
+		);
 		database.run(
 			"UPDATE project_lesson_memory SET project_id = 'legacy-project' WHERE project_id IS NULL",
 		);
@@ -54,8 +65,14 @@ function backfillProjectAwareColumns(database: Database): void {
 	}
 }
 
-function columnType(database: Database, tableName: string, columnName: string): string | null {
-	const columns = database.query(`PRAGMA table_info(${tableName})`).all() as Array<{
+function columnType(
+	database: Database,
+	tableName: string,
+	columnName: string,
+): string | null {
+	const columns = database
+		.query(`PRAGMA table_info(${tableName})`)
+		.all() as Array<{
 		name?: string;
 		type?: string;
 	}>;
@@ -63,8 +80,13 @@ function columnType(database: Database, tableName: string, columnName: string): 
 	return col?.type?.toUpperCase() ?? null;
 }
 
-function getTableColumns(database: Database, tableName: string): readonly string[] {
-	const columns = database.query(`PRAGMA table_info(${tableName})`).all() as Array<{
+function getTableColumns(
+	database: Database,
+	tableName: string,
+): readonly string[] {
+	const columns = database
+		.query(`PRAGMA table_info(${tableName})`)
+		.all() as Array<{
 		name?: string;
 	}>;
 	return columns.map((c) => c.name ?? "").filter(Boolean);
@@ -117,7 +139,10 @@ const REBUILD_DDLS: Readonly<Record<string, string>> = Object.freeze({
 	)`,
 });
 
-function rebuildTableWithTextTaskId(database: Database, tableName: string): void {
+function rebuildTableWithTextTaskId(
+	database: Database,
+	tableName: string,
+): void {
 	if (!tableExists(database, tableName)) return;
 	const currentType = columnType(database, tableName, "task_id");
 	if (currentType === null || currentType === "TEXT") return;
@@ -131,7 +156,9 @@ function rebuildTableWithTextTaskId(database: Database, tableName: string): void
 	const rebuildTable = `_rebuild_${tableName}`;
 	const columnList = columns.join(", ");
 	const castColumns = columns
-		.map((col) => (col === "task_id" ? "CAST(task_id AS TEXT) AS task_id" : col))
+		.map((col) =>
+			col === "task_id" ? "CAST(task_id AS TEXT) AS task_id" : col,
+		)
 		.join(", ");
 
 	database.run(`DROP TABLE IF EXISTS ${rebuildTable}`);
@@ -149,26 +176,35 @@ function migrateTaskIdToText(database: Database): void {
 	rebuildTableWithTextTaskId(database, "forensic_events");
 }
 
-function normalizeProjectRoot(projectRoot: string): string {
-	try {
-		return realpathSync(projectRoot);
-	} catch {
-		return normalize(projectRoot);
-	}
-}
-
-function computeDeterministicProjectId(projectRoot: string): string {
-	const root = normalizeProjectRoot(projectRoot);
-	return `proj_${createHash("sha256").update(`path:${root}`).digest("hex").slice(0, 24)}`;
-}
-
-function reconcileProjectIds(database: Database): void {
+export function reconcileProjectIds(database: Database): void {
 	if (!tableExists(database, "projects")) return;
 
 	const rows = database.query("SELECT id, path FROM projects").all() as Array<{
 		id: string;
 		path: string;
 	}>;
+	const fingerprintRows = tableExists(database, "project_git_fingerprints")
+		? (database
+				.query(
+					"SELECT project_id, normalized_remote_url, default_branch FROM project_git_fingerprints",
+				)
+				.all() as Array<{
+				project_id: string;
+				normalized_remote_url: string;
+				default_branch: string | null;
+			}>)
+		: [];
+	const fingerprintsByProject = new Map<
+		string,
+		{ normalizedRemoteUrl: string; defaultBranch: string | null }
+	>();
+	for (const row of fingerprintRows) {
+		fingerprintsByProject.set(row.project_id, {
+			normalizedRemoteUrl: row.normalized_remote_url,
+			defaultBranch: row.default_branch,
+		});
+	}
+
 	const tablesWithProjectId = [
 		"pipeline_runs",
 		"forensic_events",
@@ -180,16 +216,23 @@ function reconcileProjectIds(database: Database): void {
 	];
 
 	for (const row of rows) {
-		const targetId = computeDeterministicProjectId(row.path);
+		const fp = fingerprintsByProject.get(row.id) ?? null;
+		const targetId = computeDeterministicProjectId(row.path, fp);
 		if (targetId === row.id) continue;
 
 		database.run("BEGIN");
 		try {
 			for (const table of tablesWithProjectId) {
 				if (!tableExists(database, table)) continue;
-				database.run(`UPDATE ${table} SET project_id = ? WHERE project_id = ?`, [targetId, row.id]);
+				database.run(
+					`UPDATE ${table} SET project_id = ? WHERE project_id = ?`,
+					[targetId, row.id],
+				);
 			}
-			database.run("UPDATE projects SET id = ? WHERE id = ?", [targetId, row.id]);
+			database.run("UPDATE projects SET id = ? WHERE id = ?", [
+				targetId,
+				row.id,
+			]);
 			database.run("COMMIT");
 		} catch (error) {
 			database.run("ROLLBACK");
@@ -237,19 +280,46 @@ function backfillBackgroundTaskColumns(database: Database): void {
 	}
 
 	const columnDefinitions = Object.freeze([
-		{ name: "category", ddl: "ALTER TABLE background_tasks ADD COLUMN category TEXT" },
-		{ name: "result", ddl: "ALTER TABLE background_tasks ADD COLUMN result TEXT" },
-		{ name: "error", ddl: "ALTER TABLE background_tasks ADD COLUMN error TEXT" },
-		{ name: "agent", ddl: "ALTER TABLE background_tasks ADD COLUMN agent TEXT" },
-		{ name: "model", ddl: "ALTER TABLE background_tasks ADD COLUMN model TEXT" },
+		{
+			name: "category",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN category TEXT",
+		},
+		{
+			name: "result",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN result TEXT",
+		},
+		{
+			name: "error",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN error TEXT",
+		},
+		{
+			name: "agent",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN agent TEXT",
+		},
+		{
+			name: "model",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN model TEXT",
+		},
 		{
 			name: "priority",
 			ddl: "ALTER TABLE background_tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 50",
 		},
-		{ name: "created_at", ddl: "ALTER TABLE background_tasks ADD COLUMN created_at TEXT" },
-		{ name: "updated_at", ddl: "ALTER TABLE background_tasks ADD COLUMN updated_at TEXT" },
-		{ name: "started_at", ddl: "ALTER TABLE background_tasks ADD COLUMN started_at TEXT" },
-		{ name: "completed_at", ddl: "ALTER TABLE background_tasks ADD COLUMN completed_at TEXT" },
+		{
+			name: "created_at",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN created_at TEXT",
+		},
+		{
+			name: "updated_at",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN updated_at TEXT",
+		},
+		{
+			name: "started_at",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN started_at TEXT",
+		},
+		{
+			name: "completed_at",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN completed_at TEXT",
+		},
 	]);
 
 	for (const column of columnDefinitions) {
@@ -274,7 +344,9 @@ function backfillBackgroundTaskColumns(database: Database): void {
 }
 
 export function runKernelMigrations(database: Database): void {
-	const row = database.query("PRAGMA user_version").get() as { user_version?: number } | null;
+	const row = database.query("PRAGMA user_version").get() as {
+		user_version?: number;
+	} | null;
 	const currentVersion = row?.user_version ?? 0;
 
 	runProjectRegistryMigrations(database);

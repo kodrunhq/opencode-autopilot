@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
-import { basename, dirname, isAbsolute, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { getAutopilotDbPath, getProjectArtifactDir } from "../utils/paths";
 import { runKernelMigrations } from "./migrations";
 
@@ -95,6 +95,7 @@ export function getKernelDbPath(artifactDirOrProjectRoot?: string): string {
 			return artifactDirOrProjectRoot;
 		}
 
+		// Allow project root inputs by resolving to the artifact directory (with legacy migration).
 		const artifactDir = resolveArtifactDir(artifactDirOrProjectRoot);
 		return join(artifactDir, KERNEL_DB_FILE);
 	}

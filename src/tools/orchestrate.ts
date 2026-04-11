@@ -1264,7 +1264,7 @@ export async function orchestrateCore(
 				const issued = Date.parse(pending.issuedAt);
 				return Number.isFinite(issued) && now - issued > STALE_PENDING_DISPATCH_MS;
 			});
-			if (staleDispatches.length > 0 && state.processedResultIds.length === 0) {
+			if (staleDispatches.length > 0) {
 				const failureContext = {
 					failedPhase: state.currentPhase ?? staleDispatches[0]?.phase ?? "RECON",
 					failedAgent: staleDispatches[0]?.agent ?? null,

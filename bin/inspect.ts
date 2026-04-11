@@ -23,6 +23,7 @@ import {
 	listRuns,
 } from "../src/inspect/repository";
 import { resolveKernelDbPathFromProject } from "../src/kernel/database";
+import { reconcileProjectIds } from "../src/kernel/migrations";
 import { getAutopilotDbPath, getProjectArtifactDir } from "../src/utils/paths";
 import { inspectUsage, parseInspectArgs } from "./inspect-args";
 
@@ -74,6 +75,25 @@ export async function inspectCliCore(
 		projectArtifactDir !== null &&
 		projectKernelPathInfo !== null &&
 		existsSync(projectKernelPathInfo.path);
+
+	if (parsed.view === "reconcile-project-ids") {
+		const targetDb =
+			options.dbPath ??
+			(parsed.global ? globalDbPath : (projectKernelPathInfo?.path ?? globalDbPath));
+		if (!targetDb) return makeError("No database found for reconciliation", parsed.json);
+		if (!existsSync(targetDb)) return makeError(`Database not found: ${targetDb}`, parsed.json);
+		const db = new SqliteDatabase(targetDb);
+		try {
+			reconcileProjectIds(db);
+		} finally {
+			db.close();
+		}
+		return makeOutput(
+			{ action: "reconcile_project_ids", dbPath: targetDb },
+			parsed.json,
+			`Reconciled project IDs in ${targetDb}`,
+		);
+	}
 
 	function resolveDbInput(view: string): { dbInput: string | undefined; dbScope: string } {
 		if (options.dbPath) {

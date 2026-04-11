@@ -99,7 +99,7 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 	let kind: string | null = null;
 	let scope: string | null = null;
 	let query: string | null = null;
-	let reconcile = false;
+	const reconcile = false;
 	let help = false;
 	let error: string | null = null;
 	let global = false;

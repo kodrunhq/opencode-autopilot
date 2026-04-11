@@ -2,8 +2,8 @@ import { formatTimestamp, indentLines, renderTable, wrapText } from "./formatter
 import type {
 	InspectEventSummary,
 	InspectLessonSummary,
-	InspectMemorySummary,
 	InspectMemoryOverview,
+	InspectMemorySummary,
 	InspectPreferenceSummary,
 	InspectRunSummary,
 } from "./repository";
