@@ -681,7 +681,7 @@ describe("integration: routeCore → orchestrateCore", () => {
 		expect(mismatch.code).toBe("E_ROUTE_TOKEN_MISMATCH");
 	});
 
-	test("routeToken is consumed after first implementation start", async () => {
+	test("routeToken cannot start a second run while another run is active", async () => {
 		const routeContext = {
 			sessionID: "session-route-token-consume",
 			directory: tempDir,
@@ -730,7 +730,7 @@ describe("integration: routeCore → orchestrateCore", () => {
 			),
 		);
 		expect(repeat.action).toBe("error");
-		expect(repeat.code).toBe("E_ROUTE_TOKEN_CONSUMED");
+		expect(repeat.code).toBe("E_ACTIVE_RUN_EXISTS");
 	});
 });
 

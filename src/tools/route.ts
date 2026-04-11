@@ -1,6 +1,7 @@
 import { tool } from "@opencode-ai/plugin";
 import { openKernelDb } from "../kernel/database";
 import { createRouteTicketRepository } from "../routing/route-ticket-repository";
+import { resolveProjectIdentitySync } from "../projects/resolve";
 import {
 	getIntentRouting,
 	IntentClassificationSchema,
@@ -96,11 +97,13 @@ export function routeCore(
 		try {
 			const db = openKernelDb(context.projectRoot);
 			const repo = createRouteTicketRepository(db);
+			const project = resolveProjectIdentitySync(context.projectRoot, { db });
+			const messageId = context.messageId ?? "";
 
 			const ticket = repo.createTicket({
-				projectId: context.projectRoot,
+				projectId: project.id,
 				sessionId: context.sessionId,
-				messageId: context.messageId,
+				messageId,
 				intent: primary,
 				usePipeline: true,
 				metadata: {

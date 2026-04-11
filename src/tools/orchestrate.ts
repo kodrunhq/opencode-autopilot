@@ -45,6 +45,7 @@ import { getIntentRouting, type IntentType, IntentTypeSchema } from "../routing/
 import { createRouteTicketRepository } from "../routing/route-ticket-repository";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
+import { resolveProjectIdentitySync } from "../projects/resolve";
 import {
 	getGlobalConfigDir,
 	getProjectArtifactDir,
@@ -1273,10 +1274,11 @@ export async function orchestrateCore(
 					try {
 						const db = await openKernelDb(context.projectRoot);
 						const routeTicketRepo = createRouteTicketRepository(db);
+						const project = resolveProjectIdentitySync(context.projectRoot, { db });
 						const validationResult = routeTicketRepo.validateAndConsumeTicket(args.routeToken, {
 							sessionId: context.sessionId,
-							messageId: context.messageId,
-							projectId: context.projectRoot,
+							messageId: context.messageId ?? "",
+							projectId: project.id,
 							intent: args.intent ?? "implementation",
 						});
 						await db.close();
