@@ -8,6 +8,7 @@ import {
 	IntentTypeSchema,
 } from "../routing/intent-types";
 import { createRouteTicketRepository } from "../routing/route-ticket-repository";
+import { getProjectArtifactDir } from "../utils/paths";
 
 function buildInstruction(
 	_intent: IntentType,
@@ -96,7 +97,8 @@ export function routeCore(
 	if (context && routing.usePipeline && primary === "implementation") {
 		let db: ReturnType<typeof openKernelDb> | null = null;
 		try {
-			db = openKernelDb(context.projectRoot);
+			const artifactDir = getProjectArtifactDir(context.projectRoot);
+			db = openKernelDb(artifactDir);
 			const repo = createRouteTicketRepository(db);
 			const project = resolveProjectIdentitySync(context.projectRoot, { db });
 			const messageId = context.messageId ?? "";

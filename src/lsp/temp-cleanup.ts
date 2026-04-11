@@ -1,3 +1,5 @@
+import { getLogger } from "../logging/domains";
+
 type TempCleanupClient = {
 	readonly refCount: number;
 	readonly client: { stop(): Promise<void> };
@@ -13,8 +15,11 @@ export async function cleanupTempDirectoryLspClients(
 	for (const [key, managed] of removable) {
 		try {
 			await managed.client.stop();
-		} catch {
-			console.error(`[lsp-temp-cleanup] failed to stop client for ${key}`);
+		} catch (error) {
+			getLogger("lsp", "temp-cleanup").warn("Failed to stop client", {
+				key,
+				error: error instanceof Error ? error.message : String(error),
+			});
 		}
 		if (clients instanceof Map) clients.delete(key);
 	}

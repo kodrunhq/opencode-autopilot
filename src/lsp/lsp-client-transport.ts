@@ -6,6 +6,7 @@ import {
 	StreamMessageReader,
 	StreamMessageWriter,
 } from "vscode-jsonrpc/node";
+import { getLogger } from "../logging/domains";
 import { spawnProcess, type UnifiedProcess } from "./lsp-process";
 import { getLspServerAdditionalPathBases } from "./server-path-bases";
 import type { Diagnostic, ResolvedServer } from "./types";
@@ -106,7 +107,9 @@ export class LspClientTransport {
 			this.processExited = true;
 		});
 		this.connection.onError((error) => {
-			console.error("LSP connection error", error);
+			getLogger("lsp", "transport").error("LSP connection error", {
+				error: error instanceof Error ? error.message : String(error),
+			});
 		});
 		this.connection.listen();
 	}
@@ -236,7 +239,9 @@ export class LspClientTransport {
 					new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
 				]);
 				if (!exited) {
-					console.error("[LSPClient] Process did not exit within timeout, escalating to SIGKILL");
+					getLogger("lsp", "transport").warn(
+						"Process did not exit within timeout, escalating to SIGKILL",
+					);
 					proc.kill("SIGKILL");
 					await Promise.race([
 						proc.exited,

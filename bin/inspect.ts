@@ -17,6 +17,8 @@ import {
 	listProjects,
 	listRuns,
 } from "../src/inspect/repository";
+import { kernelDbExists } from "../src/kernel/database";
+import { getAutopilotDbPath, getProjectArtifactDir } from "../src/utils/paths";
 import { inspectUsage, parseInspectArgs } from "./inspect-args";
 
 export interface InspectCliOptions {
@@ -59,15 +61,41 @@ export async function inspectCliCore(
 		return makeError(parsed.error, parsed.json);
 	}
 
-	const dbInput = options.dbPath;
+	let dbInput: string | undefined = options.dbPath;
+	let dbScope = "unknown";
+
+	if (!dbInput) {
+		if (parsed.global) {
+			dbInput = getAutopilotDbPath();
+			dbScope = "global";
+		} else {
+			const cwd = process.cwd();
+			const artifactDir = getProjectArtifactDir(cwd);
+			if (kernelDbExists(artifactDir)) {
+				dbInput = `${artifactDir}/kernel.db`;
+				dbScope = "project";
+			} else {
+				dbInput = getAutopilotDbPath();
+				dbScope = "global (no project kernel.db found)";
+			}
+		}
+	} else {
+		dbScope = "explicit";
+	}
+
 	const verbose = parsed.verbose;
 	switch (parsed.view) {
 		case "projects": {
-			const projects = listProjects(dbInput);
+			const allProjects = listProjects(dbInput);
+			const shouldFilterEphemeral = !parsed.global && !options.dbPath;
+			const projects = shouldFilterEphemeral
+				? allProjects.filter((p) => !isEphemeralPath(p.path))
+				: allProjects;
+			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
-				{ action: "inspect_projects", projects },
+				{ action: "inspect_projects", projects, dbScope, dbPath: dbInput },
 				parsed.json,
-				formatProjects(projects, verbose),
+				`${header}${formatProjects(projects, verbose)}`,
 			);
 		}
 		case "project": {
@@ -160,4 +188,13 @@ export async function runInspect(
 	}
 
 	console.log(result.output);
+}
+
+function isEphemeralPath(path: string): boolean {
+	return (
+		path.startsWith("/tmp/") ||
+		path.startsWith("/var/folders/") ||
+		(path.includes("/T/") && path.startsWith("/var")) ||
+		path.startsWith(process.env.TMPDIR ?? "/tmp/")
+	);
 }

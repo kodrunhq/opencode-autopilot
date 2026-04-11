@@ -84,11 +84,6 @@ export function createHashlineReadEnhancerHandler() {
 			return CID_ALPHABET[h & 0xf] + CID_ALPHABET[(h >> 4) & 0xf];
 		}
 
-		// Format anchor
-		function formatAnchor(lineNum: number, content: string): string {
-			return `${lineNum}#${computeLineHash(content)}`;
-		}
-
 		for (const line of lines) {
 			// Parse line format: "N: content"
 			const match = line.match(/^(\d+):\s+(.*)$/);
@@ -102,19 +97,9 @@ export function createHashlineReadEnhancerHandler() {
 
 			if (lineNum > 0 && content) {
 				const hash = computeLineHash(content);
-				const anchor = formatAnchor(lineNum, content);
 
 				// Enhance line with hash suffix
 				enhancedLines.push(`${lineNum}: ${content} #${hash}`);
-
-				logger.debug("Enhanced read line with hash", {
-					sessionID: hookInput.sessionID,
-					filePath: readArgs.filePath,
-					lineNum,
-					hash,
-					anchor,
-					agentName,
-				});
 			} else {
 				enhancedLines.push(line);
 			}

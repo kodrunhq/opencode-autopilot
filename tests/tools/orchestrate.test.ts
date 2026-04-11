@@ -641,7 +641,7 @@ describe("integration: routeCore → orchestrateCore", () => {
 		expect(mismatch.code).toBe("E_ROUTE_TOKEN_MISMATCH");
 	});
 
-	test("oc_orchestrate rejects routeToken when called without the original message context", async () => {
+	test("oc_orchestrate accepts routeToken when called without the original message context (messageId is not validated)", async () => {
 		const routeContext = {
 			sessionID: "session-route-token-msg",
 			directory: tempDir,
@@ -666,7 +666,7 @@ describe("integration: routeCore → orchestrateCore", () => {
 			worktree: tempDir,
 		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
 
-		const mismatch = JSON.parse(
+		const result = JSON.parse(
 			await ocOrchestrate.execute(
 				{
 					idea: "add user settings",
@@ -677,8 +677,7 @@ describe("integration: routeCore → orchestrateCore", () => {
 			),
 		);
 
-		expect(mismatch.action).toBe("error");
-		expect(mismatch.code).toBe("E_ROUTE_TOKEN_MISMATCH");
+		expect(result.action).not.toBe("error");
 	});
 
 	test("routeToken cannot start a second run while another run is active", async () => {

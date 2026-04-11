@@ -1,5 +1,6 @@
 import type { Config } from "@opencode-ai/plugin";
 import { loadConfig } from "../config";
+import { getLogger } from "../logging/domains";
 import { resolveModelForAgent } from "../registry/resolver";
 import type { AgentOverride, GroupModelAssignment } from "../registry/types";
 import { autopilotAgent } from "./autopilot";
@@ -129,10 +130,9 @@ export async function configHook(config: Config, configPath?: string): Promise<v
 	try {
 		pluginConfig = await loadConfig(configPath);
 	} catch (error: unknown) {
-		console.error(
-			"[opencode-autopilot] Failed to load plugin config:",
-			error instanceof Error ? error.message : String(error),
-		);
+		getLogger("agents").error("Failed to load plugin config", {
+			error: error instanceof Error ? error.message : String(error),
+		});
 	}
 	const groups: Readonly<Record<string, GroupModelAssignment>> = pluginConfig?.groups ?? {};
 	const overrides: Readonly<Record<string, AgentOverride>> = pluginConfig?.overrides ?? {};
