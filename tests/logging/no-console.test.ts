@@ -71,4 +71,34 @@ describe("runtime logging safety", () => {
 
 		expect(() => logger.info("test message")).not.toThrow();
 	});
+
+	test("logger captured before initLoggers stays silent then resolves after init", async () => {
+		resetLoggerState();
+		const preInitLogger = getLogger("pre-init-test");
+
+		const captured: string[] = [];
+		const originalLog = console.log;
+		const originalWarn = console.warn;
+		const originalError = console.error;
+		console.log = (...args: unknown[]) => captured.push(`log: ${args.join(" ")}`);
+		console.warn = (...args: unknown[]) => captured.push(`warn: ${args.join(" ")}`);
+		console.error = (...args: unknown[]) => captured.push(`error: ${args.join(" ")}`);
+
+		try {
+			preInitLogger.info("pre-init message");
+			preInitLogger.debug("pre-init debug");
+			preInitLogger.warn("pre-init warning");
+			expect(captured).toEqual([]);
+
+			tempDir = await mkdtemp(join(tmpdir(), "logger-safety-test-"));
+			initLoggers(tempDir);
+
+			preInitLogger.info("post-init message");
+			expect(captured).toEqual([]);
+		} finally {
+			console.log = originalLog;
+			console.warn = originalWarn;
+			console.error = originalError;
+		}
+	});
 });

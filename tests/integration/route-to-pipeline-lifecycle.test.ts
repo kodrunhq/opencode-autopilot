@@ -130,6 +130,11 @@ describe("Integration: oc_route → oc_orchestrate lifecycle", () => {
 					(ticket) => ticket.routeToken === routeToken && ticket.consumedAt !== null,
 				),
 			).toBe(true);
+
+			const pipelineRuns = kernelDb
+				.query("SELECT run_id, status FROM pipeline_runs WHERE project_id = ?")
+				.all(project.id) as Array<{ run_id: string; status: string }>;
+			expect(pipelineRuns.length).toBeGreaterThan(0);
 		} finally {
 			kernelDb?.close();
 		}
