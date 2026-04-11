@@ -1,9 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { tool } from "@opencode-ai/plugin";
 import { loadConfig } from "../config";
-import { getLogger } from "../logging/domains";
 import { openKernelDb } from "../kernel/database";
-import { createRouteTicketRepository } from "../routing/route-ticket-repository";
+import { getLogger } from "../logging/domains";
 import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
 import {
@@ -43,6 +42,7 @@ import {
 } from "../orchestrator/state";
 import type { Phase, PipelineState } from "../orchestrator/types";
 import { getIntentRouting, type IntentType, IntentTypeSchema } from "../routing/intent-types";
+import { createRouteTicketRepository } from "../routing/route-ticket-repository";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
 import {

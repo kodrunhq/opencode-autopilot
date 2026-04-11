@@ -1,13 +1,12 @@
 import { tool } from "@opencode-ai/plugin";
 import { openKernelDb } from "../kernel/database";
-import { createRouteTicketRepository } from "../routing/route-ticket-repository";
 import {
 	getIntentRouting,
 	IntentClassificationSchema,
 	type IntentType,
 	IntentTypeSchema,
 } from "../routing/intent-types";
-import { getProjectArtifactDir } from "../utils/paths";
+import { createRouteTicketRepository } from "../routing/route-ticket-repository";
 
 function buildInstruction(
 	_intent: IntentType,

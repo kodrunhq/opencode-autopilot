@@ -9,7 +9,6 @@ import { runHealthChecks } from "./health/runner";
 import { createAntiSlopHandler } from "./hooks/anti-slop";
 import { createHashAnchoredEnforcementHandler } from "./hooks/hash-anchored-enforcement";
 import { createHashlineReadEnhancerHandler } from "./hooks/hashline-read-enhancer";
-import { createIntentStorageHandler } from "./hooks/intent-storage";
 import { createKeywordDetectorHandler } from "./hooks/keyword-detector";
 import { createPreemptiveCompactionHandler } from "./hooks/preemptive-compaction";
 import { createSessionNotificationHandler } from "./hooks/session-notification";
