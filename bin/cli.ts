@@ -2,8 +2,8 @@
 
 import { execFile as execFileCb } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { CONFIG_PATH, createDefaultConfig, loadConfig, saveConfig } from "../src/config";
 import { diagnose } from "../src/registry/doctor";
@@ -129,6 +129,7 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 			plugin: [...existingPlugins, PLUGIN_NAME],
 		};
 		const tmpJsonPath = `${jsonPath}.tmp.${randomBytes(8).toString("hex")}`;
+		await mkdir(dirname(jsonPath), { recursive: true });
 		await writeFile(tmpJsonPath, JSON.stringify(opencodeJson, null, 2), "utf-8");
 		await rename(tmpJsonPath, jsonPath);
 		console.log(`  ${green("✓")} Plugin registered in ${location} config`);
