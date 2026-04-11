@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.31.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.1...opencode-autopilot-v1.31.2) (2026-04-11)
+
+
+### Bug Fixes
+
+* address final Oracle review blockers ([1983497](https://github.com/kodrunhq/opencode-autopilot/commit/19834974781dd51e558608f7fabd9aefb14c61bb))
+* address Oracle review feedback - test fixtures and verification ([157ec7d](https://github.com/kodrunhq/opencode-autopilot/commit/157ec7de14de9caed011ca342849f0c2c8f236bc))
+* address remaining review feedback ([bda61fc](https://github.com/kodrunhq/opencode-autopilot/commit/bda61fc7aead2ba3ef8457cb8830ad3fec0946a4))
+* final Oracle review - handle opencode errors gracefully ([425758b](https://github.com/kodrunhq/opencode-autopilot/commit/425758b6d8ad73c52e9a8fbb618c6c27d9cbfd3a))
+* final Oracle review fixes ([df458b9](https://github.com/kodrunhq/opencode-autopilot/commit/df458b92e6dc96b97e5ea3d36a4873fd88c7bb98))
+* resolve critical install/bootstrap/health issues ([16d6976](https://github.com/kodrunhq/opencode-autopilot/commit/16d69761ee7928dd97c267936abe4861805b2ad4))
+
 ## [1.31.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.0...opencode-autopilot-v1.31.1) (2026-04-10)
 
 
