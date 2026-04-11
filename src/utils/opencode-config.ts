@@ -219,8 +219,8 @@ export async function verifyPluginLoad(): Promise<PluginVerificationResult> {
 
 		return {
 			success: true,
-			message: "OpenCode CLI is accessible",
-			details: "Plugin appears to be working",
+			message: "OpenCode CLI accessible",
+			details: "CLI responds to commands (plugin load not verified)",
 		};
 	} catch (error: unknown) {
 		const err = error as Error & { stderr?: string; status?: number };
