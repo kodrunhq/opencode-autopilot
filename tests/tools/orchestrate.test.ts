@@ -641,6 +641,46 @@ describe("integration: routeCore → orchestrateCore", () => {
 		expect(mismatch.code).toBe("E_ROUTE_TOKEN_MISMATCH");
 	});
 
+	test("oc_orchestrate rejects routeToken when called without the original message context", async () => {
+		const routeContext = {
+			sessionID: "session-route-token-msg",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-5",
+		} as unknown as Parameters<typeof ocRoute.execute>[1];
+
+		const route = JSON.parse(
+			await ocRoute.execute(
+				{
+					primaryIntent: "implementation",
+					reasoning: "User asked for a feature",
+					verbalization: "I detect implementation intent",
+				},
+				routeContext,
+			),
+		);
+
+		const contextWithoutMessage = {
+			sessionID: routeContext.sessionID,
+			directory: tempDir,
+			worktree: tempDir,
+		} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+		const mismatch = JSON.parse(
+			await ocOrchestrate.execute(
+				{
+					idea: "add user settings",
+					intent: "implementation",
+					routeToken: route.requiredPipelineArgs.routeToken,
+				},
+				contextWithoutMessage,
+			),
+		);
+
+		expect(mismatch.action).toBe("error");
+		expect(mismatch.code).toBe("E_ROUTE_TOKEN_MISMATCH");
+	});
+
 	test("routeToken is consumed after first implementation start", async () => {
 		const routeContext = {
 			sessionID: "session-route-token-consume",

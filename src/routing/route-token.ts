@@ -127,7 +127,7 @@ export function consumeRouteToken(args: {
 	}
 
 	const messageID = resolveMessageID(args.messageID);
-	if (record.messageID !== null && messageID !== null && record.messageID !== messageID) {
+	if (record.messageID !== null && record.messageID !== messageID) {
 		return {
 			ok: false,
 			code: "E_ROUTE_TOKEN_MISMATCH",
