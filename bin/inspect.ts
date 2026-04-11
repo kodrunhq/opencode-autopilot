@@ -303,7 +303,6 @@ function pruneEphemeralProjects(dbPath: string): number {
 			path: string;
 		}>;
 		const tablesWithProjectIdFk = [
-			"preference_evidence",
 			"preference_records",
 			"observations",
 			"memories",
@@ -325,8 +324,9 @@ function pruneEphemeralProjects(dbPath: string): number {
 				for (const table of tablesWithProjectIdFk) {
 					try {
 						db.run(`DELETE FROM ${table} WHERE project_id = ?`, [project.id]);
-					} catch {
-						// Table may not exist in this DB
+					} catch (e) {
+						if (e instanceof Error && e.message.includes("no such table")) continue;
+						throw e;
 					}
 				}
 				db.run("DELETE FROM projects WHERE id = ?", [project.id]);
