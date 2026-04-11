@@ -1271,8 +1271,9 @@ export async function orchestrateCore(
 					});
 				}
 				if (context.projectRoot) {
+					let db: ReturnType<typeof openKernelDb> | null = null;
 					try {
-						const db = await openKernelDb(context.projectRoot);
+						db = await openKernelDb(context.projectRoot);
 						const routeTicketRepo = createRouteTicketRepository(db);
 						const project = resolveProjectIdentitySync(context.projectRoot, { db });
 						const validationResult = routeTicketRepo.validateAndConsumeTicket(args.routeToken, {
@@ -1281,7 +1282,6 @@ export async function orchestrateCore(
 							projectId: project.id,
 							intent: args.intent ?? "implementation",
 						});
-						await db.close();
 						if (!validationResult.valid) {
 							return JSON.stringify({
 								action: "error",
@@ -1293,6 +1293,8 @@ export async function orchestrateCore(
 						// Database/project setup may not exist in all contexts
 						// For now, allow the pipeline to proceed if we can't validate
 						// This maintains backward compatibility while enabling validation where supported
+					} finally {
+						db?.close();
 					}
 				}
 			}
