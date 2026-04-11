@@ -109,7 +109,7 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 			location = "env-exact";
 		} else if (envConfigDir) {
 			// OPENCODE_CONFIG_DIR env var is set - create in that directory
-			jsonPath = join(envConfigDir, "opencode.json");
+			jsonPath = join(envConfigDir, ".opencode.json");
 			location = "env-dir";
 		} else {
 			// No env vars - use git root or global

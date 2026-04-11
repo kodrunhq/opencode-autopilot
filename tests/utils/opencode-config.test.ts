@@ -46,6 +46,30 @@ describe("opencode-config", () => {
 			const result = parseJsonc(jsonc);
 			expect(result).toEqual({ plugin: ["test"], version: 7 });
 		});
+
+		test("preserves commas inside strings", () => {
+			const jsonc = '{"msg": "a,}"}';
+			const result = parseJsonc(jsonc);
+			expect(result).toEqual({ msg: "a,}" });
+		});
+
+		test("preserves comment-like text inside strings", () => {
+			const jsonc = '{"code": "const x = 1; // not a comment"}';
+			const result = parseJsonc(jsonc);
+			expect(result).toEqual({ code: "const x = 1; // not a comment" });
+		});
+
+		test("handles complex nested structure with strings containing special chars", () => {
+			const jsonc = `{
+				"array": ["item,]", "another"],
+				"object": {"key": "value,}"},
+			}`;
+			const result = parseJsonc(jsonc);
+			expect(result).toEqual({
+				array: ["item,]", "another"],
+				object: { key: "value,}" },
+			});
+		});
 	});
 
 	describe("resolveOpenCodeConfig", () => {

@@ -2255,13 +2255,13 @@ The orchestrator pipeline drives the full SDLC: RECON, CHALLENGE, ARCHITECT, EXP
 
 A rapid 10-item checklist for validating core plugin functionality before a release. Each item should take less than 1 minute to verify.
 
-- [ ] **Plugin loads:** OpenCode starts without errors when the plugin is configured in `opencode.json`.
-- [ ] **Tools register:** Invoke `oc_doctor` -- should return JSON with `action: "doctor"` and 8 checks (7 health + 1 hook-registration).
-- [ ] **Commands accessible:** Type `/oc-` in the OpenCode TUI -- at least 11 commands should appear in autocomplete.
+- [ ] **Plugin loads:** OpenCode starts without errors when the plugin is configured in `.opencode.json`.
+- [ ] **Tools register:** Invoke `oc_doctor` -- should return JSON with `action: "doctor"` and 11 checks (10 health + 1 hook-registration).
+- [ ] **Commands accessible:** Type `/oc-` in the OpenCode TUI -- at least 14 commands should appear in autocomplete.
 - [ ] **Agents visible:** Press Tab to cycle primary agents -- autopilot, coder, debugger, planner, researcher, reviewer should be available. Native `plan` and `build` should NOT appear. Type `@` and verify metaprompter, documenter, pr-reviewer are @-callable.
 - [ ] **Skills inject:** Run `oc_doctor` in a TypeScript project -- `skill-loading` check should report detected stacks and matched skills.
 - [ ] **Memory captures:** Run `oc_memory_status` -- should return `stats` object (or null if DB not yet created). After a session with decisions, stats should show non-zero observation counts.
-- [ ] **Doctor passes:** Run `oc_doctor` -- all 8 checks should report "pass" with `allPassed: true`.
+- [ ] **Doctor passes:** Run `oc_doctor` -- all 11 checks should report "pass" with `allPassed: true`.
 - [ ] **Logs write:** End a session, then check `~/.config/opencode/logs/` for a new JSON log file.
 - [ ] **Config saves:** Run `oc_configure` start/assign/commit cycle -- config should persist to `~/.config/opencode/opencode-autopilot.json`.
-- [ ] **Stocktake counts match:** Run `oc_stocktake` -- summary counts should match: 18 skills, 11 commands, 8+ agents (standard + pipeline).
+- [ ] **Stocktake counts match:** Run `oc_stocktake` -- summary counts should match: 18 skills, 14 commands, 8+ agents (standard + pipeline).

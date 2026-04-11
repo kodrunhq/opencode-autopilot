@@ -4,19 +4,23 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileExists } from "./fs-helpers";
 
-function stripJsonComments(jsonc: string): string {
+export function parseJsonc(content: string): unknown {
 	let result = "";
 	let i = 0;
 	let inString = false;
 	let escapeNext = false;
+	// Track pending comma position to handle trailing commas
+	let pendingCommaPos = -1;
 
-	while (i < jsonc.length) {
-		const char = jsonc[i];
-		const nextChar = jsonc[i + 1];
+	while (i < content.length) {
+		const char = content[i];
+		const nextChar = content[i + 1];
 
+		// Handle escape sequences
 		if (escapeNext) {
 			result += char;
 			escapeNext = false;
+			pendingCommaPos = -1;
 			i++;
 			continue;
 		}
@@ -24,11 +28,18 @@ function stripJsonComments(jsonc: string): string {
 		if (char === "\\" && inString) {
 			result += char;
 			escapeNext = true;
+			pendingCommaPos = -1;
 			i++;
 			continue;
 		}
 
+		// Handle string boundaries
 		if (char === '"' && !inString) {
+			// If entering a string and we have a pending comma, add it first
+			if (pendingCommaPos >= 0) {
+				result = result.slice(0, pendingCommaPos) + "," + result.slice(pendingCommaPos);
+				pendingCommaPos = -1;
+			}
 			inString = true;
 			result += char;
 			i++;
@@ -38,50 +49,71 @@ function stripJsonComments(jsonc: string): string {
 		if (char === '"' && inString) {
 			inString = false;
 			result += char;
+			pendingCommaPos = -1;
 			i++;
 			continue;
 		}
 
+		// Inside strings: copy everything as-is
 		if (inString) {
+			result += char;
+			pendingCommaPos = -1;
+			i++;
+			continue;
+		}
+
+		// Outside strings: handle comments, trailing commas, and normal characters
+
+		// Single-line comment
+		if (char === "/" && nextChar === "/") {
+			while (i < content.length && content[i] !== "\n") {
+				i++;
+			}
+			continue;
+		}
+
+		// Multi-line comment
+		if (char === "/" && nextChar === "*") {
+			i += 2;
+			while (i < content.length && !(content[i] === "*" && content[i + 1] === "/")) {
+				i++;
+			}
+			i += 2;
+			continue;
+		}
+
+		// Track commas but don't add them yet (to handle trailing commas)
+		if (char === ",") {
+			pendingCommaPos = result.length;
+			i++;
+			continue;
+		}
+
+		// Whitespace: preserve but keep tracking comma
+		if (/\s/.test(char)) {
 			result += char;
 			i++;
 			continue;
 		}
 
-		// Not in string - check for comments
-		if (char === "/" && nextChar === "/") {
-			// Single-line comment - skip to end of line
-			while (i < jsonc.length && jsonc[i] !== "\n") {
-				i++;
-			}
+		// Closing brace/bracket: skip any pending comma (trailing comma)
+		if (char === "}" || char === "]") {
+			pendingCommaPos = -1;
+			result += char;
+			i++;
 			continue;
 		}
 
-		if (char === "/" && nextChar === "*") {
-			// Multi-line comment - skip to end of comment
-			i += 2;
-			while (i < jsonc.length && !(jsonc[i] === "*" && jsonc[i + 1] === "/")) {
-				i++;
-			}
-			i += 2; // Skip past */
-			continue;
+		// Any other character: add pending comma if exists, then add character
+		if (pendingCommaPos >= 0) {
+			result = result.slice(0, pendingCommaPos) + "," + result.slice(pendingCommaPos);
+			pendingCommaPos = -1;
 		}
-
 		result += char;
 		i++;
 	}
 
-	return result;
-}
-
-function stripTrailingCommas(json: string): string {
-	return json.replace(/,(\s*[}\]])/g, "$1");
-}
-
-export function parseJsonc(content: string): unknown {
-	const withoutComments = stripJsonComments(content);
-	const withoutTrailingCommas = stripTrailingCommas(withoutComments);
-	return JSON.parse(withoutTrailingCommas);
+	return JSON.parse(result);
 }
 
 async function findGitRoot(startDir: string): Promise<string | null> {
@@ -116,7 +148,6 @@ async function findProjectConfig(cwd: string): Promise<string | null> {
 	while (!visited.has(current)) {
 		visited.add(current);
 
-		// Current OpenCode uses .opencode.json (with leading dot)
 		const jsonPath = join(current, ".opencode.json");
 		if (await fileExists(jsonPath)) {
 			return jsonPath;
@@ -127,7 +158,6 @@ async function findProjectConfig(cwd: string): Promise<string | null> {
 			return jsoncPath;
 		}
 
-		// Also check legacy names for backwards compatibility
 		const legacyJsonPath = join(current, "opencode.json");
 		if (await fileExists(legacyJsonPath)) {
 			return legacyJsonPath;
