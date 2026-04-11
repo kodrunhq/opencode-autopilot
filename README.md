@@ -330,7 +330,7 @@ Extend the plugin without leaving OpenCode:
 - **`/oc-new-skill`** -- Create a skill directory with domain knowledge
 - **`/oc-new-command`** -- Create a slash command (validates against built-in names)
 
-All created assets write to `~/.config/opencode/` and are available immediately.
+All created assets write to `~/.config/opencode/` and are available immediately after restarting the OpenCode session.
 
 ## Configuration
 

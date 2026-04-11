@@ -318,12 +318,12 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 
 	const pluginVerification = await verifyPluginLoad();
 	if (pluginVerification.success) {
-		console.log(`  OpenCode can load plugin ${green("✓")}`);
+		console.log(`  OpenCode CLI accessible ${green("✓")}`);
 		if (pluginVerification.details) {
 			console.log(`    ${pluginVerification.details}`);
 		}
 	} else {
-		console.log(`  OpenCode can load plugin ${red("✗")}`);
+		console.log(`  OpenCode CLI accessible ${red("✗")}`);
 		console.log(`    ${pluginVerification.message}`);
 		if (pluginVerification.details) {
 			console.log(`    ${pluginVerification.details}`);

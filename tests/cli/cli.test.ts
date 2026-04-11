@@ -26,11 +26,19 @@ describe("CLI install", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test.skip("creates opencode.json at git root when no env vars set", async () => {
+	test("creates opencode.json at git root when no env vars set", async () => {
 		await mkdir(join(tempDir, ".git"));
 
 		const originalEnv = process.env.OPENCODE_CONFIG;
 		const originalEnvDir = process.env.OPENCODE_CONFIG_DIR;
+		const originalHome = process.env.HOME;
+		const originalUserProfile = process.env.USERPROFILE;
+		const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+
+		// Set HOME to tempDir to isolate from real config
+		process.env.HOME = tempDir;
+		process.env.USERPROFILE = tempDir;
+		process.env.XDG_CONFIG_HOME = join(tempDir, ".config");
 		delete process.env.OPENCODE_CONFIG;
 		delete process.env.OPENCODE_CONFIG_DIR;
 
@@ -42,6 +50,9 @@ describe("CLI install", () => {
 		} finally {
 			process.env.OPENCODE_CONFIG = originalEnv;
 			process.env.OPENCODE_CONFIG_DIR = originalEnvDir;
+			process.env.HOME = originalHome;
+			process.env.USERPROFILE = originalUserProfile;
+			process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
 		}
 	});
 
@@ -113,10 +124,16 @@ describe("CLI install", () => {
 		expect(content.model).toBe("some-model");
 	});
 
-	test.skip("writes opencode.json with 2-space indent", async () => {
+	test("writes opencode.json with 2-space indent", async () => {
 		const originalEnv = process.env.OPENCODE_CONFIG;
+		const originalHome = process.env.HOME;
+		const originalUserProfile = process.env.USERPROFILE;
+		const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
 		const targetConfig = join(tempDir, "opencode.json");
 		process.env.OPENCODE_CONFIG = targetConfig;
+		process.env.HOME = tempDir;
+		process.env.USERPROFILE = tempDir;
+		process.env.XDG_CONFIG_HOME = join(tempDir, ".config");
 
 		try {
 			await runInstall({ cwd: tempDir, noTui: true, configDir: configPath });
@@ -125,6 +142,9 @@ describe("CLI install", () => {
 			expect(raw).toContain('  "plugin"');
 		} finally {
 			process.env.OPENCODE_CONFIG = originalEnv;
+			process.env.HOME = originalHome;
+			process.env.USERPROFILE = originalUserProfile;
+			process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
 		}
 	});
 

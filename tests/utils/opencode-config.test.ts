@@ -6,6 +6,7 @@ import {
 	getInstallTargetPath,
 	parseJsonc,
 	resolveOpenCodeConfig,
+	verifyPluginLoad,
 } from "../../src/utils/opencode-config";
 
 describe("opencode-config", () => {
@@ -178,6 +179,35 @@ describe("opencode-config", () => {
 			expect(result).toContain(".config/opencode/opencode.json");
 
 			await rm(tempDir, { recursive: true, force: true });
+		});
+	});
+
+	describe("verifyPluginLoad", () => {
+		test("returns success when opencode CLI is accessible", async () => {
+			const result = await verifyPluginLoad();
+
+			// In CI/test environments without opencode, this will fail
+			// but we're testing the function structure, not requiring opencode to exist
+			expect(result).toHaveProperty("success");
+			expect(result).toHaveProperty("message");
+			expect(typeof result.success).toBe("boolean");
+			expect(typeof result.message).toBe("string");
+		});
+
+		test("returns honest message about verification limitations when successful", async () => {
+			const result = await verifyPluginLoad();
+
+			// The key requirement: message should NOT claim plugin loads successfully
+			// when we can only verify CLI accessibility
+			expect(result.message).not.toContain("plugin loads");
+			expect(result.message).not.toContain("working");
+
+			// Should mention CLI accessibility
+			if (result.success) {
+				expect(result.message.toLowerCase()).toContain("cli");
+				expect(result.details).toBeDefined();
+				expect(result.details).toContain("not verified");
+			}
 		});
 	});
 });
