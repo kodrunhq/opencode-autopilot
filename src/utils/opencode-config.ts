@@ -5,8 +5,72 @@ import { dirname, join, resolve } from "node:path";
 import { fileExists } from "./fs-helpers";
 
 function stripJsonComments(jsonc: string): string {
-	let result = jsonc.replace(/(^|\s)\/\/.*$/gm, "$1");
-	result = result.replace(/\/\*[\s\S]*?\*\//g, "");
+	let result = "";
+	let i = 0;
+	let inString = false;
+	let escapeNext = false;
+
+	while (i < jsonc.length) {
+		const char = jsonc[i];
+		const nextChar = jsonc[i + 1];
+
+		if (escapeNext) {
+			result += char;
+			escapeNext = false;
+			i++;
+			continue;
+		}
+
+		if (char === "\\" && inString) {
+			result += char;
+			escapeNext = true;
+			i++;
+			continue;
+		}
+
+		if (char === '"' && !inString) {
+			inString = true;
+			result += char;
+			i++;
+			continue;
+		}
+
+		if (char === '"' && inString) {
+			inString = false;
+			result += char;
+			i++;
+			continue;
+		}
+
+		if (inString) {
+			result += char;
+			i++;
+			continue;
+		}
+
+		// Not in string - check for comments
+		if (char === "/" && nextChar === "/") {
+			// Single-line comment - skip to end of line
+			while (i < jsonc.length && jsonc[i] !== "\n") {
+				i++;
+			}
+			continue;
+		}
+
+		if (char === "/" && nextChar === "*") {
+			// Multi-line comment - skip to end of comment
+			i += 2;
+			while (i < jsonc.length && !(jsonc[i] === "*" && jsonc[i + 1] === "/")) {
+				i++;
+			}
+			i += 2; // Skip past */
+			continue;
+		}
+
+		result += char;
+		i++;
+	}
+
 	return result;
 }
 
@@ -52,14 +116,26 @@ async function findProjectConfig(cwd: string): Promise<string | null> {
 	while (!visited.has(current)) {
 		visited.add(current);
 
-		const jsonPath = join(current, "opencode.json");
+		// Current OpenCode uses .opencode.json (with leading dot)
+		const jsonPath = join(current, ".opencode.json");
 		if (await fileExists(jsonPath)) {
 			return jsonPath;
 		}
 
-		const jsoncPath = join(current, "opencode.jsonc");
+		const jsoncPath = join(current, ".opencode.jsonc");
 		if (await fileExists(jsoncPath)) {
 			return jsoncPath;
+		}
+
+		// Also check legacy names for backwards compatibility
+		const legacyJsonPath = join(current, "opencode.json");
+		if (await fileExists(legacyJsonPath)) {
+			return legacyJsonPath;
+		}
+
+		const legacyJsoncPath = join(current, "opencode.jsonc");
+		if (await fileExists(legacyJsoncPath)) {
+			return legacyJsoncPath;
 		}
 
 		if (current === stopAt || current === "/") {
@@ -77,7 +153,7 @@ async function findProjectConfig(cwd: string): Promise<string | null> {
 }
 
 function getGlobalConfigPath(): string {
-	return join(homedir(), ".config", "opencode", "opencode.json");
+	return join(homedir(), ".config", "opencode", ".opencode.json");
 }
 
 export interface ResolvedConfig {
@@ -121,7 +197,12 @@ export async function resolveOpenCodeConfig(options: ResolveOptions = {}): Promi
 	if (envConfigDir) {
 		const dir = resolve(envConfigDir);
 
-		for (const filename of ["opencode.json", "opencode.jsonc"]) {
+		for (const filename of [
+			".opencode.json",
+			".opencode.jsonc",
+			"opencode.json",
+			"opencode.jsonc",
+		]) {
 			const configPath = join(dir, filename);
 			if (await fileExists(configPath)) {
 				try {
@@ -145,7 +226,7 @@ export async function resolveOpenCodeConfig(options: ResolveOptions = {}): Promi
 		}
 
 		return {
-			path: join(dir, "opencode.json"),
+			path: join(dir, ".opencode.json"),
 			exists: false,
 			content: null,
 			location: "env-dir",
@@ -198,7 +279,7 @@ export async function getInstallTargetPath(cwd?: string): Promise<string> {
 	const resolvedCwd = cwd ?? process.cwd();
 	const gitRoot = await findGitRoot(resolvedCwd);
 	if (gitRoot) {
-		return join(gitRoot, "opencode.json");
+		return join(gitRoot, ".opencode.json");
 	}
 	return getGlobalConfigPath();
 }
