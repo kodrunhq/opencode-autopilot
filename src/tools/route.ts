@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin";
 import { openKernelDb } from "../kernel/database";
+import { resolveProjectIdentitySync } from "../projects/resolve";
 import {
 	getIntentRouting,
 	IntentClassificationSchema,
@@ -13,7 +14,7 @@ function buildInstruction(
 	routing: Readonly<{ targetAgent: string; usePipeline: boolean; behavior: string }>,
 ): string {
 	if (routing.usePipeline) {
-		return `Proceed with oc_orchestrate (pass intent: "implementation") — full pipeline via ${routing.targetAgent}. ${routing.behavior}`;
+		return `Call oc_orchestrate with intent: "implementation" and routeToken from requiredPipelineArgs.routeToken - full pipeline via ${routing.targetAgent}. ${routing.behavior}`;
 	}
 	return `Route to ${routing.targetAgent} agent directly — no pipeline needed. ${routing.behavior}`;
 }
@@ -23,7 +24,9 @@ function buildSecondaryInstruction(
 	secondaryRouting: Readonly<{ targetAgent: string; usePipeline: boolean; behavior: string }>,
 ): string {
 	const intentHint =
-		secondary === "implementation" ? ' (pass intent: "implementation" to oc_orchestrate)' : "";
+		secondary === "implementation"
+			? ' (pass intent: "implementation" and routeToken from requiredPipelineArgs.routeToken to oc_orchestrate)'
+			: "";
 	return `After completing the primary intent, follow up with: ${secondaryRouting.behavior} (via ${secondaryRouting.targetAgent})${intentHint}`;
 }
 
@@ -91,14 +94,17 @@ export function routeCore(
 
 	// Issue route ticket for pipeline-start authorization
 	if (context && routing.usePipeline && primary === "implementation") {
+		let db: ReturnType<typeof openKernelDb> | null = null;
 		try {
-			const db = openKernelDb(context.projectRoot);
+			db = openKernelDb(context.projectRoot);
 			const repo = createRouteTicketRepository(db);
+			const project = resolveProjectIdentitySync(context.projectRoot, { db });
+			const messageId = context.messageId ?? "";
 
 			const ticket = repo.createTicket({
-				projectId: context.projectRoot,
+				projectId: project.id,
 				sessionId: context.sessionId,
-				messageId: context.messageId,
+				messageId,
 				intent: primary,
 				usePipeline: true,
 				metadata: {
@@ -113,9 +119,15 @@ export function routeCore(
 			result.routeToken = ticket.routeToken;
 			result.routeTokenMode = "single_use";
 			result.routeTokenExpiresAt = ticket.expiresAt;
+			result.requiredPipelineArgs = {
+				intent: primary,
+				routeToken: ticket.routeToken,
+			};
 		} catch {
 			// Ticket creation is best-effort; don't block routing if it fails
 			// The intent gate will still work via the legacy path
+		} finally {
+			db?.close();
 		}
 	}
 

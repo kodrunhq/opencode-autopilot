@@ -781,7 +781,6 @@ const plugin: Plugin = async (input) => {
 			output: { args: unknown },
 		) => {
 			obsToolBeforeHandler({ ...input, args: output.args });
-
 			const hashAnchoredResult = hashAnchoredEnforcementHandler(
 				{ ...input, args: output.args },
 				output,

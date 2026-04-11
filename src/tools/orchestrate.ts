@@ -41,6 +41,7 @@ import {
 	updatePersistedState,
 } from "../orchestrator/state";
 import type { Phase, PipelineState } from "../orchestrator/types";
+import { resolveProjectIdentitySync } from "../projects/resolve";
 import { getIntentRouting, type IntentType, IntentTypeSchema } from "../routing/intent-types";
 import { createRouteTicketRepository } from "../routing/route-ticket-repository";
 import { isEnoentError } from "../utils/fs-helpers";
@@ -71,8 +72,31 @@ const ORCHESTRATE_ERROR_CODES = Object.freeze({
 	DUPLICATE_DISPATCH: "E_DUPLICATE_DISPATCH",
 	PENDING_RESULT_REQUIRED: "E_PENDING_RESULT_REQUIRED",
 	RESULT_KIND_MISMATCH: "E_RESULT_KIND_MISMATCH",
-	NO_STATE: "E_NO_STATE",
 });
+
+function mapRouteTokenValidationError(reason: string | undefined): string {
+	switch (reason) {
+		case "Route ticket session mismatch":
+		case "Route ticket message mismatch":
+		case "Route ticket project mismatch":
+			return "E_ROUTE_TOKEN_MISMATCH";
+		case "Route ticket already consumed":
+			return "E_ROUTE_TOKEN_CONSUMED";
+		case "Route ticket not found, expired, or already consumed":
+			return "E_INVALID_ROUTE_TOKEN";
+		case "Route ticket intent mismatch":
+		case "Route ticket not authorized for pipeline use":
+			return "E_INVALID_ROUTE_TOKEN";
+		default:
+			if (reason?.includes("already consumed")) {
+				return "E_ROUTE_TOKEN_CONSUMED";
+			}
+			if (reason?.includes("mismatch")) {
+				return "E_ROUTE_TOKEN_MISMATCH";
+			}
+			return "E_INVALID_ROUTE_TOKEN";
+	}
+}
 
 function createDispatchId(): string {
 	return `dispatch_${randomBytes(6).toString("hex")}`;
@@ -663,7 +687,7 @@ const MAX_PHASE_DISPATCHES: Readonly<Record<string, number>> = Object.freeze({
 	ARCHITECT: 3,
 	EXPLORE: 2,
 	PLAN: 2,
-	BUILD: 500,
+	BUILD: 20,
 	SHIP: 2,
 	RETROSPECTIVE: 2,
 });
@@ -1247,20 +1271,21 @@ export async function orchestrateCore(
 					});
 				}
 				if (context.projectRoot) {
+					let db: ReturnType<typeof openKernelDb> | null = null;
 					try {
-						const db = await openKernelDb(context.projectRoot);
+						db = await openKernelDb(context.projectRoot);
 						const routeTicketRepo = createRouteTicketRepository(db);
+						const project = resolveProjectIdentitySync(context.projectRoot, { db });
 						const validationResult = routeTicketRepo.validateAndConsumeTicket(args.routeToken, {
 							sessionId: context.sessionId,
-							messageId: context.messageId,
-							projectId: context.projectRoot,
+							messageId: context.messageId ?? "",
+							projectId: project.id,
 							intent: args.intent ?? "implementation",
 						});
-						await db.close();
 						if (!validationResult.valid) {
 							return JSON.stringify({
 								action: "error",
-								code: "E_INVALID_ROUTE_TOKEN",
+								code: mapRouteTokenValidationError(validationResult.reason),
 								message: `Invalid or expired route token: ${validationResult.reason}. Call oc_route first to obtain a valid route token, then pass it to oc_orchestrate.`,
 							});
 						}
@@ -1268,6 +1293,8 @@ export async function orchestrateCore(
 						// Database/project setup may not exist in all contexts
 						// For now, allow the pipeline to proceed if we can't validate
 						// This maintains backward compatibility while enabling validation where supported
+					} finally {
+						db?.close();
 					}
 				}
 			}
@@ -1647,10 +1674,11 @@ export const ocOrchestrate = tool({
 			),
 	},
 	async execute(args, context) {
-		return orchestrateCore(args, getProjectArtifactDir(context.directory), {
+		const projectRoot = context.worktree ?? context.directory ?? process.cwd();
+		return orchestrateCore(args, getProjectArtifactDir(projectRoot), {
 			sessionId: context.sessionID,
-			messageId: context.messageID,
-			projectRoot: context.worktree ?? context.directory ?? process.cwd(),
+			messageId: context.messageID ?? "",
+			projectRoot,
 		});
 	},
 });

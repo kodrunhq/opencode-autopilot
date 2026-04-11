@@ -37,6 +37,55 @@ function getDefaultExpiration(ttlMinutes = 10): string {
 }
 
 export function createRouteTicketRepository(db: Database) {
+	const selectRawTicket = `
+		SELECT
+			route_token as routeToken,
+			project_id as projectId,
+			session_id as sessionId,
+			message_id as messageId,
+			intent,
+			use_pipeline as usePipeline,
+			issued_at as issuedAt,
+			expires_at as expiresAt,
+			consumed_at as consumedAt,
+			metadata_json as metadataJson
+		FROM route_tickets
+		WHERE route_token = ?
+	`;
+
+	type RawRouteTicket = {
+		readonly routeToken: string;
+		readonly projectId: string;
+		readonly sessionId: string;
+		readonly messageId: string;
+		readonly intent: string;
+		readonly usePipeline: number;
+		readonly issuedAt: string;
+		readonly expiresAt: string;
+		readonly consumedAt: string | null;
+		readonly metadataJson: string;
+	};
+
+	function parseTicket(row: RawRouteTicket): RouteTicket {
+		return {
+			routeToken: row.routeToken,
+			projectId: row.projectId,
+			sessionId: row.sessionId,
+			messageId: row.messageId,
+			intent: row.intent,
+			usePipeline: row.usePipeline === 1,
+			issuedAt: row.issuedAt,
+			expiresAt: row.expiresAt,
+			consumedAt: row.consumedAt,
+			metadataJson: row.metadataJson,
+		};
+	}
+
+	function getTicketByToken(routeToken: string): RouteTicket | null {
+		const row = db.query(selectRawTicket).get(routeToken) as RawRouteTicket | null;
+		return row ? parseTicket(row) : null;
+	}
+
 	return {
 		createTicket(params: RouteTicketCreate): RouteTicket {
 			const routeToken = generateRouteToken();
@@ -79,29 +128,11 @@ export function createRouteTicketRepository(db: Database) {
 
 		getValidTicket(routeToken: string): RouteTicket | null {
 			const now = new Date().toISOString();
-			const row = db
-				.query(
-					`
-				SELECT
-					route_token as routeToken,
-					project_id as projectId,
-					session_id as sessionId,
-					message_id as messageId,
-					intent,
-					use_pipeline as usePipeline,
-					issued_at as issuedAt,
-					expires_at as expiresAt,
-					consumed_at as consumedAt,
-					metadata_json as metadataJson
-				FROM route_tickets
-				WHERE route_token = ?
-					AND consumed_at IS NULL
-					AND expires_at > ?
-			`,
-				)
-				.get(routeToken, now) as RouteTicket | null;
-
-			return row;
+			const ticket = getTicketByToken(routeToken);
+			if (!ticket || ticket.consumedAt !== null || ticket.expiresAt <= now) {
+				return null;
+			}
+			return ticket;
 		},
 
 		consumeTicket(routeToken: string): boolean {
@@ -122,10 +153,16 @@ export function createRouteTicketRepository(db: Database) {
 				intent: string;
 			},
 		): { valid: boolean; reason?: string } {
-			const ticket = this.getValidTicket(routeToken);
+			const ticket = getTicketByToken(routeToken);
 
 			if (!ticket) {
 				return { valid: false, reason: "Route ticket not found, expired, or already consumed" };
+			}
+			if (ticket.consumedAt !== null) {
+				return { valid: false, reason: "Route ticket already consumed" };
+			}
+			if (ticket.expiresAt <= new Date().toISOString()) {
+				return { valid: false, reason: "Route ticket expired" };
 			}
 
 			if (ticket.sessionId !== params.sessionId) {

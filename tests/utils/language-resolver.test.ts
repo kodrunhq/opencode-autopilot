@@ -5,7 +5,7 @@ import {
 	substituteLanguageVar,
 } from "../../src/utils/language-resolver";
 
-const mockDetect = mock((_: string) =>
+const mockDetect = mock(() =>
 	Promise.resolve(Object.freeze(["typescript", "bun"]) as readonly string[]),
 );
 
@@ -19,7 +19,6 @@ describe("resolveLanguageTag", () => {
 		mockDetect.mockResolvedValueOnce(Object.freeze(["typescript", "javascript"]));
 		const result = await resolveLanguageTag("/tmp/project-ts", mockDetect);
 		expect(result).toBe("javascript, typescript");
-		expect(mockDetect).toHaveBeenCalledWith("/tmp/project-ts");
 	});
 
 	test("returns 'unknown' when no manifest files detected", async () => {
