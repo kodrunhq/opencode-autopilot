@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import {
 	formatEvents,
 	formatLessons,
@@ -61,31 +62,38 @@ export async function inspectCliCore(
 		return makeError(parsed.error, parsed.json);
 	}
 
-	let dbInput: string | undefined = options.dbPath;
-	let dbScope = "unknown";
+	const globalDbPath = getAutopilotDbPath();
+	const gitRoot = resolveGitRoot();
+	const projectArtifactDir = gitRoot ? getProjectArtifactDir(gitRoot) : null;
+	const projectKernelExists = projectArtifactDir !== null && kernelDbExists(projectArtifactDir);
 
-	if (!dbInput) {
-		if (parsed.global) {
-			dbInput = getAutopilotDbPath();
-			dbScope = "global";
-		} else {
-			const cwd = process.cwd();
-			const artifactDir = getProjectArtifactDir(cwd);
-			if (kernelDbExists(artifactDir)) {
-				dbInput = `${artifactDir}/kernel.db`;
-				dbScope = "project";
-			} else {
-				dbInput = getAutopilotDbPath();
-				dbScope = "global (no project kernel.db found)";
-			}
+	function resolveDbInput(view: string): { dbInput: string | undefined; dbScope: string } {
+		if (options.dbPath) {
+			return { dbInput: options.dbPath, dbScope: "explicit" };
 		}
-	} else {
-		dbScope = "explicit";
+		if (parsed.global) {
+			return { dbInput: globalDbPath, dbScope: "global" };
+		}
+
+		const globalScopedViews = ["memory", "preferences"];
+		if (globalScopedViews.includes(view)) {
+			return { dbInput: globalDbPath, dbScope: "global" };
+		}
+
+		if (projectKernelExists && projectArtifactDir) {
+			return {
+				dbInput: `${projectArtifactDir}/kernel.db`,
+				dbScope: "project",
+			};
+		}
+
+		return { dbInput: globalDbPath, dbScope: "global (no project kernel.db found)" };
 	}
 
 	const verbose = parsed.verbose;
 	switch (parsed.view) {
 		case "projects": {
+			const { dbInput, dbScope } = resolveDbInput("projects");
 			const allProjects = listProjects(dbInput);
 			const shouldFilterEphemeral = !parsed.global && !options.dbPath;
 			const projects = shouldFilterEphemeral
@@ -99,28 +107,33 @@ export async function inspectCliCore(
 			);
 		}
 		case "project": {
+			const { dbInput, dbScope } = resolveDbInput("project");
 			const details = getProjectDetails(parsed.projectRef ?? "", dbInput);
 			if (details === null) {
 				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}
+			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
 				{ action: "inspect_project", project: details },
 				parsed.json,
-				formatProjectDetails(details, verbose),
+				`${header}${formatProjectDetails(details, verbose)}`,
 			);
 		}
 		case "paths": {
+			const { dbInput, dbScope } = resolveDbInput("paths");
 			const details = getProjectDetails(parsed.projectRef ?? "", dbInput);
 			if (details === null) {
 				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}
+			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
 				{ action: "inspect_paths", project: details.project, paths: details.paths },
 				parsed.json,
-				formatPaths(details, verbose),
+				`${header}${formatPaths(details, verbose)}`,
 			);
 		}
 		case "runs": {
+			const { dbInput } = resolveDbInput("runs");
 			const runs = listRuns(
 				{ projectRef: parsed.projectRef ?? undefined, limit: parsed.limit },
 				dbInput,
@@ -128,6 +141,7 @@ export async function inspectCliCore(
 			return makeOutput({ action: "inspect_runs", runs }, parsed.json, formatRuns(runs, verbose));
 		}
 		case "events": {
+			const { dbInput } = resolveDbInput("events");
 			const events = listEvents(
 				{
 					projectRef: parsed.projectRef ?? undefined,
@@ -145,6 +159,7 @@ export async function inspectCliCore(
 			);
 		}
 		case "lessons": {
+			const { dbInput } = resolveDbInput("lessons");
 			const lessons = listLessons(
 				{ projectRef: parsed.projectRef ?? undefined, limit: parsed.limit },
 				dbInput,
@@ -156,19 +171,23 @@ export async function inspectCliCore(
 			);
 		}
 		case "preferences": {
+			const { dbInput, dbScope } = resolveDbInput("preferences");
 			const preferences = listPreferences(dbInput);
+			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
 				{ action: "inspect_preferences", preferences },
 				parsed.json,
-				formatPreferences(preferences, verbose),
+				`${header}${formatPreferences(preferences, verbose)}`,
 			);
 		}
 		case "memory": {
+			const { dbInput, dbScope } = resolveDbInput("memory");
 			const overview = getMemoryOverview(dbInput);
+			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
 				{ action: "inspect_memory", overview },
 				parsed.json,
-				formatMemoryOverview(overview, verbose),
+				`${header}${formatMemoryOverview(overview, verbose)}`,
 			);
 		}
 		case null:
@@ -190,11 +209,45 @@ export async function runInspect(
 	console.log(result.output);
 }
 
+function resolveGitRoot(): string | null {
+	try {
+		const result = execSync("git rev-parse --show-toplevel", {
+			encoding: "utf-8",
+			timeout: 3000,
+			stdio: ["pipe", "pipe", "pipe"],
+		}).trim();
+		return result.length > 0 ? result : null;
+	} catch {
+		return null;
+	}
+}
+
 function isEphemeralPath(path: string): boolean {
-	return (
-		path.startsWith("/tmp/") ||
-		path.startsWith("/var/folders/") ||
-		(path.includes("/T/") && path.startsWith("/var")) ||
-		path.startsWith(process.env.TMPDIR ?? "/tmp/")
-	);
+	if (path.startsWith("/var/folders/")) return true;
+	if (process.env.TMPDIR && path.startsWith(process.env.TMPDIR)) return true;
+	const segments = path.split("/");
+	const tmpIdx = segments.indexOf("tmp");
+	if (tmpIdx !== -1) {
+		const afterTmp = segments.slice(tmpIdx + 1).join("/");
+		if (afterTmp.length === 0) return false;
+		const ephemeralPrefixes = [
+			"forensics-project-",
+			"review-tool-",
+			"lesson-test-",
+			"log-writer-",
+			"session-logs-",
+			"orchestrate-tool-test-",
+			"report-test-",
+			"stats-test-",
+			"replay-a-",
+			"cli-inspect-",
+			"kernel-test-",
+			"route-test-",
+			"memory-test-",
+		];
+		for (const prefix of ephemeralPrefixes) {
+			if (afterTmp.startsWith(prefix)) return true;
+		}
+	}
+	return false;
 }

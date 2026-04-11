@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
-import { openKernelDb } from "../kernel/database";
+import { openProjectKernelDb } from "../kernel/database";
 import { resolveProjectIdentitySync } from "../projects/resolve";
 import {
 	getIntentRouting,
@@ -8,7 +8,6 @@ import {
 	IntentTypeSchema,
 } from "../routing/intent-types";
 import { createRouteTicketRepository } from "../routing/route-ticket-repository";
-import { getProjectArtifactDir } from "../utils/paths";
 
 function buildInstruction(
 	_intent: IntentType,
@@ -95,10 +94,8 @@ export function routeCore(
 
 	// Issue route ticket for pipeline-start authorization
 	if (context && routing.usePipeline && primary === "implementation") {
-		let db: ReturnType<typeof openKernelDb> | null = null;
 		try {
-			const artifactDir = getProjectArtifactDir(context.projectRoot);
-			db = openKernelDb(artifactDir);
+			const db = openProjectKernelDb(context.projectRoot);
 			const repo = createRouteTicketRepository(db);
 			const project = resolveProjectIdentitySync(context.projectRoot, { db });
 			const messageId = context.messageId ?? "";
@@ -125,11 +122,12 @@ export function routeCore(
 				intent: primary,
 				routeToken: ticket.routeToken,
 			};
-		} catch {
-			// Ticket creation is best-effort; don't block routing if it fails
-			// The intent gate will still work via the legacy path
-		} finally {
-			db?.close();
+		} catch (ticketError) {
+			return JSON.stringify({
+				action: "error",
+				code: "E_ROUTE_TICKET_CREATION_FAILED",
+				message: `Failed to create route ticket: ${ticketError instanceof Error ? ticketError.message : String(ticketError)}. Pipeline start authorization is required.`,
+			});
 		}
 	}
 

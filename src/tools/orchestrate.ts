@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { tool } from "@opencode-ai/plugin";
 import { loadConfig } from "../config";
-import { openKernelDb } from "../kernel/database";
+import { type openKernelDb, openProjectKernelDb } from "../kernel/database";
 import { getLogger } from "../logging/domains";
 import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
 import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
@@ -1273,8 +1273,7 @@ export async function orchestrateCore(
 				if (context.projectRoot) {
 					let db: ReturnType<typeof openKernelDb> | null = null;
 					try {
-						const artifactDir = getProjectArtifactDir(context.projectRoot);
-						db = await openKernelDb(artifactDir);
+						db = openProjectKernelDb(context.projectRoot);
 						const routeTicketRepo = createRouteTicketRepository(db);
 						const project = resolveProjectIdentitySync(context.projectRoot, { db });
 						const validationResult = routeTicketRepo.validateAndConsumeTicket(args.routeToken, {
