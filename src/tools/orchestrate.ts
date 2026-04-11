@@ -71,7 +71,6 @@ const ORCHESTRATE_ERROR_CODES = Object.freeze({
 	DUPLICATE_DISPATCH: "E_DUPLICATE_DISPATCH",
 	PENDING_RESULT_REQUIRED: "E_PENDING_RESULT_REQUIRED",
 	RESULT_KIND_MISMATCH: "E_RESULT_KIND_MISMATCH",
-	NO_STATE: "E_NO_STATE",
 });
 
 function mapRouteTokenValidationError(reason: string | undefined): string {
@@ -1282,11 +1281,11 @@ export async function orchestrateCore(
 						});
 						await db.close();
 						if (!validationResult.valid) {
-							return JSON.stringify({
-								action: "error",
-								code: mapRouteTokenValidationError(validationResult.reason),
-								message: `Invalid or expired route token: ${validationResult.reason}. Call oc_route first to obtain a valid route token, then pass it to oc_orchestrate.`,
-							});
+								return JSON.stringify({
+									action: "error",
+									code: mapRouteTokenValidationError(validationResult.reason),
+									message: `Invalid or expired route token: ${validationResult.reason}. Call oc_route first to obtain a valid route token, then pass it to oc_orchestrate.`,
+								});
 						}
 					} catch {
 						// Database/project setup may not exist in all contexts

@@ -5,9 +5,13 @@ import {
 	substituteLanguageVar,
 } from "../../src/utils/language-resolver";
 
-const mockDetect = mock((_: string) =>
+// Mock detectProjectStackTags
+const mockDetect = mock(() =>
 	Promise.resolve(Object.freeze(["typescript", "bun"]) as readonly string[]),
 );
+mock.module("../../src/skills/adaptive-injector", () => ({
+	detectProjectStackTags: mockDetect,
+}));
 
 afterEach(() => {
 	clearLanguageCache();
@@ -17,20 +21,20 @@ afterEach(() => {
 describe("resolveLanguageTag", () => {
 	test("returns comma-separated tags from detectProjectStackTags", async () => {
 		mockDetect.mockResolvedValueOnce(Object.freeze(["typescript", "javascript"]));
-		const result = await resolveLanguageTag("/tmp/project-ts", mockDetect);
+		const result = await resolveLanguageTag("/tmp/project-ts");
 		expect(result).toBe("javascript, typescript");
 	});
 
 	test("returns 'unknown' when no manifest files detected", async () => {
 		mockDetect.mockResolvedValueOnce(Object.freeze([]));
-		const result = await resolveLanguageTag("/tmp/project-empty", mockDetect);
+		const result = await resolveLanguageTag("/tmp/project-empty");
 		expect(result).toBe("unknown");
 	});
 
 	test("caches result per projectRoot within a session", async () => {
 		mockDetect.mockResolvedValue(Object.freeze(["python"]));
-		const first = await resolveLanguageTag("/tmp/project-py", mockDetect);
-		const second = await resolveLanguageTag("/tmp/project-py", mockDetect);
+		const first = await resolveLanguageTag("/tmp/project-py");
+		const second = await resolveLanguageTag("/tmp/project-py");
 		expect(first).toBe("python");
 		expect(second).toBe("python");
 		// detectProjectStackTags should be called only once due to caching

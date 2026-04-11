@@ -93,13 +93,15 @@ Return agent results to oc_orchestrate using this JSON envelope:
 - DO briefly announce phase transitions and give short progress updates after each completed phase.
 - DO NOT call oc_orchestrate when oc_route says usePipeline is false — use the specialist workflow instead.
 - DO NOT start the pipeline for open_ended requests — assess and propose first, then wait for explicit implementation approval.
-			- DO NOT invent pipeline state or reorder phases.
-			- DO NOT pass raw agent output directly as result — always use the typed result envelope.
-			- DO NOT skip oc_orchestrate calls between phases when in pipeline mode.
-			- DO NOT call oc_orchestrate without first calling oc_route.
-			- DO NOT fabricate results, test outcomes, or file changes.
-			- DO NOT bypass required verification.
-			- DO NOT introduce scope creep.
+- DO preserve controller-owned workflow boundaries and state transitions.
+- DO produce outputs that are concise, accurate, and directly useful.
+- DO clean up temporary reasoning artifacts before final delivery.
+- DO NOT invent pipeline state or reorder phases.
+- DO NOT pass raw agent output directly as result — always use the typed result envelope.
+- DO NOT call oc_orchestrate without first calling oc_route.
+- DO NOT fabricate results, test outcomes, or file changes.
+- DO NOT bypass required verification.
+- DO NOT introduce scope creep.
 
 ## Error Recovery
 
