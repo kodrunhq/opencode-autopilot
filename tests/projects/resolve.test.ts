@@ -4,7 +4,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initMemoryDb } from "../../src/memory/database";
-import { upsertProjectGitFingerprint, upsertProjectRecord } from "../../src/projects/repository";
+import {
+	getProjectByCurrentPath,
+	upsertProjectGitFingerprint,
+	upsertProjectRecord,
+} from "../../src/projects/repository";
 import {
 	normalizeGitRemoteUrl,
 	resolveProjectIdentity,
@@ -171,6 +175,31 @@ describe("resolveProjectIdentity", () => {
 		} finally {
 			readonlyDb.close();
 			await rm(dbPath, { force: true });
+		}
+	});
+
+	test("sync resolution uses the provided database instead of the global fallback", () => {
+		const kernelDb = new Database(":memory:");
+		const globalDb = new Database(":memory:");
+		initMemoryDb(kernelDb);
+		initMemoryDb(globalDb);
+
+		try {
+			const project = resolveProjectIdentitySync("/tmp/project-kernel-only", {
+				db: kernelDb,
+				now: () => "2026-04-07T00:00:00.000Z",
+				createProjectId: () => "project-kernel",
+				readGitFingerprint: () => null,
+			});
+
+			expect(project.id).toBe("project-kernel");
+			expect(getProjectByCurrentPath("/tmp/project-kernel-only", kernelDb)?.id).toBe(
+				"project-kernel",
+			);
+			expect(getProjectByCurrentPath("/tmp/project-kernel-only", globalDb)).toBeNull();
+		} finally {
+			kernelDb.close();
+			globalDb.close();
 		}
 	});
 

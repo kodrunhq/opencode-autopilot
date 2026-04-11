@@ -49,6 +49,26 @@ describe("project kernel db paths", () => {
 		expect(existsSync(expectedDbPath)).toBe(true);
 	});
 
+	test("openProjectKernelDb runs project registry migrations in the kernel DB", () => {
+		database = openProjectKernelDb(projectRoot);
+
+		const tables = database
+			.query(
+				`SELECT name
+				 FROM sqlite_master
+				 WHERE type = 'table'
+				   AND name IN ('projects', 'project_paths', 'project_git_fingerprints')
+				 ORDER BY name ASC`,
+			)
+			.all() as Array<{ name: string }>;
+
+		expect(tables.map((table) => table.name)).toEqual([
+			"project_git_fingerprints",
+			"project_paths",
+			"projects",
+		]);
+	});
+
 	test("getKernelDbPath with artifactDir returns correct path", () => {
 		expect(getKernelDbPath("/some/project/.opencode-autopilot")).toBe(
 			"/some/project/.opencode-autopilot/kernel.db",

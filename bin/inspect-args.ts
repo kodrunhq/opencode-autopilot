@@ -175,7 +175,7 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 		break;
 	}
 
-	if (!help && error === null && view === null) {
+	if (!help && error === null && view === null && !pruneEphemeral) {
 		help = true;
 	}
 	if (

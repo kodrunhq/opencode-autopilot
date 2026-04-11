@@ -114,14 +114,37 @@ export async function inspectCliCore(
 			const { dbInput, dbScope } = resolveDbInput("projects");
 			const allProjects = listProjects(dbInput);
 			const shouldFilterEphemeral = !parsed.global && !options.dbPath;
-			const projects = shouldFilterEphemeral
+			let projects = shouldFilterEphemeral
 				? allProjects.filter((p) => !isEphemeralPath(p.path))
 				: allProjects;
+			let scopeNote: string | null = null;
+			if (gitRoot && !parsed.global && !options.dbPath) {
+				const currentRepoProject =
+					projects.find((project) => project.path === gitRoot) ??
+					projects.find((project) => project.path.startsWith(`${gitRoot}/`));
+				if (currentRepoProject !== undefined) {
+					projects = [currentRepoProject];
+					scopeNote = "Showing current repo project. Use --global to list all projects.";
+				} else if (!projectKernelExists) {
+					scopeNote =
+						"No local kernel.db found; showing all projects. Use --global to confirm global scope.";
+				} else {
+					scopeNote =
+						"Current repo project was not found in the selected database; showing all projects.";
+				}
+			}
 			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
+			const note = scopeNote === null ? "" : `${scopeNote}\n\n`;
 			return makeOutput(
-				{ action: "inspect_projects", projects, dbScope, dbPath: dbInput },
+				{
+					action: "inspect_projects",
+					projects,
+					dbScope,
+					dbPath: dbInput,
+					note: scopeNote ?? undefined,
+				},
 				parsed.json,
-				`${header}${formatProjects(projects, verbose)}`,
+				`${header}${note}${formatProjects(projects, verbose)}`,
 			);
 		}
 		case "project": {
@@ -259,7 +282,6 @@ const EPHEMERAL_TEST_PREFIXES = Object.freeze([
 ]);
 
 function isEphemeralPath(path: string): boolean {
-	if (path.startsWith("/var/folders/")) return true;
 	const segments = path.split("/");
 	const tmpIdx = segments.indexOf("tmp");
 	if (tmpIdx === -1) return false;

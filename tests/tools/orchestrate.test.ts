@@ -740,6 +740,57 @@ describe("integration: routeCore → orchestrateCore", () => {
 		expect(result.message.toLowerCase()).toContain("session");
 	});
 
+	test("route ticket rejects project mismatch (different worktree/directory)", async () => {
+		const routeContext = {
+			sessionID: "session-project-mismatch",
+			directory: tempDir,
+			worktree: tempDir,
+			messageID: "route-msg-project-mismatch",
+		} as unknown as Parameters<typeof ocRoute.execute>[1];
+
+		const route = JSON.parse(
+			await ocRoute.execute(
+				{
+					primaryIntent: "implementation",
+					reasoning: "User asked for a feature",
+					verbalization: "I detect implementation intent",
+				},
+				routeContext,
+			),
+		);
+
+		// Create a SECOND temp dir to simulate a different project
+		const otherDir = await mkdtemp(join(tmpdir(), "orchestrate-tool-test-other-"));
+
+		try {
+			const mismatchedContext = {
+				sessionID: routeContext.sessionID, // Same session
+				directory: otherDir,
+				worktree: otherDir, // DIFFERENT project root
+				messageID: "route-msg-project-mismatch",
+			} as unknown as Parameters<typeof ocOrchestrate.execute>[1];
+
+			const result = JSON.parse(
+				await ocOrchestrate.execute(
+					{
+						idea: "add cross-project check",
+						intent: "implementation",
+						routeToken: route.requiredPipelineArgs.routeToken,
+					},
+					mismatchedContext,
+				),
+			);
+
+			expect(result.action).toBe("error");
+			// When using a different project dir, a different kernel DB is opened.
+			// The ticket doesn't exist in that DB, so we get INVALID rather than MISMATCH.
+			expect(result.code).toBe("E_INVALID_ROUTE_TOKEN");
+			expect(result.message.toLowerCase()).toContain("route ticket not found");
+		} finally {
+			await rm(otherDir, { recursive: true, force: true });
+		}
+	});
+
 	test("oc_orchestrate accepts routeToken when called without the original message context (messageId is not validated)", async () => {
 		const routeContext = {
 			sessionID: "session-route-token-msg",
