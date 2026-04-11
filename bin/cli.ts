@@ -39,19 +39,17 @@ const PLUGIN_NAME = "@kodrunhq/opencode-autopilot";
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-async function checkOpenCodeInstalled(): Promise<string | null> {
+async function checkOpenCodeInstalled(): Promise<{ version: string | null; error?: string }> {
 	try {
 		const { stdout } = await execFile("opencode", ["--version"]);
-		return stdout.trim();
+		return { version: stdout.trim() };
 	} catch (error: unknown) {
-		if (
-			error instanceof Error &&
-			"code" in error &&
-			(error as NodeJS.ErrnoException).code === "ENOENT"
-		) {
-			return null;
+		const err = error as Error & { code?: string; stderr?: string };
+		if (err.code === "ENOENT") {
+			return { version: null };
 		}
-		throw error;
+		const errorMsg = err.stderr || err.message || "Unknown error";
+		return { version: null, error: errorMsg };
 	}
 }
 
@@ -66,9 +64,12 @@ export async function runInstall(options: CliOptions = {}): Promise<void> {
 	console.log("─────────────────────────");
 	console.log("");
 
-	const version = await checkOpenCodeInstalled();
-	if (version) {
-		console.log(`  ${green("✓")} OpenCode installed: ${version}`);
+	const checkResult = await checkOpenCodeInstalled();
+	if (checkResult.version) {
+		console.log(`  ${green("✓")} OpenCode installed: ${checkResult.version}`);
+	} else if (checkResult.error) {
+		console.log(`  ${red("✗")} OpenCode found but not working`);
+		console.log(`    ${checkResult.error}`);
 	} else {
 		console.log(`  ${yellow("⚠")} OpenCode not found — install from https://opencode.ai`);
 	}
@@ -174,9 +175,13 @@ async function printSystemChecks(
 
 	console.log(bold("System"));
 
-	const version = await checkOpenCodeInstalled();
-	if (version) {
-		console.log(`  OpenCode installed      ${green("✓")} ${version}`);
+	const checkResult = await checkOpenCodeInstalled();
+	if (checkResult.version) {
+		console.log(`  OpenCode installed      ${green("✓")} ${checkResult.version}`);
+	} else if (checkResult.error) {
+		console.log(`  OpenCode installed      ${red("✗")} found but not working`);
+		console.log(`    ${checkResult.error}`);
+		hasFailure = true;
 	} else {
 		console.log(
 			`  OpenCode installed      ${red("✗")} not found — install from https://opencode.ai`,

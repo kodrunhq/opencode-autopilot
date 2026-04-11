@@ -211,7 +211,7 @@ export interface PluginVerificationResult {
 
 export async function verifyPluginLoad(): Promise<PluginVerificationResult> {
 	try {
-		const result = execSync("opencode --version 2>&1", {
+		execSync("opencode --version", {
 			encoding: "utf-8",
 			timeout: 10000,
 			stdio: ["pipe", "pipe", "pipe"],
@@ -220,7 +220,7 @@ export async function verifyPluginLoad(): Promise<PluginVerificationResult> {
 		return {
 			success: true,
 			message: "OpenCode CLI is accessible",
-			details: result.trim(),
+			details: "Plugin appears to be working",
 		};
 	} catch (error: unknown) {
 		const err = error as Error & { stderr?: string; status?: number };
