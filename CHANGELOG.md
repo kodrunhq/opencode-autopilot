@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.32.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.4...opencode-autopilot-v1.32.0) (2026-04-11)
+
+
+### Features
+
+* implement Oracle ULW verification loop ([c910076](https://github.com/kodrunhq/opencode-autopilot/commit/c910076badec5bcc03f85e704c37341e5f9ea6cf))
+
+
+### Bug Fixes
+
+* add route-token enforcement for implementation orchestration ([2c5c5ca](https://github.com/kodrunhq/opencode-autopilot/commit/2c5c5cadd7091e37537f43708c1421e2e6464b7a))
+* add route-token enforcement for implementation orchestration ([daaf335](https://github.com/kodrunhq/opencode-autopilot/commit/daaf335318809b074ee0f5b04463b0a875b4d5a8))
+* add route-token enforcement for implementation orchestration ([a7a9a54](https://github.com/kodrunhq/opencode-autopilot/commit/a7a9a54b356721eb9b322680873517bc5e74f64c))
+* address all 11 bugs from opus_feedback.md ([cce5f60](https://github.com/kodrunhq/opencode-autopilot/commit/cce5f60b48d6c0b498acd8cc4e6741ae1ce1ad3a))
+* comprehensive audit remediation - P0/P1 hardening ([2e4df1f](https://github.com/kodrunhq/opencode-autopilot/commit/2e4df1f0f74cde79638db31da39edc808ebb2d95))
+* enforce route-token message context on consume ([560db77](https://github.com/kodrunhq/opencode-autopilot/commit/560db77e26f61314fb4ccd2f4ecc6c2495365c44))
+* ensure route ticket db handles are always closed ([787effd](https://github.com/kodrunhq/opencode-autopilot/commit/787effdac3d823b7b2a11a223c5d214e2ff187b4))
+* implement route tickets and proxy logger for deterministic pipeline authorization ([e5b488d](https://github.com/kodrunhq/opencode-autopilot/commit/e5b488d6beacef4c3b98d56aa7a1abe828c6bb8d))
+* make route token validation work across project resolution paths ([81add78](https://github.com/kodrunhq/opencode-autopilot/commit/81add78c0f563a539f39532a545257be140d2ba2))
+* remove duplicate unused import in branch-pr.ts ([75b3665](https://github.com/kodrunhq/opencode-autopilot/commit/75b366533c3a1ca165866052ac9d66d4b02711db))
+* resolve lint errors for CI ([cc15e94](https://github.com/kodrunhq/opencode-autopilot/commit/cc15e94761e3a18fc566974412af0f4ff68cd9e2))
+* restore reliable validation and config exports ([5e92ff7](https://github.com/kodrunhq/opencode-autopilot/commit/5e92ff72a6f70dbe143cf44bf28bd7566b55d3c6))
+* use mkdtemp for truly isolated test directories ([b62d866](https://github.com/kodrunhq/opencode-autopilot/commit/b62d86656802ec623194cedd10b204f7d2c86dfc))
+* use mkdtemp for truly isolated test directories ([4f4424d](https://github.com/kodrunhq/opencode-autopilot/commit/4f4424de4de9a4a37b9c9942f745524835abd146))
+
 ## [1.31.4](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.3...opencode-autopilot-v1.31.4) (2026-04-11)
 
 
