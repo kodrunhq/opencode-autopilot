@@ -46,7 +46,14 @@ export const confidenceEntrySchema = z.object({
 export const taskSchema = z.object({
 	id: z.number(),
 	title: z.string().max(2048),
-	status: z.enum(["PENDING", "IN_PROGRESS", "DONE", "FAILED", "SKIPPED", "BLOCKED"]),
+	status: z.enum([
+		"PENDING",
+		"IN_PROGRESS",
+		"DONE",
+		"FAILED",
+		"SKIPPED",
+		"BLOCKED",
+	]),
 	wave: z.number(),
 	depends_on: z.array(z.number()).default([]),
 	attempt: z.number().default(0),
@@ -110,11 +117,20 @@ export const branchLifecycleSchema = z.object({
 
 export const pipelineStateSchema = z.object({
 	schemaVersion: z.literal(2),
-	status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED", "INTERRUPTED"]),
+	status: z.enum([
+		"NOT_STARTED",
+		"IN_PROGRESS",
+		"COMPLETED",
+		"FAILED",
+		"INTERRUPTED",
+	]),
 	runId: z
 		.string()
 		.max(128)
-		.regex(/^[a-z0-9_-]+$/i, "runId must be alphanumeric with hyphens or underscores")
+		.regex(
+			/^[a-z0-9_-]+$/i,
+			"runId must be alphanumeric with hyphens or underscores",
+		)
 		.default(generateRunId),
 	stateRevision: z.number().int().min(0).default(0),
 	idea: z.string().max(4096),
@@ -140,7 +156,11 @@ export const pipelineStateSchema = z.object({
 	processedResultIds: z.array(z.string().max(128)).max(10_000).default([]),
 	failureContext: failureContextSchema.nullable().default(null),
 	branchLifecycle: branchLifecycleSchema.nullable().default(null),
-	phaseDispatchCounts: z.record(z.string().max(32), z.number().int().min(0).max(1000)).default({}),
-	retryAttempts: z.record(z.string().max(128), z.number().int().min(0).max(100)).default({}),
+	phaseDispatchCounts: z
+		.record(z.string().max(32), z.number().int().min(0).max(1000))
+		.default({}),
+	retryAttempts: z
+		.record(z.string().max(128), z.number().int().min(0).max(100))
+		.default({}),
 	useWorktrees: z.boolean().default(false),
 });

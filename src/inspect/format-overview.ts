@@ -4,7 +4,11 @@ import {
 	summarizePreferenceEvidence,
 } from "./format-tables";
 import { formatVerboseMemoryOverview } from "./format-verbose";
-import { formatTimestamp, getTerminalWidth, truncateText } from "./formatter-helpers";
+import {
+	formatTimestamp,
+	getTerminalWidth,
+	truncateText,
+} from "./formatter-helpers";
 import type {
 	InspectMemoryOverview,
 	InspectProjectDetails,
@@ -22,7 +26,10 @@ export function formatProjects(
 	return ["Projects", "", formatProjectsTable(projects)].join("\n");
 }
 
-export function formatProjectDetails(details: InspectProjectDetails, _verbose = false): string {
+export function formatProjectDetails(
+	details: InspectProjectDetails,
+	_verbose = false,
+): string {
 	const { project, paths, gitFingerprints } = details;
 	const lines = [
 		`Project: ${project.name}`,
@@ -40,7 +47,9 @@ export function formatProjectDetails(details: InspectProjectDetails, _verbose = 
 		"Paths:",
 		...(paths.length === 0
 			? ["- none recorded yet"]
-			: paths.map((path) => `- ${path.path}${path.isCurrent ? " [current]" : ""}`)),
+			: paths.map(
+					(path) => `- ${path.path}${path.isCurrent ? " [current]" : ""}`,
+				)),
 		"",
 		"Git Fingerprints:",
 		...(gitFingerprints.length === 0
@@ -53,7 +62,10 @@ export function formatProjectDetails(details: InspectProjectDetails, _verbose = 
 	return lines.join("\n");
 }
 
-export function formatMemoryOverview(overview: InspectMemoryOverview, verbose = false): string {
+export function formatMemoryOverview(
+	overview: InspectMemoryOverview,
+	verbose = false,
+): string {
 	if (verbose) {
 		return formatVerboseMemoryOverview(overview);
 	}
@@ -92,10 +104,17 @@ export function formatMemoryOverview(overview: InspectMemoryOverview, verbose = 
 	return lines.join("\n");
 }
 
-export function formatPaths(details: InspectProjectDetails, _verbose = false): string {
+export function formatPaths(
+	details: InspectProjectDetails,
+	_verbose = false,
+): string {
 	if (details.paths.length === 0) {
 		return `No paths found for ${details.project.name}. Paths are captured when project identity changes over time.`;
 	}
 
-	return [`Paths for ${details.project.name}`, "", formatPathsTable(details)].join("\n");
+	return [
+		`Paths for ${details.project.name}`,
+		"",
+		formatPathsTable(details),
+	].join("\n");
 }

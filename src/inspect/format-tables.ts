@@ -10,7 +10,11 @@ import type {
 } from "./repository";
 
 function formatFailure(run: InspectRunSummary): string {
-	if (run.failurePhase === null && run.failureAgent === null && run.failureMessage === null) {
+	if (
+		run.failurePhase === null &&
+		run.failureAgent === null &&
+		run.failureMessage === null
+	) {
 		return "-";
 	}
 
@@ -26,13 +30,25 @@ function formatEvidenceSummary(preference: InspectPreferenceSummary): string {
 		return "none";
 	}
 
-	const confirmedCount = preference.evidence.filter((item) => item.confirmed).length;
+	const confirmedCount = preference.evidence.filter(
+		(item) => item.confirmed,
+	).length;
 	return `${confirmedCount} confirmed, ${preference.evidence.length - confirmedCount} unconfirmed`;
 }
 
-export function formatProjectsTable(projects: readonly InspectProjectSummary[]): string {
+export function formatProjectsTable(
+	projects: readonly InspectProjectSummary[],
+): string {
 	return renderTable(
-		["Project", "Current Path", "Updated", "Runs", "Events", "Lessons", "Memories"],
+		[
+			"Project",
+			"Current Path",
+			"Updated",
+			"Runs",
+			"Events",
+			"Lessons",
+			"Memories",
+		],
 		projects.map((project) => [
 			project.name,
 			project.path,
@@ -48,7 +64,16 @@ export function formatProjectsTable(projects: readonly InspectProjectSummary[]):
 
 export function formatRunsTable(runs: readonly InspectRunSummary[]): string {
 	return renderTable(
-		["Project", "Run ID", "Status", "Phase", "Idea", "Failure", "Revision", "Updated"],
+		[
+			"Project",
+			"Run ID",
+			"Status",
+			"Phase",
+			"Idea",
+			"Failure",
+			"Revision",
+			"Updated",
+		],
 		runs.map((run) => [
 			run.projectName,
 			run.runId,
@@ -63,7 +88,9 @@ export function formatRunsTable(runs: readonly InspectRunSummary[]): string {
 	);
 }
 
-export function formatEventsTable(events: readonly InspectEventSummary[]): string {
+export function formatEventsTable(
+	events: readonly InspectEventSummary[],
+): string {
 	return renderTable(
 		[
 			"Timestamp",
@@ -93,7 +120,9 @@ export function formatEventsTable(events: readonly InspectEventSummary[]): strin
 	);
 }
 
-export function formatLessonsTable(lessons: readonly InspectLessonSummary[]): string {
+export function formatLessonsTable(
+	lessons: readonly InspectLessonSummary[],
+): string {
 	return renderTable(
 		["Extracted", "Project", "Domain", "Source Phase", "Content"],
 		lessons.map((lesson) => [
@@ -107,12 +136,23 @@ export function formatLessonsTable(lessons: readonly InspectLessonSummary[]): st
 	);
 }
 
-export function formatPreferencesTable(preferences: readonly InspectPreferenceSummary[]): string {
+export function formatPreferencesTable(
+	preferences: readonly InspectPreferenceSummary[],
+): string {
 	return renderTable(
-		["Key", "Scope", "Value", "Confidence", "Evidence Count", "Evidence", "Updated"],
+		[
+			"Key",
+			"Scope",
+			"Value",
+			"Confidence",
+			"Evidence Count",
+			"Evidence",
+			"Updated",
+		],
 		preferences.map((preference) => [
 			preference.key,
-			preference.scope + (preference.projectId ? `:${preference.projectId}` : ""),
+			preference.scope +
+				(preference.projectId ? `:${preference.projectId}` : ""),
 			preference.value,
 			String(preference.confidence),
 			String(preference.evidenceCount),
@@ -136,11 +176,15 @@ export function formatPathsTable(details: InspectProjectDetails): string {
 	);
 }
 
-export function summarizePreferenceEvidence(preference: InspectPreferenceSummary): string {
+export function summarizePreferenceEvidence(
+	preference: InspectPreferenceSummary,
+): string {
 	return formatEvidenceSummary(preference);
 }
 
-export function formatMemoriesTable(memories: readonly InspectMemorySummary[]): string {
+export function formatMemoriesTable(
+	memories: readonly InspectMemorySummary[],
+): string {
 	return renderTable(
 		["Kind", "Scope", "Project", "Summary", "Updated"],
 		memories.map((memory) => [

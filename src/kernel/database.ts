@@ -65,7 +65,10 @@ export function migrateLegacyKernelDb(projectRoot: string): string | null {
 export function resolveKernelDbPathFromProject(
 	projectRoot: string,
 	options?: { migrateLegacy?: boolean },
-): { path: string; kind: "artifact" | "legacy" | "migrated" | "missing" | "artifact_with_legacy" } {
+): {
+	path: string;
+	kind: "artifact" | "legacy" | "migrated" | "missing" | "artifact_with_legacy";
+} {
 	const artifactDir = getProjectArtifactDir(projectRoot);
 	const artifactPath = join(artifactDir, KERNEL_DB_FILE);
 	const hasArtifact = existsSync(artifactPath);
@@ -89,7 +92,10 @@ export function resolveKernelDbPathFromProject(
 }
 
 export function getKernelDbPath(artifactDirOrProjectRoot?: string): string {
-	if (typeof artifactDirOrProjectRoot === "string" && artifactDirOrProjectRoot.length > 0) {
+	if (
+		typeof artifactDirOrProjectRoot === "string" &&
+		artifactDirOrProjectRoot.length > 0
+	) {
 		// If caller passed an explicit file path ending in kernel.db, honor it directly.
 		if (artifactDirOrProjectRoot.endsWith(KERNEL_DB_FILE)) {
 			return artifactDirOrProjectRoot;
@@ -116,7 +122,10 @@ export function openKernelDb(
 		mkdirSync(dirname(dbPath), { recursive: true });
 	}
 
-	const database = new Database(dbPath, options?.readonly ? { readonly: true } : undefined);
+	const database = new Database(
+		dbPath,
+		options?.readonly ? { readonly: true } : undefined,
+	);
 
 	database.run("PRAGMA foreign_keys=ON");
 	database.run("PRAGMA busy_timeout=5000");

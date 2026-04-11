@@ -4,7 +4,10 @@ import { loadConfig } from "../config";
 import { type openKernelDb, openProjectKernelDb } from "../kernel/database";
 import { getLogger } from "../logging/domains";
 import { parseTypedResultEnvelope } from "../orchestrator/contracts/legacy-result-adapter";
-import type { PendingDispatch, ResultEnvelope } from "../orchestrator/contracts/result-envelope";
+import type {
+	PendingDispatch,
+	ResultEnvelope,
+} from "../orchestrator/contracts/result-envelope";
 import {
 	buildFailureSummary,
 	clearPersistedRetryAttempts,
@@ -28,7 +31,12 @@ import {
 import { buildLessonContext } from "../orchestrator/lesson-injection";
 import { loadLessonMemory } from "../orchestrator/lesson-memory";
 import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
-import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
+import {
+	completePhase,
+	getNextPhase,
+	PHASE_INDEX,
+	TOTAL_PHASES,
+} from "../orchestrator/phase";
 import { groupByWave } from "../orchestrator/plan";
 import { getPhaseProgressString } from "../orchestrator/progress";
 import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
@@ -42,7 +50,11 @@ import {
 } from "../orchestrator/state";
 import type { Phase, PipelineState } from "../orchestrator/types";
 import { resolveProjectIdentitySync } from "../projects/resolve";
-import { getIntentRouting, type IntentType, IntentTypeSchema } from "../routing/intent-types";
+import {
+	getIntentRouting,
+	type IntentType,
+	IntentTypeSchema,
+} from "../routing/intent-types";
 import { createRouteTicketRepository } from "../routing/route-ticket-repository";
 import { isEnoentError } from "../utils/fs-helpers";
 import { ensureGitignore } from "../utils/gitignore";
@@ -51,7 +63,11 @@ import {
 	getProjectArtifactDir,
 	getProjectRootFromArtifactDir,
 } from "../utils/paths";
-import { getNotificationManager, getProgressTracker, getTaskToastManager } from "../ux/registry";
+import {
+	getNotificationManager,
+	getProgressTracker,
+	getTaskToastManager,
+} from "../ux/registry";
 import { clearReviewState, reviewCore } from "./review";
 
 interface OrchestrateArgs {
@@ -113,7 +129,9 @@ function startProgressForDispatch(phase: string, totalSteps: number): void {
 	tracker.startPhase(phase, Math.max(1, totalSteps));
 }
 
-function buildProgressLabelFromEnvelope(envelope: Readonly<ResultEnvelope>): string {
+function buildProgressLabelFromEnvelope(
+	envelope: Readonly<ResultEnvelope>,
+): string {
 	if (envelope.taskId !== null) {
 		return `${envelope.phase} task ${String(envelope.taskId)}`;
 	}
@@ -123,7 +141,9 @@ function buildProgressLabelFromEnvelope(envelope: Readonly<ResultEnvelope>): str
 	return envelope.phase;
 }
 
-function buildProgressLabelFromPending(pending: Readonly<PendingDispatch>): string {
+function buildProgressLabelFromPending(
+	pending: Readonly<PendingDispatch>,
+): string {
 	if (pending.taskId !== null) {
 		return `${pending.phase} task ${String(pending.taskId)}`;
 	}
@@ -170,7 +190,10 @@ function findPendingDispatch(
 	state: Readonly<PipelineState>,
 	dispatchId: string,
 ): PendingDispatch | null {
-	return state.pendingDispatches.find((entry) => entry.dispatchId === dispatchId) ?? null;
+	return (
+		state.pendingDispatches.find((entry) => entry.dispatchId === dispatchId) ??
+		null
+	);
 }
 
 function withPendingDispatch(
@@ -182,13 +205,20 @@ function withPendingDispatch(
 	});
 }
 
-function removePendingDispatch(state: Readonly<PipelineState>, dispatchId: string): PipelineState {
+function removePendingDispatch(
+	state: Readonly<PipelineState>,
+	dispatchId: string,
+): PipelineState {
 	return patchState(state, {
-		pendingDispatches: state.pendingDispatches.filter((entry) => entry.dispatchId !== dispatchId),
+		pendingDispatches: state.pendingDispatches.filter(
+			(entry) => entry.dispatchId !== dispatchId,
+		),
 	});
 }
 
-function expectedResultKindForPending(pending: Readonly<PendingDispatch>): string {
+function expectedResultKindForPending(
+	pending: Readonly<PendingDispatch>,
+): string {
 	return pending.resultKind;
 }
 
@@ -200,7 +230,8 @@ function markResultProcessed(
 		return state;
 	}
 	const capped = [...state.processedResultIds, envelope.resultId];
-	const nextIds = capped.length > 5000 ? capped.slice(capped.length - 5000) : capped;
+	const nextIds =
+		capped.length > 5000 ? capped.slice(capped.length - 5000) : capped;
 	return patchState(state, {
 		processedResultIds: nextIds,
 	});
@@ -260,7 +291,8 @@ function ensureDispatchIdentity(
 			agents: handlerResult.agents?.map((entry) => ({
 				...entry,
 				dispatchId: entry.dispatchId ?? createDispatchId(),
-				resultKind: entry.resultKind ?? inferExpectedResultKindForAgent(entry.agent),
+				resultKind:
+					entry.resultKind ?? inferExpectedResultKindForAgent(entry.agent),
 			})),
 		};
 	}
@@ -323,7 +355,10 @@ function applyResultEnvelope(
 	return markResultProcessed(withoutPending, envelope);
 }
 
-function parseErrorCode(error: unknown): { readonly code: string; readonly message: string } {
+function parseErrorCode(error: unknown): {
+	readonly code: string;
+	readonly message: string;
+} {
 	const message = error instanceof Error ? error.message : String(error);
 	const idx = message.indexOf(":");
 	if (idx <= 0) {
@@ -361,7 +396,10 @@ function canStartFreshRun(state: Readonly<PipelineState>): boolean {
 	);
 }
 
-async function startFreshRun(idea: string, artifactDir: string): Promise<string> {
+async function startFreshRun(
+	idea: string,
+	artifactDir: string,
+): Promise<string> {
 	const newState = createInitialState(idea);
 	await saveState(newState, artifactDir);
 
@@ -380,7 +418,12 @@ async function startFreshRun(idea: string, artifactDir: string): Promise<string>
 	}
 
 	const handler = PHASE_HANDLERS[newState.currentPhase as Phase];
-	const handlerResult = await handler(newState, artifactDir, undefined, undefined);
+	const handlerResult = await handler(
+		newState,
+		artifactDir,
+		undefined,
+		undefined,
+	);
 	return processHandlerResult(handlerResult, newState, artifactDir, undefined);
 }
 
@@ -480,7 +523,9 @@ export function buildMergeTransform(
 		return ids;
 	})();
 
-	const taskChanges = updates.tasks ? new Map(updates.tasks.map((t) => [t.id, t])) : null;
+	const taskChanges = updates.tasks
+		? new Map(updates.tasks.map((t) => [t.id, t]))
+		: null;
 
 	// Identify tasks this handler moved PENDING→IN_PROGRESS (dispatch candidates)
 	const dispatchedByThisHandler: ReadonlySet<number> = (() => {
@@ -499,8 +544,12 @@ export function buildMergeTransform(
 	// Compute new branchLifecycle.tasksPushed entries added by this handler
 	const newTasksPushed: readonly string[] = (() => {
 		if (!preHandlerState || !updates.branchLifecycle?.tasksPushed) return [];
-		const prePushed = new Set(preHandlerState.branchLifecycle?.tasksPushed ?? []);
-		return updates.branchLifecycle.tasksPushed.filter((id) => !prePushed.has(id));
+		const prePushed = new Set(
+			preHandlerState.branchLifecycle?.tasksPushed ?? [],
+		);
+		return updates.branchLifecycle.tasksPushed.filter(
+			(id) => !prePushed.has(id),
+		);
 	})();
 
 	// Mutable set populated during transform execution on each conflict retry
@@ -513,10 +562,15 @@ export function buildMergeTransform(
 		const mergedUpdates = { ...updates };
 		if (updates.branchLifecycle && current.branchLifecycle) {
 			const currentPushed = new Set(current.branchLifecycle.tasksPushed);
-			const additionalPushed = newTasksPushed.filter((id) => !currentPushed.has(id));
+			const additionalPushed = newTasksPushed.filter(
+				(id) => !currentPushed.has(id),
+			);
 			mergedUpdates.branchLifecycle = {
 				...updates.branchLifecycle,
-				tasksPushed: [...current.branchLifecycle.tasksPushed, ...additionalPushed],
+				tasksPushed: [
+					...current.branchLifecycle.tasksPushed,
+					...additionalPushed,
+				],
 			};
 		}
 
@@ -534,14 +588,19 @@ export function buildMergeTransform(
 
 			// Detect redundant dispatch: this handler moved task PENDING→IN_PROGRESS
 			// but disk already has it as IN_PROGRESS (sibling dispatched first)
-			if (dispatchedByThisHandler.has(currentTask.id) && currentTask.status === "IN_PROGRESS") {
+			if (
+				dispatchedByThisHandler.has(currentTask.id) &&
+				currentTask.status === "IN_PROGRESS"
+			) {
 				redundantTaskIds.add(currentTask.id);
 			}
 
 			return { ...currentTask, ...change };
 		});
 
-		const inProgressIds = mergedTasks.filter((t) => t.status === "IN_PROGRESS").map((t) => t.id);
+		const inProgressIds = mergedTasks
+			.filter((t) => t.status === "IN_PROGRESS")
+			.map((t) => t.id);
 		const mergedBuildProgress = mergedUpdates.buildProgress
 			? { ...mergedUpdates.buildProgress, currentTasks: inProgressIds }
 			: undefined;
@@ -669,7 +728,11 @@ async function injectSkillContext(
 }
 
 /** Build a human-readable progress string for user-facing display. */
-function buildUserProgress(state: PipelineState, label?: string, attempt?: number): string {
+function buildUserProgress(
+	state: PipelineState,
+	label?: string,
+	attempt?: number,
+): string {
 	const baseProgress = getPhaseProgressString(state);
 	const att = attempt != null ? ` (attempt ${attempt})` : "";
 	return `${baseProgress}${label ? ` — ${label}` : ""}${att}`;
@@ -731,11 +794,16 @@ async function checkCircuitBreaker(
 			nextState: currentState,
 		};
 	}
-	const withCounts = await updatePersistedState(artifactDir, currentState, (current) => {
-		const nextCounts = { ...(current.phaseDispatchCounts ?? {}) };
-		nextCounts[agentPhaseKey] = (nextCounts[agentPhaseKey] ?? 0) + incrementBy;
-		return patchState(current, { phaseDispatchCounts: nextCounts });
-	});
+	const withCounts = await updatePersistedState(
+		artifactDir,
+		currentState,
+		(current) => {
+			const nextCounts = { ...(current.phaseDispatchCounts ?? {}) };
+			nextCounts[agentPhaseKey] =
+				(nextCounts[agentPhaseKey] ?? 0) + incrementBy;
+			return patchState(current, { phaseDispatchCounts: nextCounts });
+		},
+	);
 	return {
 		abortMsg: null,
 		newCount: withCounts.phaseDispatchCounts[agentPhaseKey] ?? candidateCount,
@@ -746,15 +814,21 @@ async function checkCircuitBreaker(
 /**
  * Extract task IDs being dispatched from a DispatchResult.
  */
-export function extractDispatchTaskIds(result: DispatchResult): readonly number[] {
+export function extractDispatchTaskIds(
+	result: DispatchResult,
+): readonly number[] {
 	const ids: number[] = [];
 	if (result.action === "dispatch" && result.taskId != null) {
-		const id = typeof result.taskId === "string" ? Number(result.taskId) : result.taskId;
+		const id =
+			typeof result.taskId === "string" ? Number(result.taskId) : result.taskId;
 		if (Number.isFinite(id)) ids.push(id);
 	} else if (result.action === "dispatch_multi" && result.agents) {
 		for (const entry of result.agents) {
 			if (entry.taskId != null) {
-				const id = typeof entry.taskId === "string" ? Number(entry.taskId) : entry.taskId;
+				const id =
+					typeof entry.taskId === "string"
+						? Number(entry.taskId)
+						: entry.taskId;
 				if (Number.isFinite(id)) ids.push(id);
 			}
 		}
@@ -782,7 +856,9 @@ export function isStaleDispatch(
 	if (dispatchedTaskIds.length === 0) return false;
 
 	const alreadyInProgress = new Set(
-		preHandlerState.tasks.filter((t) => t.status === "IN_PROGRESS").map((t) => t.id),
+		preHandlerState.tasks
+			.filter((t) => t.status === "IN_PROGRESS")
+			.map((t) => t.id),
 	);
 
 	// Stale if ALL dispatched IDs were either already IN_PROGRESS in pre-handler
@@ -800,7 +876,9 @@ export function isStaleDispatch(
  * reviewPending=true lets the existing `reviewPending && !resultText` path in
  * build.ts dispatch the reviewer correctly.
  */
-export function prepareStateForBuildRerun(currentState: PipelineState): PipelineState {
+export function prepareStateForBuildRerun(
+	currentState: PipelineState,
+): PipelineState {
 	const wave = currentState.buildProgress.currentWave;
 	if (wave == null) return currentState;
 
@@ -852,15 +930,28 @@ async function processHandlerResult(
 	) {
 		const stateForRerun = prepareStateForBuildRerun(currentState);
 		if (stateForRerun !== currentState) {
-			currentState = await updatePersistedState(artifactDir, currentState, (current) =>
-				patchState(current, {
-					buildProgress: { ...current.buildProgress, reviewPending: true },
-				}),
+			currentState = await updatePersistedState(
+				artifactDir,
+				currentState,
+				(current) =>
+					patchState(current, {
+						buildProgress: { ...current.buildProgress, reviewPending: true },
+					}),
 			);
 		}
 		const freshHandler = PHASE_HANDLERS.BUILD;
-		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
-		return processHandlerResult(freshResult, currentState, artifactDir, contextSessionId);
+		const freshResult = await freshHandler(
+			currentState,
+			artifactDir,
+			undefined,
+			undefined,
+		);
+		return processHandlerResult(
+			freshResult,
+			currentState,
+			artifactDir,
+			contextSessionId,
+		);
 	}
 
 	// When concurrent completions both try to replenish the same pending task,
@@ -868,18 +959,31 @@ async function processHandlerResult(
 	// dispatch. Re-invoke BUILD against the fresh merged state so it picks the
 	// correct next pending task (or waits if the cap is full).
 	if (
-		(normalizedResult.action === "dispatch" || normalizedResult.action === "dispatch_multi") &&
+		(normalizedResult.action === "dispatch" ||
+			normalizedResult.action === "dispatch_multi") &&
 		state.currentPhase === "BUILD" &&
 		isStaleDispatch(normalizedResult, state, redundantTaskIds)
 	) {
 		const freshHandler = PHASE_HANDLERS.BUILD;
-		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
-		return processHandlerResult(freshResult, currentState, artifactDir, contextSessionId);
+		const freshResult = await freshHandler(
+			currentState,
+			artifactDir,
+			undefined,
+			undefined,
+		);
+		return processHandlerResult(
+			freshResult,
+			currentState,
+			artifactDir,
+			contextSessionId,
+		);
 	}
 
 	switch (normalizedResult.action) {
 		case "error": {
-			const codePrefix = normalizedResult.code ? `${normalizedResult.code}: ` : "";
+			const codePrefix = normalizedResult.code
+				? `${normalizedResult.code}: `
+				: "";
 			const messageBody = normalizedResult.message ?? "Handler returned error";
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
@@ -896,13 +1000,20 @@ async function processHandlerResult(
 
 		case "dispatch": {
 			// Circuit breaker
-			const phase = normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
+			const phase =
+				normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
 			const dispatchAgent = normalizedResult.agent ?? "unknown";
 			const {
 				abortMsg,
 				newCount: attempt,
 				nextState,
-			} = await checkCircuitBreaker(currentState, phase, dispatchAgent, artifactDir, 1);
+			} = await checkCircuitBreaker(
+				currentState,
+				phase,
+				dispatchAgent,
+				artifactDir,
+				1,
+			);
 			if (abortMsg) return abortMsg;
 			currentState = nextState;
 
@@ -933,7 +1044,11 @@ async function processHandlerResult(
 			};
 
 			// Log the dispatch event before any inline-review or context injection
-			const progress = buildUserProgress(currentState, normalizedResult.progress, attempt);
+			const progress = buildUserProgress(
+				currentState,
+				normalizedResult.progress,
+				attempt,
+			);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
 				phase,
@@ -959,7 +1074,10 @@ async function processHandlerResult(
 			startProgressForDispatch(phase, 1);
 
 			// Check if this is a review dispatch that should be inlined
-			const { inlined, reviewResult } = await maybeInlineReview(normalizedResult, artifactDir);
+			const { inlined, reviewResult } = await maybeInlineReview(
+				normalizedResult,
+				artifactDir,
+			);
 			if (inlined && reviewResult) {
 				if (currentState.currentPhase) {
 					let reviewPayloadText = reviewResult;
@@ -991,7 +1109,10 @@ async function processHandlerResult(
 						artifactDir,
 						currentState,
 						(current) =>
-							applyResultEnvelope(withPendingDispatch(current, pendingEntry), inlinedEnvelope),
+							applyResultEnvelope(
+								withPendingDispatch(current, pendingEntry),
+								inlinedEnvelope,
+							),
 					);
 					getTaskToastManager()?.showCompletionToast({
 						id: pendingEntry.dispatchId,
@@ -1001,10 +1122,20 @@ async function processHandlerResult(
 					advanceProgressForEnvelope(inlinedEnvelope);
 
 					const handler = PHASE_HANDLERS[currentState.currentPhase];
-					const nextResult = await handler(withInlineResult, artifactDir, reviewPayloadText, {
-						envelope: inlinedEnvelope,
-					});
-					return processHandlerResult(nextResult, withInlineResult, artifactDir, contextSessionId);
+					const nextResult = await handler(
+						withInlineResult,
+						artifactDir,
+						reviewPayloadText,
+						{
+							envelope: inlinedEnvelope,
+						},
+					);
+					return processHandlerResult(
+						nextResult,
+						withInlineResult,
+						artifactDir,
+						contextSessionId,
+					);
 				}
 				// State unavailable or pipeline completed after inline review — return complete
 				return JSON.stringify({
@@ -1014,8 +1145,10 @@ async function processHandlerResult(
 				});
 			}
 
-			currentState = await updatePersistedState(artifactDir, currentState, (current) =>
-				withPendingDispatch(current, pendingEntry),
+			currentState = await updatePersistedState(
+				artifactDir,
+				currentState,
+				(current) => withPendingDispatch(current, pendingEntry),
 			);
 
 			// Inject lesson + skill context into dispatch prompt (best-effort)
@@ -1050,7 +1183,8 @@ async function processHandlerResult(
 
 		case "dispatch_multi": {
 			// Circuit breaker — key on first agent, increment by total agent count
-			const phase = normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
+			const phase =
+				normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
 			const multiAgentName = normalizedResult.agents?.[0]?.agent ?? "unknown";
 			const multiAgentCount = normalizedResult.agents?.length ?? 1;
 			const {
@@ -1070,7 +1204,9 @@ async function processHandlerResult(
 			// Duplicate dispatch guard: prevent dispatching the same agent+phase twice
 			if (normalizedResult.agents) {
 				const duplicateAgent = normalizedResult.agents.find((entry) =>
-					currentState.pendingDispatches.some((p) => p.agent === entry.agent && p.phase === phase),
+					currentState.pendingDispatches.some(
+						(p) => p.agent === entry.agent && p.phase === phase,
+					),
 				);
 				if (duplicateAgent) {
 					const msg = `Duplicate dispatch: agent "${duplicateAgent.agent}" already has a pending dispatch for phase ${phase}.`;
@@ -1091,12 +1227,17 @@ async function processHandlerResult(
 					phase: phase as Phase,
 					agent: entry.agent,
 					issuedAt: new Date().toISOString(),
-					resultKind: entry.resultKind ?? inferExpectedResultKindForAgent(entry.agent),
+					resultKind:
+						entry.resultKind ?? inferExpectedResultKindForAgent(entry.agent),
 					taskId: entry.taskId ?? null,
 					sessionId: contextSessionId ?? null,
 				})) ?? [];
 
-			const progress = buildUserProgress(currentState, normalizedResult.progress, attempt);
+			const progress = buildUserProgress(
+				currentState,
+				normalizedResult.progress,
+				attempt,
+			);
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
 				phase,
@@ -1110,18 +1251,26 @@ async function processHandlerResult(
 				});
 			}
 			startProgressForDispatch(phase, pendingEntries.length);
-			currentState = await updatePersistedState(artifactDir, currentState, (current) => {
-				let nextState = current;
-				for (const entry of pendingEntries) {
-					nextState = withPendingDispatch(nextState, entry);
-				}
-				return nextState;
-			});
+			currentState = await updatePersistedState(
+				artifactDir,
+				currentState,
+				(current) => {
+					let nextState = current;
+					for (const entry of pendingEntries) {
+						nextState = withPendingDispatch(nextState, entry);
+					}
+					return nextState;
+				},
+			);
 
 			// Inject lesson + skill context into each agent's prompt (best-effort)
 			// Load lesson and skill context once and reuse for all agents in the batch
 			if (normalizedResult.agents && normalizedResult.phase) {
-				const lessonSuffix = await injectLessonContext("", normalizedResult.phase, artifactDir);
+				const lessonSuffix = await injectLessonContext(
+					"",
+					normalizedResult.phase,
+					artifactDir,
+				);
 				const skillSuffix = await injectSkillContext(
 					"",
 					getProjectRootFromArtifactDir(artifactDir),
@@ -1168,7 +1317,9 @@ async function processHandlerResult(
 				const taskTitle = normalizedResult.progress ?? `Task ${taskId}`;
 
 				const matchingPendingDispatch = currentState.pendingDispatches.find(
-					(pending) => pending.dispatchId === taskId || pending.taskId === normalizedResult.taskId,
+					(pending) =>
+						pending.dispatchId === taskId ||
+						pending.taskId === normalizedResult.taskId,
 				);
 
 				getTaskToastManager()?.showCompletionToast({
@@ -1195,8 +1346,10 @@ async function processHandlerResult(
 			getProgressTracker()?.complete();
 
 			const nextPhase = getNextPhase(currentState.currentPhase);
-			const advanced = await updatePersistedState(artifactDir, currentState, (current) =>
-				completePhase(current),
+			const advanced = await updatePersistedState(
+				artifactDir,
+				currentState,
+				(current) => completePhase(current),
 			);
 
 			// Phase complete toast
@@ -1230,8 +1383,18 @@ async function processHandlerResult(
 
 			// Invoke the next phase handler immediately
 			const nextHandler = PHASE_HANDLERS[nextPhase];
-			const nextResult = await nextHandler(advanced, artifactDir, undefined, undefined);
-			return processHandlerResult(nextResult, advanced, artifactDir, contextSessionId);
+			const nextResult = await nextHandler(
+				advanced,
+				artifactDir,
+				undefined,
+				undefined,
+			);
+			return processHandlerResult(
+				nextResult,
+				advanced,
+				artifactDir,
+				contextSessionId,
+			);
 		}
 
 		default:
@@ -1258,15 +1421,22 @@ export async function orchestrateCore(
 		const contextSessionId = context?.sessionId;
 
 		// Auto-finalize stale pending dispatches where the spawned session died without returning.
-		if (state && state.pendingDispatches.length > 0 && args.result === undefined) {
+		if (
+			state &&
+			state.pendingDispatches.length > 0 &&
+			args.result === undefined
+		) {
 			const now = Date.now();
 			const staleDispatches = state.pendingDispatches.filter((pending) => {
 				const issued = Date.parse(pending.issuedAt);
-				return Number.isFinite(issued) && now - issued > STALE_PENDING_DISPATCH_MS;
+				return (
+					Number.isFinite(issued) && now - issued > STALE_PENDING_DISPATCH_MS
+				);
 			});
 			if (staleDispatches.length > 0) {
 				const failureContext = {
-					failedPhase: state.currentPhase ?? staleDispatches[0]?.phase ?? "RECON",
+					failedPhase:
+						state.currentPhase ?? staleDispatches[0]?.phase ?? "RECON",
 					failedAgent: staleDispatches[0]?.agent ?? null,
 					errorMessage: `Pending dispatch stale for more than ${Math.round(
 						STALE_PENDING_DISPATCH_MS / 60000,
@@ -1274,7 +1444,8 @@ export async function orchestrateCore(
 						.map((d) => `${d.phase}/${d.agent}#${d.dispatchId}`)
 						.join(", ")}`.slice(0, 4096),
 					timestamp: new Date(now).toISOString(),
-					lastSuccessfulPhase: state.phases.filter((p) => p.status === "DONE").pop()?.name ?? null,
+					lastSuccessfulPhase:
+						state.phases.filter((p) => p.status === "DONE").pop()?.name ?? null,
 				};
 
 				state = await updatePersistedState(artifactDir, state, (current) =>
@@ -1326,12 +1497,17 @@ export async function orchestrateCore(
 					try {
 						db = openProjectKernelDb(context.projectRoot);
 						const routeTicketRepo = createRouteTicketRepository(db);
-						const project = resolveProjectIdentitySync(context.projectRoot, { db });
-						const validationResult = routeTicketRepo.validateAndConsumeTicket(args.routeToken, {
-							sessionId: context.sessionId,
-							projectId: project.id,
-							intent: args.intent ?? "implementation",
+						const project = resolveProjectIdentitySync(context.projectRoot, {
+							db,
 						});
+						const validationResult = routeTicketRepo.validateAndConsumeTicket(
+							args.routeToken,
+							{
+								sessionId: context.sessionId,
+								projectId: project.id,
+								intent: args.intent ?? "implementation",
+							},
+						);
 						if (!validationResult.valid) {
 							return JSON.stringify({
 								action: "error",
@@ -1441,7 +1617,10 @@ export async function orchestrateCore(
 					ORCHESTRATE_ERROR_CODES.PENDING_RESULT_REQUIRED,
 					msg,
 				);
-				return asErrorJson(ORCHESTRATE_ERROR_CODES.PENDING_RESULT_REQUIRED, msg);
+				return asErrorJson(
+					ORCHESTRATE_ERROR_CODES.PENDING_RESULT_REQUIRED,
+					msg,
+				);
 			}
 
 			if (typeof args.result === "string") {
@@ -1521,23 +1700,30 @@ export async function orchestrateCore(
 								dispatchError,
 							);
 
-							state = await updatePersistedState(artifactDir, state, (current) => {
-								const currentPersisted = getPersistedRetryAttempts(
-									current.retryAttempts,
-									failedPhase,
-									failedAgent,
-								);
-								const retryCountToPersist = Math.max(newCount, currentPersisted + 1);
-
-								return patchState(current, {
-									retryAttempts: setPersistedRetryAttempts(
+							state = await updatePersistedState(
+								artifactDir,
+								state,
+								(current) => {
+									const currentPersisted = getPersistedRetryAttempts(
 										current.retryAttempts,
 										failedPhase,
 										failedAgent,
-										retryCountToPersist,
-									),
-								});
-							});
+									);
+									const retryCountToPersist = Math.max(
+										newCount,
+										currentPersisted + 1,
+									);
+
+									return patchState(current, {
+										retryAttempts: setPersistedRetryAttempts(
+											current.retryAttempts,
+											failedPhase,
+											failedAgent,
+											retryCountToPersist,
+										),
+									});
+								},
+							);
 
 							logOrchestrationEvent(artifactDir, {
 								timestamp: new Date().toISOString(),
@@ -1558,34 +1744,54 @@ export async function orchestrateCore(
 								await sleep(decision.backoffMs);
 							}
 
-							state = await updatePersistedState(artifactDir, state, (current) =>
-								applyResultEnvelope(current, parsed.envelope),
+							state = await updatePersistedState(
+								artifactDir,
+								state,
+								(current) => applyResultEnvelope(current, parsed.envelope),
 							);
 							clearToastTaskForDispatch(parsed.envelope.dispatchId);
 
 							if (state.currentPhase !== null) {
 								const retryHandler = PHASE_HANDLERS[state.currentPhase];
-								const retryResult = await retryHandler(state, artifactDir, undefined, undefined);
-								return processHandlerResult(retryResult, state, artifactDir, contextSessionId);
+								const retryResult = await retryHandler(
+									state,
+									artifactDir,
+									undefined,
+									undefined,
+								);
+								return processHandlerResult(
+									retryResult,
+									state,
+									artifactDir,
+									contextSessionId,
+								);
 							}
 						}
 
 						// Read retry state BEFORE clearing — otherwise attempts is always lost
 						const retryState = getRetryStateByKey(failedPhase, failedAgent);
 						const inMemoryAttempts = retryState?.attempts ?? 0;
-						const actualAttempts = Math.max(inMemoryAttempts, persistedAttempts) || 1;
+						const actualAttempts =
+							Math.max(inMemoryAttempts, persistedAttempts) || 1;
 						clearRetryStateByKey(failedPhase, failedAgent);
 
-						state = await updatePersistedState(artifactDir, state, (current) => {
-							const withEnvelope = applyResultEnvelope(current, parsed.envelope);
-							return patchState(withEnvelope, {
-								retryAttempts: clearPersistedRetryAttempts(
-									withEnvelope.retryAttempts,
-									failedPhase,
-									failedAgent,
-								),
-							});
-						});
+						state = await updatePersistedState(
+							artifactDir,
+							state,
+							(current) => {
+								const withEnvelope = applyResultEnvelope(
+									current,
+									parsed.envelope,
+								);
+								return patchState(withEnvelope, {
+									retryAttempts: clearPersistedRetryAttempts(
+										withEnvelope.retryAttempts,
+										failedPhase,
+										failedAgent,
+									),
+								});
+							},
+						);
 						clearToastTaskForDispatch(parsed.envelope.dispatchId);
 						advanceProgressForEnvelope(parsed.envelope);
 						const failureSummary = buildFailureSummary(
@@ -1600,18 +1806,28 @@ export async function orchestrateCore(
 						phaseHandlerContext = { envelope: parsed.envelope };
 						handlerInputResult = failureSummary;
 					} else {
-						clearRetryStateByKey(parsed.envelope.phase, parsed.envelope.agent ?? "unknown");
+						clearRetryStateByKey(
+							parsed.envelope.phase,
+							parsed.envelope.agent ?? "unknown",
+						);
 
-						const nextState = await updatePersistedState(artifactDir, state, (current) => {
-							const withEnvelope = applyResultEnvelope(current, parsed.envelope);
-							return patchState(withEnvelope, {
-								retryAttempts: clearPersistedRetryAttempts(
-									withEnvelope.retryAttempts,
-									parsed.envelope.phase,
-									parsed.envelope.agent ?? "unknown",
-								),
-							});
-						});
+						const nextState = await updatePersistedState(
+							artifactDir,
+							state,
+							(current) => {
+								const withEnvelope = applyResultEnvelope(
+									current,
+									parsed.envelope,
+								);
+								return patchState(withEnvelope, {
+									retryAttempts: clearPersistedRetryAttempts(
+										withEnvelope.retryAttempts,
+										parsed.envelope.phase,
+										parsed.envelope.agent ?? "unknown",
+									),
+								});
+							},
+						);
 						showCompletionToastForEnvelope(state, parsed.envelope);
 						state = nextState;
 						advanceProgressForEnvelope(parsed.envelope);
@@ -1647,14 +1863,21 @@ export async function orchestrateCore(
 				handlerInputResult,
 				phaseHandlerContext,
 			);
-			return processHandlerResult(handlerResult, state, artifactDir, contextSessionId);
+			return processHandlerResult(
+				handlerResult,
+				state,
+				artifactDir,
+				contextSessionId,
+			);
 		}
 
 		return JSON.stringify({ action: "error", message: "Unexpected state" });
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
 		const parsedErr = parseErrorCode(error);
-		let safeMessage = message.replace(/[/\\][^\s"']+/g, "[PATH]").slice(0, 4096);
+		let safeMessage = message
+			.replace(/[/\\][^\s"']+/g, "[PATH]")
+			.slice(0, 4096);
 
 		if (isAbortError(error)) {
 			const result = await handleAbortCleanup(artifactDir, safeMessage);
@@ -1670,7 +1893,9 @@ export async function orchestrateCore(
 			const currentState = await loadState(artifactDir);
 			if (currentState?.currentPhase) {
 				safeMessage = enrichErrorMessage(safeMessage, currentState);
-				const lastDone = currentState.phases.filter((p) => p.status === "DONE").pop();
+				const lastDone = currentState.phases
+					.filter((p) => p.status === "DONE")
+					.pop();
 				const failureContext = {
 					failedPhase: currentState.currentPhase,
 					failedAgent: null as string | null,
@@ -1692,7 +1917,11 @@ export async function orchestrateCore(
 			// Swallow save errors -- original error takes priority
 		}
 
-		return JSON.stringify({ action: "error", code: parsedErr.code, message: safeMessage });
+		return JSON.stringify({
+			action: "error",
+			code: parsedErr.code,
+			message: safeMessage,
+		});
 	}
 }
 

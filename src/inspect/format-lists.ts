@@ -20,7 +20,10 @@ import type {
 	InspectRunSummary,
 } from "./repository";
 
-export function formatRuns(runs: readonly InspectRunSummary[], verbose = false): string {
+export function formatRuns(
+	runs: readonly InspectRunSummary[],
+	verbose = false,
+): string {
 	if (verbose) {
 		return formatVerboseRuns(runs);
 	}
@@ -31,7 +34,10 @@ export function formatRuns(runs: readonly InspectRunSummary[], verbose = false):
 	return ["Runs", "", formatRunsTable(runs)].join("\n");
 }
 
-export function formatEvents(events: readonly InspectEventSummary[], verbose = false): string {
+export function formatEvents(
+	events: readonly InspectEventSummary[],
+	verbose = false,
+): string {
 	if (verbose) {
 		return formatVerboseEvents(events);
 	}
@@ -42,7 +48,10 @@ export function formatEvents(events: readonly InspectEventSummary[], verbose = f
 	return ["Events", "", formatEventsTable(events)].join("\n");
 }
 
-export function formatLessons(lessons: readonly InspectLessonSummary[], verbose = false): string {
+export function formatLessons(
+	lessons: readonly InspectLessonSummary[],
+	verbose = false,
+): string {
 	if (verbose) {
 		return formatVerboseLessons(lessons);
 	}
@@ -67,7 +76,10 @@ export function formatPreferences(
 	return ["Preferences", "", formatPreferencesTable(preferences)].join("\n");
 }
 
-export function formatMemories(memories: readonly InspectMemorySummary[], verbose = false): string {
+export function formatMemories(
+	memories: readonly InspectMemorySummary[],
+	verbose = false,
+): string {
 	if (verbose) {
 		return formatVerboseMemories(memories);
 	}

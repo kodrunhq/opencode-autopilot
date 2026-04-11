@@ -23,7 +23,11 @@ function getProjectRoot(path: string): string {
 	return getProjectRootFromArtifactDir(path);
 }
 
-function resolveProjectId(path: string, db: Database, options?: { readonly?: boolean }): string {
+function resolveProjectId(
+	path: string,
+	db: Database,
+	options?: { readonly?: boolean },
+): string {
 	const projectRoot = getProjectRoot(path);
 	return resolveProjectIdentitySync(projectRoot, {
 		db,
@@ -31,28 +35,36 @@ function resolveProjectId(path: string, db: Database, options?: { readonly?: boo
 	}).id;
 }
 
-function parsePipelineStateRow(row: PipelineRunRow | null): PipelineState | null {
+function parsePipelineStateRow(
+	row: PipelineRunRow | null,
+): PipelineState | null {
 	if (row === null) {
 		return null;
 	}
 	return pipelineStateSchema.parse(JSON.parse(row.state_json));
 }
 
-function parseReviewStateRow(row: ActiveReviewStateRow | null): ReviewState | null {
+function parseReviewStateRow(
+	row: ActiveReviewStateRow | null,
+): ReviewState | null {
 	if (row === null) {
 		return null;
 	}
 	return reviewStateSchema.parse(JSON.parse(row.state_json));
 }
 
-function parseReviewMemoryRow(row: ProjectReviewMemoryRow | null): ReviewMemory | null {
+function parseReviewMemoryRow(
+	row: ProjectReviewMemoryRow | null,
+): ReviewMemory | null {
 	if (row === null) {
 		return null;
 	}
 	return reviewMemorySchema.parse(JSON.parse(row.state_json));
 }
 
-function parseLessonMemoryRow(row: ProjectLessonMemoryRow | null): LessonMemory | null {
+function parseLessonMemoryRow(
+	row: ProjectLessonMemoryRow | null,
+): LessonMemory | null {
 	if (row === null) {
 		return null;
 	}
@@ -109,7 +121,10 @@ function parseForensicEventRow(row: ForensicEventRow): ForensicEvent {
 	});
 }
 
-function getLatestPipelineRow(db: Database, projectId: string): PipelineRunRow | null {
+function getLatestPipelineRow(
+	db: Database,
+	projectId: string,
+): PipelineRunRow | null {
 	return db
 		.query(
 			`SELECT *
@@ -144,7 +159,9 @@ function tableExists(db: Database, tableName: string): boolean {
 	return row?.name === tableName;
 }
 
-export function loadLatestPipelineStateFromKernel(artifactDir: string): PipelineState | null {
+export function loadLatestPipelineStateFromKernel(
+	artifactDir: string,
+): PipelineState | null {
 	if (!kernelDbExists(artifactDir)) {
 		return null;
 	}
@@ -170,7 +187,10 @@ export function savePipelineStateToKernel(
 		withWriteTransaction(db, () => {
 			const current = getLatestPipelineRow(db, projectId);
 			const currentRevision = current?.state_revision ?? -1;
-			if (typeof expectedRevision === "number" && currentRevision !== expectedRevision) {
+			if (
+				typeof expectedRevision === "number" &&
+				currentRevision !== expectedRevision
+			) {
 				throw new Error(
 					`${KERNEL_STATE_CONFLICT_CODE}: expected stateRevision ${expectedRevision}, found ${currentRevision}`,
 				);
@@ -230,7 +250,13 @@ export function savePipelineStateToKernel(
 				db.run(
 					`INSERT INTO run_phases (run_id, phase_name, status, completed_at, confidence)
 					 VALUES (?, ?, ?, ?, ?)`,
-					[validated.runId, phase.name, phase.status, phase.completedAt, phase.confidence],
+					[
+						validated.runId,
+						phase.name,
+						phase.status,
+						phase.completedAt,
+						phase.confidence,
+					],
 				);
 			}
 
@@ -260,7 +286,9 @@ export function savePipelineStateToKernel(
 				);
 			}
 
-			db.run("DELETE FROM run_pending_dispatches WHERE run_id = ?", [validated.runId]);
+			db.run("DELETE FROM run_pending_dispatches WHERE run_id = ?", [
+				validated.runId,
+			]);
 			for (const pending of validated.pendingDispatches) {
 				db.run(
 					`INSERT INTO run_pending_dispatches (
@@ -286,12 +314,14 @@ export function savePipelineStateToKernel(
 				);
 			}
 
-			db.run("DELETE FROM run_processed_results WHERE run_id = ?", [validated.runId]);
+			db.run("DELETE FROM run_processed_results WHERE run_id = ?", [
+				validated.runId,
+			]);
 			for (const resultId of validated.processedResultIds) {
-				db.run(`INSERT INTO run_processed_results (run_id, result_id) VALUES (?, ?)`, [
-					validated.runId,
-					resultId,
-				]);
+				db.run(
+					`INSERT INTO run_processed_results (run_id, result_id) VALUES (?, ?)`,
+					[validated.runId, resultId],
+				);
 			}
 		});
 	} finally {
@@ -299,7 +329,9 @@ export function savePipelineStateToKernel(
 	}
 }
 
-export function loadActiveReviewStateFromKernel(artifactDir: string): ReviewState | null {
+export function loadActiveReviewStateFromKernel(
+	artifactDir: string,
+): ReviewState | null {
 	if (!kernelDbExists(artifactDir)) {
 		return null;
 	}
@@ -316,7 +348,10 @@ export function loadActiveReviewStateFromKernel(artifactDir: string): ReviewStat
 	}
 }
 
-export function saveActiveReviewStateToKernel(artifactDir: string, state: ReviewState): void {
+export function saveActiveReviewStateToKernel(
+	artifactDir: string,
+	state: ReviewState,
+): void {
 	const validated = reviewStateSchema.parse(state);
 	const db = openKernelDb(artifactDir);
 	try {
@@ -358,7 +393,9 @@ export function clearActiveReviewStateInKernel(artifactDir: string): void {
 	}
 }
 
-export function loadReviewMemoryFromKernel(artifactDir: string): ReviewMemory | null {
+export function loadReviewMemoryFromKernel(
+	artifactDir: string,
+): ReviewMemory | null {
 	if (!kernelDbExists(artifactDir)) {
 		return null;
 	}
@@ -375,7 +412,10 @@ export function loadReviewMemoryFromKernel(artifactDir: string): ReviewMemory | 
 	}
 }
 
-export function saveReviewMemoryToKernel(artifactDir: string, memory: ReviewMemory): void {
+export function saveReviewMemoryToKernel(
+	artifactDir: string,
+	memory: ReviewMemory,
+): void {
 	const validated = reviewMemorySchema.parse(memory);
 	const db = openKernelDb(artifactDir);
 	try {
@@ -387,14 +427,21 @@ export function saveReviewMemoryToKernel(artifactDir: string, memory: ReviewMemo
 				schema_version = excluded.schema_version,
 				last_reviewed_at = excluded.last_reviewed_at,
 				state_json = excluded.state_json`,
-			[projectId, validated.schemaVersion, validated.lastReviewedAt, JSON.stringify(validated)],
+			[
+				projectId,
+				validated.schemaVersion,
+				validated.lastReviewedAt,
+				JSON.stringify(validated),
+			],
 		);
 	} finally {
 		db.close();
 	}
 }
 
-export function loadLessonMemoryFromKernel(artifactDir: string): LessonMemory | null {
+export function loadLessonMemoryFromKernel(
+	artifactDir: string,
+): LessonMemory | null {
 	if (!kernelDbExists(artifactDir)) {
 		return null;
 	}
@@ -429,7 +476,10 @@ export function loadLessonMemoryFromKernel(artifactDir: string): LessonMemory | 
 	}
 }
 
-export function saveLessonMemoryToKernel(artifactDir: string, memory: LessonMemory): void {
+export function saveLessonMemoryToKernel(
+	artifactDir: string,
+	memory: LessonMemory,
+): void {
 	const validated = lessonMemorySchema.parse(memory);
 	const db = openKernelDb(artifactDir);
 	try {
@@ -442,7 +492,12 @@ export function saveLessonMemoryToKernel(artifactDir: string, memory: LessonMemo
 					schema_version = excluded.schema_version,
 					last_updated_at = excluded.last_updated_at,
 					state_json = excluded.state_json`,
-				[projectId, validated.schemaVersion, validated.lastUpdatedAt, JSON.stringify(validated)],
+				[
+					projectId,
+					validated.schemaVersion,
+					validated.lastUpdatedAt,
+					JSON.stringify(validated),
+				],
 			);
 
 			db.run("DELETE FROM project_lessons WHERE project_id = ?", [projectId]);
@@ -481,7 +536,9 @@ export function countForensicEventsInKernel(artifactDir: string): number {
 	try {
 		const projectId = resolveProjectId(artifactDir, db, { readonly: true });
 		const row = db
-			.query("SELECT COUNT(*) as count FROM forensic_events WHERE project_id = ?")
+			.query(
+				"SELECT COUNT(*) as count FROM forensic_events WHERE project_id = ?",
+			)
 			.get(projectId) as {
 			count?: number;
 		} | null;
@@ -550,7 +607,9 @@ export function appendForensicEventsToKernel(
 	}
 }
 
-export function loadForensicEventsFromKernel(artifactDir: string): readonly ForensicEvent[] {
+export function loadForensicEventsFromKernel(
+	artifactDir: string,
+): readonly ForensicEvent[] {
 	if (!kernelDbExists(artifactDir)) {
 		return Object.freeze([]);
 	}
