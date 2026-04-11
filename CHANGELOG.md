@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.32.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.32.0...opencode-autopilot-v1.32.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* handle macOS T/ temp dirs in isEphemeralPath, add prune/reachability regression tests ([b4921a7](https://github.com/kodrunhq/opencode-autopilot/commit/b4921a784341bd353568c54690e16b2ff51fab91))
+* narrow ephemeral filtering, add --prune-ephemeral, improve inspect defaults ([74f812c](https://github.com/kodrunhq/opencode-autopilot/commit/74f812c8d3643c3d78958e25b2825091a0111233))
+* Oracle blockers — fail-closed, view-aware inspect, git root, openProjectKernelDb ([ebdea24](https://github.com/kodrunhq/opencode-autopilot/commit/ebdea24db46cf5eb51e3e1901ff9aa33036a9e9c))
+* prune all project-scoped rows including memory and graph tables ([c1ddae9](https://github.com/kodrunhq/opencode-autopilot/commit/c1ddae9bae02c60b14085916ddf59598cd48c0a8))
+* remove preference_evidence from prune list, tighten error handling ([86ee88e](https://github.com/kodrunhq/opencode-autopilot/commit/86ee88ecced42b9237921b05e46e0f1d9c41ba2d))
+* resolve 5 systemic root causes — pipeline start, storage, logging, inspect, auth ([e01104b](https://github.com/kodrunhq/opencode-autopilot/commit/e01104ba62cfdb4033ceafe7a4366291d8d4093c))
+* resolve 5 systemic root causes — pipeline start, storage, logging, inspect, auth ([0f686e3](https://github.com/kodrunhq/opencode-autopilot/commit/0f686e3a8441ceef8badeea6351ea38b59fc7174))
+* resolve all 5 Oracle round 3 blockers — prune, inspect scope, project mismatch, ephemeral filter, storage topology ([494ea79](https://github.com/kodrunhq/opencode-autopilot/commit/494ea79128ce1db23ff8470fdcef03d98b43950c))
+* scope inspect to current repo only, prune all project-scoped rows ([ca90b9a](https://github.com/kodrunhq/opencode-autopilot/commit/ca90b9a480a6eddb4000632bad4e1d1d5de6cb54))
+
 ## [1.32.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.31.4...opencode-autopilot-v1.32.0) (2026-04-11)
 
 
