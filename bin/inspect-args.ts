@@ -7,7 +7,8 @@ type InspectView =
 	| "lessons"
 	| "preferences"
 	| "memory"
-	| "memories";
+	| "memories"
+	| "reconcile-project-ids";
 
 export interface ParsedInspectArgs {
 	readonly view: InspectView | null;
@@ -21,6 +22,7 @@ export interface ParsedInspectArgs {
 	readonly kind: string | null;
 	readonly scope: string | null;
 	readonly query: string | null;
+	readonly reconcile: boolean;
 	readonly help: boolean;
 	readonly error: string | null;
 	readonly global: boolean;
@@ -37,6 +39,7 @@ const INSPECT_VIEWS: readonly InspectView[] = Object.freeze([
 	"preferences",
 	"memory",
 	"memories",
+	"reconcile-project-ids",
 ]);
 
 function isInspectView(value: string): value is InspectView {
@@ -57,6 +60,7 @@ export function inspectUsage(): string {
 		"  preferences                  List stored preferences",
 		"  memory                       Show memory overview",
 		"  memories [--project <ref>]   List stored memories",
+		"  reconcile-project-ids        Reconcile deterministic project IDs in the selected DB (explicit/--global/project)",
 		"",
 		"Options:",
 		"  --project <ref>              Project id, path, or unique name",
@@ -95,6 +99,7 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 	let kind: string | null = null;
 	let scope: string | null = null;
 	let query: string | null = null;
+	let reconcile = false;
 	let help = false;
 	let error: string | null = null;
 	let global = false;
@@ -237,6 +242,7 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 		kind,
 		scope,
 		query,
+		reconcile,
 		help,
 		error,
 		global,
