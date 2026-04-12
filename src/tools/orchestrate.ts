@@ -34,7 +34,6 @@ import { getPhaseProgressString } from "../orchestrator/progress";
 import {
 	buildProgramOracleSignoffRequest,
 	isPassingProgramOracleSignoff,
-	type ProgramOracleSignoff,
 	type ProgramOracleSignoffInputs,
 	programOracleSignoffSchema,
 } from "../orchestrator/signoff";
