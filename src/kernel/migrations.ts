@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { runProjectRegistryMigrations } from "../projects/database";
+import { computeDeterministicProjectId } from "../projects/resolve";
 import { KERNEL_SCHEMA_STATEMENTS, KERNEL_SCHEMA_VERSION } from "./schema";
 
 function columnExists(database: Database, tableName: string, columnName: string): boolean {
@@ -88,6 +89,7 @@ const REBUILD_DDLS: Readonly<Record<string, string>> = Object.freeze({
 		issued_at TEXT NOT NULL,
 		result_kind TEXT NOT NULL,
 		task_id TEXT,
+		session_id TEXT,
 		PRIMARY KEY (run_id, dispatch_id),
 		FOREIGN KEY (run_id) REFERENCES pipeline_runs(run_id) ON DELETE CASCADE
 	)`,
@@ -145,25 +147,154 @@ function migrateTaskIdToText(database: Database): void {
 	rebuildTableWithTextTaskId(database, "forensic_events");
 }
 
+export function reconcileProjectIds(database: Database): void {
+	if (!tableExists(database, "projects")) return;
+
+	const rows = database.query("SELECT id, path FROM projects").all() as Array<{
+		id: string;
+		path: string;
+	}>;
+	const fingerprintRows = tableExists(database, "project_git_fingerprints")
+		? (database
+				.query(
+					"SELECT project_id, normalized_remote_url, default_branch FROM project_git_fingerprints",
+				)
+				.all() as Array<{
+				project_id: string;
+				normalized_remote_url: string;
+				default_branch: string | null;
+			}>)
+		: [];
+	const fingerprintsByProject = new Map<
+		string,
+		{ normalizedRemoteUrl: string; defaultBranch: string | null }
+	>();
+	for (const row of fingerprintRows) {
+		fingerprintsByProject.set(row.project_id, {
+			normalizedRemoteUrl: row.normalized_remote_url,
+			defaultBranch: row.default_branch,
+		});
+	}
+
+	const tablesWithProjectId = [
+		"pipeline_runs",
+		"forensic_events",
+		"active_review_state",
+		"project_review_memory",
+		"project_lesson_memory",
+		"project_lessons",
+		"project_paths",
+		"project_git_fingerprints",
+		"route_tickets",
+		"graph_files",
+		"graph_nodes",
+		"graph_edges",
+	];
+
+	for (const row of rows) {
+		if (row.id.startsWith("proj_")) continue;
+
+		const fp = fingerprintsByProject.get(row.id) ?? null;
+		const targetId = computeDeterministicProjectId(row.path, fp);
+		if (targetId === row.id) continue;
+
+		database.run("PRAGMA foreign_keys=OFF");
+		database.run("BEGIN");
+		try {
+			for (const table of tablesWithProjectId) {
+				if (!tableExists(database, table)) continue;
+				database.run(`UPDATE ${table} SET project_id = ? WHERE project_id = ?`, [targetId, row.id]);
+			}
+			database.run("UPDATE projects SET id = ? WHERE id = ?", [targetId, row.id]);
+			database.run("COMMIT");
+		} catch (error) {
+			database.run("ROLLBACK");
+			throw error;
+		} finally {
+			database.run("PRAGMA foreign_keys=ON");
+		}
+	}
+}
+
+function ensureSessionIdOnPendingDispatches(database: Database): void {
+	if (!tableExists(database, "run_pending_dispatches")) return;
+	if (columnExists(database, "run_pending_dispatches", "session_id")) return;
+
+	const rebuildTable = `_rebuild_run_pending_dispatches`;
+	database.run(`DROP TABLE IF EXISTS ${rebuildTable}`);
+	database.run(REBUILD_DDLS.run_pending_dispatches);
+	database.run(
+		`INSERT INTO ${rebuildTable} (
+			run_id,
+			dispatch_id,
+			phase,
+			agent,
+			issued_at,
+			result_kind,
+			task_id,
+			session_id
+		)
+		SELECT
+			run_id,
+			dispatch_id,
+			phase,
+			agent,
+			issued_at,
+			result_kind,
+			CAST(task_id AS TEXT) AS task_id,
+			NULL AS session_id
+		FROM run_pending_dispatches`,
+	);
+	database.run("DROP TABLE run_pending_dispatches");
+	database.run(`ALTER TABLE ${rebuildTable} RENAME TO run_pending_dispatches`);
+}
+
 function backfillBackgroundTaskColumns(database: Database): void {
 	if (!tableExists(database, "background_tasks")) {
 		return;
 	}
 
 	const columnDefinitions = Object.freeze([
-		{ name: "category", ddl: "ALTER TABLE background_tasks ADD COLUMN category TEXT" },
-		{ name: "result", ddl: "ALTER TABLE background_tasks ADD COLUMN result TEXT" },
-		{ name: "error", ddl: "ALTER TABLE background_tasks ADD COLUMN error TEXT" },
-		{ name: "agent", ddl: "ALTER TABLE background_tasks ADD COLUMN agent TEXT" },
-		{ name: "model", ddl: "ALTER TABLE background_tasks ADD COLUMN model TEXT" },
+		{
+			name: "category",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN category TEXT",
+		},
+		{
+			name: "result",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN result TEXT",
+		},
+		{
+			name: "error",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN error TEXT",
+		},
+		{
+			name: "agent",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN agent TEXT",
+		},
+		{
+			name: "model",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN model TEXT",
+		},
 		{
 			name: "priority",
 			ddl: "ALTER TABLE background_tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 50",
 		},
-		{ name: "created_at", ddl: "ALTER TABLE background_tasks ADD COLUMN created_at TEXT" },
-		{ name: "updated_at", ddl: "ALTER TABLE background_tasks ADD COLUMN updated_at TEXT" },
-		{ name: "started_at", ddl: "ALTER TABLE background_tasks ADD COLUMN started_at TEXT" },
-		{ name: "completed_at", ddl: "ALTER TABLE background_tasks ADD COLUMN completed_at TEXT" },
+		{
+			name: "created_at",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN created_at TEXT",
+		},
+		{
+			name: "updated_at",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN updated_at TEXT",
+		},
+		{
+			name: "started_at",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN started_at TEXT",
+		},
+		{
+			name: "completed_at",
+			ddl: "ALTER TABLE background_tasks ADD COLUMN completed_at TEXT",
+		},
 	]);
 
 	for (const column of columnDefinitions) {
@@ -188,7 +319,9 @@ function backfillBackgroundTaskColumns(database: Database): void {
 }
 
 export function runKernelMigrations(database: Database): void {
-	const row = database.query("PRAGMA user_version").get() as { user_version?: number } | null;
+	const row = database.query("PRAGMA user_version").get() as {
+		user_version?: number;
+	} | null;
 	const currentVersion = row?.user_version ?? 0;
 
 	runProjectRegistryMigrations(database);
@@ -199,9 +332,11 @@ export function runKernelMigrations(database: Database): void {
 
 	backfillProjectAwareColumns(database);
 	migrateTaskIdToText(database);
+	ensureSessionIdOnPendingDispatches(database);
 	backfillBackgroundTaskColumns(database);
 
 	if (currentVersion < KERNEL_SCHEMA_VERSION) {
+		reconcileProjectIds(database);
 		database.run(`PRAGMA user_version = ${KERNEL_SCHEMA_VERSION}`);
 	}
 }

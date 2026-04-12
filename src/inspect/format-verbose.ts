@@ -1,10 +1,18 @@
-import { formatTimestamp, indentLines, renderTable, wrapText } from "./formatter-helpers";
+import {
+	formatMinutesDuration,
+	formatTimestamp,
+	indentLines,
+	renderTable,
+	wrapText,
+} from "./formatter-helpers";
 import type {
 	InspectEventSummary,
 	InspectLessonSummary,
 	InspectMemoryOverview,
+	InspectMemorySummary,
 	InspectPreferenceSummary,
 	InspectRunSummary,
+	InspectStuckDispatch,
 } from "./repository";
 
 function formatEvidenceDetail(preference: InspectPreferenceSummary): readonly string[] {
@@ -83,6 +91,47 @@ export function formatVerboseEvents(events: readonly InspectEventSummary[]): str
 	return lines.join("\n");
 }
 
+export function formatVerboseStuckDispatches(dispatches: readonly InspectStuckDispatch[]): string {
+	if (dispatches.length === 0) {
+		return "No stuck dispatches found. Pending dispatches appear here when subagent sessions die silently.";
+	}
+
+	const headers = ["Run ID", "Status", "Run Phase", "Dispatch Phase", "Agent", "Pending"];
+	const rows = dispatches.map((dispatch) => [
+		dispatch.runId,
+		dispatch.status,
+		dispatch.currentPhase ?? "-",
+		dispatch.dispatchPhase,
+		dispatch.agent,
+		formatMinutesDuration(dispatch.staleMinutes),
+	]);
+	const lines = [
+		"Stuck Dispatches",
+		"",
+		renderTable(headers, rows, { minWidths: [12, 10, 10, 14, 12, 8] }),
+		"",
+	];
+
+	for (const dispatch of dispatches) {
+		lines.push(`- ${dispatch.runId} | ${dispatch.dispatchPhase} / ${dispatch.agent}`);
+		lines.push(
+			...indentLines([
+				`Status: ${dispatch.status}`,
+				`Current phase: ${dispatch.currentPhase ?? "-"}`,
+				`Dispatch ID: ${dispatch.dispatchId}`,
+				`Pending since: ${formatTimestamp(dispatch.issuedAt)}`,
+				`Pending for: ${formatMinutesDuration(dispatch.staleMinutes)}`,
+				`Session ID: ${dispatch.sessionId ?? "-"}`,
+			]),
+		);
+		lines.push("  Idea:");
+		lines.push(...indentLines(wrapText(dispatch.idea), "    "));
+		lines.push("");
+	}
+
+	return lines.join("\n").trimEnd();
+}
+
 export function formatVerboseLessons(lessons: readonly InspectLessonSummary[]): string {
 	if (lessons.length === 0) {
 		return "No lessons found. Lessons are extracted during the RETROSPECTIVE phase of pipeline runs.";
@@ -123,11 +172,41 @@ export function formatVerbosePreferences(preferences: readonly InspectPreference
 	return lines.join("\n").trimEnd();
 }
 
+export function formatVerboseMemories(memories: readonly InspectMemorySummary[]): string {
+	if (memories.length === 0) {
+		return "No memories found. Memories are stored by memory tools or capture heuristics.";
+	}
+
+	const lines = ["Memories", ""];
+	for (const memory of memories) {
+		lines.push(
+			`[${memory.kind}/${memory.scope}] ${memory.projectName ?? "global"} | ${formatTimestamp(memory.lastUpdated)}`,
+		);
+		lines.push(...indentLines([`Summary: ${memory.summary}`]));
+		lines.push(...indentLines(wrapText(memory.content)));
+		if (memory.tags) {
+			lines.push(...indentLines([`Tags: ${memory.tags}`]));
+		}
+		lines.push(
+			...indentLines([
+				`Confidence: ${memory.confidence}`,
+				`Evidence: ${memory.evidenceCount}`,
+				`Last accessed: ${formatTimestamp(memory.lastAccessed)}`,
+			]),
+		);
+		lines.push("");
+	}
+
+	return lines.join("\n").trimEnd();
+}
+
 export function formatVerboseMemoryOverview(overview: InspectMemoryOverview): string {
 	const lines = [
 		"Memory Overview",
 		"",
 		`Total observations: ${overview.stats.totalObservations}`,
+		`Total memories: ${overview.stats.totalMemories}`,
+		`Memories by kind: ${JSON.stringify(overview.stats.memoriesByKind)}`,
 		`Total projects: ${overview.stats.totalProjects}`,
 		`Total preferences: ${overview.stats.totalPreferences}`,
 		`Storage size: ${overview.stats.storageSizeKb} KB`,

@@ -70,7 +70,10 @@ async function listEntries(dirPath: string): Promise<ListEntriesResult> {
 	try {
 		const entries = await readdir(dirPath, { withFileTypes: true });
 		return {
-			entries: entries.map((e) => ({ name: e.name, isDirectory: e.isDirectory() })),
+			entries: entries.map((e) => ({
+				name: e.name,
+				isDirectory: e.isDirectory(),
+			})),
 			error: null,
 		};
 	} catch (error: unknown) {
@@ -226,9 +229,10 @@ async function hasInstallerMarker(filePath: string): Promise<boolean> {
 	}
 }
 
-async function cleanupDeprecatedAssets(
-	targetDir: string,
-): Promise<{ readonly removed: readonly string[]; readonly errors: readonly string[] }> {
+async function cleanupDeprecatedAssets(targetDir: string): Promise<{
+	readonly removed: readonly string[];
+	readonly errors: readonly string[];
+}> {
 	const removed: string[] = [];
 	const errors: string[] = [];
 	for (const asset of DEPRECATED_ASSETS) {
@@ -255,7 +259,10 @@ async function cleanupDeprecatedAssets(
 async function forceUpdateAssets(
 	sourceDir: string,
 	targetDir: string,
-): Promise<{ readonly updated: readonly string[]; readonly errors: readonly string[] }> {
+): Promise<{
+	readonly updated: readonly string[];
+	readonly errors: readonly string[];
+}> {
 	const updated: string[] = [];
 	const errors: string[] = [];
 	for (const asset of FORCE_UPDATE_ASSETS) {

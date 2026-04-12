@@ -2,11 +2,14 @@ type InspectView =
 	| "projects"
 	| "project"
 	| "paths"
+	| "stuck"
 	| "runs"
 	| "events"
 	| "lessons"
 	| "preferences"
-	| "memory";
+	| "memory"
+	| "memories"
+	| "reconcile-project-ids";
 
 export interface ParsedInspectArgs {
 	readonly view: InspectView | null;
@@ -14,9 +17,14 @@ export interface ParsedInspectArgs {
 	readonly verbose: boolean;
 	readonly projectRef: string | null;
 	readonly limit: number;
+	readonly threshold: number;
 	readonly runId: string | null;
 	readonly sessionId: string | null;
 	readonly type: string | null;
+	readonly kind: string | null;
+	readonly scope: string | null;
+	readonly query: string | null;
+	readonly reconcile: boolean;
 	readonly help: boolean;
 	readonly error: string | null;
 	readonly global: boolean;
@@ -27,11 +35,14 @@ const INSPECT_VIEWS: readonly InspectView[] = Object.freeze([
 	"projects",
 	"project",
 	"paths",
+	"stuck",
 	"runs",
 	"events",
 	"lessons",
 	"preferences",
 	"memory",
+	"memories",
+	"reconcile-project-ids",
 ]);
 
 function isInspectView(value: string): value is InspectView {
@@ -46,11 +57,14 @@ export function inspectUsage(): string {
 		"  projects                     List known projects",
 		"  project --project <ref>      Show one project's details",
 		"  paths --project <ref>        List one project's path history",
+		"  stuck [--project <ref>]      List pipeline runs with stale pending dispatches",
 		"  runs [--project <ref>]       List pipeline runs",
 		"  events [--project <ref>]     List forensic events",
 		"  lessons [--project <ref>]    List stored lessons",
 		"  preferences                  List stored preferences",
 		"  memory                       Show memory overview",
+		"  memories [--project <ref>]   List stored memories",
+		"  reconcile-project-ids        Reconcile deterministic project IDs in the selected DB (explicit/--global/project)",
 		"",
 		"Options:",
 		"  --project <ref>              Project id, path, or unique name",
@@ -59,7 +73,11 @@ export function inspectUsage(): string {
 		"  --run-id <id>                Filter events by run id",
 		"  --session-id <id>            Filter events by session id",
 		"  --type <type>                Filter events by type",
+		"  --kind <kind>                Filter memories by kind",
+		"  --scope <scope>              Filter memories by scope (project|user)",
+		"  --query <text>               Text search memories (uses FTS when available)",
 		"  --limit <n>                  Limit rows (default: 20 for runs, 50 elsewhere)",
+		"  --threshold <minutes>        Stale dispatch threshold in minutes (default: 60)",
 		"  --verbose                    Show full content and expanded detail blocks",
 		"  --json                       Emit JSON output",
 		"  --help, -h                   Show inspect help",
@@ -80,9 +98,14 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 	let verbose = false;
 	let projectRef: string | null = null;
 	let limit = 50;
+	let threshold = 60;
 	let runId: string | null = null;
 	let sessionId: string | null = null;
 	let type: string | null = null;
+	let kind: string | null = null;
+	let scope: string | null = null;
+	let query: string | null = null;
+	const reconcile = false;
 	let help = false;
 	let error: string | null = null;
 	let global = false;
@@ -129,6 +152,16 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 			index += 1;
 			continue;
 		}
+		if (arg === "--threshold") {
+			const parsed = parsePositiveInt(args[index + 1] ?? "");
+			if (parsed === null) {
+				error = "--threshold must be a positive integer.";
+				break;
+			}
+			threshold = parsed;
+			index += 1;
+			continue;
+		}
 		if (arg === "--run-id") {
 			runId = args[index + 1] ?? null;
 			if (runId === null) {
@@ -151,6 +184,33 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 			type = args[index + 1] ?? null;
 			if (type === null) {
 				error = "Missing value for --type.";
+				break;
+			}
+			index += 1;
+			continue;
+		}
+		if (arg === "--kind") {
+			kind = args[index + 1] ?? null;
+			if (kind === null) {
+				error = "Missing value for --kind.";
+				break;
+			}
+			index += 1;
+			continue;
+		}
+		if (arg === "--scope") {
+			scope = args[index + 1] ?? null;
+			if (scope === null) {
+				error = "Missing value for --scope.";
+				break;
+			}
+			index += 1;
+			continue;
+		}
+		if (arg === "--query") {
+			query = args[index + 1] ?? null;
+			if (query === null) {
+				error = "Missing value for --query.";
 				break;
 			}
 			index += 1;
@@ -192,9 +252,14 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 		verbose,
 		projectRef,
 		limit,
+		threshold,
 		runId,
 		sessionId,
 		type,
+		kind,
+		scope,
+		query,
+		reconcile,
 		help,
 		error,
 		global,

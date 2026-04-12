@@ -15,7 +15,7 @@ import { createSessionNotificationHandler } from "./hooks/session-notification";
 import { createSessionRecoveryHandler } from "./hooks/session-recovery";
 import { createToolOutputTruncatorHandler } from "./hooks/tool-output-truncator";
 import { installAssets } from "./installer";
-import { openKernelDb } from "./kernel/database";
+import { openProjectKernelDb } from "./kernel/database";
 import { getLogger, initLoggers } from "./logging/domains";
 import {
 	ocLspDiagnostics,
@@ -485,12 +485,30 @@ const plugin: Plugin = async (input) => {
 	const chatMessageHandler = createChatMessageHandler(manager);
 	const toolExecuteAfterHandler = createToolExecuteAfterHandler(manager);
 	const recoveryEventHandler = (() => {
+		let cachedKernelDb: ReturnType<typeof openProjectKernelDb> | null = null;
+		const getKernelDb = () => {
+			if (cachedKernelDb) {
+				return cachedKernelDb;
+			}
+
+			try {
+				cachedKernelDb = openProjectKernelDb(projectRoot);
+				return cachedKernelDb;
+			} catch {
+				return null;
+			}
+		};
+
 		try {
-			const kernelDb = openKernelDb();
+			const kernelDb = getKernelDb();
+			if (!kernelDb) {
+				return createRecoveryEventHandler(getDefaultRecoveryOrchestrator());
+			}
+
 			const orchestrator = createRecoveryOrchestratorWithDb(kernelDb);
 			return createRecoveryEventHandler({
 				orchestrator,
-				db: kernelDb,
+				db: getKernelDb,
 				sdk: {
 					abortSession: sdkOps.abortSession,
 					showToast: (title, message, variant) =>

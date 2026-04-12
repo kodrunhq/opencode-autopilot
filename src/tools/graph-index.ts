@@ -6,9 +6,8 @@
 
 import { tool } from "@opencode-ai/plugin";
 import { indexProject } from "../graph/indexer";
-import { openKernelDb } from "../kernel/database";
+import { openProjectKernelDb } from "../kernel/database";
 import { resolveProjectIdentitySync } from "../projects/resolve";
-import { getProjectArtifactDir } from "../utils/paths";
 
 interface GraphIndexArgs {
 	readonly projectRoot?: string;
@@ -23,7 +22,7 @@ export async function graphIndexCore(args: GraphIndexArgs): Promise<{
 }> {
 	try {
 		const projectRoot = args.projectRoot ?? process.cwd();
-		const db = openKernelDb(getProjectArtifactDir(projectRoot));
+		const db = openProjectKernelDb(projectRoot);
 
 		const resolved = resolveProjectIdentitySync(projectRoot, {
 			db,

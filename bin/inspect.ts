@@ -4,23 +4,28 @@ import { existsSync } from "node:fs";
 import {
 	formatEvents,
 	formatLessons,
+	formatMemories,
 	formatMemoryOverview,
 	formatPaths,
 	formatPreferences,
 	formatProjectDetails,
 	formatProjects,
 	formatRuns,
+	formatStuckDispatches,
 } from "../src/inspect/formatters";
 import {
 	getMemoryOverview,
 	getProjectDetails,
 	listEvents,
 	listLessons,
+	listMemories,
 	listPreferences,
 	listProjects,
 	listRuns,
+	listStuckDispatches,
 } from "../src/inspect/repository";
-import { kernelDbExists } from "../src/kernel/database";
+import { resolveKernelDbPathFromProject } from "../src/kernel/database";
+import { reconcileProjectIds } from "../src/kernel/migrations";
 import { getAutopilotDbPath, getProjectArtifactDir } from "../src/utils/paths";
 import { inspectUsage, parseInspectArgs } from "./inspect-args";
 
@@ -67,9 +72,35 @@ export async function inspectCliCore(
 	const globalDbPath = getAutopilotDbPath();
 	const gitRoot = resolveGitRoot();
 	const projectArtifactDir = gitRoot ? getProjectArtifactDir(gitRoot) : null;
-	const projectKernelExists = projectArtifactDir !== null && kernelDbExists(projectArtifactDir);
+	const projectKernelPathInfo = gitRoot ? resolveKernelDbPathFromProject(gitRoot) : null;
+	const projectKernelExists =
+		projectArtifactDir !== null &&
+		projectKernelPathInfo !== null &&
+		existsSync(projectKernelPathInfo.path);
 
-	function resolveDbInput(view: string): { dbInput: string | undefined; dbScope: string } {
+	if (parsed.view === "reconcile-project-ids") {
+		const targetDb =
+			options.dbPath ??
+			(parsed.global ? globalDbPath : (projectKernelPathInfo?.path ?? globalDbPath));
+		if (!targetDb) return makeError("No database found for reconciliation", parsed.json);
+		if (!existsSync(targetDb)) return makeError(`Database not found: ${targetDb}`, parsed.json);
+		const db = new SqliteDatabase(targetDb);
+		try {
+			reconcileProjectIds(db);
+		} finally {
+			db.close();
+		}
+		return makeOutput(
+			{ action: "reconcile_project_ids", dbPath: targetDb },
+			parsed.json,
+			`Reconciled project IDs in ${targetDb}`,
+		);
+	}
+
+	function resolveDbInput(view: string): {
+		dbInput: string;
+		dbScope: string;
+	} {
 		if (options.dbPath) {
 			return { dbInput: options.dbPath, dbScope: "explicit" };
 		}
@@ -77,20 +108,31 @@ export async function inspectCliCore(
 			return { dbInput: globalDbPath, dbScope: "global" };
 		}
 
-		const globalScopedViews = ["memory", "preferences"];
+		const globalScopedViews = ["memory", "memories", "preferences"];
 		if (globalScopedViews.includes(view)) {
 			return { dbInput: globalDbPath, dbScope: "global" };
 		}
 
-		if (projectKernelExists && projectArtifactDir) {
+		if (projectKernelExists && projectArtifactDir && projectKernelPathInfo) {
+			const scopeLabel =
+				projectKernelPathInfo.kind === "legacy"
+					? "project (legacy kernel.db at repo root)"
+					: projectKernelPathInfo.kind === "migrated"
+						? "project (migrated legacy kernel.db)"
+						: projectKernelPathInfo.kind === "artifact_with_legacy"
+							? "project (artifact kernel.db in use; legacy kernel.db also present at repo root)"
+							: "project";
 			return {
-				dbInput: `${projectArtifactDir}/kernel.db`,
-				dbScope: "project",
+				dbInput: projectKernelPathInfo.path,
+				dbScope: scopeLabel,
 			};
 		}
 
 		if (gitRoot) {
-			return { dbInput: globalDbPath, dbScope: "project (using global DB — no local kernel.db)" };
+			return {
+				dbInput: globalDbPath,
+				dbScope: "project (using global DB — no local kernel.db)",
+			};
 		}
 
 		return { dbInput: globalDbPath, dbScope: "global" };
@@ -109,6 +151,8 @@ export async function inspectCliCore(
 	}
 
 	const verbose = parsed.verbose;
+	const scopeHeader = (dbScope: string, dbInput: string): string =>
+		`DB scope: ${dbScope} (${dbInput})\n\n`;
 	switch (parsed.view) {
 		case "projects": {
 			const { dbInput, dbScope } = resolveDbInput("projects");
@@ -131,7 +175,7 @@ export async function inspectCliCore(
 						"No project record found for current repo in the selected database. Use --global to list all projects.";
 				}
 			}
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
+			const header = scopeHeader(dbScope, dbInput);
 			const note = scopeNote === null ? "" : `${scopeNote}\n\n`;
 			return makeOutput(
 				{
@@ -151,11 +195,10 @@ export async function inspectCliCore(
 			if (details === null) {
 				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
 				{ action: "inspect_project", project: details },
 				parsed.json,
-				`${header}${formatProjectDetails(details, verbose)}`,
+				`${scopeHeader(dbScope, dbInput)}${formatProjectDetails(details, verbose)}`,
 			);
 		}
 		case "paths": {
@@ -164,23 +207,52 @@ export async function inspectCliCore(
 			if (details === null) {
 				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
-				{ action: "inspect_paths", project: details.project, paths: details.paths },
+				{
+					action: "inspect_paths",
+					project: details.project,
+					paths: details.paths,
+				},
 				parsed.json,
-				`${header}${formatPaths(details, verbose)}`,
+				`${scopeHeader(dbScope, dbInput)}${formatPaths(details, verbose)}`,
+			);
+		}
+		case "stuck": {
+			const { dbInput, dbScope } = resolveDbInput("stuck");
+			const stuckDispatches = listStuckDispatches(
+				{
+					projectRef: parsed.projectRef ?? undefined,
+					thresholdMinutes: parsed.threshold,
+					limit: parsed.limit,
+				},
+				dbInput,
+			);
+			return makeOutput(
+				{
+					action: "inspect_stuck_dispatches",
+					dispatches: stuckDispatches,
+					thresholdMinutes: parsed.threshold,
+					dbScope,
+					dbPath: dbInput,
+				},
+				parsed.json,
+				`${scopeHeader(dbScope, dbInput)}${formatStuckDispatches(stuckDispatches, verbose, parsed.threshold)}`,
 			);
 		}
 		case "runs": {
-			const { dbInput } = resolveDbInput("runs");
+			const { dbInput, dbScope } = resolveDbInput("runs");
 			const runs = listRuns(
 				{ projectRef: parsed.projectRef ?? undefined, limit: parsed.limit },
 				dbInput,
 			);
-			return makeOutput({ action: "inspect_runs", runs }, parsed.json, formatRuns(runs, verbose));
+			return makeOutput(
+				{ action: "inspect_runs", runs, dbScope, dbPath: dbInput },
+				parsed.json,
+				`${scopeHeader(dbScope, dbInput)}${formatRuns(runs, verbose)}`,
+			);
 		}
 		case "events": {
-			const { dbInput } = resolveDbInput("events");
+			const { dbInput, dbScope } = resolveDbInput("events");
 			const events = listEvents(
 				{
 					projectRef: parsed.projectRef ?? undefined,
@@ -192,27 +264,27 @@ export async function inspectCliCore(
 				dbInput,
 			);
 			return makeOutput(
-				{ action: "inspect_events", events },
+				{ action: "inspect_events", events, dbScope, dbPath: dbInput },
 				parsed.json,
-				formatEvents(events, verbose),
+				`${scopeHeader(dbScope, dbInput)}${formatEvents(events, verbose)}`,
 			);
 		}
 		case "lessons": {
-			const { dbInput } = resolveDbInput("lessons");
+			const { dbInput, dbScope } = resolveDbInput("lessons");
 			const lessons = listLessons(
 				{ projectRef: parsed.projectRef ?? undefined, limit: parsed.limit },
 				dbInput,
 			);
 			return makeOutput(
-				{ action: "inspect_lessons", lessons },
+				{ action: "inspect_lessons", lessons, dbScope, dbPath: dbInput },
 				parsed.json,
-				formatLessons(lessons, verbose),
+				`${scopeHeader(dbScope, dbInput)}${formatLessons(lessons, verbose)}`,
 			);
 		}
 		case "preferences": {
 			const { dbInput, dbScope } = resolveDbInput("preferences");
 			const preferences = listPreferences(dbInput);
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
+			const header = scopeHeader(dbScope, dbInput);
 			return makeOutput(
 				{ action: "inspect_preferences", preferences },
 				parsed.json,
@@ -222,11 +294,30 @@ export async function inspectCliCore(
 		case "memory": {
 			const { dbInput, dbScope } = resolveDbInput("memory");
 			const overview = getMemoryOverview(dbInput);
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
+			const header = scopeHeader(dbScope, dbInput);
 			return makeOutput(
 				{ action: "inspect_memory", overview },
 				parsed.json,
 				`${header}${formatMemoryOverview(overview, verbose)}`,
+			);
+		}
+		case "memories": {
+			const { dbInput, dbScope } = resolveDbInput("memories");
+			const memories = listMemories(
+				{
+					projectRef: parsed.projectRef ?? undefined,
+					kind: parsed.kind ?? undefined,
+					scope: parsed.scope ?? undefined,
+					query: parsed.query ?? undefined,
+					limit: parsed.limit,
+				},
+				dbInput,
+			);
+			const header = scopeHeader(dbScope, dbInput);
+			return makeOutput(
+				{ action: "inspect_memories", memories },
+				parsed.json,
+				`${header}${formatMemories(memories, verbose)}`,
 			);
 		}
 		case null:

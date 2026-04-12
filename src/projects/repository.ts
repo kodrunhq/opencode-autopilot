@@ -47,7 +47,9 @@ function resolveProjectRegistryDb(db?: Database): Database {
 }
 
 function withWriteTransaction<T>(db: Database, callback: () => T): T {
-	const row = db.query("PRAGMA transaction_state").get() as { transaction_state?: string } | null;
+	const row = db.query("PRAGMA transaction_state").get() as {
+		transaction_state?: string;
+	} | null;
 	const isAlreadyInTransaction = row?.transaction_state === "TRANSACTION";
 	if (isAlreadyInTransaction) {
 		return callback();

@@ -1,4 +1,10 @@
-export { getKernelDbPath, KERNEL_DB_FILE, kernelDbExists, openKernelDb } from "./database";
+export {
+	getKernelDbPath,
+	KERNEL_DB_FILE,
+	kernelDbExists,
+	openKernelDb,
+	openProjectKernelDb,
+} from "./database";
 export { runKernelMigrations } from "./migrations";
 export { type RetryOptions, withRetry } from "./retry";
 export * from "./schema";

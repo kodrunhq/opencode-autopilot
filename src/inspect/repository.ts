@@ -32,6 +32,7 @@ interface ProjectCountRow extends ProjectRow {
 	readonly run_count: number;
 	readonly event_count: number;
 	readonly observation_count: number;
+	readonly memory_count: number;
 	readonly has_active_review_state: number;
 	readonly has_review_memory: number;
 }
@@ -51,6 +52,19 @@ interface PipelineRunSummaryRow {
 	readonly failure_agent: string | null;
 	readonly failure_message: string | null;
 	readonly last_successful_phase: string | null;
+}
+
+interface StuckDispatchRow {
+	readonly run_id: string;
+	readonly status: string;
+	readonly current_phase: string | null;
+	readonly idea: string;
+	readonly dispatch_id: string;
+	readonly dispatch_phase: string;
+	readonly agent: string;
+	readonly issued_at: string;
+	readonly session_id: string | null;
+	readonly stale_minutes: number;
 }
 
 interface ForensicEventSummaryRow {
@@ -118,6 +132,29 @@ interface ObservationRow {
 	readonly created_at: string;
 }
 
+interface MemoryRow {
+	readonly id: number;
+	readonly text_id: string;
+	readonly project_id: string | null;
+	readonly project_name: string | null;
+	readonly project_path: string | null;
+	readonly kind: string;
+	readonly scope: string;
+	readonly content: string;
+	readonly summary: string;
+	readonly reasoning: string | null;
+	readonly confidence: number;
+	readonly evidence_count: number;
+	readonly tags: string | null;
+	readonly topic_group: string | null;
+	readonly topic: string | null;
+	readonly source_kind: string | null;
+	readonly status: string;
+	readonly created_at: string;
+	readonly last_updated: string;
+	readonly last_accessed: string;
+}
+
 interface CountRow {
 	readonly cnt: number;
 }
@@ -153,6 +190,7 @@ export interface InspectProjectSummary {
 	readonly runCount: number;
 	readonly eventCount: number;
 	readonly observationCount: number;
+	readonly memoryCount: number;
 	readonly lessonCount: number;
 	readonly hasActiveReviewState: boolean;
 	readonly hasReviewMemory: boolean;
@@ -179,6 +217,19 @@ export interface InspectRunSummary {
 	readonly failureAgent: string | null;
 	readonly failureMessage: string | null;
 	readonly lastSuccessfulPhase: string | null;
+}
+
+export interface InspectStuckDispatch {
+	readonly runId: string;
+	readonly status: string;
+	readonly currentPhase: string | null;
+	readonly idea: string;
+	readonly dispatchId: string;
+	readonly dispatchPhase: string;
+	readonly agent: string;
+	readonly issuedAt: string;
+	readonly sessionId: string | null;
+	readonly staleMinutes: number;
 }
 
 export interface InspectEventSummary {
@@ -241,8 +292,36 @@ export interface InspectMemoryOverview {
 	readonly preferences: readonly InspectPreferenceSummary[];
 }
 
+export interface InspectMemorySummary {
+	readonly id: number;
+	readonly textId: string;
+	readonly projectId: string | null;
+	readonly projectName: string | null;
+	readonly projectPath: string | null;
+	readonly kind: string;
+	readonly scope: string;
+	readonly summary: string;
+	readonly content: string;
+	readonly tags: string | null;
+	readonly topicGroup: string | null;
+	readonly topic: string | null;
+	readonly sourceKind: string | null;
+	readonly status: string;
+	readonly confidence: number;
+	readonly evidenceCount: number;
+	readonly createdAt: string;
+	readonly lastUpdated: string;
+	readonly lastAccessed: string;
+}
+
 export interface InspectRunQuery {
 	readonly projectRef?: string;
+	readonly limit?: number;
+}
+
+export interface InspectStuckQuery {
+	readonly projectRef?: string;
+	readonly thresholdMinutes?: number;
 	readonly limit?: number;
 }
 
@@ -256,6 +335,14 @@ export interface InspectEventQuery {
 
 export interface InspectLessonQuery {
 	readonly projectRef?: string;
+	readonly limit?: number;
+}
+
+export interface InspectMemoryQuery {
+	readonly projectRef?: string;
+	readonly kind?: string;
+	readonly scope?: string;
+	readonly query?: string;
 	readonly limit?: number;
 }
 
@@ -294,6 +381,30 @@ function rowToPreference(row: PreferenceRow): InspectPreferenceSummary {
 		createdAt: row.created_at,
 		lastUpdated: row.last_updated,
 	}) as InspectPreferenceSummary;
+}
+
+function rowToMemory(row: MemoryRow): InspectMemorySummary {
+	return Object.freeze({
+		id: row.id,
+		textId: row.text_id,
+		projectId: row.project_id,
+		projectName: row.project_name,
+		projectPath: row.project_path,
+		kind: row.kind,
+		scope: row.scope,
+		summary: row.summary,
+		content: row.content,
+		tags: row.tags,
+		topicGroup: row.topic_group,
+		topic: row.topic,
+		sourceKind: row.source_kind,
+		status: row.status,
+		confidence: row.confidence,
+		evidenceCount: row.evidence_count,
+		createdAt: row.created_at,
+		lastUpdated: row.last_updated,
+		lastAccessed: row.last_accessed,
+	});
 }
 
 function rowToPreferenceEvidence(row: PreferenceEvidenceRow): PreferenceEvidence {
@@ -414,6 +525,7 @@ function buildProjectSummary(
 		runCount: row.run_count,
 		eventCount: row.event_count,
 		observationCount: row.observation_count,
+		memoryCount: row.memory_count ?? 0,
 		lessonCount: lessonCounts.get(row.id) ?? 0,
 		hasActiveReviewState: row.has_active_review_state === 1,
 		hasReviewMemory: row.has_review_memory === 1,
@@ -430,6 +542,9 @@ function readProjectRows(db: Database): readonly ProjectCountRow[] {
 	const observationCounts = tableExists(db, "observations")
 		? countSubquery("observations", "observation_count")
 		: emptyCountSubquery("observation_count");
+	const memoryCounts = tableExists(db, "memories")
+		? countSubquery("memories", "memory_count")
+		: emptyCountSubquery("memory_count");
 	const activeReviewJoin = tableExists(db, "active_review_state")
 		? "LEFT JOIN active_review_state ars ON ars.project_id = p.id"
 		: "LEFT JOIN (SELECT NULL AS project_id WHERE 0) ars ON ars.project_id = p.id";
@@ -444,12 +559,13 @@ function readProjectRows(db: Database): readonly ProjectCountRow[] {
 					p.*,
 					COALESCE(path_counts.path_count, 0) AS path_count,
 					COALESCE(fingerprint_counts.fingerprint_count, 0) AS fingerprint_count,
-					COALESCE(run_counts.run_count, 0) AS run_count,
-					COALESCE(event_counts.event_count, 0) AS event_count,
-					COALESCE(observation_counts.observation_count, 0) AS observation_count,
-					CASE WHEN ars.project_id IS NULL THEN 0 ELSE 1 END AS has_active_review_state,
-					CASE WHEN prm.project_id IS NULL THEN 0 ELSE 1 END AS has_review_memory
-				 FROM projects p
+				COALESCE(run_counts.run_count, 0) AS run_count,
+				COALESCE(event_counts.event_count, 0) AS event_count,
+				COALESCE(observation_counts.observation_count, 0) AS observation_count,
+				COALESCE(memory_counts.memory_count, 0) AS memory_count,
+				CASE WHEN ars.project_id IS NULL THEN 0 ELSE 1 END AS has_active_review_state,
+				CASE WHEN prm.project_id IS NULL THEN 0 ELSE 1 END AS has_review_memory
+			 FROM projects p
 				 LEFT JOIN (
 					SELECT project_id, COUNT(*) AS path_count
 					FROM project_paths
@@ -460,11 +576,12 @@ function readProjectRows(db: Database): readonly ProjectCountRow[] {
 					FROM project_git_fingerprints
 					GROUP BY project_id
 				 ) AS fingerprint_counts ON fingerprint_counts.project_id = p.id
-				 LEFT JOIN (${runCounts}) AS run_counts ON run_counts.project_id = p.id
-				 LEFT JOIN (${eventCounts}) AS event_counts ON event_counts.project_id = p.id
-				 LEFT JOIN (${observationCounts}) AS observation_counts ON observation_counts.project_id = p.id
-				 ${activeReviewJoin}
-				 ${reviewMemoryJoin}
+			 LEFT JOIN (${runCounts}) AS run_counts ON run_counts.project_id = p.id
+			 LEFT JOIN (${eventCounts}) AS event_counts ON event_counts.project_id = p.id
+			 LEFT JOIN (${observationCounts}) AS observation_counts ON observation_counts.project_id = p.id
+			 LEFT JOIN (${memoryCounts}) AS memory_counts ON memory_counts.project_id = p.id
+			 ${activeReviewJoin}
+			 ${reviewMemoryJoin}
 				 ORDER BY p.last_updated DESC, p.name ASC, p.id ASC`,
 			)
 			.all() as ProjectCountRow[],
@@ -593,6 +710,77 @@ export function listRuns(
 					failureAgent: row.failure_agent,
 					failureMessage: row.failure_message,
 					lastSuccessfulPhase: row.last_successful_phase,
+				}),
+			),
+		);
+	});
+}
+
+export function listStuckDispatches(
+	query: InspectStuckQuery = {},
+	input?: InspectDbInput,
+): readonly InspectStuckDispatch[] {
+	return withInspectDb(input, Object.freeze([]), (db) => {
+		if (!tableExists(db, "pipeline_runs") || !tableExists(db, "run_pending_dispatches")) {
+			return Object.freeze([]);
+		}
+
+		const thresholdMinutes = Math.max(1, query.thresholdMinutes ?? 60);
+		const limit = Math.max(1, query.limit ?? 50);
+		const resolvedProject =
+			typeof query.projectRef === "string"
+				? resolveProjectReferenceInDb(query.projectRef, db)
+				: null;
+		if (query.projectRef && resolvedProject === null) {
+			return Object.freeze([]);
+		}
+
+		const conditions = [
+			"julianday(rpd.issued_at) IS NOT NULL",
+			"CAST((julianday('now') - julianday(rpd.issued_at)) * 1440 AS INTEGER) >= ?",
+		];
+		const params: Array<string | number> = [thresholdMinutes];
+
+		if (resolvedProject !== null) {
+			conditions.push("pr.project_id = ?");
+			params.push(resolvedProject.id);
+		}
+
+		const whereClause = `WHERE ${conditions.join(" AND ")}`;
+		const rows = db
+			.query(
+				`SELECT
+					pr.run_id,
+					pr.status,
+					pr.current_phase,
+					pr.idea,
+					rpd.dispatch_id,
+					rpd.phase AS dispatch_phase,
+					rpd.agent,
+					rpd.issued_at,
+					rpd.session_id,
+					CAST((julianday('now') - julianday(rpd.issued_at)) * 1440 AS INTEGER) AS stale_minutes
+				 FROM pipeline_runs pr
+				 JOIN run_pending_dispatches rpd ON rpd.run_id = pr.run_id
+				 ${whereClause}
+				 ORDER BY stale_minutes DESC, rpd.issued_at ASC, pr.run_id ASC, rpd.dispatch_id ASC
+				 LIMIT ?`,
+			)
+			.all(...params, limit) as StuckDispatchRow[];
+
+		return Object.freeze(
+			rows.map((row) =>
+				Object.freeze({
+					runId: row.run_id,
+					status: row.status,
+					currentPhase: row.current_phase,
+					idea: row.idea,
+					dispatchId: row.dispatch_id,
+					dispatchPhase: row.dispatch_phase,
+					agent: row.agent,
+					issuedAt: row.issued_at,
+					sessionId: row.session_id,
+					staleMinutes: row.stale_minutes,
 				}),
 			),
 		);
@@ -738,6 +926,66 @@ export function listLessons(
 
 		lessons.sort((a, b) => b.extractedAt.localeCompare(a.extractedAt));
 		return Object.freeze(lessons.slice(0, limit));
+	});
+}
+
+export function listMemories(
+	query: InspectMemoryQuery = {},
+	input?: InspectDbInput,
+): readonly InspectMemorySummary[] {
+	return withInspectDb(input, Object.freeze([]), (db) => {
+		if (!tableExists(db, "memories")) {
+			return Object.freeze([]);
+		}
+
+		const limit = Math.max(1, query.limit ?? 50);
+		const resolvedProject =
+			typeof query.projectRef === "string"
+				? resolveProjectReferenceInDb(query.projectRef, db)
+				: null;
+		if (query.projectRef && resolvedProject === null) {
+			return Object.freeze([]);
+		}
+
+		const conditions: string[] = ["m.status = 'active'"];
+		const params: Array<string | number> = [];
+		const useFts = tableExists(db, "memories_fts");
+
+		if (resolvedProject !== null) {
+			conditions.push("m.project_id = ?");
+			params.push(resolvedProject.id);
+		}
+		if (query.kind) {
+			conditions.push("m.kind = ?");
+			params.push(query.kind);
+		}
+		if (query.scope) {
+			conditions.push("m.scope = ?");
+			params.push(query.scope);
+		}
+		if (query.query) {
+			if (useFts) {
+				conditions.push("m.id IN (SELECT rowid FROM memories_fts WHERE memories_fts MATCH ?)");
+				params.push(query.query);
+			} else {
+				conditions.push("(m.content LIKE ? OR m.summary LIKE ?)");
+				params.push(`%${query.query}%`, `%${query.query}%`);
+			}
+		}
+
+		const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+		const rows = db
+			.query(
+				`SELECT m.*, p.name AS project_name, p.path AS project_path
+				 FROM memories m
+				 LEFT JOIN projects p ON p.id = m.project_id
+				 ${whereClause}
+				 ORDER BY m.last_updated DESC, m.id DESC
+				 LIMIT ?`,
+			)
+			.all(...params, limit) as MemoryRow[];
+
+		return Object.freeze(rows.map(rowToMemory));
 	});
 }
 
