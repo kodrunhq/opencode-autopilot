@@ -13,11 +13,7 @@ import {
 	listProjectPaths,
 } from "../projects/repository";
 import { projectRecordSchema } from "../projects/schemas";
-import type {
-	ProjectGitFingerprint,
-	ProjectPathRecord,
-	ProjectRecord,
-} from "../projects/types";
+import type { ProjectGitFingerprint, ProjectPathRecord, ProjectRecord } from "../projects/types";
 import { getAutopilotDbPath } from "../utils/paths";
 
 type InspectDbInput = Database | string | undefined;
@@ -363,9 +359,7 @@ function rowToProject(row: ProjectRow): ProjectRecord {
 function safeParseJson(value: string): Record<string, unknown> {
 	try {
 		const parsed = JSON.parse(value) as unknown;
-		return typeof parsed === "object" &&
-			parsed !== null &&
-			!Array.isArray(parsed)
+		return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
 			? (parsed as Record<string, unknown>)
 			: {};
 	} catch {
@@ -413,9 +407,7 @@ function rowToMemory(row: MemoryRow): InspectMemorySummary {
 	});
 }
 
-function rowToPreferenceEvidence(
-	row: PreferenceEvidenceRow,
-): PreferenceEvidence {
+function rowToPreferenceEvidence(row: PreferenceEvidenceRow): PreferenceEvidence {
 	return preferenceEvidenceSchema.parse({
 		id: row.id,
 		preferenceId: row.preference_id,
@@ -429,9 +421,7 @@ function rowToPreferenceEvidence(
 	});
 }
 
-function countLessonsByProject(
-	rows: readonly LessonMemoryRow[],
-): ReadonlyMap<string, number> {
+function countLessonsByProject(rows: readonly LessonMemoryRow[]): ReadonlyMap<string, number> {
 	const counts = new Map<string, number>();
 
 	for (const row of rows) {
@@ -491,10 +481,7 @@ function withInspectDb<T>(
 	}
 }
 
-function resolveProjectReferenceInDb(
-	projectRef: string,
-	db: Database,
-): ProjectRecord | null {
+function resolveProjectReferenceInDb(projectRef: string, db: Database): ProjectRecord | null {
 	const trimmed = projectRef.trim();
 	if (trimmed.length === 0) {
 		return null;
@@ -511,17 +498,13 @@ function resolveProjectReferenceInDb(
 	}
 
 	const nameMatches = db
-		.query(
-			"SELECT * FROM projects WHERE name = ? ORDER BY last_updated DESC, id DESC LIMIT 2",
-		)
+		.query("SELECT * FROM projects WHERE name = ? ORDER BY last_updated DESC, id DESC LIMIT 2")
 		.all(trimmed) as ProjectRow[];
 	if (nameMatches.length === 1) {
 		return rowToProject(nameMatches[0]);
 	}
 	if (nameMatches.length > 1) {
-		throw new Error(
-			`Project reference '${trimmed}' is ambiguous; use project id or path.`,
-		);
+		throw new Error(`Project reference '${trimmed}' is ambiguous; use project id or path.`);
 	}
 
 	return null;
@@ -605,9 +588,7 @@ function readProjectRows(db: Database): readonly ProjectCountRow[] {
 	);
 }
 
-export function listProjects(
-	input?: InspectDbInput,
-): readonly InspectProjectSummary[] {
+export function listProjects(input?: InspectDbInput): readonly InspectProjectSummary[] {
 	return withInspectDb(input, Object.freeze([]), (db) => {
 		const projectRows = readProjectRows(db);
 		const lessonRows = tableExists(db, "project_lesson_memory")
@@ -620,9 +601,7 @@ export function listProjects(
 					.all() as LessonMemoryRow[])
 			: [];
 		const lessonCounts = countLessonsByProject(lessonRows);
-		return Object.freeze(
-			projectRows.map((row) => buildProjectSummary(row, lessonCounts)),
-		);
+		return Object.freeze(projectRows.map((row) => buildProjectSummary(row, lessonCounts)));
 	});
 }
 
@@ -742,10 +721,7 @@ export function listStuckDispatches(
 	input?: InspectDbInput,
 ): readonly InspectStuckDispatch[] {
 	return withInspectDb(input, Object.freeze([]), (db) => {
-		if (
-			!tableExists(db, "pipeline_runs") ||
-			!tableExists(db, "run_pending_dispatches")
-		) {
+		if (!tableExists(db, "pipeline_runs") || !tableExists(db, "run_pending_dispatches")) {
 			return Object.freeze([]);
 		}
 
@@ -849,8 +825,7 @@ export function listEvents(
 			params.push(query.type);
 		}
 
-		const whereClause =
-			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+		const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 		const rows = db
 			.query(
 				`SELECT
@@ -928,9 +903,7 @@ export function listLessons(
 
 		const lessons: InspectLessonSummary[] = [];
 		for (const row of rows) {
-			const parsed = lessonMemorySchema.safeParse(
-				safeParseJson(row.state_json),
-			);
+			const parsed = lessonMemorySchema.safeParse(safeParseJson(row.state_json));
 			if (!parsed.success) {
 				continue;
 			}
@@ -992,9 +965,7 @@ export function listMemories(
 		}
 		if (query.query) {
 			if (useFts) {
-				conditions.push(
-					"m.id IN (SELECT rowid FROM memories_fts WHERE memories_fts MATCH ?)",
-				);
+				conditions.push("m.id IN (SELECT rowid FROM memories_fts WHERE memories_fts MATCH ?)");
 				params.push(query.query);
 			} else {
 				conditions.push("(m.content LIKE ? OR m.summary LIKE ?)");
@@ -1002,8 +973,7 @@ export function listMemories(
 			}
 		}
 
-		const whereClause =
-			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+		const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 		const rows = db
 			.query(
 				`SELECT m.*, p.name AS project_name, p.path AS project_path
@@ -1019,9 +989,7 @@ export function listMemories(
 	});
 }
 
-export function listPreferences(
-	input?: InspectDbInput,
-): readonly InspectPreferenceSummary[] {
+export function listPreferences(input?: InspectDbInput): readonly InspectPreferenceSummary[] {
 	return withInspectDb(input, Object.freeze([]), (db) => {
 		if (tableExists(db, "preference_records")) {
 			const rows = db
@@ -1078,9 +1046,7 @@ export function listPreferences(
 	});
 }
 
-export function getMemoryOverview(
-	input?: InspectDbInput,
-): InspectMemoryOverview {
+export function getMemoryOverview(input?: InspectDbInput): InspectMemoryOverview {
 	return withInspectDb(
 		input,
 		Object.freeze({
@@ -1102,9 +1068,8 @@ export function getMemoryOverview(
 			const totalObservations = (
 				db.query("SELECT COUNT(*) as cnt FROM observations").get() as CountRow
 			).cnt;
-			const totalProjects = (
-				db.query("SELECT COUNT(*) as cnt FROM projects").get() as CountRow
-			).cnt;
+			const totalProjects = (db.query("SELECT COUNT(*) as cnt FROM projects").get() as CountRow)
+				.cnt;
 			const totalPreferences = (
 				db
 					.query(
@@ -1118,16 +1083,12 @@ export function getMemoryOverview(
 			const totalMemories = tableExists(db, "memories")
 				? (
 						db
-							.query(
-								"SELECT COUNT(*) as cnt FROM memories WHERE status = 'active'",
-							)
+							.query("SELECT COUNT(*) as cnt FROM memories WHERE status = 'active'")
 							.get() as CountRow
 					).cnt
 				: 0;
 
-			const typeCounts = Object.fromEntries(
-				OBSERVATION_TYPES.map((type) => [type, 0]),
-			);
+			const typeCounts = Object.fromEntries(OBSERVATION_TYPES.map((type) => [type, 0]));
 			const typeRows = db
 				.query("SELECT type, COUNT(*) as cnt FROM observations GROUP BY type")
 				.all() as TypeCountRow[];

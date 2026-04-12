@@ -85,8 +85,7 @@ export function calculateColumnWidths(
 	}
 
 	const widths = [...minWidths];
-	let remainingWidth =
-		availableWidth - minWidths.reduce((sum, width) => sum + width, 0);
+	let remainingWidth = availableWidth - minWidths.reduce((sum, width) => sum + width, 0);
 	const expandable = desiredWidths.map((desired, index) =>
 		Math.max(0, desired - (minWidths[index] ?? 0)),
 	);
@@ -106,8 +105,7 @@ export function calculateColumnWidths(
 
 	while (remainingWidth > 0) {
 		const nextIndex = expandable.findIndex(
-			(extraWidth, index) =>
-				extraWidth > (widths[index] ?? 0) - (minWidths[index] ?? 0),
+			(extraWidth, index) => extraWidth > (widths[index] ?? 0) - (minWidths[index] ?? 0),
 		);
 		if (nextIndex < 0) {
 			break;
@@ -131,10 +129,7 @@ export function renderTable(
 	return [renderRow(headers), divider, ...rows.map(renderRow)].join("\n");
 }
 
-export function wrapText(
-	value: string,
-	width = getTerminalWidth() - 4,
-): readonly string[] {
+export function wrapText(value: string, width = getTerminalWidth() - 4): readonly string[] {
 	const wrapWidth = Math.max(MIN_WRAP_WIDTH, width);
 	const lines: string[] = [];
 
@@ -165,9 +160,6 @@ export function wrapText(
 	return lines;
 }
 
-export function indentLines(
-	lines: readonly string[],
-	indent = "  ",
-): readonly string[] {
+export function indentLines(lines: readonly string[], indent = "  "): readonly string[] {
 	return lines.map((line) => `${indent}${line}`);
 }

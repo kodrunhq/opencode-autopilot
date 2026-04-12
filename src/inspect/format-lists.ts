@@ -23,10 +23,7 @@ import type {
 	InspectStuckDispatch,
 } from "./repository";
 
-export function formatRuns(
-	runs: readonly InspectRunSummary[],
-	verbose = false,
-): string {
+export function formatRuns(runs: readonly InspectRunSummary[], verbose = false): string {
 	if (verbose) {
 		return formatVerboseRuns(runs);
 	}
@@ -37,10 +34,7 @@ export function formatRuns(
 	return ["Runs", "", formatRunsTable(runs)].join("\n");
 }
 
-export function formatEvents(
-	events: readonly InspectEventSummary[],
-	verbose = false,
-): string {
+export function formatEvents(events: readonly InspectEventSummary[], verbose = false): string {
 	if (verbose) {
 		return formatVerboseEvents(events);
 	}
@@ -63,9 +57,7 @@ export function formatStuckDispatches(
 		return `No stuck dispatches found. Pending dispatches older than ${thresholdMinutes} minutes appear here when a subagent session dies silently.`;
 	}
 
-	return ["Stuck Dispatches", "", formatStuckDispatchesTable(dispatches)].join(
-		"\n",
-	);
+	return ["Stuck Dispatches", "", formatStuckDispatchesTable(dispatches)].join("\n");
 }
 
 export function formatStuck(
@@ -76,10 +68,7 @@ export function formatStuck(
 	return formatStuckDispatches(dispatches, verbose, thresholdMinutes);
 }
 
-export function formatLessons(
-	lessons: readonly InspectLessonSummary[],
-	verbose = false,
-): string {
+export function formatLessons(lessons: readonly InspectLessonSummary[], verbose = false): string {
 	if (verbose) {
 		return formatVerboseLessons(lessons);
 	}
@@ -104,10 +93,7 @@ export function formatPreferences(
 	return ["Preferences", "", formatPreferencesTable(preferences)].join("\n");
 }
 
-export function formatMemories(
-	memories: readonly InspectMemorySummary[],
-	verbose = false,
-): string {
+export function formatMemories(memories: readonly InspectMemorySummary[], verbose = false): string {
 	if (verbose) {
 		return formatVerboseMemories(memories);
 	}

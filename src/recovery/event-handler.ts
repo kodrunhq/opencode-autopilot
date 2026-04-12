@@ -7,9 +7,7 @@ import { clearRecoveryState } from "./persistence";
 
 const logger = getLogger("recovery", "event-handler");
 
-function getEventProperties(event: {
-	readonly [key: string]: unknown;
-}): Record<string, unknown> {
+function getEventProperties(event: { readonly [key: string]: unknown }): Record<string, unknown> {
 	const properties = event.properties;
 	return properties !== null && typeof properties === "object"
 		? (properties as Record<string, unknown>)
@@ -41,13 +39,8 @@ function extractSessionId(properties: Record<string, unknown>): string | null {
 	return null;
 }
 
-function extractError(
-	properties: Record<string, unknown>,
-): Error | string | null {
-	if (
-		properties.error instanceof Error ||
-		typeof properties.error === "string"
-	) {
+function extractError(properties: Record<string, unknown>): Error | string | null {
+	if (properties.error instanceof Error || typeof properties.error === "string") {
 		return properties.error;
 	}
 
@@ -62,9 +55,7 @@ function extractError(
 			typeof nestedError === "object" &&
 			typeof (nestedError as Record<string, unknown>).message === "string"
 		) {
-			return new Error(
-				(nestedError as Record<string, unknown>).message as string,
-			);
+			return new Error((nestedError as Record<string, unknown>).message as string);
 		}
 	}
 
@@ -89,10 +80,7 @@ interface PipelineRunStateRow {
 	readonly state_json: string;
 }
 
-function reconcileStalePendingDispatches(
-	sessionId: string,
-	db: Database,
-): void {
+function reconcileStalePendingDispatches(sessionId: string, db: Database): void {
 	try {
 		const pendingDispatches = db
 			.query(
@@ -119,22 +107,17 @@ function reconcileStalePendingDispatches(
 					.get(dispatch.run_id) as PipelineRunStateRow | null;
 
 				if (!stateRow) {
-					logger.warn(
-						"Skipping stale pending dispatch reconciliation; pipeline run missing",
-						{
-							sessionId,
-							runId: dispatch.run_id,
-							dispatchId: dispatch.dispatch_id,
-							phase: dispatch.phase,
-							agent: dispatch.agent,
-						},
-					);
+					logger.warn("Skipping stale pending dispatch reconciliation; pipeline run missing", {
+						sessionId,
+						runId: dispatch.run_id,
+						dispatchId: dispatch.dispatch_id,
+						phase: dispatch.phase,
+						agent: dispatch.agent,
+					});
 					continue;
 				}
 
-				const parsedState = pipelineStateSchema.safeParse(
-					JSON.parse(stateRow.state_json),
-				);
+				const parsedState = pipelineStateSchema.safeParse(JSON.parse(stateRow.state_json));
 				if (!parsedState.success) {
 					logger.warn(
 						"Skipping stale pending dispatch reconciliation; pipeline state parse failed",
@@ -162,8 +145,7 @@ function reconcileStalePendingDispatches(
 						),
 					timestamp,
 					lastSuccessfulPhase:
-						currentState.phases.filter((phase) => phase.status === "DONE").pop()
-							?.name ?? null,
+						currentState.phases.filter((phase) => phase.status === "DONE").pop()?.name ?? null,
 				};
 				const updatedState = pipelineStateSchema.parse({
 					...currentState,
@@ -198,16 +180,13 @@ function reconcileStalePendingDispatches(
 					],
 				);
 
-				logger.info(
-					"Reconciled stale pending dispatch after session termination",
-					{
-						sessionId,
-						runId: dispatch.run_id,
-						dispatchId: dispatch.dispatch_id,
-						phase: dispatch.phase,
-						agent: dispatch.agent,
-					},
-				);
+				logger.info("Reconciled stale pending dispatch after session termination", {
+					sessionId,
+					runId: dispatch.run_id,
+					dispatchId: dispatch.dispatch_id,
+					phase: dispatch.phase,
+					agent: dispatch.agent,
+				});
 			} catch (error: unknown) {
 				logger.warn("Failed to reconcile stale pending dispatch", {
 					sessionId,
@@ -221,9 +200,7 @@ function reconcileStalePendingDispatches(
 		}
 
 		try {
-			db.run("DELETE FROM run_pending_dispatches WHERE session_id = ?", [
-				sessionId,
-			]);
+			db.run("DELETE FROM run_pending_dispatches WHERE session_id = ?", [sessionId]);
 		} catch (error: unknown) {
 			logger.warn("Failed to delete reconciled pending dispatch rows", {
 				sessionId,
@@ -240,11 +217,7 @@ function reconcileStalePendingDispatches(
 
 export interface RecoverySdkOperations {
 	readonly abortSession?: (sessionId: string) => Promise<void>;
-	readonly showToast?: (
-		title: string,
-		message: string,
-		variant: string,
-	) => Promise<void>;
+	readonly showToast?: (title: string, message: string, variant: string) => Promise<void>;
 }
 
 function executeRecoveryAction(
@@ -340,11 +313,7 @@ function executeRecoveryAction(
 			orchestrator.recordResult(sessionId, true);
 			logger.info("Skipping failed step and continuing", { sessionId });
 			sdk
-				?.showToast?.(
-					"Recovery",
-					"Skipped stuck step, continuing execution",
-					"warning",
-				)
+				?.showToast?.("Recovery", "Skipped stuck step, continuing execution", "warning")
 				.catch(() => {});
 			break;
 		}
@@ -356,11 +325,7 @@ function executeRecoveryAction(
 				errorCategory: action.errorCategory,
 			});
 			sdk
-				?.showToast?.(
-					"Recovery Failed",
-					`Unrecoverable error: ${action.errorCategory}`,
-					"error",
-				)
+				?.showToast?.("Recovery Failed", `Unrecoverable error: ${action.errorCategory}`, "error")
 				.catch(() => {});
 			break;
 		}
@@ -372,11 +337,7 @@ function executeRecoveryAction(
 				errorCategory: action.errorCategory,
 			});
 			sdk
-				?.showToast?.(
-					"Action Required",
-					`Recovery needs input: ${action.errorCategory}`,
-					"warning",
-				)
+				?.showToast?.("Action Required", `Recovery needs input: ${action.errorCategory}`, "warning")
 				.catch(() => {});
 			break;
 		}
@@ -401,16 +362,13 @@ export function createRecoveryEventHandler(
 	orchestratorOrOptions: RecoveryOrchestrator | RecoveryEventHandlerOptions,
 ) {
 	const options: RecoveryEventHandlerOptions =
-		orchestratorOrOptions instanceof Object &&
-		"orchestrator" in orchestratorOrOptions
+		orchestratorOrOptions instanceof Object && "orchestrator" in orchestratorOrOptions
 			? orchestratorOrOptions
 			: { orchestrator: orchestratorOrOptions };
 
 	const { orchestrator, db, sdk } = options;
 
-	return async (input: {
-		event: { type: string; [key: string]: unknown };
-	}): Promise<void> => {
+	return async (input: { event: { type: string; [key: string]: unknown } }): Promise<void> => {
 		try {
 			const { event } = input;
 			const properties = getEventProperties(event);
@@ -424,11 +382,7 @@ export function createRecoveryEventHandler(
 					}
 
 					if (error) {
-						const action = orchestrator.handleError(
-							sessionId,
-							error,
-							properties,
-						);
+						const action = orchestrator.handleError(sessionId, error, properties);
 						if (action) {
 							executeRecoveryAction(action, sessionId, orchestrator, sdk);
 						}
@@ -450,13 +404,10 @@ export function createRecoveryEventHandler(
 						try {
 							clearRecoveryState(db, sessionId);
 						} catch (error: unknown) {
-							logger.warn(
-								"Failed to clear persisted recovery state on session delete",
-								{
-									sessionId,
-									error: error instanceof Error ? error.message : String(error),
-								},
-							);
+							logger.warn("Failed to clear persisted recovery state on session delete", {
+								sessionId,
+								error: error instanceof Error ? error.message : String(error),
+							});
 						}
 						reconcileStalePendingDispatches(sessionId, db);
 					}

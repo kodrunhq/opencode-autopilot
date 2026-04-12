@@ -90,9 +90,7 @@ function rowToProjectPath(row: ProjectPathRow): ProjectPathRecord {
 	});
 }
 
-function rowToProjectFingerprint(
-	row: ProjectFingerprintRow,
-): ProjectGitFingerprint {
+function rowToProjectFingerprint(row: ProjectFingerprintRow): ProjectGitFingerprint {
 	return projectGitFingerprintSchema.parse({
 		projectId: row.project_id,
 		normalizedRemoteUrl: row.normalized_remote_url,
@@ -102,10 +100,7 @@ function rowToProjectFingerprint(
 	});
 }
 
-export function upsertProjectRecord(
-	project: ProjectRecord,
-	db?: Database,
-): ProjectRecord {
+export function upsertProjectRecord(project: ProjectRecord, db?: Database): ProjectRecord {
 	const validated = projectRecordSchema.parse(project);
 	const d = resolveProjectRegistryDb(db);
 	const firstSeenAt = validated.firstSeenAt ?? validated.lastUpdated;
@@ -119,19 +114,13 @@ export function upsertProjectRecord(
 				name = excluded.name,
 				first_seen_at = COALESCE(projects.first_seen_at, excluded.first_seen_at),
 				last_updated = excluded.last_updated`,
-			[
-				validated.id,
-				validated.path,
-				validated.name,
-				firstSeenAt,
-				validated.lastUpdated,
-			],
+			[validated.id, validated.path, validated.name, firstSeenAt, validated.lastUpdated],
 		);
 
-		d.run(
-			"UPDATE project_paths SET is_current = 0, last_updated = ? WHERE project_id = ?",
-			[validated.lastUpdated, validated.id],
-		);
+		d.run("UPDATE project_paths SET is_current = 0, last_updated = ? WHERE project_id = ?", [
+			validated.lastUpdated,
+			validated.id,
+		]);
 		d.run(
 			`INSERT INTO project_paths (project_id, path, first_seen_at, last_updated, is_current)
 			 VALUES (?, ?, ?, ?, 1)
@@ -148,32 +137,19 @@ export function upsertProjectRecord(
 	});
 }
 
-export function getProjectById(
-	projectId: string,
-	db?: Database,
-): ProjectRecord | null {
+export function getProjectById(projectId: string, db?: Database): ProjectRecord | null {
 	const d = resolveProjectRegistryDb(db);
-	const row = d
-		.query("SELECT * FROM projects WHERE id = ?")
-		.get(projectId) as ProjectRow | null;
+	const row = d.query("SELECT * FROM projects WHERE id = ?").get(projectId) as ProjectRow | null;
 	return row ? rowToProject(row) : null;
 }
 
-export function getProjectByCurrentPath(
-	path: string,
-	db?: Database,
-): ProjectRecord | null {
+export function getProjectByCurrentPath(path: string, db?: Database): ProjectRecord | null {
 	const d = resolveProjectRegistryDb(db);
-	const row = d
-		.query("SELECT * FROM projects WHERE path = ?")
-		.get(path) as ProjectRow | null;
+	const row = d.query("SELECT * FROM projects WHERE path = ?").get(path) as ProjectRow | null;
 	return row ? rowToProject(row) : null;
 }
 
-export function getProjectByAnyPath(
-	path: string,
-	db?: Database,
-): ProjectRecord | null {
+export function getProjectByAnyPath(path: string, db?: Database): ProjectRecord | null {
 	const current = getProjectByCurrentPath(path, db);
 	if (current !== null) {
 		return current;
@@ -193,10 +169,7 @@ export function getProjectByAnyPath(
 	return row ? rowToProject(row) : null;
 }
 
-export function listProjectPaths(
-	projectId: string,
-	db?: Database,
-): readonly ProjectPathRecord[] {
+export function listProjectPaths(projectId: string, db?: Database): readonly ProjectPathRecord[] {
 	const d = resolveProjectRegistryDb(db);
 	const rows = d
 		.query(
@@ -252,13 +225,7 @@ export function upsertProjectGitFingerprint(
 		ON CONFLICT(project_id, normalized_remote_url) DO UPDATE SET
 			default_branch = excluded.default_branch,
 			last_updated = excluded.last_updated`,
-		[
-			projectId,
-			validated.normalizedRemoteUrl,
-			validated.defaultBranch,
-			seenAt,
-			seenAt,
-		],
+		[projectId, validated.normalizedRemoteUrl, validated.defaultBranch, seenAt, seenAt],
 	);
 
 	return projectGitFingerprintSchema.parse({

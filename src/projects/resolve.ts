@@ -21,9 +21,7 @@ export interface ProjectResolverDeps {
 	readonly db?: Database;
 	readonly now?: () => string;
 	readonly createProjectId?: () => string;
-	readonly readGitFingerprint?: (
-		projectRoot: string,
-	) => Promise<GitFingerprintInput | null>;
+	readonly readGitFingerprint?: (projectRoot: string) => Promise<GitFingerprintInput | null>;
 }
 
 function normalizeProjectRoot(projectRoot: string): string {
@@ -60,9 +58,7 @@ export function normalizeGitRemoteUrl(remoteUrl: string): string | null {
 
 	try {
 		const parsed = new URL(trimmed);
-		const normalizedPath = parsed.pathname
-			.replace(/\.git$/i, "")
-			.replace(/^\/+/, "");
+		const normalizedPath = parsed.pathname.replace(/\.git$/i, "").replace(/^\/+/, "");
 		if (normalizedPath.length === 0) {
 			return null;
 		}
@@ -89,10 +85,7 @@ async function readGitCommand(
 	}
 }
 
-function readGitCommandSync(
-	projectRoot: string,
-	args: readonly string[],
-): string | null {
+function readGitCommandSync(projectRoot: string, args: readonly string[]): string | null {
 	try {
 		const stdout = execFileSync("git", args, {
 			cwd: projectRoot,
@@ -109,11 +102,7 @@ function readGitCommandSync(
 export async function readProjectGitFingerprint(
 	projectRoot: string,
 ): Promise<GitFingerprintInput | null> {
-	const remoteUrl = await readGitCommand(projectRoot, [
-		"config",
-		"--get",
-		"remote.origin.url",
-	]);
+	const remoteUrl = await readGitCommand(projectRoot, ["config", "--get", "remote.origin.url"]);
 	if (remoteUrl === null) {
 		return null;
 	}
@@ -129,9 +118,7 @@ export async function readProjectGitFingerprint(
 		"refs/remotes/origin/HEAD",
 	]);
 	const defaultBranch =
-		remoteHead === null
-			? null
-			: remoteHead.split("/").slice(1).join("/") || null;
+		remoteHead === null ? null : remoteHead.split("/").slice(1).join("/") || null;
 
 	return {
 		normalizedRemoteUrl,
@@ -139,14 +126,8 @@ export async function readProjectGitFingerprint(
 	};
 }
 
-export function readProjectGitFingerprintSync(
-	projectRoot: string,
-): GitFingerprintInput | null {
-	const remoteUrl = readGitCommandSync(projectRoot, [
-		"config",
-		"--get",
-		"remote.origin.url",
-	]);
+export function readProjectGitFingerprintSync(projectRoot: string): GitFingerprintInput | null {
+	const remoteUrl = readGitCommandSync(projectRoot, ["config", "--get", "remote.origin.url"]);
 	if (remoteUrl === null) {
 		return null;
 	}
@@ -162,9 +143,7 @@ export function readProjectGitFingerprintSync(
 		"refs/remotes/origin/HEAD",
 	]);
 	const defaultBranch =
-		remoteHead === null
-			? null
-			: remoteHead.split("/").slice(1).join("/") || null;
+		remoteHead === null ? null : remoteHead.split("/").slice(1).join("/") || null;
 
 	return {
 		normalizedRemoteUrl,
@@ -176,9 +155,7 @@ export interface SyncProjectResolverDeps {
 	readonly db?: Database;
 	readonly now?: () => string;
 	readonly createProjectId?: () => string;
-	readonly readGitFingerprint?: (
-		projectRoot: string,
-	) => GitFingerprintInput | null;
+	readonly readGitFingerprint?: (projectRoot: string) => GitFingerprintInput | null;
 	readonly allowCreate?: boolean;
 }
 
@@ -189,12 +166,10 @@ export async function resolveProjectIdentity(
 	const now = deps.now ?? (() => new Date().toISOString());
 	const seenAt = now();
 	const projectName = basename(projectRoot);
-	const readGitFingerprint =
-		deps.readGitFingerprint ?? readProjectGitFingerprint;
+	const readGitFingerprint = deps.readGitFingerprint ?? readProjectGitFingerprint;
 	const fingerprint = await readGitFingerprint(projectRoot);
 	const createProjectId =
-		deps.createProjectId ??
-		(() => computeDeterministicProjectId(projectRoot, fingerprint));
+		deps.createProjectId ?? (() => computeDeterministicProjectId(projectRoot, fingerprint));
 
 	const current = getProjectByCurrentPath(projectRoot, deps.db);
 	if (current !== null) {
@@ -206,46 +181,25 @@ export async function resolveProjectIdentity(
 			},
 			deps.db,
 		);
-		const currentFingerprint =
-			fingerprint ?? (await readGitFingerprint(projectRoot));
+		const currentFingerprint = fingerprint ?? (await readGitFingerprint(projectRoot));
 		if (currentFingerprint !== null) {
-			upsertProjectGitFingerprint(
-				updated.id,
-				currentFingerprint,
-				seenAt,
-				deps.db,
-			);
+			upsertProjectGitFingerprint(updated.id, currentFingerprint, seenAt, deps.db);
 		}
 		return updated;
 	}
 
 	const historical = getProjectByAnyPath(projectRoot, deps.db);
 	if (historical !== null) {
-		const updated = setProjectCurrentPath(
-			historical.id,
-			projectRoot,
-			projectName,
-			seenAt,
-			deps.db,
-		);
-		const currentFingerprint =
-			fingerprint ?? (await readGitFingerprint(projectRoot));
+		const updated = setProjectCurrentPath(historical.id, projectRoot, projectName, seenAt, deps.db);
+		const currentFingerprint = fingerprint ?? (await readGitFingerprint(projectRoot));
 		if (currentFingerprint !== null) {
-			upsertProjectGitFingerprint(
-				updated.id,
-				currentFingerprint,
-				seenAt,
-				deps.db,
-			);
+			upsertProjectGitFingerprint(updated.id, currentFingerprint, seenAt, deps.db);
 		}
 		return updated;
 	}
 
 	if (fingerprint !== null) {
-		const matches = getProjectsByGitFingerprint(
-			fingerprint.normalizedRemoteUrl,
-			deps.db,
-		);
+		const matches = getProjectsByGitFingerprint(fingerprint.normalizedRemoteUrl, deps.db);
 		if (matches.length === 1) {
 			const updated = setProjectCurrentPath(
 				matches[0].id,
@@ -283,12 +237,10 @@ export function resolveProjectIdentitySync(
 	const allowCreate = deps.allowCreate ?? true;
 	const seenAt = now();
 	const projectName = basename(projectRoot);
-	const readGitFingerprint =
-		deps.readGitFingerprint ?? readProjectGitFingerprintSync;
+	const readGitFingerprint = deps.readGitFingerprint ?? readProjectGitFingerprintSync;
 	const fingerprint = readGitFingerprint(projectRoot);
 	const createProjectId =
-		deps.createProjectId ??
-		(() => computeDeterministicProjectId(projectRoot, fingerprint));
+		deps.createProjectId ?? (() => computeDeterministicProjectId(projectRoot, fingerprint));
 
 	const current = getProjectByCurrentPath(projectRoot, deps.db);
 	if (current !== null) {
@@ -316,13 +268,7 @@ export function resolveProjectIdentitySync(
 			return historical;
 		}
 
-		const updated = setProjectCurrentPath(
-			historical.id,
-			projectRoot,
-			projectName,
-			seenAt,
-			deps.db,
-		);
+		const updated = setProjectCurrentPath(historical.id, projectRoot, projectName, seenAt, deps.db);
 		if (fingerprint !== null) {
 			upsertProjectGitFingerprint(updated.id, fingerprint, seenAt, deps.db);
 		}
@@ -330,10 +276,7 @@ export function resolveProjectIdentitySync(
 	}
 
 	if (fingerprint !== null) {
-		const matches = getProjectsByGitFingerprint(
-			fingerprint.normalizedRemoteUrl,
-			deps.db,
-		);
+		const matches = getProjectsByGitFingerprint(fingerprint.normalizedRemoteUrl, deps.db);
 		if (matches.length === 1) {
 			if (!allowCreate) {
 				return matches[0];

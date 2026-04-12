@@ -39,11 +39,7 @@ export interface InspectCliResult {
 	readonly format: "text" | "json";
 }
 
-function makeOutput(
-	payload: unknown,
-	json: boolean,
-	text: string,
-): InspectCliResult {
+function makeOutput(payload: unknown, json: boolean, text: string): InspectCliResult {
 	return Object.freeze({
 		isError: false,
 		format: json ? "json" : "text",
@@ -67,11 +63,7 @@ export async function inspectCliCore(
 ): Promise<InspectCliResult> {
 	const parsed = parseInspectArgs(args);
 	if (parsed.help) {
-		return makeOutput(
-			{ action: "help", usage: inspectUsage() },
-			parsed.json,
-			inspectUsage(),
-		);
+		return makeOutput({ action: "help", usage: inspectUsage() }, parsed.json, inspectUsage());
 	}
 	if (parsed.error !== null) {
 		return makeError(parsed.error, parsed.json);
@@ -80,9 +72,7 @@ export async function inspectCliCore(
 	const globalDbPath = getAutopilotDbPath();
 	const gitRoot = resolveGitRoot();
 	const projectArtifactDir = gitRoot ? getProjectArtifactDir(gitRoot) : null;
-	const projectKernelPathInfo = gitRoot
-		? resolveKernelDbPathFromProject(gitRoot)
-		: null;
+	const projectKernelPathInfo = gitRoot ? resolveKernelDbPathFromProject(gitRoot) : null;
 	const projectKernelExists =
 		projectArtifactDir !== null &&
 		projectKernelPathInfo !== null &&
@@ -91,13 +81,9 @@ export async function inspectCliCore(
 	if (parsed.view === "reconcile-project-ids") {
 		const targetDb =
 			options.dbPath ??
-			(parsed.global
-				? globalDbPath
-				: (projectKernelPathInfo?.path ?? globalDbPath));
-		if (!targetDb)
-			return makeError("No database found for reconciliation", parsed.json);
-		if (!existsSync(targetDb))
-			return makeError(`Database not found: ${targetDb}`, parsed.json);
+			(parsed.global ? globalDbPath : (projectKernelPathInfo?.path ?? globalDbPath));
+		if (!targetDb) return makeError("No database found for reconciliation", parsed.json);
+		if (!existsSync(targetDb)) return makeError(`Database not found: ${targetDb}`, parsed.json);
 		const db = new SqliteDatabase(targetDb);
 		try {
 			reconcileProjectIds(db);
@@ -152,23 +138,14 @@ export async function inspectCliCore(
 		return { dbInput: globalDbPath, dbScope: "global" };
 	}
 
-	if (
-		!parsed.help &&
-		parsed.error === null &&
-		parsed.view === null &&
-		parsed.pruneEphemeral
-	) {
+	if (!parsed.help && parsed.error === null && parsed.view === null && parsed.pruneEphemeral) {
 		const pruneDbPath = options.dbPath ?? globalDbPath;
 		const pruned = pruneEphemeralProjects(pruneDbPath);
 		return makeOutput(
 			{ action: "prune_ephemeral", pruned, dbPath: pruneDbPath },
 			parsed.json,
 			parsed.json
-				? JSON.stringify(
-						{ action: "prune_ephemeral", pruned, dbPath: pruneDbPath },
-						null,
-						2,
-					)
+				? JSON.stringify({ action: "prune_ephemeral", pruned, dbPath: pruneDbPath }, null, 2)
 				: `Pruned ${pruned} ephemeral project records from ${pruneDbPath}`,
 		);
 	}
@@ -191,8 +168,7 @@ export async function inspectCliCore(
 					projects.find((project) => project.path.startsWith(`${gitRoot}/`));
 				if (currentRepoProject !== undefined) {
 					projects = [currentRepoProject];
-					scopeNote =
-						"Showing current repo project. Use --global to list all projects.";
+					scopeNote = "Showing current repo project. Use --global to list all projects.";
 				} else {
 					projects = [];
 					scopeNote =
@@ -217,10 +193,7 @@ export async function inspectCliCore(
 			const { dbInput, dbScope } = resolveDbInput("project");
 			const details = getProjectDetails(parsed.projectRef ?? "", dbInput);
 			if (details === null) {
-				return makeError(
-					`Project not found: ${parsed.projectRef}`,
-					parsed.json,
-				);
+				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}
 			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
@@ -233,10 +206,7 @@ export async function inspectCliCore(
 			const { dbInput, dbScope } = resolveDbInput("paths");
 			const details = getProjectDetails(parsed.projectRef ?? "", dbInput);
 			if (details === null) {
-				return makeError(
-					`Project not found: ${parsed.projectRef}`,
-					parsed.json,
-				);
+				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}
 			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
@@ -353,11 +323,7 @@ export async function inspectCliCore(
 			);
 		}
 		case null:
-			return makeOutput(
-				{ action: "help", usage: inspectUsage() },
-				parsed.json,
-				inspectUsage(),
-			);
+			return makeOutput({ action: "help", usage: inspectUsage() }, parsed.json, inspectUsage());
 	}
 }
 
@@ -410,9 +376,7 @@ const TEMP_DIR_NAMES = Object.freeze(["tmp", "T"]);
 
 function isEphemeralPath(path: string): boolean {
 	const segments = path.split("/");
-	const tmpIdx = segments.findIndex((s) =>
-		(TEMP_DIR_NAMES as readonly string[]).includes(s),
-	);
+	const tmpIdx = segments.findIndex((s) => (TEMP_DIR_NAMES as readonly string[]).includes(s));
 	if (tmpIdx === -1) return false;
 	const afterTmp = segments.slice(tmpIdx + 1).join("/");
 	if (afterTmp.length === 0) return false;
@@ -454,8 +418,7 @@ function pruneEphemeralProjects(dbPath: string): number {
 					try {
 						db.run(`DELETE FROM ${table} WHERE project_id = ?`, [project.id]);
 					} catch (e) {
-						if (e instanceof Error && e.message.includes("no such table"))
-							continue;
+						if (e instanceof Error && e.message.includes("no such table")) continue;
 						throw e;
 					}
 				}

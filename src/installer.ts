@@ -1,11 +1,4 @@
-import {
-	access,
-	copyFile,
-	open,
-	readdir,
-	readFile,
-	unlink,
-} from "node:fs/promises";
+import { access, copyFile, open, readdir, readFile, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { copyIfMissing, ensureDir, isEnoentError } from "./utils/fs-helpers";
 import { getAssetsDir, getGlobalConfigDir } from "./utils/paths";
@@ -92,10 +85,7 @@ async function listEntries(dirPath: string): Promise<ListEntriesResult> {
 	}
 }
 
-async function haveSameContent(
-	source: string,
-	target: string,
-): Promise<boolean> {
+async function haveSameContent(source: string, target: string): Promise<boolean> {
 	const [sourceContent, targetContent] = await Promise.all([
 		readFile(source, "utf-8"),
 		readFile(target, "utf-8"),
@@ -239,9 +229,7 @@ async function hasInstallerMarker(filePath: string): Promise<boolean> {
 	}
 }
 
-async function cleanupDeprecatedAssets(
-	targetDir: string,
-): Promise<{
+async function cleanupDeprecatedAssets(targetDir: string): Promise<{
 	readonly removed: readonly string[];
 	readonly errors: readonly string[];
 }> {
@@ -323,12 +311,7 @@ export async function installAssets(
 			...skills.copied,
 			...templates.copied,
 		],
-		skipped: [
-			...agents.skipped,
-			...commands.skipped,
-			...skills.skipped,
-			...templates.skipped,
-		],
+		skipped: [...agents.skipped, ...commands.skipped, ...skills.skipped, ...templates.skipped],
 		errors: [
 			...cleanup.errors,
 			...forceUpdate.errors,

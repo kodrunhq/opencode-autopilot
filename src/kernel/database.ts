@@ -83,19 +83,13 @@ export function kernelDbExists(artifactDir?: string): boolean {
 	return existsSync(getKernelDbPath(artifactDir));
 }
 
-export function openKernelDb(
-	artifactDir?: string,
-	options?: { readonly?: boolean },
-): Database {
+export function openKernelDb(artifactDir?: string, options?: { readonly?: boolean }): Database {
 	const dbPath = getKernelDbPath(artifactDir);
 	if (!options?.readonly) {
 		mkdirSync(dirname(dbPath), { recursive: true });
 	}
 
-	const database = new Database(
-		dbPath,
-		options?.readonly ? { readonly: true } : undefined,
-	);
+	const database = new Database(dbPath, options?.readonly ? { readonly: true } : undefined);
 
 	database.run("PRAGMA foreign_keys=ON");
 	database.run("PRAGMA busy_timeout=5000");

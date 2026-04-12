@@ -3,14 +3,8 @@ import { runProjectRegistryMigrations } from "../projects/database";
 import { computeDeterministicProjectId } from "../projects/resolve";
 import { KERNEL_SCHEMA_STATEMENTS, KERNEL_SCHEMA_VERSION } from "./schema";
 
-function columnExists(
-	database: Database,
-	tableName: string,
-	columnName: string,
-): boolean {
-	const columns = database
-		.query(`PRAGMA table_info(${tableName})`)
-		.all() as Array<{
+function columnExists(database: Database, tableName: string, columnName: string): boolean {
+	const columns = database.query(`PRAGMA table_info(${tableName})`).all() as Array<{
 		name?: string;
 	}>;
 	return columns.some((column) => column.name === columnName);
@@ -26,9 +20,7 @@ function tableExists(database: Database, tableName: string): boolean {
 function backfillProjectAwareColumns(database: Database): void {
 	if (!columnExists(database, "pipeline_runs", "project_id")) {
 		database.run("ALTER TABLE pipeline_runs ADD COLUMN project_id TEXT");
-		database.run(
-			"UPDATE pipeline_runs SET project_id = 'legacy-project' WHERE project_id IS NULL",
-		);
+		database.run("UPDATE pipeline_runs SET project_id = 'legacy-project' WHERE project_id IS NULL");
 	}
 
 	if (!columnExists(database, "active_review_state", "project_id")) {
@@ -39,18 +31,14 @@ function backfillProjectAwareColumns(database: Database): void {
 	}
 
 	if (!columnExists(database, "project_review_memory", "project_id")) {
-		database.run(
-			"ALTER TABLE project_review_memory ADD COLUMN project_id TEXT",
-		);
+		database.run("ALTER TABLE project_review_memory ADD COLUMN project_id TEXT");
 		database.run(
 			"UPDATE project_review_memory SET project_id = 'legacy-project' WHERE project_id IS NULL",
 		);
 	}
 
 	if (!columnExists(database, "project_lesson_memory", "project_id")) {
-		database.run(
-			"ALTER TABLE project_lesson_memory ADD COLUMN project_id TEXT",
-		);
+		database.run("ALTER TABLE project_lesson_memory ADD COLUMN project_id TEXT");
 		database.run(
 			"UPDATE project_lesson_memory SET project_id = 'legacy-project' WHERE project_id IS NULL",
 		);
@@ -64,14 +52,8 @@ function backfillProjectAwareColumns(database: Database): void {
 	}
 }
 
-function columnType(
-	database: Database,
-	tableName: string,
-	columnName: string,
-): string | null {
-	const columns = database
-		.query(`PRAGMA table_info(${tableName})`)
-		.all() as Array<{
+function columnType(database: Database, tableName: string, columnName: string): string | null {
+	const columns = database.query(`PRAGMA table_info(${tableName})`).all() as Array<{
 		name?: string;
 		type?: string;
 	}>;
@@ -79,13 +61,8 @@ function columnType(
 	return col?.type?.toUpperCase() ?? null;
 }
 
-function getTableColumns(
-	database: Database,
-	tableName: string,
-): readonly string[] {
-	const columns = database
-		.query(`PRAGMA table_info(${tableName})`)
-		.all() as Array<{
+function getTableColumns(database: Database, tableName: string): readonly string[] {
+	const columns = database.query(`PRAGMA table_info(${tableName})`).all() as Array<{
 		name?: string;
 	}>;
 	return columns.map((c) => c.name ?? "").filter(Boolean);
@@ -138,10 +115,7 @@ const REBUILD_DDLS: Readonly<Record<string, string>> = Object.freeze({
 	)`,
 });
 
-function rebuildTableWithTextTaskId(
-	database: Database,
-	tableName: string,
-): void {
+function rebuildTableWithTextTaskId(database: Database, tableName: string): void {
 	if (!tableExists(database, tableName)) return;
 	const currentType = columnType(database, tableName, "task_id");
 	if (currentType === null || currentType === "TEXT") return;
@@ -155,9 +129,7 @@ function rebuildTableWithTextTaskId(
 	const rebuildTable = `_rebuild_${tableName}`;
 	const columnList = columns.join(", ");
 	const castColumns = columns
-		.map((col) =>
-			col === "task_id" ? "CAST(task_id AS TEXT) AS task_id" : col,
-		)
+		.map((col) => (col === "task_id" ? "CAST(task_id AS TEXT) AS task_id" : col))
 		.join(", ");
 
 	database.run(`DROP TABLE IF EXISTS ${rebuildTable}`);
@@ -225,15 +197,9 @@ export function reconcileProjectIds(database: Database): void {
 		try {
 			for (const table of tablesWithProjectId) {
 				if (!tableExists(database, table)) continue;
-				database.run(
-					`UPDATE ${table} SET project_id = ? WHERE project_id = ?`,
-					[targetId, row.id],
-				);
+				database.run(`UPDATE ${table} SET project_id = ? WHERE project_id = ?`, [targetId, row.id]);
 			}
-			database.run("UPDATE projects SET id = ? WHERE id = ?", [
-				targetId,
-				row.id,
-			]);
+			database.run("UPDATE projects SET id = ? WHERE id = ?", [targetId, row.id]);
 			database.run("COMMIT");
 		} catch (error) {
 			database.run("ROLLBACK");

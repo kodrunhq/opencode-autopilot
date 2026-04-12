@@ -15,21 +15,14 @@ import type {
 	InspectStuckDispatch,
 } from "./repository";
 
-function formatEvidenceDetail(
-	preference: InspectPreferenceSummary,
-): readonly string[] {
+function formatEvidenceDetail(preference: InspectPreferenceSummary): readonly string[] {
 	if (preference.evidence.length === 0) {
 		return ["  - none recorded"];
 	}
 
 	return preference.evidence.map((item) => {
-		const references = [item.sessionId, item.runId]
-			.filter((value) => value !== null)
-			.join(" / ");
-		const source =
-			references.length > 0
-				? `${item.statement} [${references}]`
-				: item.statement;
+		const references = [item.sessionId, item.runId].filter((value) => value !== null).join(" / ");
+		const source = references.length > 0 ? `${item.statement} [${references}]` : item.statement;
 		return `  - [${item.confirmed ? "confirmed" : "unconfirmed"}] ${source} (${item.createdAt})`;
 	});
 }
@@ -39,14 +32,7 @@ export function formatVerboseRuns(runs: readonly InspectRunSummary[]): string {
 		return "No runs found. Pipeline runs appear here after an orchestration starts.";
 	}
 
-	const headers = [
-		"Project",
-		"Run ID",
-		"Status",
-		"Phase",
-		"Revision",
-		"Updated",
-	];
+	const headers = ["Project", "Run ID", "Status", "Phase", "Revision", "Updated"];
 	const rows = runs.map((run) => [
 		run.projectName,
 		run.runId,
@@ -55,12 +41,7 @@ export function formatVerboseRuns(runs: readonly InspectRunSummary[]): string {
 		String(run.stateRevision),
 		run.lastUpdatedAt,
 	]);
-	const lines = [
-		"Runs",
-		"",
-		renderTable(headers, rows, { minWidths: [12, 12, 8, 8, 8, 20] }),
-		"",
-	];
+	const lines = ["Runs", "", renderTable(headers, rows, { minWidths: [12, 12, 8, 8, 8, 20] }), ""];
 
 	for (const run of runs) {
 		lines.push(`- ${run.projectName} / ${run.runId}`);
@@ -77,9 +58,7 @@ export function formatVerboseRuns(runs: readonly InspectRunSummary[]): string {
 	return lines.join("\n");
 }
 
-export function formatVerboseEvents(
-	events: readonly InspectEventSummary[],
-): string {
+export function formatVerboseEvents(events: readonly InspectEventSummary[]): string {
 	if (events.length === 0) {
 		return "No events found. Forensic events are captured while pipeline sessions execute.";
 	}
@@ -105,33 +84,19 @@ export function formatVerboseEvents(
 		lines.push(...indentLines([`Message: ${event.message ?? "-"}`]));
 		if (Object.keys(event.payload).length > 0) {
 			lines.push("  Payload:");
-			lines.push(
-				...indentLines(
-					JSON.stringify(event.payload, null, 2).split("\n"),
-					"    ",
-				),
-			);
+			lines.push(...indentLines(JSON.stringify(event.payload, null, 2).split("\n"), "    "));
 		}
 	}
 
 	return lines.join("\n");
 }
 
-export function formatVerboseStuckDispatches(
-	dispatches: readonly InspectStuckDispatch[],
-): string {
+export function formatVerboseStuckDispatches(dispatches: readonly InspectStuckDispatch[]): string {
 	if (dispatches.length === 0) {
 		return "No stuck dispatches found. Pending dispatches appear here when subagent sessions die silently.";
 	}
 
-	const headers = [
-		"Run ID",
-		"Status",
-		"Run Phase",
-		"Dispatch Phase",
-		"Agent",
-		"Pending",
-	];
+	const headers = ["Run ID", "Status", "Run Phase", "Dispatch Phase", "Agent", "Pending"];
 	const rows = dispatches.map((dispatch) => [
 		dispatch.runId,
 		dispatch.status,
@@ -148,9 +113,7 @@ export function formatVerboseStuckDispatches(
 	];
 
 	for (const dispatch of dispatches) {
-		lines.push(
-			`- ${dispatch.runId} | ${dispatch.dispatchPhase} / ${dispatch.agent}`,
-		);
+		lines.push(`- ${dispatch.runId} | ${dispatch.dispatchPhase} / ${dispatch.agent}`);
 		lines.push(
 			...indentLines([
 				`Status: ${dispatch.status}`,
@@ -169,9 +132,7 @@ export function formatVerboseStuckDispatches(
 	return lines.join("\n").trimEnd();
 }
 
-export function formatVerboseLessons(
-	lessons: readonly InspectLessonSummary[],
-): string {
+export function formatVerboseLessons(lessons: readonly InspectLessonSummary[]): string {
 	if (lessons.length === 0) {
 		return "No lessons found. Lessons are extracted during the RETROSPECTIVE phase of pipeline runs.";
 	}
@@ -189,9 +150,7 @@ export function formatVerboseLessons(
 	return lines.join("\n").trimEnd();
 }
 
-export function formatVerbosePreferences(
-	preferences: readonly InspectPreferenceSummary[],
-): string {
+export function formatVerbosePreferences(preferences: readonly InspectPreferenceSummary[]): string {
 	if (preferences.length === 0) {
 		return "No preferences found. Preferences are inferred from sessions and confirmed evidence.";
 	}
@@ -213,9 +172,7 @@ export function formatVerbosePreferences(
 	return lines.join("\n").trimEnd();
 }
 
-export function formatVerboseMemories(
-	memories: readonly InspectMemorySummary[],
-): string {
+export function formatVerboseMemories(memories: readonly InspectMemorySummary[]): string {
 	if (memories.length === 0) {
 		return "No memories found. Memories are stored by memory tools or capture heuristics.";
 	}
@@ -243,9 +200,7 @@ export function formatVerboseMemories(
 	return lines.join("\n").trimEnd();
 }
 
-export function formatVerboseMemoryOverview(
-	overview: InspectMemoryOverview,
-): string {
+export function formatVerboseMemoryOverview(overview: InspectMemoryOverview): string {
 	const lines = [
 		"Memory Overview",
 		"",
@@ -261,9 +216,7 @@ export function formatVerboseMemoryOverview(
 		lines.push("- none captured yet");
 	} else {
 		for (const observation of overview.recentObservations) {
-			lines.push(
-				`- [${observation.type}] ${observation.projectName ?? "global"}`,
-			);
+			lines.push(`- [${observation.type}] ${observation.projectName ?? "global"}`);
 			lines.push(
 				...indentLines([
 					`Session: ${observation.sessionId}`,
