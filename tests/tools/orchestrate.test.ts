@@ -178,7 +178,7 @@ describe("orchestrateCore", () => {
 		expect(
 			saved?.pendingDispatches.some((dispatch) => dispatch.dispatchId === first.dispatchId),
 		).toBe(false);
-		expect(saved?.processedResultIds).toContain("recon-retry-1");
+		expect(saved?.processedResultIds).not.toContain("recon-retry-1");
 		expect(saved?.processedResultIds).toContain("recon-retry-2");
 	});
 

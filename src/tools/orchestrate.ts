@@ -403,8 +403,26 @@ function removePendingDispatch(state: Readonly<PipelineState>, dispatchId: strin
 	});
 }
 
-function acceptDispatch(state: Readonly<PipelineState>, dispatchId: string): PipelineState {
-	return removePendingDispatch(state, dispatchId);
+function acceptDispatch(
+	state: Readonly<PipelineState>,
+	dispatchId: string,
+	envelope?: ResultEnvelope,
+): PipelineState {
+	const removed = removePendingDispatch(state, dispatchId);
+	if (envelope) {
+		return markResultProcessed(removed, envelope);
+	}
+	const dispatch = state.pendingDispatches.find((d) => d.dispatchId === dispatchId);
+	if (dispatch?.receivedResultId) {
+		return markResultProcessed(removed, {
+			resultId: dispatch.receivedResultId,
+			dispatchId,
+			phase: dispatch.phase,
+			kind: dispatch.resultKind,
+			taskId: dispatch.taskId,
+		} as ResultEnvelope);
+	}
+	return removed;
 }
 
 function failDispatchRecoverable(
@@ -417,9 +435,8 @@ function failDispatchRecoverable(
 				? {
 						...entry,
 						status: "FAILED_RECOVERABLE",
-						callerSessionId: null,
 						spawnedSessionId: null,
-						sessionId: null,
+						sessionId: entry.callerSessionId,
 					}
 				: entry,
 		),
@@ -573,14 +590,11 @@ function applyResultEnvelope(
 						status: "RESULT_RECEIVED",
 						receivedResultId: envelope.resultId,
 						receivedAt,
-						callerSessionId: null,
-						spawnedSessionId: null,
-						sessionId: null,
 					}
 				: entry,
 		),
 	});
-	return markResultProcessed(withReceivedResult, envelope);
+	return withReceivedResult;
 }
 
 function isRecoverableHandlerError(handlerResult: Readonly<DispatchResult>): boolean {
@@ -1496,7 +1510,7 @@ async function processHandlerResult(
 					isRecoverable
 						? failDispatchRecoverable(current, resultEnvelope.dispatchId)
 						: shouldAcceptOnError
-							? acceptDispatch(current, resultEnvelope.dispatchId)
+							? acceptDispatch(current, resultEnvelope.dispatchId, resultEnvelope)
 							: failDispatchTerminal(current, resultEnvelope.dispatchId),
 				);
 				if (!isRecoverable && !shouldAcceptOnError) {
@@ -1566,7 +1580,7 @@ async function processHandlerResult(
 					publishTaskCompleted(visibilityBus, currentState, resultEnvelope.taskId);
 				}
 				currentState = await updatePersistedState(artifactDir, currentState, (current) =>
-					acceptDispatch(current, resultEnvelope.dispatchId),
+					acceptDispatch(current, resultEnvelope.dispatchId, resultEnvelope),
 				);
 			}
 
@@ -1772,7 +1786,7 @@ async function processHandlerResult(
 					publishTaskCompleted(visibilityBus, currentState, resultEnvelope.taskId);
 				}
 				currentState = await updatePersistedState(artifactDir, currentState, (current) =>
-					acceptDispatch(current, resultEnvelope.dispatchId),
+					acceptDispatch(current, resultEnvelope.dispatchId, resultEnvelope),
 				);
 			}
 
@@ -1911,7 +1925,7 @@ async function processHandlerResult(
 					publishTaskCompleted(visibilityBus, currentState, resultEnvelope.taskId);
 				}
 				currentState = await updatePersistedState(artifactDir, currentState, (current) =>
-					acceptDispatch(current, resultEnvelope.dispatchId),
+					acceptDispatch(current, resultEnvelope.dispatchId, resultEnvelope),
 				);
 			}
 

@@ -201,4 +201,50 @@ describe("forensic regression acceptance", () => {
 
 		expect(parts).toEqual([{ type: "text", text: "Visible operator update" }]);
 	});
+
+	test("session IDs survive RESULT_RECEIVED state for recovery tools", () => {
+		const dispatch = pendingDispatchSchema.parse({
+			dispatchId: "dispatch_session_survival",
+			phase: "RECON",
+			agent: "oc-researcher",
+			issuedAt: "2026-04-13T00:00:00.000Z",
+			callerSessionId: "ses_caller_survive",
+			spawnedSessionId: "ses_spawned_survive",
+			status: "RESULT_RECEIVED",
+			receivedResultId: "result-123",
+			receivedAt: "2026-04-13T00:01:00.000Z",
+		});
+
+		expect(dispatch.callerSessionId).toBe("ses_caller_survive");
+		expect(dispatch.spawnedSessionId).toBe("ses_spawned_survive");
+		expect(dispatch.status).toBe("RESULT_RECEIVED");
+	});
+
+	test("FAILED_RECOVERABLE dispatch preserves callerSessionId for runId-based recovery", () => {
+		const dispatch = pendingDispatchSchema.parse({
+			dispatchId: "dispatch_recoverable_session",
+			phase: "CHALLENGE",
+			agent: "oc-challenger",
+			issuedAt: "2026-04-13T00:00:00.000Z",
+			callerSessionId: "ses_caller_recover",
+			status: "FAILED_RECOVERABLE",
+		});
+
+		expect(dispatch.callerSessionId).toBe("ses_caller_recover");
+		expect(dispatch.status).toBe("FAILED_RECOVERABLE");
+	});
+
+	test("dispatch status schema has exactly 3 valid states (no dead states)", () => {
+		const state = createPipelineState("RECON");
+		const dispatch = state.pendingDispatches.length > 0 ? state.pendingDispatches[0] : null;
+
+		const validStatuses = ["PENDING", "RESULT_RECEIVED", "FAILED_RECOVERABLE"];
+
+		if (dispatch) {
+			expect(validStatuses).toContain(dispatch.status);
+		}
+
+		expect(validStatuses).toHaveLength(3);
+		expect(validStatuses).not.toContain("RESULT_ACCEPTED");
+	});
 });

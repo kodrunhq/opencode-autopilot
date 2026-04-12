@@ -89,9 +89,7 @@ export const pendingDispatchSchema = z
 		phase: phaseSchema,
 		agent: z.string().min(1).max(128),
 		issuedAt: z.string().max(128),
-		status: z
-			.enum(["PENDING", "RESULT_RECEIVED", "RESULT_ACCEPTED", "FAILED_RECOVERABLE"])
-			.default("PENDING"),
+		status: z.enum(["PENDING", "RESULT_RECEIVED", "FAILED_RECOVERABLE"]).default("PENDING"),
 		receivedResultId: z.string().max(128).nullable().default(null),
 		receivedAt: z.string().max(128).nullable().default(null),
 		resultKind: dispatchResultKindSchema.default("phase_output"),

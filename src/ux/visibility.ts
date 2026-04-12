@@ -272,6 +272,10 @@ export function stripLeakedPromptContent(text: string): string {
 	return collapseBlankLines(redactedLines.join("\n")).trim();
 }
 
+function sanitizeVisibleText(text: string): string {
+	return stripLeakedPromptContent(stripInternalReasoning(text));
+}
+
 export function stripInternalReasoning(text: string): string {
 	if (text.trim().length === 0) {
 		return "";
@@ -569,25 +573,25 @@ export function buildOrchestrateDisplayText(
 
 	const explicitDisplayText = readString(payload.displayText);
 	if (explicitDisplayText) {
-		return stripInternalReasoning(explicitDisplayText);
+		return sanitizeVisibleText(explicitDisplayText);
 	}
 
 	const progress = readString(payload._userProgress) ?? readString(payload.progress);
 	if (progress) {
-		return stripInternalReasoning(progress);
+		return sanitizeVisibleText(progress);
 	}
 
 	const action = readString(payload.action);
 	if (action === "complete") {
-		return stripInternalReasoning(readString(payload.summary) ?? "Pipeline completed.");
+		return sanitizeVisibleText(readString(payload.summary) ?? "Pipeline completed.");
 	}
 
 	if (action === "error") {
-		return stripInternalReasoning(readString(payload.message) ?? "Pipeline error.");
+		return sanitizeVisibleText(readString(payload.message) ?? "Pipeline error.");
 	}
 
 	if (action === "abandoned") {
-		return stripInternalReasoning(readString(payload.displayText) ?? "Pipeline abandoned.");
+		return sanitizeVisibleText(readString(payload.displayText) ?? "Pipeline abandoned.");
 	}
 
 	if (action === "dispatch" || action === "dispatch_multi") {
