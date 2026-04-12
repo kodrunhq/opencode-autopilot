@@ -415,7 +415,7 @@ function createVisibilityEvent(input: VisibilityEventInput): VisibilityEvent {
 			trancheCount: input.trancheCount ?? null,
 			taskId: input.taskId ?? null,
 			agent: input.agent ?? null,
-			summary: stripInternalReasoning(input.summary ?? formatVisibilitySummary(input)),
+			summary: sanitizeVisibleText(input.summary ?? formatVisibilitySummary(input)),
 			metadata: normalizeMetadata(input.metadata),
 		}),
 	);
@@ -463,14 +463,14 @@ export function buildOperatorTextFromEvents(
 	fallbackText?: string,
 ): string {
 	const summaries = events
-		.map((event) => stripInternalReasoning(event.summary))
+		.map((event) => sanitizeVisibleText(event.summary))
 		.filter((summary) => summary.length > 0);
 
 	if (summaries.length > 0) {
 		return summaries.join("\n");
 	}
 
-	return stripInternalReasoning(fallbackText ?? "");
+	return sanitizeVisibleText(fallbackText ?? "");
 }
 
 export function createVisibilityBus(options: { readonly artifactDir: string }): VisibilityBus {
