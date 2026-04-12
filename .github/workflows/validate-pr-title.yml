@@ -1,0 +1,32 @@
+name: Validate PR Title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional-pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce Conventional Commit PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if [[ "$PR_HEAD_REF" == release-please--* ]]; then
+            exit 0
+          fi
+
+          if [[ "$PR_TITLE" =~ ^(feat|fix|deps|chore|docs|refactor|perf|test|build|ci|revert|style)(\([^)]+\))?(!)?:\ .+ ]]; then
+            exit 0
+          fi
+
+          printf '%s\n' 'Pull request titles must use Conventional Commits so release-please can classify merges on main.'
+          printf '%s\n' 'Examples:'
+          printf '%s\n' '  fix: harden kernel DB pathing and recover stale dispatches'
+          printf '%s\n' '  feat(cli): add release doctor command'
+          printf '%s\n' '  chore(main): release opencode-autopilot 1.32.2'
+          exit 1
