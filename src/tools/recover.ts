@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { tool } from "@opencode-ai/plugin";
-import { openKernelDb } from "../kernel/database";
+import { openProjectKernelDb } from "../kernel/database";
 import {
 	getDefaultRecoveryOrchestrator,
 	getStrategy,
@@ -161,19 +161,40 @@ export async function recoverCore(
 						.get(row.run_id) as { readonly state_json: string } | null;
 					if (runRow) {
 						const state = JSON.parse(runRow.state_json);
+						const timestamp = new Date().toISOString();
 						state.status = "INTERRUPTED";
 						state.pendingDispatches = [];
 						state.failureContext = {
 							failedPhase: row.phase,
 							failedAgent: row.agent,
 							errorMessage: `Manually finalized: stale dispatch older than ${staleMinutes} minutes`,
-							timestamp: new Date().toISOString(),
+							timestamp,
 						};
 						state.stateRevision = (state.stateRevision ?? 0) + 1;
-						state.lastUpdatedAt = new Date().toISOString();
+						state.lastUpdatedAt = timestamp;
 						db.run(
-							"UPDATE pipeline_runs SET state_json = ?, status = 'INTERRUPTED', current_phase = ? WHERE run_id = ?",
-							[JSON.stringify(state), row.phase, row.run_id],
+							`UPDATE pipeline_runs
+							 SET state_json = ?,
+							     status = 'INTERRUPTED',
+							     current_phase = ?,
+							     state_revision = ?,
+							     last_updated_at = ?,
+							     failure_phase = ?,
+							     failure_agent = ?,
+							     failure_message = ?,
+							     last_successful_phase = ?
+							 WHERE run_id = ?`,
+							[
+								JSON.stringify(state),
+								row.phase,
+								state.stateRevision,
+								timestamp,
+								row.phase,
+								row.agent,
+								state.failureContext.errorMessage,
+								state.failureContext.lastSuccessfulPhase ?? null,
+								row.run_id,
+							],
 						);
 					}
 				} catch {
@@ -246,7 +267,8 @@ export const ocRecover = tool({
 		sessionId: tool.schema.string().min(1).optional().describe("Session ID to inspect"),
 	},
 	async execute({ action, sessionId }, context) {
-		const db = openKernelDb();
+		const projectRoot = context?.projectRoot ?? process.cwd();
+		const db = openProjectKernelDb(projectRoot);
 		try {
 			return await recoverCore(action, { sessionId: sessionId ?? context.sessionID }, db);
 		} finally {
