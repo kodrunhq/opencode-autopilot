@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getKernelDbPath, openProjectKernelDb } from "../../src/kernel/database";
@@ -12,6 +12,7 @@ describe("project kernel db paths", () => {
 
 	beforeEach(async () => {
 		projectRoot = await mkdtemp(join(tmpdir(), "project-kernel-path-"));
+		await writeFile(join(projectRoot, "package.json"), JSON.stringify({ name: "kernel-test" }));
 	});
 
 	afterEach(async () => {
@@ -73,5 +74,13 @@ describe("project kernel db paths", () => {
 		expect(getKernelDbPath("/some/project/.opencode-autopilot")).toBe(
 			"/some/project/.opencode-autopilot/kernel.db",
 		);
+	});
+
+	test("getKernelDbPath rejects project root paths", () => {
+		expect(() => getKernelDbPath(projectRoot)).toThrow("looks like a project root");
+	});
+
+	test("getKernelDbPath rejects project subdirectories outside artifact dir", () => {
+		expect(() => getKernelDbPath(join(projectRoot, "tmp"))).toThrow("must live under");
 	});
 });

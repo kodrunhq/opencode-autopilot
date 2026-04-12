@@ -8,8 +8,14 @@ import {
 } from "../lesson-memory";
 import { lessonSchema } from "../lesson-schemas";
 import type { Lesson } from "../lesson-types";
+import {
+	isPassingProgramOracleSignoff,
+	type ProgramOracleSignoff,
+	parseProgramOracleSignoff,
+	persistProgramOracleSignoff,
+} from "../signoff";
 import type { Phase } from "../types";
-import type { DispatchResult, PhaseHandler } from "./types";
+import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
 
 export const LESSONS_PARSE_ERROR_CODE = "E_RETRO_PARSE";
@@ -56,7 +62,68 @@ function parseAndValidateLessons(raw: string): {
 	return { valid: Object.freeze(validated), parseError: false };
 }
 
-export const handleRetrospective: PhaseHandler = async (state, artifactDir, result?) => {
+function getProgramOracleSignoffExpectation(
+	context: Readonly<PhaseHandlerContext> | undefined,
+	state: Parameters<PhaseHandler>[0],
+): { readonly signoffId: string; readonly inputsDigest: string } | null {
+	if (context?.envelope.kind !== "oracle_signoff") {
+		return null;
+	}
+
+	const pendingSignoff = state.oracleSignoffs.program;
+	if (!pendingSignoff) {
+		return null;
+	}
+
+	return Object.freeze({
+		signoffId: pendingSignoff.signoffId,
+		inputsDigest: pendingSignoff.inputsDigest,
+	});
+}
+
+export const handleRetrospective: PhaseHandler = async (state, artifactDir, result?, context?) => {
+	const programOracleExpectation = getProgramOracleSignoffExpectation(context, state);
+
+	if (result && programOracleExpectation) {
+		let signoff: ProgramOracleSignoff | null = null;
+		try {
+			signoff = parseProgramOracleSignoff(result, {
+				expectedSignoffId: programOracleExpectation.signoffId,
+				expectedInputsDigest: programOracleExpectation.inputsDigest,
+			});
+			if (!signoff) {
+				throw new Error(
+					`Oracle signoff ${programOracleExpectation.signoffId} is missing from the response.`,
+				);
+			}
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : String(error);
+			return Object.freeze({
+				action: "error",
+				code: "E_ORACLE_PROGRAM_PARSE_FAILED",
+				phase: "RETROSPECTIVE",
+				message: `Program Oracle signoff parse failed: ${message}`,
+				progress: "Program Oracle signoff parse failed",
+			} satisfies DispatchResult);
+		}
+
+		await persistProgramOracleSignoff(artifactDir, signoff, state.runId);
+		return Object.freeze({
+			action: "complete",
+			resultKind: "phase_output",
+			phase: "RETROSPECTIVE",
+			progress: isPassingProgramOracleSignoff(signoff)
+				? "Program Oracle signoff passed — RETROSPECTIVE complete"
+				: "Program Oracle signoff recorded — completion blocked",
+			_stateUpdates: {
+				oracleSignoffs: {
+					...state.oracleSignoffs,
+					program: signoff,
+				},
+			},
+		} satisfies DispatchResult);
+	}
+
 	if (result) {
 		const { valid, parseError } = parseAndValidateLessons(result);
 

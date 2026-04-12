@@ -5,7 +5,12 @@ import {
 	projectVerificationConfigSchema,
 	resolveProjectVerificationSettings,
 } from "../config";
-import type { LoopContext, VerificationCheck, VerificationResult } from "./types";
+import type {
+	LoopContext,
+	VerificationCheck,
+	VerificationCheckStatus,
+	VerificationResult,
+} from "./types";
 
 export interface CommandExecutionResult {
 	readonly exitCode: number;
@@ -81,8 +86,54 @@ function createDefaultCommandRunnerForProject(
 	};
 }
 
-function createCheck(name: string, passed: boolean, message: string): VerificationCheck {
-	return Object.freeze({ name, passed, message });
+function createCheck(
+	name: string,
+	status: VerificationCheckStatus,
+	message: string,
+): VerificationCheck {
+	return Object.freeze({ name, passed: status === "PASSED", status, message });
+}
+
+function determineVerificationStatus(
+	checks: readonly VerificationCheck[],
+): VerificationResult["status"] {
+	if (checks.some((check) => check.status === "FAILED")) {
+		return "FAILED";
+	}
+
+	if (checks.some((check) => check.status === "BLOCKED")) {
+		return "BLOCKED";
+	}
+
+	if (checks.some((check) => check.status === "PENDING")) {
+		return "PENDING";
+	}
+
+	return "PASSED";
+}
+
+export function summarizeVerificationResult(result: VerificationResult): string {
+	if (result.checks.length === 0) {
+		return "No verification checks were recorded.";
+	}
+
+	const byStatus = {
+		PASSED: 0,
+		FAILED: 0,
+		BLOCKED: 0,
+		PENDING: 0,
+		SKIPPED_WITH_REASON: 0,
+	};
+
+	for (const check of result.checks) {
+		byStatus[check.status] += 1;
+	}
+
+	const parts = Object.entries(byStatus)
+		.filter(([, count]) => count > 0)
+		.map(([status, count]) => `${count} ${status}`);
+
+	return `Verification ${result.status}: ${parts.join(", ")}.`;
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -195,14 +246,16 @@ export class VerificationHandler {
 							this.runCommandCheck(commandCheck.name, commandCheck.command),
 						),
 					)
-				: [createCheck("verification", false, "No verification commands configured")];
+				: [createCheck("verification", "BLOCKED", "No verification commands configured")];
 		const checks = await Promise.all([
 			...commandCheckResults,
 			this.checkArtifactsExist(this.deps.artifactPaths ?? []),
 		]);
+		const status = determineVerificationStatus(checks);
 
 		return Object.freeze({
-			passed: checks.every((check) => check.passed),
+			passed: status === "PASSED",
+			status,
 			checks: Object.freeze(checks),
 			timestamp: new Date().toISOString(),
 		});
@@ -210,7 +263,7 @@ export class VerificationHandler {
 
 	async checkArtifactsExist(paths: readonly string[]): Promise<VerificationCheck> {
 		if (paths.length === 0) {
-			return createCheck("artifacts", true, "No artifact paths configured");
+			return createCheck("artifacts", "PASSED", "No artifact paths configured");
 		}
 
 		try {
@@ -224,13 +277,13 @@ export class VerificationHandler {
 			}
 
 			if (missingPaths.length > 0) {
-				return createCheck("artifacts", false, `Missing artifacts: ${missingPaths.join(", ")}`);
+				return createCheck("artifacts", "FAILED", `Missing artifacts: ${missingPaths.join(", ")}`);
 			}
 
-			return createCheck("artifacts", true, `Verified ${paths.length} artifact(s)`);
+			return createCheck("artifacts", "PASSED", `Verified ${paths.length} artifact(s)`);
 		} catch (error: unknown) {
 			const message = error instanceof Error ? error.message : String(error);
-			return createCheck("artifacts", false, `Artifact check failed: ${message}`);
+			return createCheck("artifacts", "FAILED", `Artifact check failed: ${message}`);
 		}
 	}
 
@@ -248,21 +301,21 @@ export class VerificationHandler {
 
 	private async runCommandCheck(name: string, command: string): Promise<VerificationCheck> {
 		if (!this.runCommand) {
-			return createCheck(name, false, `Failed ${command}: no command runner configured`);
+			return createCheck(name, "BLOCKED", `Failed ${command}: no command runner configured`);
 		}
 
 		try {
 			const result = await this.runCommand(command);
 			if (result.exitCode === 0) {
-				return createCheck(name, true, `${command} passed`);
+				return createCheck(name, "PASSED", `${command} passed`);
 			}
 
 			const details =
 				result.output.trim().length > 0 ? `: ${result.output}` : ` (exit code ${result.exitCode})`;
-			return createCheck(name, false, `${command} failed${details}`);
+			return createCheck(name, "FAILED", `${command} failed${details}`);
 		} catch (error: unknown) {
 			const message = error instanceof Error ? error.message : String(error);
-			return createCheck(name, false, `${command} failed: ${message}`);
+			return createCheck(name, "FAILED", `${command} failed: ${message}`);
 		}
 	}
 }

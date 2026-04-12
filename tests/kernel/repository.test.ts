@@ -10,15 +10,19 @@ import {
 	loadActiveReviewStateFromKernel,
 	loadForensicEventsFromKernel,
 	loadLatestPipelineStateFromKernel,
+	loadLatestReviewRunFromKernel,
 	loadLessonMemoryFromKernel,
 	loadReviewMemoryFromKernel,
+	loadReviewRunFromKernel,
 	saveActiveReviewStateToKernel,
 	saveLessonMemoryToKernel,
 	savePipelineStateToKernel,
 	saveReviewMemoryToKernel,
+	saveReviewRunToKernel,
 } from "../../src/kernel/repository";
 import { createForensicEvent } from "../../src/observability/forensic-log";
 import { createEmptyLessonMemory } from "../../src/orchestrator/lesson-memory";
+import { reviewRunSchema } from "../../src/orchestrator/review-runner";
 import { createInitialState, patchState } from "../../src/orchestrator/state";
 import { createEmptyMemory } from "../../src/review/memory";
 import { reviewStateSchema } from "../../src/review/schemas";
@@ -39,13 +43,15 @@ describe("kernel repository", () => {
 		try {
 			const tables = db
 				.query(
-					"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('pipeline_runs', 'forensic_events', 'active_review_state')",
+					"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('pipeline_runs', 'forensic_events', 'active_review_state', 'review_runs', 'review_findings')",
 				)
 				.all() as Array<{ name: string }>;
 			expect(tables.map((row) => row.name).sort()).toEqual([
 				"active_review_state",
 				"forensic_events",
 				"pipeline_runs",
+				"review_findings",
+				"review_runs",
 			]);
 		} finally {
 			db.close();
@@ -112,6 +118,75 @@ describe("kernel repository", () => {
 
 		saveReviewMemoryToKernel(artifactDir, memory);
 		expect(loadReviewMemoryFromKernel(artifactDir)).toEqual(memory);
+	});
+
+	test("stores and loads structured review runs with findings", () => {
+		const reviewRun = reviewRunSchema.parse({
+			reviewRunId: "review_test_1",
+			runId: "run_test_1",
+			trancheId: "tranche_test_1",
+			scope: "branch",
+			status: "BLOCKED",
+			verdict: "BLOCKED",
+			policy: {
+				requiredReviewers: ["logic-auditor", "security-auditor"],
+				blockingSeverityThreshold: "HIGH",
+				allowedWaivers: [],
+			},
+			selectedReviewers: ["logic-auditor", "security-auditor"],
+			reviewers: [
+				{
+					reviewer: "logic-auditor",
+					required: true,
+					status: "COMPLETED",
+					findingsCount: 1,
+					startedAt: "2026-04-12T12:00:00.000Z",
+					completedAt: "2026-04-12T12:05:00.000Z",
+				},
+				{
+					reviewer: "security-auditor",
+					required: true,
+					status: "FAILED",
+					findingsCount: 0,
+					startedAt: "2026-04-12T12:00:00.000Z",
+					completedAt: "2026-04-12T12:05:00.000Z",
+				},
+			],
+			findings: [
+				{
+					findingId: "review_test_1_finding_1",
+					reviewRunId: "review_test_1",
+					reviewer: "logic-auditor",
+					severity: "HIGH",
+					file: "src/example.ts",
+					line: 42,
+					title: "Unhandled edge case",
+					detail: "Problem: missing null guard",
+					status: "open",
+				},
+			],
+			findingsSummary: {
+				CRITICAL: 0,
+				HIGH: 1,
+				MEDIUM: 0,
+				LOW: 0,
+				open: 1,
+				accepted: 0,
+				fixed: 0,
+				blockingOpen: 1,
+			},
+			summary: "1 HIGH finding; required security review missing.",
+			blockedReason: "Required reviewers did not execute: security-auditor",
+			startedAt: "2026-04-12T12:00:00.000Z",
+			completedAt: "2026-04-12T12:05:00.000Z",
+		});
+
+		saveReviewRunToKernel(artifactDir, reviewRun);
+
+		expect(loadReviewRunFromKernel(artifactDir, reviewRun.reviewRunId)).toEqual(reviewRun);
+		expect(
+			loadLatestReviewRunFromKernel(artifactDir, { runId: reviewRun.runId ?? undefined }),
+		).toEqual(reviewRun);
 	});
 
 	test("stores lesson memory in the kernel", () => {

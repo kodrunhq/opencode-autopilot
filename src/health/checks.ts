@@ -149,6 +149,7 @@ export async function configGroupsCheck(configPath?: string): Promise<HealthResu
 /** v7 config fields that must be present on a v7 config. */
 const V7_REQUIRED_FIELDS: readonly string[] = Object.freeze([
 	"background",
+	"mode",
 	"routing",
 	"recovery",
 	"mcp",
@@ -156,7 +157,7 @@ const V7_REQUIRED_FIELDS: readonly string[] = Object.freeze([
 
 /**
  * Check that v7 configs contain all four new top-level fields introduced in v7:
- * background, routing, recovery, and mcp.
+ * background, mode, routing, recovery, and mcp.
  * Inspects the raw on-disk JSON so that Zod default-filling does not mask
  * actually-missing fields. Pre-v7 configs receive a pass with a migration notice.
  */
@@ -184,7 +185,7 @@ export async function configV7FieldsCheck(configPath?: string): Promise<HealthRe
 			return Object.freeze({
 				name: "config-v7-fields",
 				status: "pass" as const,
-				message: `Config v${version} will gain v7 fields (background, routing, recovery, mcp) on next load`,
+				message: `Config v${version} will gain v7 fields (background, mode, routing, recovery, mcp) on next load`,
 			});
 		}
 

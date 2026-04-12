@@ -3,6 +3,8 @@ import { forensicEventSchema } from "../observability/forensic-schemas";
 import type { ForensicEvent } from "../observability/forensic-types";
 import { lessonMemorySchema } from "../orchestrator/lesson-schemas";
 import type { LessonMemory } from "../orchestrator/lesson-types";
+import type { ReviewRun } from "../orchestrator/review-runner";
+import { reviewRunSchema } from "../orchestrator/review-runner";
 import { pipelineStateSchema } from "../orchestrator/schemas";
 import type { PipelineState } from "../orchestrator/types";
 import { resolveProjectIdentitySync } from "../projects/resolve";
@@ -16,6 +18,7 @@ import type {
 	PipelineRunRow,
 	ProjectLessonMemoryRow,
 	ProjectReviewMemoryRow,
+	ReviewRunRow,
 } from "./types";
 import { KERNEL_STATE_CONFLICT_CODE } from "./types";
 
@@ -50,6 +53,13 @@ function parseReviewMemoryRow(row: ProjectReviewMemoryRow | null): ReviewMemory 
 		return null;
 	}
 	return reviewMemorySchema.parse(JSON.parse(row.state_json));
+}
+
+function parseReviewRunRow(row: ReviewRunRow | null): ReviewRun | null {
+	if (row === null) {
+		return null;
+	}
+	return reviewRunSchema.parse(JSON.parse(row.state_json));
 }
 
 function parseLessonMemoryRow(row: ProjectLessonMemoryRow | null): LessonMemory | null {
@@ -353,6 +363,160 @@ export function clearActiveReviewStateInKernel(artifactDir: string): void {
 	try {
 		const projectId = resolveProjectId(artifactDir, db);
 		db.run("DELETE FROM active_review_state WHERE project_id = ?", [projectId]);
+	} finally {
+		db.close();
+	}
+}
+
+export function loadReviewRunFromKernel(
+	artifactDir: string,
+	reviewRunId: string,
+): ReviewRun | null {
+	if (!kernelDbExists(artifactDir)) {
+		return null;
+	}
+
+	const db = openKernelDb(artifactDir, { readonly: true });
+	try {
+		const projectId = resolveProjectId(artifactDir, db, { readonly: true });
+		const row = db
+			.query("SELECT * FROM review_runs WHERE project_id = ? AND review_run_id = ?")
+			.get(projectId, reviewRunId) as ReviewRunRow | null;
+		return parseReviewRunRow(row);
+	} finally {
+		db.close();
+	}
+}
+
+export function loadLatestReviewRunFromKernel(
+	artifactDir: string,
+	options?: { readonly runId?: string },
+): ReviewRun | null {
+	if (!kernelDbExists(artifactDir)) {
+		return null;
+	}
+
+	const db = openKernelDb(artifactDir, { readonly: true });
+	try {
+		const projectId = resolveProjectId(artifactDir, db, { readonly: true });
+		const row = options?.runId
+			? (db
+					.query(
+						`SELECT *
+						 FROM review_runs
+						 WHERE project_id = ? AND run_id = ?
+						 ORDER BY started_at DESC, review_run_id DESC
+						 LIMIT 1`,
+					)
+					.get(projectId, options.runId) as ReviewRunRow | null)
+			: (db
+					.query(
+						`SELECT *
+						 FROM review_runs
+						 WHERE project_id = ?
+						 ORDER BY started_at DESC, review_run_id DESC
+						 LIMIT 1`,
+					)
+					.get(projectId) as ReviewRunRow | null);
+		return parseReviewRunRow(row);
+	} finally {
+		db.close();
+	}
+}
+
+export function saveReviewRunToKernel(artifactDir: string, reviewRun: ReviewRun): void {
+	const validated = reviewRunSchema.parse(reviewRun);
+	const db = openKernelDb(artifactDir);
+	try {
+		const projectId = resolveProjectId(artifactDir, db);
+		withWriteTransaction(db, () => {
+			db.run(
+				`INSERT INTO review_runs (
+					project_id,
+					review_run_id,
+					run_id,
+					tranche_id,
+					scope,
+					status,
+					verdict,
+					blocking_severity_threshold,
+					required_reviewers_json,
+					missing_required_reviewers_json,
+					findings_summary_json,
+					summary,
+					blocked_reason,
+					started_at,
+					completed_at,
+					state_json
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT(review_run_id) DO UPDATE SET
+					project_id = excluded.project_id,
+					run_id = excluded.run_id,
+					tranche_id = excluded.tranche_id,
+					scope = excluded.scope,
+					status = excluded.status,
+					verdict = excluded.verdict,
+					blocking_severity_threshold = excluded.blocking_severity_threshold,
+					required_reviewers_json = excluded.required_reviewers_json,
+					missing_required_reviewers_json = excluded.missing_required_reviewers_json,
+					findings_summary_json = excluded.findings_summary_json,
+					summary = excluded.summary,
+					blocked_reason = excluded.blocked_reason,
+					started_at = excluded.started_at,
+					completed_at = excluded.completed_at,
+					state_json = excluded.state_json`,
+				[
+					projectId,
+					validated.reviewRunId,
+					validated.runId,
+					validated.trancheId,
+					validated.scope,
+					validated.status,
+					validated.verdict,
+					validated.policy.blockingSeverityThreshold,
+					JSON.stringify(validated.policy.requiredReviewers),
+					JSON.stringify(
+						validated.reviewers
+							.filter((reviewer) => reviewer.required && reviewer.status !== "COMPLETED")
+							.map((reviewer) => reviewer.reviewer),
+					),
+					JSON.stringify(validated.findingsSummary),
+					validated.summary,
+					validated.blockedReason,
+					validated.startedAt,
+					validated.completedAt,
+					JSON.stringify(validated),
+				],
+			);
+
+			db.run("DELETE FROM review_findings WHERE review_run_id = ?", [validated.reviewRunId]);
+			for (const finding of validated.findings) {
+				db.run(
+					`INSERT INTO review_findings (
+						review_run_id,
+						finding_id,
+						reviewer,
+						severity,
+						file,
+						line,
+						title,
+						detail,
+						status
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					[
+						validated.reviewRunId,
+						finding.findingId,
+						finding.reviewer,
+						finding.severity,
+						finding.file,
+						finding.line,
+						finding.title,
+						finding.detail,
+						finding.status,
+					],
+				);
+			}
+		});
 	} finally {
 		db.close();
 	}

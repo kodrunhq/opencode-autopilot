@@ -64,6 +64,9 @@ function createBuildState() {
 			strikeCount: 0,
 			reviewPending: false,
 			oraclePending: false,
+			oracleSignoffId: null,
+			oracleInputsDigest: null,
+			lastReviewReport: null,
 		},
 		phases: state.phases.map((phase) =>
 			["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN"].includes(phase.name)
@@ -76,6 +79,30 @@ function createBuildState() {
 }
 
 describe("orchestrateCore UX integration", () => {
+	test("fresh broad run returns curated visibility events for tranche and phase start", async () => {
+		const result = JSON.parse(
+			await orchestrateCore(
+				{
+					idea: [
+						"Implement the remediation program:",
+						"1. Add program and tranche persistence.",
+						"2. Add autonomous tranche planning heuristics.",
+						"3. Continue automatically across multiple PRs.",
+					].join("\n"),
+					intent: "implementation",
+				},
+				tempDir,
+			),
+		);
+
+		expect(result.displayText).toContain("Tranche 1/");
+		expect(result.displayText).toContain("[1/8]");
+		expect(result.visibility.events.map((event: { type: string }) => event.type)).toEqual([
+			"tranche_started",
+			"phase_started",
+		]);
+	});
+
 	test("dispatch_multi registers running tasks and phase progress", async () => {
 		await saveState(createBuildState(), tempDir);
 
@@ -109,9 +136,14 @@ describe("orchestrateCore UX integration", () => {
 			payload: { text: "task completed successfully" },
 		};
 
-		await orchestrateCore({ result: JSON.stringify(resultEnvelope) }, tempDir);
+		const result = JSON.parse(
+			await orchestrateCore({ result: JSON.stringify(resultEnvelope) }, tempDir),
+		);
 
 		expect(tracker.getProgress()?.current).toBe(1);
 		expect(taskToastManager.getRunningTasks()).toHaveLength(1);
+		expect(result.visibility.events.map((event: { type: string }) => event.type)).toContain(
+			"task_completed",
+		);
 	});
 });

@@ -1,4 +1,5 @@
 import { getLogger } from "../logging/domains";
+import { summarizeBackgroundDescription } from "../ux/visibility";
 import type { BackgroundTaskRecord } from "./database";
 
 export interface BackgroundSdkOperations {
@@ -36,6 +37,7 @@ export function createSdkRunner(
 
 		const agentLabel = task.agent ? ` via ${task.agent}` : "";
 		const modelLabel = task.model ? ` (${task.model})` : "";
-		return `Dispatched${agentLabel}${modelLabel}: ${task.description} (prompt delivered; agent runs async in session)`;
+		const taskSummary = summarizeBackgroundDescription(task.description, 72);
+		return `Background task dispatched${agentLabel}${modelLabel}. ${taskSummary.length > 0 ? `Summary: ${taskSummary}. ` : ""}Prompt delivered to child session.`;
 	};
 }

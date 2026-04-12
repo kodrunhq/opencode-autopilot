@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createDefaultConfig, saveConfig } from "../../src/config";
+import {
+	createDefaultConfig,
+	inspectConfigMode,
+	loadConfig,
+	pluginConfigSchema,
+	saveConfig,
+} from "../../src/config";
 import { configGroupsCheck, configHealthCheck, configVersionCheck } from "../../src/health/checks";
 
 describe("Config Health Checks", () => {
@@ -143,6 +149,146 @@ describe("Config Migration", () => {
 		expect(v7ConfigDefaults.autonomy.enabled).toBe(false);
 		expect(v7ConfigDefaults.autonomy.verification).toBe("normal");
 		expect(v7ConfigDefaults.autonomy.maxIterations).toBe(10);
+		expect(v7ConfigDefaults.mode).toEqual({
+			interactionMode: "interactive",
+			executionMode: "foreground",
+			visibilityMode: "summary",
+			verificationMode: "normal",
+		});
+	});
+});
+
+describe("Canonical mode validation", () => {
+	test("inspectConfigMode warns when legacy autonomy intent is contradictory", () => {
+		const config = {
+			...createDefaultConfig(),
+			orchestrator: {
+				...createDefaultConfig().orchestrator,
+				autonomy: "full" as const,
+			},
+		};
+
+		const result = inspectConfigMode(config);
+
+		expect(result.hasErrors).toBe(false);
+		expect(result.issues.map((issue) => issue.code)).toContain("disabled_legacy_mode_flags");
+	});
+
+	test("pluginConfigSchema rejects contradictory autonomous mode", () => {
+		const config = {
+			...createDefaultConfig(),
+			mode: {
+				interactionMode: "autonomous" as const,
+				executionMode: "foreground" as const,
+				visibilityMode: "summary" as const,
+				verificationMode: "strict" as const,
+			},
+			orchestrator: {
+				...createDefaultConfig().orchestrator,
+				autonomy: "full" as const,
+			},
+		};
+
+		const result = pluginConfigSchema.safeParse(config);
+
+		expect(result.success).toBe(false);
+		expect(result.error?.issues.map((issue) => issue.message).join("\n")).toContain(
+			"Autonomous mode requires executionMode=background.",
+		);
+	});
+
+	test("pluginConfigSchema accepts debug visibility without enabling it by default", () => {
+		const config = {
+			...createDefaultConfig(),
+			mode: {
+				...createDefaultConfig().mode,
+				visibilityMode: "debug" as const,
+			},
+		};
+
+		const result = pluginConfigSchema.safeParse(config);
+
+		expect(result.success).toBe(true);
+		expect(result.data?.mode.visibilityMode).toBe("debug");
+		expect(createDefaultConfig().mode.visibilityMode).toBe("summary");
+	});
+
+	test("saveConfig rejects autonomous mode without verification commands", async () => {
+		const tmpDir = join(tmpdir(), `config-autonomous-${Date.now()}`);
+		await mkdir(tmpDir, { recursive: true });
+		const configPath = join(tmpDir, "config.json");
+
+		try {
+			const baseConfig = createDefaultConfig();
+			const config = {
+				...baseConfig,
+				mode: {
+					interactionMode: "autonomous" as const,
+					executionMode: "background" as const,
+					visibilityMode: "summary" as const,
+					verificationMode: "strict" as const,
+				},
+				orchestrator: { ...baseConfig.orchestrator, autonomy: "full" as const },
+				background: { ...baseConfig.background, enabled: true },
+				autonomy: { ...baseConfig.autonomy, enabled: true, verification: "strict" as const },
+				routing: { ...baseConfig.routing, enabled: true },
+			};
+
+			return expect(saveConfig(config, configPath)).rejects.toThrow(
+				"Autonomous mode requires a verification profile",
+			);
+		} finally {
+			await rm(tmpDir, { recursive: true, force: true });
+		}
+	});
+
+	test("loadConfig injects canonical mode into legacy v7 configs", async () => {
+		const tmpDir = join(tmpdir(), `config-mode-migration-${Date.now()}`);
+		await mkdir(tmpDir, { recursive: true });
+		const configPath = join(tmpDir, "config.json");
+
+		try {
+			const legacyV7Config = {
+				version: 7,
+				configured: true,
+				groups: {},
+				overrides: {},
+				orchestrator: {
+					autonomy: "full",
+					strictness: "normal",
+					phases: {
+						recon: true,
+						challenge: true,
+						architect: true,
+						explore: true,
+						plan: true,
+						build: true,
+						ship: true,
+						retrospective: true,
+					},
+					maxParallelTasks: 5,
+				},
+				confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
+				fallback: createDefaultConfig().fallback,
+				memory: createDefaultConfig().memory,
+				notifications: createDefaultConfig().notifications,
+				verification: createDefaultConfig().verification,
+				background: { enabled: false, maxConcurrent: 5, persistence: true },
+				autonomy: { enabled: false, verification: "normal", maxIterations: 10 },
+				routing: { enabled: false, categories: {} },
+				recovery: createDefaultConfig().recovery,
+				mcp: createDefaultConfig().mcp,
+				hashline_edit: createDefaultConfig().hashline_edit,
+			};
+			await writeFile(configPath, JSON.stringify(legacyV7Config, null, 2), "utf-8");
+
+			const loaded = await loadConfig(configPath);
+
+			expect(loaded?.mode.interactionMode).toBe("interactive");
+			expect(loaded?.mode.executionMode).toBe("foreground");
+		} finally {
+			await rm(tmpDir, { recursive: true, force: true });
+		}
 	});
 });
 
@@ -154,6 +300,8 @@ describe("Config Barrel Exports", () => {
 		expect(configModule.loadConfig).toBeDefined();
 		expect(configModule.saveConfig).toBeDefined();
 		expect(configModule.createDefaultConfig).toBeDefined();
+		expect(configModule.modeConfigSchema).toBeDefined();
+		expect(configModule.inspectConfigMode).toBeDefined();
 		expect(configModule.migrateV6toV7).toBeDefined();
 		expect(configModule.v7ConfigDefaults).toBeDefined();
 	});

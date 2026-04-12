@@ -1,3 +1,5 @@
+import { stripInternalReasoning } from "../ux/visibility";
+
 interface SessionMessage {
 	readonly role: string;
 	readonly text: string;
@@ -62,7 +64,7 @@ export function createNotificationContentBuilder(ctx: NotificationContentContext
 
 			const userSummary = lastUserMessage ? collapseWhitespace(lastUserMessage.text) : "";
 			const assistantSummary = lastAssistantMessage
-				? getLastNonEmptyLine(lastAssistantMessage.text)
+				? getLastNonEmptyLine(stripInternalReasoning(lastAssistantMessage.text))
 				: "";
 
 			const detailLines = [

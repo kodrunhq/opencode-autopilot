@@ -6,7 +6,7 @@ import { handleBuild } from "../src/orchestrator/handlers/build";
 import { handleExplore } from "../src/orchestrator/handlers/explore";
 import { handlePlan } from "../src/orchestrator/handlers/plan";
 import { handleRetrospective } from "../src/orchestrator/handlers/retrospective";
-import { handleShip } from "../src/orchestrator/handlers/ship";
+import { createShipHandler, handleShip } from "../src/orchestrator/handlers/ship";
 import { AGENT_NAMES } from "../src/orchestrator/handlers/types";
 import { pipelineStateSchema } from "../src/orchestrator/schemas";
 import type { PipelineState } from "../src/orchestrator/types";
@@ -40,6 +40,17 @@ function makeState(overrides: Partial<PipelineState> = {}): PipelineState {
 	});
 }
 
+function createPassingTrancheSignoff() {
+	return {
+		signoffId: "tranche-signoff-1",
+		scope: "TRANCHE" as const,
+		inputsDigest: "digest-tranche-signoff-1",
+		verdict: "PASS" as const,
+		reasoning: "Ready to ship.",
+		blockingConditions: [],
+	};
+}
+
 // --- PLAN handler ---
 describe("handlePlan", () => {
 	test("dispatches oc-planner with ARCHITECT artifact refs when no result", async () => {
@@ -70,7 +81,10 @@ describe("handlePlan", () => {
 // --- SHIP handler ---
 describe("handleShip", () => {
 	test("dispatches oc-shipper with refs to all prior phase artifacts", async () => {
-		const state = makeState({ currentPhase: "SHIP" });
+		const state = makeState({
+			currentPhase: "SHIP",
+			oracleSignoffs: { tranche: createPassingTrancheSignoff(), program: null },
+		});
 		const result = await handleShip(state, "/tmp/artifacts");
 		const prompt = result.prompt ?? "";
 
@@ -90,10 +104,61 @@ describe("handleShip", () => {
 		expect(result.phase).toBe("SHIP");
 	});
 
+	test("blocks SHIP when review findings remain open above policy threshold", async () => {
+		const state = makeState({
+			currentPhase: "SHIP",
+			oracleSignoffs: { tranche: createPassingTrancheSignoff(), program: null },
+			reviewStatus: {
+				reviewRunId: "review_ship_blocked",
+				trancheId: "tranche_ship_blocked",
+				scope: "branch",
+				status: "BLOCKED",
+				verdict: "BLOCKED",
+				blockingSeverityThreshold: "HIGH",
+				selectedReviewers: ["logic-auditor"],
+				requiredReviewers: ["logic-auditor"],
+				missingRequiredReviewers: [],
+				reviewers: [
+					{
+						reviewer: "logic-auditor",
+						required: true,
+						status: "COMPLETED",
+						findingsCount: 1,
+						startedAt: new Date().toISOString(),
+						completedAt: new Date().toISOString(),
+					},
+				],
+				findingsSummary: {
+					CRITICAL: 0,
+					HIGH: 1,
+					MEDIUM: 0,
+					LOW: 0,
+					open: 1,
+					accepted: 0,
+					fixed: 0,
+					blockingOpen: 1,
+				},
+				summary: "1 HIGH finding remains open.",
+				blockedReason: "1 open review finding(s) remain at or above HIGH",
+				startedAt: null,
+				completedAt: null,
+			},
+		});
+
+		const result = await handleShip(state, "/tmp/artifacts");
+
+		expect(result.action).toBe("error");
+		expect(result.code).toBe("E_SHIP_REVIEW_BLOCKED");
+		expect(result.message).toContain("open review finding");
+	});
+
 	test("returns error when no SHIP artifacts exist after result", async () => {
 		const fs = await import("node:fs/promises");
 		const tmpDir = `/tmp/test-ship-error-${Date.now()}`;
-		const state = makeState({ currentPhase: "SHIP" });
+		const state = makeState({
+			currentPhase: "SHIP",
+			oracleSignoffs: { tranche: createPassingTrancheSignoff(), program: null },
+		});
 		// Create run-scoped directory
 		await fs.mkdir(`${tmpDir}/phases/${state.runId}/SHIP`, { recursive: true });
 
@@ -110,7 +175,25 @@ describe("handleShip", () => {
 	test("returns complete when walkthrough.md exists after result", async () => {
 		const fs = await import("node:fs/promises");
 		const tmpDir = `/tmp/test-ship-complete-${Date.now()}`;
-		const state = makeState({ currentPhase: "SHIP" });
+		const state = makeState({
+			currentPhase: "SHIP",
+			oracleSignoffs: { tranche: createPassingTrancheSignoff(), program: null },
+		});
+		const shipHandler = createShipHandler({
+			runLocalVerification: async () => ({
+				passed: true,
+				status: "PASSED",
+				checks: [{ name: "tests", passed: true, status: "PASSED", message: "tests passed" }],
+				timestamp: new Date().toISOString(),
+			}),
+			pollGitHubChecks: async () => ({
+				status: "SKIPPED_WITH_REASON",
+				summary:
+					"No pull request is required for this delivery state, so remote GitHub checks were skipped.",
+				checks: [],
+				attempts: 1,
+			}),
+		});
 		// Create run-scoped directory
 		await fs.mkdir(`${tmpDir}/phases/${state.runId}/SHIP`, { recursive: true });
 		await fs.writeFile(
@@ -118,11 +201,19 @@ describe("handleShip", () => {
 			"# Walkthrough\nContent",
 		);
 
-		const result = await handleShip(state, tmpDir, "shipped");
+		const result = await shipHandler(state, tmpDir, "shipped");
 
 		expect(result.action).toBe("complete");
 		expect(result.phase).toBe("SHIP");
 		await fs.rm(tmpDir, { recursive: true, force: true });
+	});
+
+	test("blocks SHIP when tranche Oracle signoff is missing", async () => {
+		const state = makeState({ currentPhase: "SHIP" });
+		const result = await handleShip(state, "/tmp/artifacts");
+
+		expect(result.action).toBe("error");
+		expect(result.code).toBe("E_ORACLE_TRANCHE_SIGNOFF_REQUIRED");
 	});
 });
 
@@ -189,18 +280,24 @@ describe("handleBuild", () => {
 		}>,
 		buildProgress?: Partial<PipelineState["buildProgress"]>,
 	): PipelineState {
+		const nextBuildProgress = {
+			currentTask: null,
+			currentTasks: [],
+			currentWave: null,
+			attemptCount: 0,
+			strikeCount: 0,
+			reviewPending: false,
+			oraclePending: false,
+			oracleSignoffId: null,
+			oracleInputsDigest: null,
+			lastReviewReport: null,
+			...(buildProgress ?? {}),
+		} satisfies PipelineState["buildProgress"];
+
 		return makeState({
 			currentPhase: "BUILD",
 			tasks: tasks.map((t) => ({ ...t, depends_on: [], attempt: 0, strike: 0 })),
-			buildProgress: {
-				currentTask: null,
-				currentTasks: [],
-				currentWave: null,
-				attemptCount: 0,
-				strikeCount: 0,
-				reviewPending: false,
-				...buildProgress,
-			},
+			buildProgress: nextBuildProgress,
 		});
 	}
 
@@ -275,6 +372,8 @@ describe("handleBuild", () => {
 		// Wave 1 complete -> review dispatch
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toContain("review");
+		expect(result._stateUpdates?.reviewStatus?.status).toBe("RUNNING");
+		expect(result._stateUpdates?.reviewStatus?.selectedReviewers.length).toBeGreaterThan(0);
 	});
 
 	test("after review advances to next wave", async () => {
@@ -290,6 +389,37 @@ describe("handleBuild", () => {
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe(AGENT_NAMES.BUILD);
 		expect(result.prompt).toContain("Task B");
+	});
+
+	test("legacy review completion sets a terminal review status", async () => {
+		const baseState = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
+				{ id: 2, title: "Task B", status: "PENDING", wave: 2 },
+			],
+			{ currentTask: null, currentWave: 1, reviewPending: true },
+		);
+		const state = {
+			...baseState,
+			reviewStatus: {
+				...baseState.reviewStatus,
+				reviewRunId: "review_legacy_terminal",
+				scope: "branch",
+				status: "RUNNING" as const,
+			},
+		};
+		const result = await handleBuild(
+			state,
+			"/tmp/artifacts",
+			JSON.stringify({ verdict: "CLEAN", summary: "Legacy review accepted." }),
+		);
+
+		expect(result.action).toBe("dispatch");
+		expect(result.agent).toBe(AGENT_NAMES.BUILD);
+		expect(result.prompt).toContain("Task B");
+		expect(result._stateUpdates?.reviewStatus?.status).toBe("PASSED");
+		expect(result._stateUpdates?.reviewStatus?.reviewRunId).toBe("review_legacy_terminal");
+		expect(result._stateUpdates?.reviewStatus?.summary).toBe("Legacy review accepted.");
 	});
 
 	test("review with CRITICAL findings returns fix dispatch", async () => {
@@ -311,14 +441,128 @@ describe("handleBuild", () => {
 		expect(result.prompt).toContain("CRITICAL");
 	});
 
+	test("structured review result blocks on open HIGH findings", async () => {
+		const state = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
+				{ id: 2, title: "Task B", status: "PENDING", wave: 2 },
+			],
+			{
+				currentTask: null,
+				currentWave: 1,
+				reviewPending: true,
+			},
+		);
+		const result = await handleBuild(
+			state,
+			"/tmp/artifacts",
+			JSON.stringify({
+				action: "complete",
+				reviewRun: {
+					reviewRunId: "review_block_high",
+					runId: state.runId,
+					trancheId: state.runId,
+					scope: "branch",
+					status: "BLOCKED",
+					verdict: "BLOCKED",
+					policy: {
+						requiredReviewers: ["logic-auditor"],
+						blockingSeverityThreshold: "HIGH",
+						allowedWaivers: [],
+					},
+					selectedReviewers: ["logic-auditor"],
+					reviewers: [
+						{
+							reviewer: "logic-auditor",
+							required: true,
+							status: "COMPLETED",
+							findingsCount: 1,
+							startedAt: "2026-04-12T00:00:00.000Z",
+							completedAt: "2026-04-12T00:05:00.000Z",
+						},
+					],
+					findings: [
+						{
+							findingId: "finding_1",
+							reviewRunId: "review_block_high",
+							reviewer: "logic-auditor",
+							severity: "HIGH",
+							file: "src/example.ts",
+							line: 12,
+							title: "Missing guard",
+							detail: "Problem: missing null guard",
+							status: "open",
+						},
+					],
+					findingsSummary: {
+						CRITICAL: 0,
+						HIGH: 1,
+						MEDIUM: 0,
+						LOW: 0,
+						open: 1,
+						accepted: 0,
+						fixed: 0,
+						blockingOpen: 1,
+					},
+					summary: "1 HIGH finding remains open.",
+					blockedReason: "1 open review finding(s) remain at or above HIGH",
+					startedAt: "2026-04-12T00:00:00.000Z",
+					completedAt: "2026-04-12T00:05:00.000Z",
+				},
+				reviewStatus: {
+					reviewRunId: "review_block_high",
+					trancheId: state.runId,
+					scope: "branch",
+					status: "BLOCKED",
+					verdict: "BLOCKED",
+					blockingSeverityThreshold: "HIGH",
+					selectedReviewers: ["logic-auditor"],
+					requiredReviewers: ["logic-auditor"],
+					missingRequiredReviewers: [],
+					reviewers: [
+						{
+							reviewer: "logic-auditor",
+							required: true,
+							status: "COMPLETED",
+							findingsCount: 1,
+							startedAt: "2026-04-12T00:00:00.000Z",
+							completedAt: "2026-04-12T00:05:00.000Z",
+						},
+					],
+					findingsSummary: {
+						CRITICAL: 0,
+						HIGH: 1,
+						MEDIUM: 0,
+						LOW: 0,
+						open: 1,
+						accepted: 0,
+						fixed: 0,
+						blockingOpen: 1,
+					},
+					summary: "1 HIGH finding remains open.",
+					blockedReason: "1 open review finding(s) remain at or above HIGH",
+				},
+			}),
+		);
+
+		expect(result.action).toBe("dispatch");
+		expect(result.agent).toBe(AGENT_NAMES.BUILD);
+		expect(result.prompt).toContain("HIGH");
+		expect(result._stateUpdates?.reviewStatus?.status).toBe("BLOCKED");
+	});
+
 	test("all tasks in all waves DONE returns complete", async () => {
-		const state = makeBuildState([
-			{ id: 1, title: "Task A", status: "DONE", wave: 1 },
-			{ id: 2, title: "Task B", status: "DONE", wave: 2 },
-		]);
+		const state = {
+			...makeBuildState([
+				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
+				{ id: 2, title: "Task B", status: "DONE", wave: 2 },
+			]),
+			oracleSignoffs: { tranche: createPassingTrancheSignoff(), program: null },
+		};
 		const result = await handleBuild(state, "/tmp/artifacts");
 
-		expect(result.action).toBe("complete");
+		expect(result.action).toBe("dispatch");
+		expect(result.agent).toBe("oracle");
 		expect(result.phase).toBe("BUILD");
 	});
 

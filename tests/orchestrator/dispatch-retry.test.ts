@@ -15,6 +15,7 @@ import {
 	setPersistedRetryAttempts,
 	sleep,
 } from "../../src/orchestrator/dispatch-retry";
+import { pipelineStateSchema } from "../../src/orchestrator/schemas";
 
 afterEach(() => {
 	clearAllRetryState();
@@ -543,7 +544,19 @@ describe("handler artifact contracts (Fix 3)", () => {
 
 	test("SHIP returns error when neither walkthrough.md, changelog.md, nor decisions.md exist", async () => {
 		const { handleShip } = await import("../../src/orchestrator/handlers/ship");
-		const state = makeMinimalState("SHIP");
+		const state = makeMinimalState("SHIP", {
+			oracleSignoffs: {
+				tranche: {
+					signoffId: "ship-tranche-pass",
+					scope: "TRANCHE",
+					inputsDigest: "ship-digest",
+					verdict: "PASS",
+					reasoning: "Ready to ship.",
+					blockingConditions: [],
+				},
+				program: null,
+			},
+		});
 		const result = await handleShip(state, "/tmp/nonexistent-artifacts-ship", "agent output");
 		expect(result.action).toBe("error");
 		expect(result.phase).toBe("SHIP");
@@ -556,8 +569,35 @@ describe("handler artifact contracts (Fix 3)", () => {
 		const fs = await import("node:fs/promises");
 		const { getPhaseDir } = await import("../../src/orchestrator/artifacts");
 		const tmpDir = `/tmp/test-ship-decisions-${Date.now()}`;
-		const { handleShip } = await import("../../src/orchestrator/handlers/ship");
-		const state = makeMinimalState("SHIP");
+		const { createShipHandler } = await import("../../src/orchestrator/handlers/ship");
+		const state = makeMinimalState("SHIP", {
+			oracleSignoffs: {
+				tranche: {
+					signoffId: "ship-tranche-pass",
+					scope: "TRANCHE",
+					inputsDigest: "ship-digest",
+					verdict: "PASS",
+					reasoning: "Ready to ship.",
+					blockingConditions: [],
+				},
+				program: null,
+			},
+		});
+		const handleShip = createShipHandler({
+			runLocalVerification: async () => ({
+				passed: true,
+				status: "PASSED",
+				checks: [{ name: "tests", passed: true, status: "PASSED", message: "tests passed" }],
+				timestamp: new Date().toISOString(),
+			}),
+			pollGitHubChecks: async () => ({
+				status: "SKIPPED_WITH_REASON",
+				summary:
+					"No pull request is required for this delivery state, so remote GitHub checks were skipped.",
+				checks: [],
+				attempts: 1,
+			}),
+		});
 		const shipDir = getPhaseDir(tmpDir, "SHIP", state.runId);
 		await fs.mkdir(shipDir, { recursive: true });
 		await fs.writeFile(join(shipDir, "decisions.md"), "# Decisions\nContent");
@@ -570,7 +610,19 @@ describe("handler artifact contracts (Fix 3)", () => {
 
 	test("SHIP returns dispatch when no result yet", async () => {
 		const { handleShip } = await import("../../src/orchestrator/handlers/ship");
-		const state = makeMinimalState("SHIP");
+		const state = makeMinimalState("SHIP", {
+			oracleSignoffs: {
+				tranche: {
+					signoffId: "ship-tranche-pass",
+					scope: "TRANCHE",
+					inputsDigest: "ship-digest",
+					verdict: "PASS",
+					reasoning: "Ready to ship.",
+					blockingConditions: [],
+				},
+				program: null,
+			},
+		});
 		const result = await handleShip(state, "/tmp/nonexistent-artifacts-ship");
 		expect(result.action).toBe("dispatch");
 		expect(result.agent).toBe("oc-shipper");
@@ -592,8 +644,9 @@ describe("ARCHITECT partial failure (Fix 4)", () => {
 			confidence: [
 				{
 					phase: "RECON",
+					agent: "oc-researcher",
+					area: "architecture",
 					level: "LOW",
-					source: "test",
 					rationale: "test",
 					timestamp: new Date().toISOString(),
 				},
@@ -628,8 +681,9 @@ describe("ARCHITECT partial failure (Fix 4)", () => {
 			confidence: [
 				{
 					phase: "RECON",
+					agent: "oc-researcher",
+					area: "architecture",
 					level: "LOW",
-					source: "test",
 					rationale: "test",
 					timestamp: new Date().toISOString(),
 				},
@@ -889,11 +943,11 @@ describe("persisted retry state (Bug #3)", () => {
 });
 
 function makeMinimalState(
-	phase: string,
+	phase: import("../../src/orchestrator/types").PipelineState["currentPhase"],
 	overrides: Record<string, unknown> = {},
 ): import("../../src/orchestrator/types").PipelineState {
 	const now = new Date().toISOString();
-	return {
+	return pipelineStateSchema.parse({
 		schemaVersion: 2 as const,
 		status: "IN_PROGRESS" as const,
 		runId: "test-run",
@@ -915,13 +969,49 @@ function makeMinimalState(
 			attemptCount: 0,
 			strikeCount: 0,
 			reviewPending: false,
+			oraclePending: false,
+			oracleSignoffId: null,
+			oracleInputsDigest: null,
+			lastReviewReport: null,
+		},
+		oracleSignoffs: {
+			tranche: null,
+			program: null,
 		},
 		pendingDispatches: [],
 		processedResultIds: [],
 		failureContext: null,
 		branchLifecycle: null,
+		programContext: null,
 		phaseDispatchCounts: {},
 		retryAttempts: {},
+		useWorktrees: false,
+		reviewStatus: {
+			reviewRunId: null,
+			trancheId: null,
+			scope: null,
+			status: "IDLE",
+			verdict: null,
+			blockingSeverityThreshold: "HIGH",
+			selectedReviewers: [],
+			requiredReviewers: [],
+			missingRequiredReviewers: [],
+			reviewers: [],
+			findingsSummary: {
+				CRITICAL: 0,
+				HIGH: 0,
+				MEDIUM: 0,
+				LOW: 0,
+				open: 0,
+				accepted: 0,
+				fixed: 0,
+				blockingOpen: 0,
+			},
+			summary: null,
+			blockedReason: null,
+			startedAt: null,
+			completedAt: null,
+		},
 		...overrides,
-	} as import("../../src/orchestrator/types").PipelineState;
+	});
 }

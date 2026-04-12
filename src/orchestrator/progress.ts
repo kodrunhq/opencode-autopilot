@@ -1,5 +1,5 @@
 import { PHASES } from "./schemas";
-import type { PipelineState } from "./types";
+import type { PipelineState, Task } from "./types";
 
 const PHASE_INDEX = Object.freeze(
 	Object.fromEntries(PHASES.map((phase, index) => [phase, index + 1])) as Record<
@@ -38,6 +38,9 @@ export function getPhaseProgressString(state: PipelineState): string {
 		case "BUILD": {
 			const progress = state.buildProgress;
 			if (!progress || progress.currentWave === null) {
+				if (progress?.oraclePending) {
+					return `${baseProgress} Awaiting tranche Oracle signoff...`;
+				}
 				return `${baseProgress} Starting build phase...`;
 			}
 
@@ -47,7 +50,18 @@ export function getPhaseProgressString(state: PipelineState): string {
 			const totalTasksInWave = state.tasks.filter((t) => t.wave === progress.currentWave).length;
 
 			if (progress.reviewPending) {
+				const completedReviewers = state.reviewStatus.reviewers.filter(
+					(reviewer) => reviewer.status === "COMPLETED",
+				).length;
+				const totalReviewers = state.reviewStatus.reviewers.length;
+				if (totalReviewers > 0) {
+					return `${baseProgress} Review stage for wave ${progress.currentWave}/${totalWaves} (${completedReviewers}/${totalReviewers} reviewers complete)...`;
+				}
 				return `${baseProgress} Reviewing wave ${progress.currentWave}/${totalWaves}...`;
+			}
+
+			if (progress.oraclePending) {
+				return `${baseProgress} Awaiting tranche Oracle signoff...`;
 			}
 
 			// Just a sensible string for current build status
@@ -60,4 +74,47 @@ export function getPhaseProgressString(state: PipelineState): string {
 		default:
 			return `${baseProgress} Executing ${currentPhase}...`;
 	}
+}
+
+export function getActiveTasks(state: Readonly<PipelineState>): readonly Task[] {
+	const activeTaskIds = new Set(state.buildProgress.currentTasks);
+	return Object.freeze(
+		state.tasks.filter((task) => activeTaskIds.has(task.id) || task.status === "IN_PROGRESS"),
+	);
+}
+
+export function getRemainingTaskBacklog(state: Readonly<PipelineState>): readonly Task[] {
+	return Object.freeze(
+		state.tasks.filter((task) => task.status !== "DONE" && task.status !== "SKIPPED"),
+	);
+}
+
+export function getPipelineBlockedReason(state: Readonly<PipelineState>): string | null {
+	if (state.reviewStatus.blockedReason) {
+		return state.reviewStatus.blockedReason;
+	}
+
+	const trancheOracle = state.oracleSignoffs.tranche;
+	if (trancheOracle?.verdict === "FAIL") {
+		return trancheOracle.blockingConditions.join("; ") || trancheOracle.reasoning;
+	}
+
+	if (
+		(state.verificationStatus.status === "FAILED" ||
+			state.verificationStatus.status === "BLOCKED") &&
+		state.verificationStatus.summary
+	) {
+		return state.verificationStatus.summary;
+	}
+
+	if (state.failureContext?.errorMessage) {
+		return state.failureContext.errorMessage;
+	}
+
+	const blockedTasks = state.tasks.filter((task) => task.status === "BLOCKED");
+	if (blockedTasks.length > 0) {
+		return blockedTasks.map((task) => `Task ${task.id}: ${task.title}`).join("; ");
+	}
+
+	return null;
 }

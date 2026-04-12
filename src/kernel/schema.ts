@@ -1,7 +1,7 @@
 import { BACKGROUND_TASKS_SCHEMA_STATEMENTS } from "../background/schema";
 import { GRAPH_SCHEMA_STATEMENTS } from "../graph/schema";
 
-export const KERNEL_SCHEMA_VERSION = 8;
+export const KERNEL_SCHEMA_VERSION = 10;
 
 export const ROUTE_TICKETS_SCHEMA = Object.freeze([
 	`CREATE TABLE IF NOT EXISTS route_tickets (
@@ -41,6 +41,38 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 	)`,
 	`CREATE INDEX IF NOT EXISTS idx_pipeline_runs_project_updated_at ON pipeline_runs(project_id, last_updated_at DESC, run_id DESC)`,
+	`CREATE TABLE IF NOT EXISTS program_runs (
+		project_id TEXT NOT NULL,
+		program_id TEXT PRIMARY KEY,
+		schema_version INTEGER NOT NULL,
+		status TEXT NOT NULL,
+		mode TEXT NOT NULL,
+		originating_request TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		current_tranche_id TEXT,
+		final_oracle_verdict TEXT,
+		success_criteria_json TEXT NOT NULL,
+		blocked_reason TEXT,
+		state_json TEXT NOT NULL,
+		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_program_runs_project_created_at ON program_runs(project_id, created_at DESC, program_id DESC)`,
+	`CREATE TABLE IF NOT EXISTS program_tranches (
+		program_id TEXT NOT NULL,
+		tranche_id TEXT NOT NULL,
+		sequence_number INTEGER NOT NULL,
+		title TEXT NOT NULL,
+		objective TEXT NOT NULL,
+		scope_json TEXT NOT NULL,
+		dependencies_json TEXT NOT NULL,
+		status TEXT NOT NULL,
+		verification_profile TEXT NOT NULL,
+		delivery_manifest_id TEXT,
+		selection_rationale TEXT NOT NULL,
+		PRIMARY KEY (program_id, tranche_id),
+		FOREIGN KEY (program_id) REFERENCES program_runs(program_id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_program_tranches_program_sequence ON program_tranches(program_id, sequence_number)`,
 	`CREATE TABLE IF NOT EXISTS run_phases (
 		run_id TEXT NOT NULL,
 		phase_name TEXT NOT NULL,
@@ -89,6 +121,41 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 		state_json TEXT NOT NULL,
 		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 	)`,
+	`CREATE TABLE IF NOT EXISTS review_runs (
+		project_id TEXT NOT NULL,
+		review_run_id TEXT PRIMARY KEY,
+		run_id TEXT,
+		tranche_id TEXT,
+		scope TEXT NOT NULL,
+		status TEXT NOT NULL,
+		verdict TEXT NOT NULL,
+		blocking_severity_threshold TEXT NOT NULL,
+		required_reviewers_json TEXT NOT NULL,
+		missing_required_reviewers_json TEXT NOT NULL,
+		findings_summary_json TEXT NOT NULL,
+		summary TEXT,
+		blocked_reason TEXT,
+		started_at TEXT NOT NULL,
+		completed_at TEXT,
+		state_json TEXT NOT NULL,
+		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_review_runs_project_started_at ON review_runs(project_id, started_at DESC, review_run_id DESC)`,
+	`CREATE INDEX IF NOT EXISTS idx_review_runs_run_id ON review_runs(run_id, started_at DESC, review_run_id DESC)`,
+	`CREATE TABLE IF NOT EXISTS review_findings (
+		review_run_id TEXT NOT NULL,
+		finding_id TEXT NOT NULL,
+		reviewer TEXT NOT NULL,
+		severity TEXT NOT NULL,
+		file TEXT NOT NULL,
+		line INTEGER,
+		title TEXT NOT NULL,
+		detail TEXT NOT NULL,
+		status TEXT NOT NULL,
+		PRIMARY KEY (review_run_id, finding_id),
+		FOREIGN KEY (review_run_id) REFERENCES review_runs(review_run_id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_review_findings_run_status_severity ON review_findings(review_run_id, status, severity)`,
 	`CREATE TABLE IF NOT EXISTS project_review_memory (
 		project_id TEXT PRIMARY KEY,
 		schema_version INTEGER NOT NULL,

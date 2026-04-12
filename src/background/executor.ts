@@ -50,7 +50,7 @@ function getDefaultRunner(
 		await wait(delayMs, signal);
 		const agentSuffix = task.agent ? ` [agent=${task.agent}]` : "";
 		const modelSuffix = task.model ? ` [model=${task.model}]` : "";
-		return `Completed background task: ${task.description}${agentSuffix}${modelSuffix}`;
+		return `Completed background task${agentSuffix}${modelSuffix}`;
 	};
 }
 
@@ -135,7 +135,7 @@ export async function executeTask(
 			return { taskId: task.id, status: "cancelled" };
 		}
 
-		const message = result ?? `Completed background task: ${task.description}`;
+		const message = result ?? "Completed background task";
 		await deps.updateStatus(task.id, "completed", { result: message });
 		logger?.info("Background task completed", { backgroundTaskId: task.id });
 		return { taskId: task.id, status: "completed", result: message };

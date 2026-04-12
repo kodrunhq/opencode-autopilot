@@ -233,6 +233,14 @@ export const handlePlan: PhaseHandler = async (state, artifactDir, result?) => {
 
 	const challengeRef = getArtifactRef(artifactDir, "CHALLENGE", "brief.md", state.runId);
 	const tasksPath = getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId);
+	const trancheScopeLines =
+		state.programContext === null
+			? []
+			: [
+					`This run is tranche ${state.programContext.trancheIndex}/${state.programContext.trancheCount}: ${state.programContext.trancheTitle}.`,
+					`Selection rationale: ${state.programContext.selectionRationale}`,
+					"Plan ONLY this tranche scope. Do not ask which tranche to do first and do not schedule later tranches here.",
+				];
 
 	const prompt = [
 		`Read ${architectDescription} at`,
@@ -243,6 +251,7 @@ export const handlePlan: PhaseHandler = async (state, artifactDir, result?) => {
 		`Write tasks to ${tasksPath} as strict JSON with shape {"schemaVersion":1,"tasks":[{"taskId":"W1-T01","title":"...","wave":1,"depends_on":[]}]}.`,
 		"Each task should have a 300-line diff max.",
 		"Assign wave numbers for parallel execution.",
+		...trancheScopeLines,
 	].join(" ");
 
 	return Object.freeze({

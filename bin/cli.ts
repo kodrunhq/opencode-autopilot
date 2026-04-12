@@ -5,7 +5,13 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
-import { CONFIG_PATH, createDefaultConfig, loadConfig, saveConfig } from "../src/config";
+import {
+	CONFIG_PATH,
+	createDefaultConfig,
+	inspectConfigMode,
+	loadConfig,
+	saveConfig,
+} from "../src/config";
 import { diagnose } from "../src/registry/doctor";
 import { ALL_GROUP_IDS, DIVERSITY_RULES, GROUP_DEFINITIONS } from "../src/registry/model-groups";
 import type { GroupId } from "../src/registry/types";
@@ -17,6 +23,7 @@ import {
 	resolveOpenCodeConfig,
 	verifyPluginLoad,
 } from "../src/utils/opencode-config";
+import { inspectProjectArtifactState } from "../src/utils/paths";
 import { runConfigure } from "./configure-tui";
 import { runInspect } from "./inspect";
 
@@ -294,6 +301,53 @@ function printDiversityResults(
 	}
 }
 
+function printProjectPreflight(
+	projectRoot: string,
+	config: Awaited<ReturnType<typeof loadConfig>>,
+): boolean {
+	console.log("");
+	console.log(bold("Project Preflight"));
+
+	let hasFailure = false;
+	const artifactState = inspectProjectArtifactState(projectRoot);
+	const configAnalysis = config ? inspectConfigMode(config, { projectRoot }) : null;
+
+	if (configAnalysis) {
+		console.log(
+			`  Canonical mode          ${configAnalysis.mode.interactionMode}/${configAnalysis.mode.executionMode}/${configAnalysis.mode.visibilityMode}/${configAnalysis.mode.verificationMode}`,
+		);
+		console.log(
+			`  Verification profile    ${configAnalysis.verificationProfileConfigured ? green("✓") : yellow("⚠")} ${configAnalysis.verificationProfileConfigured ? "configured" : "missing"}`,
+		);
+	}
+
+	if (artifactState.issues.length === 0 && (configAnalysis?.issues.length ?? 0) === 0) {
+		console.log(`  Artifact boundary       ${green("✓")} clean`);
+		return false;
+	}
+
+	for (const issue of artifactState.issues) {
+		const icon = issue.severity === "error" ? red("✗") : yellow("⚠");
+		console.log(`  Artifact boundary       ${icon} ${issue.message}`);
+		for (const filePath of issue.paths) {
+			console.log(`    ${filePath}`);
+		}
+		if (issue.severity === "error") {
+			hasFailure = true;
+		}
+	}
+
+	for (const issue of configAnalysis?.issues ?? []) {
+		const icon = issue.severity === "error" ? red("✗") : yellow("⚠");
+		console.log(`  Mode invariants         ${icon} ${issue.message}`);
+		if (issue.severity === "error") {
+			hasFailure = true;
+		}
+	}
+
+	return hasFailure;
+}
+
 // ── runDoctor ───────────────────────────────────────────────────────
 
 export async function runDoctor(options: CliOptions = {}): Promise<void> {
@@ -312,6 +366,7 @@ export async function runDoctor(options: CliOptions = {}): Promise<void> {
 
 	printModelAssignments(result);
 	printDiversityResults(result, config);
+	hasFailure = printProjectPreflight(cwd, config) || hasFailure;
 
 	console.log("");
 	console.log(bold("Plugin Load Verification"));

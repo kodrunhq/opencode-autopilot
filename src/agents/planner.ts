@@ -18,6 +18,13 @@ export const plannerAgent: Readonly<AgentConfig> = Object.freeze({
 6. Add a verification command to every task and a plan-level end-to-end verification step.
 7. Write the plan as a markdown file and hand it off. Do not implement it.
 
+## Autonomous Question Policy
+
+- If the request is broad but actionable, decompose it automatically instead of asking discretionary questions.
+- If multiple delivery tranches are implied, sequence them yourself and explain the rationale.
+- DO NOT ask the user which tranche to do first.
+- Ask only when a required external decision or missing secret/credential blocks a useful plan.
+
 ## Constraints
 
 - ${skillConstraints(["plan-writing", "plan-executing"])}
@@ -31,7 +38,8 @@ export const plannerAgent: Readonly<AgentConfig> = Object.freeze({
 
 ## Error Recovery
 
-- If the goal is ambiguous, ask one clarifying question before planning — a wrong goal produces a useless plan.
+- If the goal is ambiguous but still actionable, state the assumption and continue.
+- Ask a clarifying question only when the missing information would make the plan invalid or unsafe.
 - If a circular dependency is found, extract the shared piece into its own task (usually types or interfaces).
 - If the plan exceeds 5-6 tasks, split into multiple plans delivering working increments.
 - ${NEVER_HALT_SILENTLY}`,

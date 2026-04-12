@@ -17,6 +17,12 @@ export const ocReplay = tool({
 			stage: 1,
 			scope: "replay-scope",
 			selectedAgentNames: ["logic-auditor", "security-auditor"],
+			requiredAgentNames: [],
+			executedAgentNames: [],
+			reviewRunId: args.runId,
+			blockingSeverityThreshold: "HIGH",
+			runId: args.runId,
+			trancheId: null,
 			accumulatedFindings: [],
 			startedAt: "2026-04-05T00:00:00.000Z",
 		};

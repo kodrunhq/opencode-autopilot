@@ -8,11 +8,18 @@ import type {
 	phaseSchema,
 	phaseStatusSchema,
 	pipelineStateSchema,
+	pipelineVerificationStatusSchema,
+	programContextSchema,
 	taskSchema,
 } from "./schemas";
 
 // Re-export BuildProgress from schemas
 export type { BuildProgress } from "./schemas";
+export type {
+	OracleSignoffState,
+	ProgramOracleSignoff,
+	TrancheOracleSignoff,
+} from "./signoff";
 
 export interface BranchLifecycle {
 	readonly currentBranch: string | null;
@@ -22,7 +29,14 @@ export interface BranchLifecycle {
 	readonly worktreePath: string | null;
 	readonly createdAt: string | null;
 	readonly lastPushedAt: string | null;
-	readonly tasksPushed: readonly string[];
+	readonly tasksPushed: string[];
+	readonly programId: string | null;
+	readonly trancheId: string | null;
+	readonly humanTitle: string | null;
+	readonly commitStrategy: "per_task" | "per_wave" | "squash";
+	readonly reviewSummary: string | null;
+	readonly oracleSummary: string | null;
+	readonly verificationSummary: string | null;
 }
 
 export type PipelineState = z.infer<typeof pipelineStateSchema>;
@@ -35,3 +49,5 @@ export type Task = z.infer<typeof taskSchema>;
 export type FailureContext = z.infer<typeof failureContextSchema>;
 export type PendingDispatch = z.infer<typeof pendingDispatchSchema>;
 export type DispatchResultKind = z.infer<typeof dispatchResultKindSchema>;
+export type ProgramPipelineContext = z.infer<typeof programContextSchema>;
+export type PipelineVerificationStatus = z.infer<typeof pipelineVerificationStatusSchema>;

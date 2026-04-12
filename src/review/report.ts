@@ -94,6 +94,14 @@ export function buildReport(
 	findings: readonly ReviewFinding[],
 	scope: string,
 	agentsRan: readonly string[],
+	options?: {
+		readonly reviewRunId?: string | null;
+		readonly selectedReviewers?: readonly string[];
+		readonly requiredReviewers?: readonly string[];
+		readonly executedReviewers?: readonly string[];
+		readonly missingRequiredReviewers?: readonly string[];
+		readonly blockingSeverityThreshold?: Severity;
+	},
 ): ReviewReport {
 	// 1. Deduplicate
 	const deduped = deduplicateFindings(findings);
@@ -126,11 +134,17 @@ export function buildReport(
 
 	// 4. Validate through schema
 	const report = reviewReportSchema.parse({
+		reviewRunId: options?.reviewRunId ?? null,
 		verdict,
 		findings: sorted,
 		agentResults: [],
 		scope,
 		agentsRan: [...agentsRan],
+		selectedReviewers: [...(options?.selectedReviewers ?? agentsRan)],
+		requiredReviewers: [...(options?.requiredReviewers ?? [])],
+		executedReviewers: [...(options?.executedReviewers ?? agentsRan)],
+		missingRequiredReviewers: [...(options?.missingRequiredReviewers ?? [])],
+		blockingSeverityThreshold: options?.blockingSeverityThreshold ?? "HIGH",
 		totalDurationMs: 0,
 		completedAt: new Date().toISOString(),
 		summary,

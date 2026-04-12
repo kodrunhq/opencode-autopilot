@@ -14,7 +14,7 @@ function buildInstruction(
 	routing: Readonly<{ targetAgent: string; usePipeline: boolean; behavior: string }>,
 ): string {
 	if (routing.usePipeline) {
-		return `Call oc_orchestrate with intent: "implementation" and routeToken from requiredPipelineArgs.routeToken - full pipeline via ${routing.targetAgent}. ${routing.behavior}`;
+		return `Call oc_orchestrate with intent: "implementation" and routeToken from requiredPipelineArgs.routeToken - full pipeline via ${routing.targetAgent}. ${routing.behavior} Autonomous question policy: do not ask discretionary questions, do not ask which tranche to start, and let the controller decompose broad requests into tranches automatically with visible rationale.`;
 	}
 	return `Route to ${routing.targetAgent} agent directly — no pipeline needed. ${routing.behavior}`;
 }
@@ -25,7 +25,7 @@ function buildSecondaryInstruction(
 ): string {
 	const intentHint =
 		secondary === "implementation"
-			? ' (pass intent: "implementation" and routeToken from requiredPipelineArgs.routeToken to oc_orchestrate)'
+			? ' (pass intent: "implementation" and routeToken from requiredPipelineArgs.routeToken to oc_orchestrate; broad requests will tranche automatically without asking which tranche to start)'
 			: "";
 	return `After completing the primary intent, follow up with: ${secondaryRouting.behavior} (via ${secondaryRouting.targetAgent})${intentHint}`;
 }

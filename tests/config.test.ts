@@ -49,10 +49,16 @@ describe("createDefaultConfig", () => {
 		expect(config.overrides).toEqual({});
 	});
 
-	test("orchestrator defaults: autonomy full, strictness normal, all phases true", () => {
+	test("default config uses coherent interactive mode defaults", () => {
 		const config = createDefaultConfig();
-		expect(config.orchestrator.autonomy).toBe("full");
+		expect(config.orchestrator.autonomy).toBe("supervised");
 		expect(config.orchestrator.strictness).toBe("normal");
+		expect(config.mode).toEqual({
+			interactionMode: "interactive",
+			executionMode: "foreground",
+			visibilityMode: "summary",
+			verificationMode: "normal",
+		});
 		expect(config.orchestrator.phases.recon).toBe(true);
 		expect(config.orchestrator.phases.challenge).toBe(true);
 		expect(config.orchestrator.phases.architect).toBe(true);

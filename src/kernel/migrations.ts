@@ -178,8 +178,10 @@ export function reconcileProjectIds(database: Database): void {
 
 	const tablesWithProjectId = [
 		"pipeline_runs",
+		"program_runs",
 		"forensic_events",
 		"active_review_state",
+		"review_runs",
 		"project_review_memory",
 		"project_lesson_memory",
 		"project_lessons",

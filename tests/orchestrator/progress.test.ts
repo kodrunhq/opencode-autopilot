@@ -47,8 +47,14 @@ describe("Progress Display (Task 1)", () => {
 				currentWave: 2,
 				reviewPending: true,
 			},
+			reviewStatus: {
+				reviewers: [
+					{ reviewer: "logic-auditor", status: "COMPLETED" },
+					{ reviewer: "security-auditor", status: "PENDING" },
+				],
+			},
 		};
 		const progress = getPhaseProgressString(state as PipelineState);
-		expect(progress).toBe("[6/8] Reviewing wave 2/2...");
+		expect(progress).toBe("[6/8] Review stage for wave 2/2 (1/2 reviewers complete)...");
 	});
 });

@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { appendForensicEventsToKernel, loadForensicEventsFromKernel } from "../kernel/repository";
 import { isEnoentError } from "../utils/fs-helpers";
-import { getProjectArtifactDir } from "../utils/paths";
+import { assertProjectArtifactOwnership, getProjectArtifactDir } from "../utils/paths";
 import { forensicEventSchema } from "./forensic-schemas";
 import type { ForensicEvent, ForensicEventDomain, ForensicEventType } from "./forensic-types";
 
@@ -105,10 +105,11 @@ export function isDuplicateEvent(
 }
 
 function appendValidatedForensicEvent(artifactDir: string, event: ForensicEvent): void {
-	mkdirSync(artifactDir, { recursive: true });
+	const validatedArtifactDir = assertProjectArtifactOwnership(artifactDir);
+	mkdirSync(validatedArtifactDir, { recursive: true });
 
 	try {
-		appendForensicEventsToKernel(artifactDir, [event]);
+		appendForensicEventsToKernel(validatedArtifactDir, [event]);
 	} catch {
 		if (!forensicWriteWarned) {
 			forensicWriteWarned = true;
@@ -116,7 +117,7 @@ function appendValidatedForensicEvent(artifactDir: string, event: ForensicEvent)
 	}
 
 	try {
-		const logPath = join(artifactDir, FORENSIC_LOG_FILE);
+		const logPath = join(validatedArtifactDir, FORENSIC_LOG_FILE);
 		appendFileSync(logPath, `${JSON.stringify(event)}\n`, "utf-8");
 	} catch {
 		if (!forensicMirrorWarned) {

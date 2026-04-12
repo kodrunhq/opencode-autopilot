@@ -38,6 +38,10 @@ export interface ReviewStageResult {
 	readonly parseMode?: "typed" | "legacy";
 }
 
+export interface AdvancePipelineOptions {
+	readonly executedAgentNames?: readonly string[];
+}
+
 /**
  * Advance the pipeline from the current stage to the next.
  *
@@ -51,6 +55,7 @@ export function advancePipeline(
 	agentName = "unknown",
 	_runId?: string,
 	_seed?: string,
+	options?: AdvancePipelineOptions,
 ): ReviewStageResult {
 	const typedEnvelope = parseTypedFindingsEnvelope(findingsJson);
 	const parseMode = typedEnvelope ? "typed" : "legacy";
@@ -58,6 +63,12 @@ export function advancePipeline(
 		? typedEnvelope.findings
 		: parseAgentFindings(findingsJson, agentName);
 	const accumulated = [...currentState.accumulatedFindings, ...newFindings];
+	const executedAgentNames = [
+		...new Set([
+			...(currentState.executedAgentNames ?? []),
+			...(options?.executedAgentNames ?? []),
+		]),
+	];
 
 	const nextStage = currentState.stage + 1;
 
@@ -74,6 +85,7 @@ export function advancePipeline(
 				...currentState,
 				stage: nextStage,
 				accumulatedFindings: accumulated,
+				executedAgentNames,
 			};
 			return Object.freeze({
 				action: "dispatch" as const,
@@ -100,6 +112,7 @@ export function advancePipeline(
 				...currentState,
 				stage: nextStage,
 				accumulatedFindings: accumulated,
+				executedAgentNames,
 			};
 			return Object.freeze({
 				action: "dispatch" as const,
@@ -124,6 +137,7 @@ export function advancePipeline(
 					...currentState,
 					stage: nextStage,
 					accumulatedFindings: accumulated,
+					executedAgentNames,
 				};
 				return Object.freeze({
 					action: "dispatch" as const,
@@ -135,7 +149,16 @@ export function advancePipeline(
 				});
 			}
 			// No fix cycle needed -- complete
-			const report = buildReport(accumulated, currentState.scope, currentState.selectedAgentNames);
+			const report = buildReport(accumulated, currentState.scope, executedAgentNames, {
+				reviewRunId: currentState.reviewRunId,
+				selectedReviewers: currentState.selectedAgentNames,
+				requiredReviewers: currentState.requiredAgentNames,
+				executedReviewers: executedAgentNames,
+				missingRequiredReviewers: currentState.requiredAgentNames.filter(
+					(reviewer) => !executedAgentNames.includes(reviewer),
+				),
+				blockingSeverityThreshold: currentState.blockingSeverityThreshold,
+			});
 			return Object.freeze({
 				action: "complete" as const,
 				report,
@@ -150,7 +173,16 @@ export function advancePipeline(
 
 		case 4: {
 			// Stage 4 -> complete: Build final report with all findings
-			const report = buildReport(accumulated, currentState.scope, currentState.selectedAgentNames);
+			const report = buildReport(accumulated, currentState.scope, executedAgentNames, {
+				reviewRunId: currentState.reviewRunId,
+				selectedReviewers: currentState.selectedAgentNames,
+				requiredReviewers: currentState.requiredAgentNames,
+				executedReviewers: executedAgentNames,
+				missingRequiredReviewers: currentState.requiredAgentNames.filter(
+					(reviewer) => !executedAgentNames.includes(reviewer),
+				),
+				blockingSeverityThreshold: currentState.blockingSeverityThreshold,
+			});
 			return Object.freeze({
 				action: "complete" as const,
 				report,

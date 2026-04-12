@@ -50,6 +50,10 @@ function makeBuildState(
 			attemptCount: 0,
 			strikeCount: 0,
 			reviewPending: false,
+			oraclePending: false,
+			oracleSignoffId: null,
+			oracleInputsDigest: null,
+			lastReviewReport: null,
 			...buildProgress,
 		},
 	});
@@ -87,6 +91,10 @@ describe("parallel BUILD integration", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: false,
+				oraclePending: false,
+				oracleSignoffId: null,
+				oracleInputsDigest: null,
+				lastReviewReport: null,
 			},
 			tempDir,
 			"run-1",
@@ -126,6 +134,10 @@ describe("parallel BUILD integration", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: false,
+				oraclePending: false,
+				oracleSignoffId: null,
+				oracleInputsDigest: null,
+				lastReviewReport: null,
 			},
 			tempDir,
 			"run-1",
@@ -375,6 +387,10 @@ describe("parallel BUILD integration", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: false,
+				oraclePending: false,
+				oracleSignoffId: null,
+				oracleInputsDigest: null,
+				lastReviewReport: null,
 			},
 			tempDir,
 			"run-1",
@@ -413,6 +429,10 @@ describe("parallel BUILD integration", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: false,
+				oraclePending: false,
+				oracleSignoffId: null,
+				oracleInputsDigest: null,
+				lastReviewReport: null,
 			},
 			tempDir,
 			"run-1",
@@ -650,6 +670,10 @@ describe("parallel BUILD integration", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: false,
+				oraclePending: false,
+				oracleSignoffId: null,
+				oracleInputsDigest: null,
+				lastReviewReport: null,
 			},
 		};
 
@@ -734,6 +758,13 @@ describe("parallel BUILD integration", () => {
 			worktreePath: null,
 			createdAt: null,
 			lastPushedAt: null,
+			programId: null,
+			trancheId: null,
+			humanTitle: null,
+			commitStrategy: "per_task" as const,
+			reviewSummary: null,
+			oracleSummary: null,
+			verificationSummary: null,
 		};
 		const state: PipelineState = { ...baseState, branchLifecycle: lifecycle };
 
@@ -808,6 +839,13 @@ describe("parallel BUILD integration", () => {
 			worktreePath: null,
 			createdAt: null,
 			lastPushedAt: null,
+			programId: null,
+			trancheId: null,
+			humanTitle: null,
+			commitStrategy: "per_task" as const,
+			reviewSummary: null,
+			oracleSummary: null,
+			verificationSummary: null,
 		};
 		const diskState: PipelineState = { ...baseState, branchLifecycle: lifecycle };
 
@@ -836,6 +874,13 @@ describe("parallel BUILD integration", () => {
 			worktreePath: null,
 			createdAt: null,
 			lastPushedAt: null,
+			programId: null,
+			trancheId: null,
+			humanTitle: null,
+			commitStrategy: "per_task" as const,
+			reviewSummary: null,
+			oracleSummary: null,
+			verificationSummary: null,
 		};
 		const baseState = makeBuildState(
 			[
