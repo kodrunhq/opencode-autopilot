@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.33.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.32.2...opencode-autopilot-v1.33.0) (2026-04-12)
+
+
+### Features
+
+* comprehensive control-plane redesign (OPA-001 through OPA-010) ([bac3d3f](https://github.com/kodrunhq/opencode-autopilot/commit/bac3d3f0ca6992212409f1c03e739399b75d0f60))
+* comprehensive control-plane redesign addressing OPA-001 thru OPA-010 ([7117892](https://github.com/kodrunhq/opencode-autopilot/commit/71178920ae140594b1870d8e33c002deb17885df))
+
+
+### Bug Fixes
+
+* address Codex and Copilot review findings ([f156597](https://github.com/kodrunhq/opencode-autopilot/commit/f156597fae87e421cd02e509ac7bbbcaf9896221))
+* address Oracle review findings ([2145e2a](https://github.com/kodrunhq/opencode-autopilot/commit/2145e2a20e4febbdbb0b3180381112cb58fec3ec))
+* **ci:** store regex in variable to avoid bash parsing error ([c2dc0a6](https://github.com/kodrunhq/opencode-autopilot/commit/c2dc0a629959c7c40ed287dc7868d0f28431c4e4))
+
 ## [1.32.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.32.1...opencode-autopilot-v1.32.2) (2026-04-12)
 
 
