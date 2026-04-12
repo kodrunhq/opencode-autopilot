@@ -5,10 +5,9 @@ import { z } from "zod";
 import { BackgroundManager } from "../background/manager";
 import { type BackgroundSdkOperations, createSdkRunner } from "../background/sdk-runner";
 import { loadConfig } from "../config";
-import { openKernelDb } from "../kernel/database";
+import { openProjectKernelDb } from "../kernel/database";
 import { runKernelMigrations } from "../kernel/migrations";
 import type { TaskStatus } from "../types/background";
-import { getProjectArtifactDir } from "../utils/paths";
 
 const backgroundActionSchema = z.enum(["spawn", "status", "list", "cancel", "result"]);
 
@@ -41,7 +40,7 @@ function createEphemeralKernelDb(): Database {
 }
 
 function openConfiguredBackgroundDb(projectRoot: string, persistence: boolean): Database {
-	return persistence ? openKernelDb(getProjectArtifactDir(projectRoot)) : createEphemeralKernelDb();
+	return persistence ? openProjectKernelDb(projectRoot) : createEphemeralKernelDb();
 }
 
 async function getDefaultManager(projectRoot: string): Promise<BackgroundManager> {

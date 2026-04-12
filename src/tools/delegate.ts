@@ -5,14 +5,14 @@ import { tool } from "@opencode-ai/plugin";
 import { BackgroundManager } from "../background/manager";
 import { type BackgroundSdkOperations, createSdkRunner } from "../background/sdk-runner";
 import { loadConfig } from "../config";
-import { openKernelDb } from "../kernel/database";
+import { openProjectKernelDb } from "../kernel/database";
 import { runKernelMigrations } from "../kernel/migrations";
 import { makeRoutingDecision } from "../routing";
 import { getCategoryDefinition } from "../routing/categories";
 import { buildMultiSkillContext } from "../skills/adaptive-injector";
 import { loadAllSkills } from "../skills/loader";
 import { type Category, CategoryConfigSchema, CategorySchema } from "../types/routing";
-import { getGlobalConfigDir, getProjectArtifactDir } from "../utils/paths";
+import { getGlobalConfigDir } from "../utils/paths";
 
 function buildDisplayText(input: {
 	readonly task: string;
@@ -154,7 +154,7 @@ function createEphemeralKernelDb(): Database {
 }
 
 function openConfiguredDelegateDb(projectRoot: string, persistence: boolean): Database {
-	return persistence ? openKernelDb(getProjectArtifactDir(projectRoot)) : createEphemeralKernelDb();
+	return persistence ? openProjectKernelDb(projectRoot) : createEphemeralKernelDb();
 }
 
 async function getDelegateManager(
