@@ -141,7 +141,9 @@ export function openProjectKernelDb(
 	projectRoot: string,
 	options?: { readonly?: boolean },
 ): Database {
-	migrateLegacyKernelDb(projectRoot);
+	if (!options?.readonly) {
+		migrateLegacyKernelDb(projectRoot);
+	}
 	const artifactDir = getProjectArtifactDir(projectRoot);
 	return openKernelDb(artifactDir, options);
 }

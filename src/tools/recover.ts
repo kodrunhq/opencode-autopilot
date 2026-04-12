@@ -272,7 +272,7 @@ export const ocRecover = tool({
 		sessionId: tool.schema.string().min(1).optional().describe("Session ID to inspect"),
 	},
 	async execute({ action, sessionId }, context) {
-		const projectRoot = context?.projectRoot ?? process.cwd();
+		const projectRoot = context.worktree ?? context.directory ?? process.cwd();
 		const db = openProjectKernelDb(projectRoot);
 		try {
 			return await recoverCore(action, { sessionId: sessionId ?? context.sessionID }, db);

@@ -191,7 +191,7 @@ export function formatVerboseMemories(memories: readonly InspectMemorySummary[])
 			...indentLines([
 				`Confidence: ${memory.confidence}`,
 				`Evidence: ${memory.evidenceCount}`,
-				`Accesses: ${memory.lastAccessed}`,
+				`Last accessed: ${formatTimestamp(memory.lastAccessed)}`,
 			]),
 		);
 		lines.push("");
