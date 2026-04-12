@@ -111,8 +111,6 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 		PRIMARY KEY (run_id, dispatch_id),
 		FOREIGN KEY (run_id) REFERENCES pipeline_runs(run_id) ON DELETE CASCADE
 	)`,
-	`CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_caller_session ON run_pending_dispatches(caller_session_id, issued_at DESC, dispatch_id)`,
-	`CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_spawned_session ON run_pending_dispatches(spawned_session_id, issued_at DESC, dispatch_id)`,
 	`CREATE TABLE IF NOT EXISTS run_processed_results (
 		run_id TEXT NOT NULL,
 		result_id TEXT NOT NULL,

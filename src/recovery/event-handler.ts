@@ -87,7 +87,7 @@ function reconcileStalePendingDispatches(sessionId: string, db: Database): void 
 				`SELECT run_id, dispatch_id, phase, agent
 				 FROM run_pending_dispatches
 				 WHERE caller_session_id = ?
-				   AND status = 'PENDING'`,
+				   AND status IN ('PENDING', 'RESULT_RECEIVED')`,
 			)
 			.all(sessionId) as PendingDispatchRow[];
 

@@ -2173,7 +2173,7 @@ export async function orchestrateCore(
 			const activeState = state;
 			const now = Date.now();
 			const staleDispatches = activeState.pendingDispatches.filter((pending) => {
-				if (pending.status !== "PENDING") {
+				if (pending.status !== "PENDING" && pending.status !== "RESULT_RECEIVED") {
 					return false;
 				}
 				const issued = Date.parse(pending.issuedAt);

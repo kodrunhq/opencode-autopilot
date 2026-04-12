@@ -1,4 +1,3 @@
-// @ts-nocheck
 /// <reference types="bun" />
 
 import { afterEach, describe, expect, test } from "bun:test";

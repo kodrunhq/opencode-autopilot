@@ -23,6 +23,7 @@ type RecoverToolAction = "status" | "retry" | "clear-strategies" | "history" | "
 interface RecoverToolOptions {
 	readonly sessionId?: string;
 	readonly runId?: string;
+	readonly dispatchId?: string;
 	readonly orchestrator?: RecoveryOrchestrator;
 }
 
@@ -30,7 +31,8 @@ interface RecoveryTargetResolution {
 	readonly sessionIds: readonly string[];
 	readonly sessionId: string | null;
 	readonly runId: string | null;
-	readonly source: "session" | "run";
+	readonly dispatchId: string | null;
+	readonly source: "session" | "run" | "dispatch";
 }
 
 interface RecoverySessionState {
@@ -77,6 +79,37 @@ function loadPipelineStateForRun(db: Database, runId: string) {
 	}
 }
 
+interface PendingDispatchLookupRow {
+	readonly run_id: string;
+	readonly caller_session_id: string | null;
+	readonly session_id: string | null;
+}
+
+function resolveRecoveryDispatch(db: Database, dispatchId: string) {
+	const row = db
+		.query(
+			`SELECT run_id, caller_session_id, session_id
+			 FROM run_pending_dispatches
+			 WHERE dispatch_id = ?
+			 ORDER BY issued_at DESC
+			 LIMIT 1`,
+		)
+		.get(dispatchId) as PendingDispatchLookupRow | null;
+	if (!row) {
+		return null;
+	}
+
+	const sessionId = row.caller_session_id ?? row.session_id;
+	if (!sessionId) {
+		return null;
+	}
+
+	return Object.freeze({
+		runId: row.run_id,
+		sessionId,
+	});
+}
+
 function resolveRecoveryTarget(
 	options: RecoverToolOptions,
 	db?: Database,
@@ -86,7 +119,23 @@ function resolveRecoveryTarget(
 			sessionIds: Object.freeze([options.sessionId]),
 			sessionId: options.sessionId,
 			runId: null,
+			dispatchId: null,
 			source: "session",
+		};
+	}
+
+	if (options.dispatchId && db) {
+		const resolvedDispatch = resolveRecoveryDispatch(db, options.dispatchId);
+		if (!resolvedDispatch) {
+			return null;
+		}
+
+		return {
+			sessionIds: Object.freeze([resolvedDispatch.sessionId]),
+			sessionId: resolvedDispatch.sessionId,
+			runId: resolvedDispatch.runId,
+			dispatchId: options.dispatchId,
+			source: "dispatch",
 		};
 	}
 
@@ -108,6 +157,7 @@ function resolveRecoveryTarget(
 		sessionIds,
 		sessionId: sessionIds[0] ?? null,
 		runId: options.runId,
+		dispatchId: null,
 		source: "run",
 	};
 }
@@ -116,17 +166,19 @@ function formatRecoveryStatusDisplay(
 	target: RecoveryTargetResolution,
 	states: readonly RecoverySessionState[],
 ): string {
-	if (target.source === "session") {
+	if (target.source === "session" || target.source === "dispatch") {
 		const entry = states[0];
+		const headingLines = [
+			...(target.dispatchId ? [`Dispatch: ${target.dispatchId}`] : []),
+			...(target.runId ? [`Run: ${target.runId}`] : []),
+			`Session: ${target.sessionId}`,
+		];
 		if (!entry || entry.state === null) {
-			return createDisplayText("Recovery status", [
-				`Session: ${target.sessionId}`,
-				"No recovery state found.",
-			]);
+			return createDisplayText("Recovery status", [...headingLines, "No recovery state found."]);
 		}
 
 		return createDisplayText("Recovery status", [
-			`Session: ${entry.sessionId}`,
+			...headingLines,
 			`Attempts: ${entry.state.attempts.length}/${entry.state.maxAttempts}`,
 			`Recovering: ${entry.state.isRecovering ? "yes" : "no"}`,
 			`Current strategy: ${entry.state.currentStrategy ?? "<none>"}`,
@@ -151,8 +203,13 @@ function buildRecoveryHistoryDisplay(
 		readonly history: RecoveryState["attempts"];
 	}[],
 ): string {
-	if (target.source === "session") {
+	if (target.source === "session" || target.source === "dispatch") {
 		const history = histories[0]?.history ?? [];
+		const targetLines = [
+			...(target.dispatchId ? [`Dispatch: ${target.dispatchId}`] : []),
+			...(target.runId ? [`Run: ${target.runId}`] : []),
+			`Session: ${target.sessionId}`,
+		];
 		return createDisplayText(
 			"Recovery history",
 			history.length > 0
@@ -160,7 +217,7 @@ function buildRecoveryHistoryDisplay(
 						(attempt) =>
 							`#${attempt.attemptNumber} ${attempt.errorCategory} -> ${attempt.strategy} (${attempt.success ? "success" : "pending"})`,
 					)
-				: [`Session: ${target.sessionId}`, "No recovery attempts found."],
+				: [...targetLines, "No recovery attempts found."],
 		);
 	}
 
@@ -218,9 +275,11 @@ export async function recoverCore(
 	if (!target) {
 		return JSON.stringify({
 			action: "error",
-			message: options.runId
-				? `No pending dispatch caller sessions found for runId ${options.runId}`
-				: "sessionId required",
+			message: options.dispatchId
+				? `No pending dispatch caller session found for dispatchId ${options.dispatchId}`
+				: options.runId
+					? `No pending dispatch caller sessions found for runId ${options.runId}`
+					: "sessionId required",
 		});
 	}
 
@@ -236,6 +295,7 @@ export async function recoverCore(
 				action: "recovery_status",
 				sessionId: target.sessionId,
 				runId: target.runId,
+				dispatchId: target.dispatchId,
 				resolvedSessionIds: target.sessionIds,
 				state: sessionStates[0]?.state ?? null,
 				states: target.source === "run" ? sessionStates : undefined,
@@ -252,6 +312,7 @@ export async function recoverCore(
 				action: "recovery_history",
 				sessionId: target.sessionId,
 				runId: target.runId,
+				dispatchId: target.dispatchId,
 				resolvedSessionIds: target.sessionIds,
 				history: histories[0]?.history ?? [],
 				histories: target.source === "run" ? histories : undefined,
@@ -271,9 +332,11 @@ export async function recoverCore(
 				action: "recovery_clear_strategies",
 				sessionId: target.sessionId,
 				runId: target.runId,
+				dispatchId: target.dispatchId,
 				resolvedSessionIds: target.sessionIds,
 				ok: true,
 				displayText: createDisplayText("Recovery strategies cleared", [
+					...(target.dispatchId ? [`Dispatch: ${target.dispatchId}`] : []),
 					...(target.runId ? [`Run: ${target.runId}`] : []),
 					...target.sessionIds.map((sessionId) => `Session: ${sessionId}`),
 					"Recovery strategy state cleared for all resolved sessions.",
@@ -407,10 +470,12 @@ export async function recoverCore(
 				action: "recovery_retry",
 				sessionId: target.sessionId,
 				runId: target.runId,
+				dispatchId: target.dispatchId,
 				resolvedSessionIds: target.sessionIds,
 				nextAction,
 				retries: target.source === "run" ? retries : undefined,
 				displayText: createDisplayText("Recovery retry", [
+					...(target.dispatchId ? [`Dispatch: ${target.dispatchId}`] : []),
 					...(target.runId ? [`Run: ${target.runId}`] : []),
 					...retries.map(
 						(retry) =>
@@ -420,25 +485,28 @@ export async function recoverCore(
 			});
 		}
 	}
-
-	return JSON.stringify({ action: "error", message: `Unsupported action: ${action}` });
 }
 
 export const ocRecover = tool({
 	description:
-		"Inspect and manage session recovery state. Actions: status, retry, clear-strategies, history, finalize-stuck. Accepts sessionId or runId. The finalize-stuck action marks stale pending dispatches as INTERRUPTED. Returns JSON with displayText.",
+		"Inspect and manage session recovery state. Actions: status, retry, clear-strategies, history, finalize-stuck. Accepts sessionId, runId, or dispatchId. The finalize-stuck action marks stale pending dispatches as INTERRUPTED. Returns JSON with displayText.",
 	args: {
 		action: recoverActionSchema.describe("Recovery action"),
 		sessionId: tool.schema.string().min(1).optional().describe("Session ID to inspect"),
 		runId: tool.schema.string().min(1).optional().describe("Run ID to inspect"),
+		dispatchId: tool.schema.string().min(1).optional().describe("Dispatch ID to inspect"),
 	},
-	async execute({ action, sessionId, runId }, context) {
+	async execute({ action, sessionId, runId, dispatchId }, context) {
 		const projectRoot = context.worktree ?? context.directory ?? process.cwd();
 		const db = openProjectKernelDb(projectRoot);
 		try {
 			return await recoverCore(
 				action,
-				{ sessionId: runId ? sessionId : (sessionId ?? context.sessionID), runId },
+				{
+					sessionId: runId || dispatchId ? sessionId : (sessionId ?? context.sessionID),
+					runId,
+					dispatchId,
+				},
 				db,
 			);
 		} finally {

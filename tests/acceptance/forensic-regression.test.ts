@@ -1,17 +1,21 @@
 /// <reference types="bun" />
 
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDefaultConfig, loadConfig, pluginConfigSchema } from "../../src/config";
 import { configModeCoherenceCheck } from "../../src/health/checks";
+import { openKernelDb } from "../../src/kernel/database";
+import { getPhaseDir } from "../../src/orchestrator/artifacts";
 import { handleArchitect } from "../../src/orchestrator/handlers/architect";
 import { handleChallenge } from "../../src/orchestrator/handlers/challenge";
 import { handleRecon } from "../../src/orchestrator/handlers/recon";
 import type { DispatchResult } from "../../src/orchestrator/handlers/types";
 import { PHASES, pendingDispatchSchema, pipelineStateSchema } from "../../src/orchestrator/schemas";
+import { loadState } from "../../src/orchestrator/state";
 import type { PipelineState } from "../../src/orchestrator/types";
+import { orchestrateCore } from "../../src/tools/orchestrate";
 import { sanitizeChatMessageParts } from "../../src/ux/visibility";
 
 const tempDirs: string[] = [];
@@ -167,6 +171,93 @@ describe("forensic regression acceptance", () => {
 			"agent output",
 		);
 		expectRecoverableArtifactError(architectResult, "ARCHITECT", "design.md");
+	});
+
+	test("RECON failure sequence keeps the original dispatch recoverable until retry advances to CHALLENGE", async () => {
+		const tempDir = await createTempDir("recon-failure-sequence");
+		const first = JSON.parse(
+			await orchestrateCore({ idea: "test recon failure", intent: "implementation" }, tempDir),
+		);
+
+		expect(first.action).toBe("dispatch");
+		expect(first.phase).toBe("RECON");
+
+		const missingArtifactEnvelope = {
+			schemaVersion: 1,
+			resultId: "recon-failure-sequence-1",
+			runId: first.runId,
+			phase: "RECON",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "research complete" },
+		};
+
+		const failedAttempt = JSON.parse(
+			await orchestrateCore({ result: JSON.stringify(missingArtifactEnvelope) }, tempDir),
+		);
+		expectRecoverableArtifactError(failedAttempt, "RECON", "report.md");
+
+		const stateAfterFailure = await loadState(tempDir);
+		const failedDispatch = stateAfterFailure?.pendingDispatches.find(
+			(dispatch) => dispatch.dispatchId === first.dispatchId,
+		);
+
+		expect(stateAfterFailure?.status).toBe("IN_PROGRESS");
+		expect(failedDispatch).toMatchObject({
+			dispatchId: first.dispatchId,
+			status: "FAILED_RECOVERABLE",
+			receivedResultId: "recon-failure-sequence-1",
+		});
+
+		const dbAfterFailure = openKernelDb(tempDir);
+		try {
+			const persistedDispatch = dbAfterFailure
+				.query("SELECT status FROM run_pending_dispatches WHERE dispatch_id = ?")
+				.get(first.dispatchId) as { readonly status: string } | null;
+			expect(persistedDispatch).toEqual({ status: "FAILED_RECOVERABLE" });
+		} finally {
+			dbAfterFailure.close();
+		}
+
+		const reconDir = getPhaseDir(tempDir, "RECON", first.runId);
+		await mkdir(reconDir, { recursive: true });
+		await writeFile(join(reconDir, "report.md"), "# Report\nrecovered recon artifact", "utf-8");
+
+		const retriedAttempt = JSON.parse(
+			await orchestrateCore(
+				{
+					result: JSON.stringify({
+						...missingArtifactEnvelope,
+						resultId: "recon-failure-sequence-2",
+					}),
+				},
+				tempDir,
+			),
+		);
+
+		expect(retriedAttempt.action).toBe("dispatch");
+		expect(retriedAttempt.phase).toBe("CHALLENGE");
+
+		const stateAfterRetry = await loadState(tempDir);
+		expect(
+			stateAfterRetry?.pendingDispatches.some(
+				(dispatch) => dispatch.dispatchId === first.dispatchId,
+			),
+		).toBe(false);
+		expect(stateAfterRetry?.processedResultIds).not.toContain("recon-failure-sequence-1");
+		expect(stateAfterRetry?.processedResultIds).toContain("recon-failure-sequence-2");
+
+		const dbAfterRetry = openKernelDb(tempDir);
+		try {
+			const persistedDispatch = dbAfterRetry
+				.query("SELECT status FROM run_pending_dispatches WHERE dispatch_id = ?")
+				.get(first.dispatchId);
+			expect(persistedDispatch).toBeNull();
+		} finally {
+			dbAfterRetry.close();
+		}
 	});
 
 	test("session correlation preserves caller and spawned session ids while keeping sessionId aliased", () => {

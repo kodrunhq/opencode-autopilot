@@ -117,4 +117,54 @@ describe("recoverCore", () => {
 			db.close();
 		}
 	});
+
+	test("status resolves recovery state from dispatchId via pending dispatch caller session", async () => {
+		const state = createInitialState("recover by dispatchId");
+		await saveState(
+			{
+				...state,
+				pendingDispatches: [
+					{
+						dispatchId: "dispatch_recover_dispatch",
+						phase: "RECON",
+						agent: "oc-researcher",
+						issuedAt: new Date().toISOString(),
+						status: "FAILED_RECOVERABLE",
+						receivedResultId: "result-recover-dispatch",
+						receivedAt: new Date().toISOString(),
+						resultKind: "phase_output",
+						taskId: null,
+						callerSessionId: "sess-dispatch",
+						spawnedSessionId: null,
+						sessionId: "sess-dispatch",
+					},
+				],
+			},
+			tempDir,
+		);
+
+		const db = openKernelDb(tempDir);
+		try {
+			saveRecoveryState(db, {
+				sessionId: "sess-dispatch",
+				attempts: Object.freeze([]),
+				currentStrategy: null,
+				maxAttempts: 3,
+				isRecovering: false,
+				lastError: null,
+			});
+
+			const result = JSON.parse(
+				await recoverCore("status", { dispatchId: "dispatch_recover_dispatch" }, db),
+			);
+			expect(result.action).toBe("recovery_status");
+			expect(result.dispatchId).toBe("dispatch_recover_dispatch");
+			expect(result.runId).toBe(state.runId);
+			expect(result.sessionId).toBe("sess-dispatch");
+			expect(result.resolvedSessionIds).toEqual(["sess-dispatch"]);
+			expect(result.state.sessionId).toBe("sess-dispatch");
+		} finally {
+			db.close();
+		}
+	});
 });

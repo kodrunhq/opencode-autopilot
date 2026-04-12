@@ -287,6 +287,12 @@ function ensurePendingDispatchSessionCorrelationColumns(database: Database): voi
 	);
 	database.run("DROP TABLE run_pending_dispatches");
 	database.run(`ALTER TABLE ${rebuildTable} RENAME TO run_pending_dispatches`);
+	database.run(
+		"CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_caller_session ON run_pending_dispatches(caller_session_id, issued_at DESC, dispatch_id)",
+	);
+	database.run(
+		"CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_spawned_session ON run_pending_dispatches(spawned_session_id, issued_at DESC, dispatch_id)",
+	);
 }
 
 function backfillBackgroundTaskColumns(database: Database): void {
@@ -373,6 +379,12 @@ export function runKernelMigrations(database: Database): void {
 	backfillProjectAwareColumns(database);
 	migrateTaskIdToText(database);
 	ensurePendingDispatchSessionCorrelationColumns(database);
+	database.run(
+		"CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_caller_session ON run_pending_dispatches(caller_session_id, issued_at DESC, dispatch_id)",
+	);
+	database.run(
+		"CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_spawned_session ON run_pending_dispatches(spawned_session_id, issued_at DESC, dispatch_id)",
+	);
 	backfillBackgroundTaskColumns(database);
 
 	if (currentVersion < KERNEL_SCHEMA_VERSION) {
