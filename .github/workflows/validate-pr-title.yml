@@ -20,7 +20,8 @@ jobs:
             exit 0
           fi
 
-          if [[ "$PR_TITLE" =~ ^(feat|fix|deps|chore|docs|refactor|perf|test|build|ci|revert|style)(\([^)]+\))?(!)?:\ .+ ]]; then
+          re='^(feat|fix|deps|chore|docs|refactor|perf|test|build|ci|revert|style)(\([^)]+\))?(!)?:\ .+'
+          if [[ "$PR_TITLE" =~ $re ]]; then
             exit 0
           fi
 
