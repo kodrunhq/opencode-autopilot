@@ -3,7 +3,7 @@ import { access, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { Config } from "@opencode-ai/plugin";
 import { parse } from "yaml";
-import { loadConfig } from "../config";
+import { inspectConfigMode, loadConfig } from "../config";
 import { getGlobalMcpManager } from "../mcp";
 import { AGENT_NAMES } from "../orchestrator/handlers/types";
 import { ALL_GROUP_IDS } from "../registry/model-groups";
@@ -211,6 +211,54 @@ export async function configV7FieldsCheck(configPath?: string): Promise<HealthRe
 			name: "config-v7-fields",
 			status: "fail" as const,
 			message: `Config v7 fields check failed: ${msg}`,
+		});
+	}
+}
+
+export async function configModeCoherenceCheck(configPath?: string): Promise<HealthResult> {
+	const resolvedPath = configPath ?? join(getGlobalConfigDir(), "opencode-autopilot.json");
+	try {
+		const config = await loadConfig(resolvedPath);
+		if (config === null) {
+			return Object.freeze({
+				name: "config-mode-coherence",
+				status: "fail" as const,
+				message: "Config file not found",
+			});
+		}
+
+		const analysis = inspectConfigMode(config);
+		const errors = analysis.issues.filter((issue) => issue.severity === "error");
+		const warnings = analysis.issues.filter((issue) => issue.severity !== "error");
+
+		if (errors.length > 0) {
+			const messages = errors.map((e) => e.message).join("; ");
+			return Object.freeze({
+				name: "config-mode-coherence",
+				status: "fail" as const,
+				message: `Mode invariants violated: ${messages}`,
+				details: Object.freeze(errors.map((e) => `[${e.code}] ${e.message}`)),
+			});
+		}
+
+		const modeLabel = `${config.mode.interactionMode}/${config.mode.executionMode}/${config.mode.visibilityMode}/${config.mode.verificationMode}`;
+		const warningSuffix =
+			warnings.length > 0 ? ` (${warnings.map((w) => w.message).join("; ")})` : "";
+		const autonomousSafe =
+			config.mode.interactionMode !== "autonomous" || analysis.verificationProfileConfigured;
+		const status = autonomousSafe ? ("pass" as const) : ("fail" as const);
+
+		return Object.freeze({
+			name: "config-mode-coherence",
+			status,
+			message: `Canonical mode: ${modeLabel}${warningSuffix}`,
+		});
+	} catch (error: unknown) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return Object.freeze({
+			name: "config-mode-coherence",
+			status: "fail" as const,
+			message: `Mode coherence check failed: ${msg}`,
 		});
 	}
 }

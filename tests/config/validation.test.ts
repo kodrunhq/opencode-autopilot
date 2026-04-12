@@ -5,7 +5,6 @@ import { join } from "node:path";
 import {
 	createDefaultConfig,
 	inspectConfigMode,
-	loadConfig,
 	pluginConfigSchema,
 	saveConfig,
 } from "../../src/config";
@@ -159,7 +158,7 @@ describe("Config Migration", () => {
 });
 
 describe("Canonical mode validation", () => {
-	test("inspectConfigMode warns when legacy autonomy intent is contradictory", () => {
+	test("inspectConfigMode errors when legacy autonomy intent is contradictory", () => {
 		const config = {
 			...createDefaultConfig(),
 			orchestrator: {
@@ -170,8 +169,11 @@ describe("Canonical mode validation", () => {
 
 		const result = inspectConfigMode(config);
 
-		expect(result.hasErrors).toBe(false);
+		expect(result.hasErrors).toBe(true);
 		expect(result.issues.map((issue) => issue.code)).toContain("disabled_legacy_mode_flags");
+		expect(
+			result.issues.find((issue) => issue.code === "disabled_legacy_mode_flags")?.severity,
+		).toBe("error");
 	});
 
 	test("pluginConfigSchema rejects contradictory autonomous mode", () => {
@@ -242,7 +244,7 @@ describe("Canonical mode validation", () => {
 		}
 	});
 
-	test("loadConfig injects canonical mode into legacy v7 configs", async () => {
+	test("loadConfig rejects contradictory legacy v7 config instead of silently downgrading", async () => {
 		const tmpDir = join(tmpdir(), `config-mode-migration-${Date.now()}`);
 		await mkdir(tmpDir, { recursive: true });
 		const configPath = join(tmpDir, "config.json");
@@ -282,10 +284,9 @@ describe("Canonical mode validation", () => {
 			};
 			await writeFile(configPath, JSON.stringify(legacyV7Config, null, 2), "utf-8");
 
-			const loaded = await loadConfig(configPath);
-
-			expect(loaded?.mode.interactionMode).toBe("interactive");
-			expect(loaded?.mode.executionMode).toBe("foreground");
+			expect(() => pluginConfigSchema.parse(legacyV7Config)).toThrow(
+				/Contradictory autonomy configuration/,
+			);
 		} finally {
 			await rm(tmpDir, { recursive: true, force: true });
 		}

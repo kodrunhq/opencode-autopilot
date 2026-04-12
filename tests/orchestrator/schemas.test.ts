@@ -3,6 +3,7 @@ import {
 	confidenceEntrySchema,
 	decisionEntrySchema,
 	PHASES,
+	pendingDispatchSchema,
 	phaseSchema,
 	phaseStatusSchema,
 	pipelineStateSchema,
@@ -135,6 +136,38 @@ describe("taskSchema", () => {
 		const result = taskSchema.parse(task);
 		expect(result.attempt).toBe(3);
 		expect(result.strike).toBe(1);
+	});
+});
+
+describe("pendingDispatchSchema", () => {
+	test("applies transactional result-handling defaults", () => {
+		const pending = pendingDispatchSchema.parse({
+			dispatchId: "dispatch_recon_1",
+			phase: "RECON",
+			agent: "oc-researcher",
+			issuedAt: "2026-03-31T00:00:00Z",
+		});
+
+		expect(pending.status).toBe("PENDING");
+		expect(pending.receivedResultId).toBeNull();
+		expect(pending.receivedAt).toBeNull();
+		expect(pending.callerSessionId).toBeNull();
+		expect(pending.spawnedSessionId).toBeNull();
+		expect(pending.sessionId).toBeNull();
+	});
+
+	test("aliases legacy sessionId into callerSessionId", () => {
+		const pending = pendingDispatchSchema.parse({
+			dispatchId: "dispatch_recon_legacy",
+			phase: "RECON",
+			agent: "oc-researcher",
+			issuedAt: "2026-03-31T00:00:00Z",
+			sessionId: "session-parent",
+		});
+
+		expect(pending.callerSessionId).toBe("session-parent");
+		expect(pending.spawnedSessionId).toBeNull();
+		expect(pending.sessionId).toBe("session-parent");
 	});
 });
 

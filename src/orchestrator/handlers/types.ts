@@ -14,6 +14,8 @@ export const AGENT_NAMES = Object.freeze({
 	RETROSPECTIVE: "oc-shipper",
 } as const);
 
+export type ErrorSeverity = "recoverable" | "terminal";
+
 export interface DispatchResult {
 	readonly action: "dispatch" | "dispatch_multi" | "complete" | "error";
 	readonly code?: string;
@@ -35,6 +37,7 @@ export interface DispatchResult {
 	readonly dispatchId?: string;
 	readonly runId?: string;
 	readonly expectedResultKind?: DispatchResultKind;
+	readonly errorSeverity?: ErrorSeverity;
 	readonly _stateUpdates?: Partial<PipelineState>;
 	readonly _userProgress?: string;
 }

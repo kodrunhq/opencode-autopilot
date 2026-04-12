@@ -27,7 +27,7 @@ describe("Config migration chain integration: v1 through v6", () => {
 		expect(result?.configured).toBe(true);
 
 		// Orchestrator defaults
-		expect(result?.orchestrator.autonomy).toBe("full");
+		expect(result?.orchestrator.autonomy).toBe("supervised");
 		expect(result?.orchestrator.strictness).toBe("normal");
 		expect(result?.orchestrator.phases.recon).toBe(true);
 		expect(result?.orchestrator.phases.build).toBe(true);

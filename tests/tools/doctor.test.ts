@@ -46,7 +46,7 @@ describe("doctorCore", () => {
 					utilities: { primary: "a/m8", fallbacks: [] },
 				},
 				overrides: {},
-				orchestrator: {},
+				orchestrator: { autonomy: "supervised" },
 				confidence: {},
 				fallback: {},
 			}),
@@ -209,7 +209,7 @@ describe("doctorCore", () => {
 		);
 
 		const checkNames = result.checks.map((c: { name: string }) => c.name);
-		expect(result.checks.length).toBe(12);
+		expect(result.checks.length).toBe(13);
 		expect(checkNames).toEqual([
 			"config-validity",
 			"agent-injection",
@@ -219,6 +219,7 @@ describe("doctorCore", () => {
 			"memory-db",
 			"command-accessibility",
 			"config-v7-fields",
+			"config-mode-coherence",
 			"routing-health",
 			"mcp-health",
 			"lsp-servers",

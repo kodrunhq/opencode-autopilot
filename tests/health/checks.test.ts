@@ -535,7 +535,7 @@ describe("mcpHealthCheck", () => {
 				configured: true,
 				groups: {},
 				overrides: {},
-				orchestrator: { autonomy: "full", strictness: "normal", phases: {} },
+				orchestrator: { autonomy: "supervised", strictness: "normal", phases: {} },
 				confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
 				fallback: {
 					enabled: true,
@@ -568,15 +568,17 @@ describe("mcpHealthCheck", () => {
 			join(skillsDir, "SKILL.md"),
 			`---
 name: docs
-description: Docs skill
-stacks: []
-requires: []
+description: Documentation server
 mcp:
   serverName: docs-server
+  transport: stdio
   command: npx
+  args: ["-y", "docs-server"]
 ---
-# Docs`,
+
+`,
 		);
+
 		const configPath = join(tempDir, "opencode-autopilot.json");
 		await writeFile(
 			configPath,
@@ -585,7 +587,7 @@ mcp:
 				configured: true,
 				groups: {},
 				overrides: {},
-				orchestrator: { autonomy: "full", strictness: "normal", phases: {} },
+				orchestrator: { autonomy: "supervised", strictness: "normal", phases: {} },
 				confidence: { enabled: true, thresholds: { proceed: "MEDIUM", abort: "LOW" } },
 				fallback: {
 					enabled: true,
@@ -595,9 +597,15 @@ mcp:
 					testMode: { forceError: false, forcedErrorType: null },
 				},
 				memory: { enabled: true, injectionBudget: 2000, decayHalfLifeDays: 90 },
-				background: {},
+				mode: {
+					interactionMode: "interactive",
+					executionMode: "foreground",
+					visibilityMode: "summary",
+					verificationMode: "normal",
+				},
+				background: { enabled: false, maxConcurrent: 5, persistence: true },
 				autonomy: { enabled: false, verification: "normal", maxIterations: 10 },
-				routing: {},
+				routing: { enabled: false, categories: {} },
 				recovery: {},
 				mcp: { enabled: true, skills: {} },
 			}),

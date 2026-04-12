@@ -69,6 +69,209 @@ function collapseWhitespace(text: string): string {
 	return text.replace(/\s+/gu, " ").trim();
 }
 
+type PromptLineStrength = "strong" | "weak";
+
+interface PromptLikeSection {
+	readonly startLineIndex: number;
+	readonly endLineIndex: number;
+	readonly promptLineCount: number;
+	readonly strongPromptLineCount: number;
+}
+
+interface PromptRedactionRange {
+	readonly startLineIndex: number;
+	readonly endLineIndex: number;
+}
+
+const INTERNAL_PROMPT_REDACTION = "[internal prompt redacted]";
+
+function readPromptLineStrength(line: string): PromptLineStrength | null {
+	const trimmed = line.trim();
+	if (trimmed.length === 0) {
+		return null;
+	}
+
+	if (/\btask\((?:category|subagent_type)=/u.test(trimmed)) {
+		return "strong";
+	}
+
+	if (/^##\s*(?:TASK|CONTEXT|GOAL|EXPECTED OUTCOME|MUST DO|MUST NOT DO)\b:?/iu.test(trimmed)) {
+		return "strong";
+	}
+
+	if (/^(?:MUST DO|MUST NOT DO)\s*:/iu.test(trimmed)) {
+		return "strong";
+	}
+
+	if (/^#{0,3}\s*DELEGATION PROMPT\b:?/iu.test(trimmed)) {
+		return "strong";
+	}
+
+	if (/^##\s*PHASE\b/iu.test(trimmed) || /^###\s*STEP\b/iu.test(trimmed)) {
+		return "weak";
+	}
+
+	if (/^IMPORTANT\s*:/iu.test(trimmed) || /^YOU ARE\b/iu.test(trimmed)) {
+		return "weak";
+	}
+
+	if (/^YOUR TASK IS\b/iu.test(trimmed)) {
+		return "weak";
+	}
+
+	return null;
+}
+
+function collectPromptLikeSections(lines: readonly string[]): readonly PromptLikeSection[] {
+	const sections: PromptLikeSection[] = [];
+	let lineIndex = 0;
+
+	while (lineIndex < lines.length) {
+		while (lineIndex < lines.length && lines[lineIndex]?.trim().length === 0) {
+			lineIndex += 1;
+		}
+
+		if (lineIndex >= lines.length) {
+			break;
+		}
+
+		const startLineIndex = lineIndex;
+		let promptLineCount = 0;
+		let strongPromptLineCount = 0;
+
+		while (lineIndex < lines.length && lines[lineIndex]?.trim().length !== 0) {
+			const promptLineStrength = readPromptLineStrength(lines[lineIndex] ?? "");
+			if (promptLineStrength !== null) {
+				promptLineCount += 1;
+				if (promptLineStrength === "strong") {
+					strongPromptLineCount += 1;
+				}
+			}
+
+			lineIndex += 1;
+		}
+
+		sections.push({
+			startLineIndex,
+			endLineIndex: lineIndex - 1,
+			promptLineCount,
+			strongPromptLineCount,
+		});
+	}
+
+	return sections;
+}
+
+function mergePromptRedactionRanges(
+	ranges: readonly PromptRedactionRange[],
+): readonly PromptRedactionRange[] {
+	if (ranges.length <= 1) {
+		return ranges;
+	}
+
+	const sortedRanges = [...ranges].sort(
+		(left, right) => left.startLineIndex - right.startLineIndex,
+	);
+	const mergedRanges: PromptRedactionRange[] = [sortedRanges[0] as PromptRedactionRange];
+
+	for (const range of sortedRanges.slice(1)) {
+		const previousRange = mergedRanges[mergedRanges.length - 1];
+		if (previousRange && range.startLineIndex <= previousRange.endLineIndex + 1) {
+			mergedRanges[mergedRanges.length - 1] = {
+				startLineIndex: previousRange.startLineIndex,
+				endLineIndex: Math.max(previousRange.endLineIndex, range.endLineIndex),
+			};
+			continue;
+		}
+
+		mergedRanges.push(range);
+	}
+
+	return mergedRanges;
+}
+
+function collectPromptRedactionRanges(lines: readonly string[]): readonly PromptRedactionRange[] {
+	const sections = collectPromptLikeSections(lines);
+	const ranges: PromptRedactionRange[] = [];
+	let runStartSectionIndex: number | null = null;
+	let runPromptLineCount = 0;
+	let runStrongPromptLineCount = 0;
+
+	const flushRun = (endSectionIndex: number) => {
+		if (runStartSectionIndex === null || runPromptLineCount < 3 || runStrongPromptLineCount === 0) {
+			return;
+		}
+
+		const startSection = sections[runStartSectionIndex];
+		const endSection = sections[endSectionIndex];
+		if (!startSection || !endSection) {
+			return;
+		}
+
+		ranges.push({
+			startLineIndex: startSection.startLineIndex,
+			endLineIndex: endSection.endLineIndex,
+		});
+	};
+
+	for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
+		const section = sections[sectionIndex];
+		if (section.promptLineCount > 0) {
+			if (runStartSectionIndex === null) {
+				runStartSectionIndex = sectionIndex;
+				runPromptLineCount = 0;
+				runStrongPromptLineCount = 0;
+			}
+
+			runPromptLineCount += section.promptLineCount;
+			runStrongPromptLineCount += section.strongPromptLineCount;
+			continue;
+		}
+
+		flushRun(sectionIndex - 1);
+		runStartSectionIndex = null;
+		runPromptLineCount = 0;
+		runStrongPromptLineCount = 0;
+	}
+
+	flushRun(sections.length - 1);
+
+	return mergePromptRedactionRanges(ranges);
+}
+
+export function stripLeakedPromptContent(text: string): string {
+	if (text.trim().length === 0) {
+		return "";
+	}
+
+	const lines = text.split(/\r?\n/u);
+	const redactionRanges = collectPromptRedactionRanges(lines);
+	if (redactionRanges.length === 0) {
+		return text;
+	}
+
+	const redactedLines: string[] = [];
+	let lineIndex = 0;
+
+	for (const range of redactionRanges) {
+		if (lineIndex < range.startLineIndex) {
+			redactedLines.push(...lines.slice(lineIndex, range.startLineIndex));
+		}
+
+		if (redactedLines[redactedLines.length - 1] !== INTERNAL_PROMPT_REDACTION) {
+			redactedLines.push(INTERNAL_PROMPT_REDACTION);
+		}
+
+		lineIndex = range.endLineIndex + 1;
+	}
+
+	if (lineIndex < lines.length) {
+		redactedLines.push(...lines.slice(lineIndex));
+	}
+
+	return collapseBlankLines(redactedLines.join("\n")).trim();
+}
+
 export function stripInternalReasoning(text: string): string {
 	if (text.trim().length === 0) {
 		return "";
@@ -115,7 +318,7 @@ export function sanitizeChatMessageParts(parts: unknown[]): void {
 			continue;
 		}
 
-		const sanitizedText = stripInternalReasoning(record.text);
+		const sanitizedText = stripLeakedPromptContent(stripInternalReasoning(record.text));
 		if (sanitizedText.length === 0) {
 			continue;
 		}
@@ -460,7 +663,7 @@ export function createToolVisibilityProjectionHandler(options: {
 			return;
 		}
 
-		output.output = stripInternalReasoning(output.output);
+		output.output = stripLeakedPromptContent(stripInternalReasoning(output.output));
 	};
 }
 

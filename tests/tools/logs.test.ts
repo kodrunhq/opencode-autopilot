@@ -4,7 +4,9 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createForensicEvent, resetDedupCache } from "../../src/observability/forensic-log";
+import { createInitialState, saveState } from "../../src/orchestrator/state";
 import { logsCore } from "../../src/tools/logs";
+import { getProjectArtifactDir } from "../../src/utils/paths";
 import { writeForensicSession } from "../observability/test-helpers";
 
 describe("oc_logs tool", () => {
@@ -98,6 +100,41 @@ describe("oc_logs tool", () => {
 		const result = JSON.parse(await logsCore("detail", undefined, testDir));
 		expect(result.action).toBe("logs_detail");
 		expect(result.sessionLog.sessionId).toBe("session-latest");
+	});
+
+	test("logsCore detail resolves session logs from runId", async () => {
+		const sessionId = "session-run-detail";
+		await createSessionLog(sessionId);
+
+		const state = createInitialState("logs by runId");
+		await saveState(
+			{
+				...state,
+				pendingDispatches: [
+					{
+						dispatchId: "dispatch_logs_run",
+						phase: "RECON",
+						agent: "oc-researcher",
+						issuedAt: "2026-04-01T10:00:00Z",
+						status: "PENDING",
+						receivedResultId: null,
+						receivedAt: null,
+						resultKind: "phase_output",
+						taskId: null,
+						callerSessionId: sessionId,
+						spawnedSessionId: "child-run-detail",
+						sessionId,
+					},
+				],
+			},
+			getProjectArtifactDir(testDir),
+		);
+
+		const result = JSON.parse(await logsCore("detail", { runId: state.runId }, testDir));
+		expect(result.action).toBe("logs_detail");
+		expect(result.runId).toBe(state.runId);
+		expect(result.resolvedSessionIds).toEqual([sessionId]);
+		expect(result.sessionLog.sessionId).toBe(sessionId);
 	});
 
 	test("logsCore search filters events by type", async () => {

@@ -381,6 +381,7 @@ export function createShipHandler(deps: ShipHandlerDeps = {}): PhaseHandler {
 			if (!hasArtifacts) {
 				return Object.freeze({
 					action: "error",
+					errorSeverity: "recoverable",
 					phase: "SHIP",
 					message: `SHIP agent returned a result but did not write required artifacts in ${shipDir}. At least one of walkthrough.md, decisions.md, or changelog.md must exist.`,
 				} satisfies DispatchResult);

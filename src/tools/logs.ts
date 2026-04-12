@@ -14,16 +14,22 @@
 
 import { tool } from "@opencode-ai/plugin";
 import { z } from "zod";
+import { openProjectKernelDb } from "../kernel/database";
 import {
 	listSessionLogs,
 	readLatestSessionLog,
 	readSessionLog,
+	type SessionLog,
 	searchEvents,
 } from "../observability/log-reader";
 import { generateSessionSummary } from "../observability/summary-generator";
+import { pipelineStateSchema } from "../orchestrator/schemas";
+import { collectPendingDispatchSessionIds } from "../orchestrator/session-correlation";
+import { getProjectRootFromArtifactDir } from "../utils/paths";
 
 interface LogsOptions {
 	readonly sessionID?: string;
+	readonly runId?: string;
 	readonly eventType?: string;
 	readonly after?: string;
 	readonly before?: string;
@@ -56,10 +62,10 @@ function formatSessionTable(
 		"|------------|---------|--------|-----------|--------|",
 	];
 
-	for (const s of sessions) {
-		const started = s.startedAt.replace("T", " ").replace(/\.\d+Z$/, "Z");
+	for (const session of sessions) {
+		const started = session.startedAt.replace("T", " ").replace(/\.\d+Z$/, "Z");
 		lines.push(
-			`| ${s.sessionId} | ${started} | ${s.eventCount} | ${s.decisionCount} | ${s.errorCount} |`,
+			`| ${session.sessionId} | ${started} | ${session.eventCount} | ${session.decisionCount} | ${session.errorCount} |`,
 		);
 	}
 
@@ -67,11 +73,87 @@ function formatSessionTable(
 	return lines.join("\n");
 }
 
+async function readLogsForRun(
+	runId: string,
+	artifactDirOrProjectRoot: string,
+): Promise<readonly SessionLog[]> {
+	const projectRoot = getProjectRootFromArtifactDir(artifactDirOrProjectRoot);
+	const db = openProjectKernelDb(projectRoot);
+
+	try {
+		const row = db
+			.query(
+				"SELECT state_json FROM pipeline_runs WHERE run_id = ? ORDER BY state_revision DESC LIMIT 1",
+			)
+			.get(runId) as { readonly state_json: string } | null;
+		if (!row) {
+			return Object.freeze([]);
+		}
+
+		const parsed = pipelineStateSchema.safeParse(JSON.parse(row.state_json));
+		if (!parsed.success) {
+			return Object.freeze([]);
+		}
+
+		const sessionIds = collectPendingDispatchSessionIds(parsed.data.pendingDispatches);
+		const logs = await Promise.all(
+			sessionIds.map((sessionId) => readSessionLog(sessionId, artifactDirOrProjectRoot)),
+		);
+
+		return Object.freeze(logs.filter((log): log is SessionLog => log !== null));
+	} catch {
+		return Object.freeze([]);
+	} finally {
+		db.close();
+	}
+}
+
+async function resolveSessionLogs(
+	options: LogsOptions | undefined,
+	logsRoot: string,
+): Promise<readonly SessionLog[]> {
+	if (options?.sessionID) {
+		const log = await readSessionLog(options.sessionID, logsRoot);
+		return log ? Object.freeze([log]) : Object.freeze([]);
+	}
+
+	if (options?.runId) {
+		return readLogsForRun(options.runId, logsRoot);
+	}
+
+	const latest = await readLatestSessionLog(logsRoot);
+	return latest ? Object.freeze([latest]) : Object.freeze([]);
+}
+
+function buildDetailSummary(logs: readonly SessionLog[]): string {
+	if (logs.length === 0) {
+		return "";
+	}
+
+	if (logs.length === 1) {
+		return generateSessionSummary(logs[0]);
+	}
+
+	return logs.map((log) => generateSessionSummary(log)).join("\n\n---\n\n");
+}
+
+function buildMissingTargetMessage(options: LogsOptions | undefined): string {
+	if (options?.sessionID) {
+		return `Session "${options.sessionID}" not found.`;
+	}
+
+	if (options?.runId) {
+		return `Run "${options.runId}" did not resolve to any session logs.`;
+	}
+
+	return "No session logs found.";
+}
+
 /**
  * Core function for the oc_logs tool.
  *
  * @param mode - "list", "detail", or "search"
- * @param options - Optional filters (sessionID, eventType, after, before)
+ * @param options - Optional filters (sessionID, runId, eventType, after, before)
  * @param logsDir - Optional override for logs directory (for testing)
  */
 export async function logsCore(
@@ -92,64 +174,65 @@ export async function logsCore(
 		}
 
 		case "detail": {
-			const log = options?.sessionID
-				? await readSessionLog(options.sessionID, logsRoot)
-				: await readLatestSessionLog(logsRoot);
+			const logs = await resolveSessionLogs(options, logsRoot);
+			const log = logs[0] ?? null;
 
 			if (!log) {
-				const target = options?.sessionID
-					? `Session "${options.sessionID}" not found.`
-					: "No session logs found.";
 				return JSON.stringify({
 					action: "error",
-					message: target,
+					message: buildMissingTargetMessage(options),
 				});
 			}
 
-			const summary = generateSessionSummary(log);
+			const summary = buildDetailSummary(logs);
 
 			return JSON.stringify({
 				action: "logs_detail",
+				runId: options?.runId,
+				resolvedSessionIds: logs.map((entry) => entry.sessionId),
 				sessionLog: log,
+				sessionLogs: logs.length > 1 ? logs : undefined,
 				summary,
 				displayText: summary,
 			});
 		}
 
 		case "search": {
-			const log = options?.sessionID
-				? await readSessionLog(options.sessionID, logsRoot)
-				: await readLatestSessionLog(logsRoot);
+			const logs = await resolveSessionLogs(options, logsRoot);
+			const log = logs[0] ?? null;
 
 			if (!log) {
-				const target = options?.sessionID
-					? `Session "${options.sessionID}" not found.`
-					: "No session logs found.";
 				return JSON.stringify({
 					action: "error",
-					message: target,
+					message: buildMissingTargetMessage(options),
 				});
 			}
 
-			const filtered = searchEvents(log.events, {
-				type: options?.eventType,
-				after: options?.after,
-				before: options?.before,
-				domain: options?.domain,
-				subsystem: options?.subsystem,
-				severity: options?.severity,
-			});
+			const filtered = searchEvents(
+				logs.flatMap((entry) => entry.events),
+				{
+					type: options?.eventType,
+					after: options?.after,
+					before: options?.before,
+					domain: options?.domain,
+					subsystem: options?.subsystem,
+					severity: options?.severity,
+				},
+			);
 
 			const displayLines = [
 				`Search Results (${filtered.length} event(s))`,
 				"",
-				...filtered.map((e) => `[${e.timestamp}] ${e.type}: ${JSON.stringify(e)}`),
+				...filtered.map((event) => `[${event.timestamp}] ${event.type}: ${JSON.stringify(event)}`),
 			];
 
 			return JSON.stringify({
 				action: "logs_search",
+				runId: options?.runId,
 				sessionId: log.sessionId,
+				sessionIds: logs.map((entry) => entry.sessionId),
 				filters: {
+					runId: options?.runId,
 					eventType: options?.eventType,
 					after: options?.after,
 					before: options?.before,
@@ -170,7 +253,7 @@ export async function logsCore(
 export const ocLogs = tool({
 	description:
 		"View session logs. Modes: 'list' shows all sessions, 'detail' shows full log with " +
-		"summary, 'search' filters events by type/time/domain/subsystem/severity. Use to inspect session history and errors.",
+		"summary, 'search' filters events by type/time/domain/subsystem/severity. Accepts sessionID or runId to resolve correlated logs.",
 	args: {
 		mode: z.enum(["list", "detail", "search"]).describe("View mode: list, detail, or search"),
 		sessionID: z
@@ -178,6 +261,11 @@ export const ocLogs = tool({
 			.regex(/^[a-zA-Z0-9_-]{1,256}$/)
 			.optional()
 			.describe("Session ID to view (uses latest if omitted)"),
+		runId: z
+			.string()
+			.regex(/^[a-zA-Z0-9_-]{1,256}$/)
+			.optional()
+			.describe("Run ID to resolve through pending dispatch session correlation"),
 		eventType: z.string().optional().describe("Filter events by type (for search mode)"),
 		after: z.string().optional().describe("Only events after this ISO timestamp (for search mode)"),
 		before: z
@@ -199,7 +287,16 @@ export const ocLogs = tool({
 				"Filter by severity: matches event.type (e.g. 'error', 'warning') or payload.severity/payload.level (for search mode)",
 			),
 	},
-	async execute({ mode, sessionID, eventType, after, before, domain, subsystem, severity }) {
-		return logsCore(mode, { sessionID, eventType, after, before, domain, subsystem, severity });
+	async execute({ mode, sessionID, runId, eventType, after, before, domain, subsystem, severity }) {
+		return logsCore(mode, {
+			sessionID,
+			runId,
+			eventType,
+			after,
+			before,
+			domain,
+			subsystem,
+			severity,
+		});
 	},
 });

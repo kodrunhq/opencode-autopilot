@@ -171,7 +171,7 @@ describe("v1 to v7 migration", () => {
 		// "default" is not in AGENT_REGISTRY, so it becomes an override
 		expect(result?.overrides.default).toBeDefined();
 		expect(result?.overrides.default.primary).toBe("gpt-4");
-		expect(result?.orchestrator.autonomy).toBe("full");
+		expect(result?.orchestrator.autonomy).toBe("supervised");
 		expect(result?.orchestrator.strictness).toBe("normal");
 		expect(result?.confidence.enabled).toBe(true);
 		expect(result?.confidence.thresholds.proceed).toBe("MEDIUM");
@@ -181,7 +181,7 @@ describe("v1 to v7 migration", () => {
 		expect(result?.verification.projectOverrides).toEqual({});
 	});
 
-	test("loadConfig on a v1 JSON file writes migrated v5 back to disk", async () => {
+	test("loadConfig on a v1 JSON file writes migrated v7 back to disk", async () => {
 		const v1Config = { version: 1, configured: true, models: {} };
 		await writeFile(configPath, JSON.stringify(v1Config), "utf-8");
 

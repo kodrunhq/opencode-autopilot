@@ -9,6 +9,7 @@ import { getPhaseDir } from "../../src/orchestrator/artifacts";
 import { clearAllRetryState, recordRetryAttempt } from "../../src/orchestrator/dispatch-retry";
 import { formatOracleSignoffEnvelope } from "../../src/orchestrator/signoff";
 import { createInitialState, loadState, saveState } from "../../src/orchestrator/state";
+import type { PendingDispatch } from "../../src/orchestrator/types";
 import {
 	buildPipelineIdeaForTranche,
 	loadLatestProgramRunFromKernel,
@@ -20,6 +21,24 @@ import { ocOrchestrate, orchestrateCore } from "../../src/tools/orchestrate";
 import { ocRoute, routeCore } from "../../src/tools/route";
 
 let tempDir: string;
+
+function makePendingDispatch(overrides: Partial<PendingDispatch> = {}): PendingDispatch {
+	const callerSessionId = overrides.callerSessionId ?? overrides.sessionId ?? null;
+	return {
+		dispatchId: overrides.dispatchId ?? "dispatch_test",
+		phase: overrides.phase ?? "RECON",
+		agent: overrides.agent ?? "oc-researcher",
+		issuedAt: overrides.issuedAt ?? new Date().toISOString(),
+		status: overrides.status ?? "PENDING",
+		receivedResultId: overrides.receivedResultId ?? null,
+		receivedAt: overrides.receivedAt ?? null,
+		resultKind: overrides.resultKind ?? "phase_output",
+		taskId: overrides.taskId ?? null,
+		callerSessionId,
+		spawnedSessionId: overrides.spawnedSessionId ?? null,
+		sessionId: callerSessionId,
+	};
+}
 
 beforeEach(async () => {
 	tempDir = await mkdtemp(join(tmpdir(), "orchestrate-tool-test-"));
@@ -81,6 +100,88 @@ describe("orchestrateCore", () => {
 		expect(parsed.phase).toBe("CHALLENGE");
 	});
 
+	test("keeps a dispatch alive when a result arrives before its required artifact exists", async () => {
+		const first = JSON.parse(
+			await orchestrateCore(
+				{ idea: "recover missing recon artifact", intent: "implementation" },
+				tempDir,
+			),
+		);
+
+		const envelope = {
+			schemaVersion: 1,
+			resultId: "recon-missing-artifact-1",
+			runId: first.runId,
+			phase: "RECON",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "research complete" },
+		};
+
+		const result = JSON.parse(await orchestrateCore({ result: JSON.stringify(envelope) }, tempDir));
+		expect(result.action).toBe("error");
+		expect(result.phase).toBe("RECON");
+		expect(result.message).toContain("did not write the required artifact");
+		expect(result.stopClassification).toBeUndefined();
+
+		const saved = await loadState(tempDir);
+		const pending = saved?.pendingDispatches.find(
+			(dispatch) => dispatch.dispatchId === first.dispatchId,
+		);
+		expect(saved?.status).toBe("IN_PROGRESS");
+		expect(pending).toMatchObject({
+			dispatchId: first.dispatchId,
+			status: "FAILED_RECOVERABLE",
+			receivedResultId: envelope.resultId,
+		});
+		expect(pending?.receivedAt).toEqual(expect.any(String));
+	});
+
+	test("accepts a resubmitted result on the original dispatch after the artifact is created", async () => {
+		const first = JSON.parse(
+			await orchestrateCore({ idea: "retry recon artifact", intent: "implementation" }, tempDir),
+		);
+
+		const missingArtifactEnvelope = {
+			schemaVersion: 1,
+			resultId: "recon-retry-1",
+			runId: first.runId,
+			phase: "RECON",
+			dispatchId: first.dispatchId,
+			agent: first.agent,
+			kind: "phase_output",
+			taskId: null,
+			payload: { text: "research complete" },
+		};
+
+		await orchestrateCore({ result: JSON.stringify(missingArtifactEnvelope) }, tempDir);
+
+		const reconDir = getPhaseDir(tempDir, "RECON", first.runId);
+		await mkdir(reconDir, { recursive: true });
+		await writeFile(join(reconDir, "report.md"), "# Report\ntransactional retry");
+
+		const retriedEnvelope = {
+			...missingArtifactEnvelope,
+			resultId: "recon-retry-2",
+		};
+		const retried = JSON.parse(
+			await orchestrateCore({ result: JSON.stringify(retriedEnvelope) }, tempDir),
+		);
+
+		expect(retried.action).toBe("dispatch");
+		expect(retried.phase).toBe("CHALLENGE");
+		expect(retried.agent).toBe("oc-challenger");
+
+		const saved = await loadState(tempDir);
+		expect(
+			saved?.pendingDispatches.some((dispatch) => dispatch.dispatchId === first.dispatchId),
+		).toBe(false);
+		expect(saved?.processedResultIds).toContain("recon-retry-1");
+		expect(saved?.processedResultIds).toContain("recon-retry-2");
+	});
+
 	test("returns stale error for mismatched runId", async () => {
 		await orchestrateCore({ idea: "build a chat", intent: "implementation" }, tempDir);
 		const result = await orchestrateCore(
@@ -105,6 +206,54 @@ describe("orchestrateCore", () => {
 
 		const logRaw = await readFile(join(tempDir, "orchestration.jsonl"), "utf-8");
 		expect(logRaw).toContain("E_STALE_RESULT");
+	});
+
+	test("result processing never overwrites spawnedSessionId with caller session context", async () => {
+		const state = createInitialState("preserve child session");
+		await saveState(
+			{
+				...state,
+				pendingDispatches: [
+					makePendingDispatch({
+						dispatchId: "dispatch_child_session",
+						callerSessionId: "parent-session",
+						spawnedSessionId: "child-session",
+					}),
+				],
+			},
+			tempDir,
+		);
+
+		const result = await orchestrateCore(
+			{
+				result: JSON.stringify({
+					schemaVersion: 1,
+					resultId: "child-session-stale-run",
+					runId: "other-run",
+					phase: "RECON",
+					dispatchId: "dispatch_child_session",
+					agent: "oc-researcher",
+					kind: "phase_output",
+					taskId: null,
+					payload: { text: "ignored" },
+				}),
+			},
+			tempDir,
+			{
+				sessionId: "parent-session",
+				messageId: "msg-child-session",
+				projectRoot: tempDir,
+			},
+		);
+		const parsed = JSON.parse(result);
+		expect(parsed.action).toBe("error");
+		expect(parsed.code).toBe("E_STALE_RESULT");
+
+		const persisted = await loadState(tempDir);
+		expect(persisted?.pendingDispatches).toHaveLength(1);
+		expect(persisted?.pendingDispatches[0]?.callerSessionId).toBe("parent-session");
+		expect(persisted?.pendingDispatches[0]?.spawnedSessionId).toBe("child-session");
+		expect(persisted?.pendingDispatches[0]?.sessionId).toBe("parent-session");
 	});
 
 	test("returns error when result kind does not match pending dispatch expectation", async () => {
@@ -162,15 +311,13 @@ describe("orchestrateCore", () => {
 				lastReviewReport: null,
 			},
 			pendingDispatches: [
-				{
+				makePendingDispatch({
 					dispatchId: "dispatch_build_1",
-					phase: "BUILD" as const,
+					phase: "BUILD",
 					agent: "oc-implementer",
-					issuedAt: new Date().toISOString(),
-					resultKind: "task_completion" as const,
+					resultKind: "task_completion",
 					taskId: 1,
-					sessionId: null,
-				},
+				}),
 			],
 			phases: state.phases.map((p) =>
 				["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN"].includes(p.name)
@@ -527,15 +674,11 @@ describe("orchestrateCore", () => {
 					: { ...phase, status: "IN_PROGRESS" as const },
 			),
 			pendingDispatches: [
-				{
+				makePendingDispatch({
 					dispatchId: "dispatch_retro_program",
-					phase: "RETROSPECTIVE" as const,
+					phase: "RETROSPECTIVE",
 					agent: "oc-shipper",
-					issuedAt: new Date().toISOString(),
-					resultKind: "phase_output" as const,
-					taskId: null,
-					sessionId: null,
-				},
+				}),
 			],
 		};
 		await saveState(retrospectiveState, tempDir);
@@ -628,15 +771,11 @@ describe("orchestrateCore", () => {
 					: { ...phase, status: "DONE" as const },
 			),
 			pendingDispatches: [
-				{
+				makePendingDispatch({
 					dispatchId: "dispatch_retro_final",
-					phase: "RETROSPECTIVE" as const,
+					phase: "RETROSPECTIVE",
 					agent: "oc-shipper",
-					issuedAt: new Date().toISOString(),
-					resultKind: "phase_output" as const,
-					taskId: null,
-					sessionId: null,
-				},
+				}),
 			],
 		};
 		await saveState(retrospectiveState, tempDir);

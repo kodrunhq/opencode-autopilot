@@ -69,6 +69,7 @@ export async function handleArchitect(
 					action: "error" as const,
 					phase: "ARCHITECT",
 					message: `ARCHITECT agent returned a result but did not write all required proposals: expected ${depth} proposals in ${proposalsDir}, found ${proposalCount}. The agent must write all proposal files before the phase can complete.`,
+					errorSeverity: "recoverable" as const,
 				});
 			}
 			// Proposals complete, dispatch critic
@@ -92,6 +93,7 @@ export async function handleArchitect(
 				action: "error" as const,
 				phase: "ARCHITECT",
 				message: `ARCHITECT agent returned a result but did not write the required artifact: ${artifactPath}. The agent must write design.md before the phase can complete.`,
+				errorSeverity: "recoverable" as const,
 			});
 		}
 	}
@@ -122,6 +124,7 @@ export async function handleArchitect(
 					action: "error" as const,
 					phase: "ARCHITECT",
 					message: `ARCHITECT arena: expected ${depth} proposals but only ${proposalCount} were written in ${proposalsDir}. Missing proposals must be written before critic can evaluate.`,
+					errorSeverity: "recoverable" as const,
 				});
 			}
 			return Object.freeze({

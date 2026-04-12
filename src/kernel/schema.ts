@@ -1,7 +1,7 @@
 import { BACKGROUND_TASKS_SCHEMA_STATEMENTS } from "../background/schema";
 import { GRAPH_SCHEMA_STATEMENTS } from "../graph/schema";
 
-export const KERNEL_SCHEMA_VERSION = 10;
+export const KERNEL_SCHEMA_VERSION = 11;
 
 export const ROUTE_TICKETS_SCHEMA = Object.freeze([
 	`CREATE TABLE IF NOT EXISTS route_tickets (
@@ -100,12 +100,19 @@ export const KERNEL_SCHEMA_STATEMENTS: readonly string[] = Object.freeze([
 		phase TEXT NOT NULL,
 		agent TEXT NOT NULL,
 		issued_at TEXT NOT NULL,
+		status TEXT NOT NULL,
+		received_result_id TEXT,
+		received_at TEXT,
 		result_kind TEXT NOT NULL,
 		task_id TEXT,
 		session_id TEXT,
+		caller_session_id TEXT,
+		spawned_session_id TEXT,
 		PRIMARY KEY (run_id, dispatch_id),
 		FOREIGN KEY (run_id) REFERENCES pipeline_runs(run_id) ON DELETE CASCADE
 	)`,
+	`CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_caller_session ON run_pending_dispatches(caller_session_id, issued_at DESC, dispatch_id)`,
+	`CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_spawned_session ON run_pending_dispatches(spawned_session_id, issued_at DESC, dispatch_id)`,
 	`CREATE TABLE IF NOT EXISTS run_processed_results (
 		run_id TEXT NOT NULL,
 		result_id TEXT NOT NULL,

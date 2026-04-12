@@ -64,6 +64,8 @@ interface StuckDispatchRow {
 	readonly agent: string;
 	readonly issued_at: string;
 	readonly session_id: string | null;
+	readonly caller_session_id: string | null;
+	readonly spawned_session_id: string | null;
 	readonly stale_minutes: number;
 }
 
@@ -229,6 +231,8 @@ export interface InspectStuckDispatch {
 	readonly agent: string;
 	readonly issuedAt: string;
 	readonly sessionId: string | null;
+	readonly callerSessionId: string | null;
+	readonly spawnedSessionId: string | null;
 	readonly staleMinutes: number;
 }
 
@@ -736,6 +740,7 @@ export function listStuckDispatches(
 		}
 
 		const conditions = [
+			"rpd.status = 'PENDING'",
 			"julianday(rpd.issued_at) IS NOT NULL",
 			"CAST((julianday('now') - julianday(rpd.issued_at)) * 1440 AS INTEGER) >= ?",
 		];
@@ -759,6 +764,8 @@ export function listStuckDispatches(
 					rpd.agent,
 					rpd.issued_at,
 					rpd.session_id,
+					rpd.caller_session_id,
+					rpd.spawned_session_id,
 					CAST((julianday('now') - julianday(rpd.issued_at)) * 1440 AS INTEGER) AS stale_minutes
 				 FROM pipeline_runs pr
 				 JOIN run_pending_dispatches rpd ON rpd.run_id = pr.run_id
@@ -779,7 +786,9 @@ export function listStuckDispatches(
 					dispatchPhase: row.dispatch_phase,
 					agent: row.agent,
 					issuedAt: row.issued_at,
-					sessionId: row.session_id,
+					sessionId: row.caller_session_id ?? row.session_id,
+					callerSessionId: row.caller_session_id ?? row.session_id,
+					spawnedSessionId: row.spawned_session_id,
 					staleMinutes: row.stale_minutes,
 				}),
 			),
