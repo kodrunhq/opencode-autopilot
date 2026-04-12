@@ -193,6 +193,7 @@ export function reconcileProjectIds(database: Database): void {
 		const targetId = computeDeterministicProjectId(row.path, fp);
 		if (targetId === row.id) continue;
 
+		database.run("PRAGMA foreign_keys=OFF");
 		database.run("BEGIN");
 		try {
 			for (const table of tablesWithProjectId) {
@@ -204,6 +205,8 @@ export function reconcileProjectIds(database: Database): void {
 		} catch (error) {
 			database.run("ROLLBACK");
 			throw error;
+		} finally {
+			database.run("PRAGMA foreign_keys=ON");
 		}
 	}
 }

@@ -1,12 +1,10 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { getAutopilotDbPath, getProjectArtifactDir } from "../utils/paths";
 import { runKernelMigrations } from "./migrations";
 
 export const KERNEL_DB_FILE = "kernel.db";
-
-const MAX_KERNEL_PATH_WARNING_LENGTH = 200;
 
 const LEGACY_KERNEL_FILES = Object.freeze([
 	KERNEL_DB_FILE,
@@ -14,23 +12,28 @@ const LEGACY_KERNEL_FILES = Object.freeze([
 	`${KERNEL_DB_FILE}-shm`,
 ]);
 
-function truncateKernelPathWarning(path: string): string {
-	if (path.length <= MAX_KERNEL_PATH_WARNING_LENGTH) {
-		return path;
+const PROJECT_ROOT_SIGNALS = Object.freeze([
+	".git",
+	"package.json",
+	"tsconfig.json",
+	"Cargo.toml",
+	"go.mod",
+	"pom.xml",
+]);
+
+function looksLikeProjectRoot(dirPath: string): boolean {
+	const name = basename(dirPath);
+	if (name === ".opencode-autopilot" || name === KERNEL_DB_FILE) {
+		return false;
 	}
 
-	return `${path.slice(0, MAX_KERNEL_PATH_WARNING_LENGTH - 3)}...`;
-}
-
-function warnIfNotArtifactDir(path: string): void {
-	const normalizedPath = path.replace(/[\\/]+$/, "");
-	if (normalizedPath.endsWith(".opencode-autopilot") || normalizedPath.endsWith(KERNEL_DB_FILE)) {
-		return;
+	for (const signal of PROJECT_ROOT_SIGNALS) {
+		if (existsSync(join(dirPath, signal))) {
+			return true;
+		}
 	}
 
-	console.warn?.(
-		`openKernelDb: expected artifact dir (.opencode-autopilot) or explicit kernel.db path, got: ${truncateKernelPathWarning(path)}`,
-	);
+	return false;
 }
 
 export function detectLegacyKernelDb(projectRoot: string): string | null {
@@ -90,10 +93,14 @@ export function resolveKernelDbPathFromProject(
 
 export function getKernelDbPath(artifactDir?: string): string {
 	if (typeof artifactDir === "string" && artifactDir.length > 0) {
-		warnIfNotArtifactDir(artifactDir);
-
 		if (artifactDir.endsWith(KERNEL_DB_FILE)) {
 			return artifactDir;
+		}
+
+		if (looksLikeProjectRoot(artifactDir)) {
+			throw new Error(
+				`openKernelDb: path "${artifactDir}" looks like a project root. Use openProjectKernelDb(projectRoot) for project-scoped access.`,
+			);
 		}
 
 		return join(artifactDir, KERNEL_DB_FILE);
