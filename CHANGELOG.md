@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.33.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.33.0...opencode-autopilot-v1.33.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* address PR review comments — stale RESULT_RECEIVED cleanup, kernel index ordering, [@ts-nocheck](https://github.com/ts-nocheck) removal ([35a0173](https://github.com/kodrunhq/opencode-autopilot/commit/35a017347b4fcdf37c389a610acc67fde6fff57d))
+* forensic session3 — 5-PR control plane repair ([2402b2c](https://github.com/kodrunhq/opencode-autopilot/commit/2402b2c37d2b11f4a8c612995d1bc54cb0e32862))
+* forensic session3 — 5-PR control plane repair with acceptance harness ([7326277](https://github.com/kodrunhq/opencode-autopilot/commit/73262771e47fbadf28ec0e1af5b2e98a228dcf74))
+* oracle-verified gaps — session ID preservation, idempotent retry, dead state removal ([28c75d9](https://github.com/kodrunhq/opencode-autopilot/commit/28c75d92806cfd30848150383636714493f6cf0c))
+* runId recovery/logs work after interruption, RESULT_RECEIVED row cleanup ([55c010f](https://github.com/kodrunhq/opencode-autopilot/commit/55c010fe52dadb08b34925fea1d3e882ccf2f96b))
+* sanitize prompt leakage through visibility event summaries ([c4cb795](https://github.com/kodrunhq/opencode-autopilot/commit/c4cb795ab0bd2b6228b1a7907410621a0f0c53b9))
+
 ## [1.33.0](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.32.2...opencode-autopilot-v1.33.0) (2026-04-12)
 
 
