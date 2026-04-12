@@ -4,6 +4,7 @@ import {
 	formatMemoriesTable,
 	formatPreferencesTable,
 	formatRunsTable,
+	formatStuckDispatchesTable,
 } from "./format-tables";
 import {
 	formatVerboseEvents,
@@ -11,6 +12,7 @@ import {
 	formatVerboseMemories,
 	formatVerbosePreferences,
 	formatVerboseRuns,
+	formatVerboseStuckDispatches,
 } from "./format-verbose";
 import type {
 	InspectEventSummary,
@@ -18,6 +20,7 @@ import type {
 	InspectMemorySummary,
 	InspectPreferenceSummary,
 	InspectRunSummary,
+	InspectStuckDispatch,
 } from "./repository";
 
 export function formatRuns(
@@ -46,6 +49,31 @@ export function formatEvents(
 	}
 
 	return ["Events", "", formatEventsTable(events)].join("\n");
+}
+
+export function formatStuckDispatches(
+	dispatches: readonly InspectStuckDispatch[],
+	verbose = false,
+	thresholdMinutes = 60,
+): string {
+	if (verbose) {
+		return formatVerboseStuckDispatches(dispatches);
+	}
+	if (dispatches.length === 0) {
+		return `No stuck dispatches found. Pending dispatches older than ${thresholdMinutes} minutes appear here when a subagent session dies silently.`;
+	}
+
+	return ["Stuck Dispatches", "", formatStuckDispatchesTable(dispatches)].join(
+		"\n",
+	);
+}
+
+export function formatStuck(
+	dispatches: readonly InspectStuckDispatch[],
+	verbose = false,
+	thresholdMinutes = 60,
+): string {
+	return formatStuckDispatches(dispatches, verbose, thresholdMinutes);
 }
 
 export function formatLessons(

@@ -1,7 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { runProjectRegistryMigrations } from "../projects/database";
 import { computeDeterministicProjectId } from "../projects/resolve";
-import type { GitFingerprintInput } from "../projects/types";
 import { KERNEL_SCHEMA_STATEMENTS, KERNEL_SCHEMA_VERSION } from "./schema";
 
 function columnExists(
@@ -216,6 +215,8 @@ export function reconcileProjectIds(database: Database): void {
 	];
 
 	for (const row of rows) {
+		if (row.id.startsWith("proj_")) continue;
+
 		const fp = fingerprintsByProject.get(row.id) ?? null;
 		const targetId = computeDeterministicProjectId(row.path, fp);
 		if (targetId === row.id) continue;
@@ -359,9 +360,9 @@ export function runKernelMigrations(database: Database): void {
 	migrateTaskIdToText(database);
 	ensureSessionIdOnPendingDispatches(database);
 	backfillBackgroundTaskColumns(database);
-	// Project ID reconciliation is intentionally not automatic to avoid mutating live IDs unexpectedly.
 
 	if (currentVersion < KERNEL_SCHEMA_VERSION) {
+		reconcileProjectIds(database);
 		database.run(`PRAGMA user_version = ${KERNEL_SCHEMA_VERSION}`);
 	}
 }

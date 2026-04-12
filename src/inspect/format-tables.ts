@@ -1,4 +1,4 @@
-import { renderTable } from "./formatter-helpers";
+import { formatMinutesDuration, renderTable } from "./formatter-helpers";
 import type {
 	InspectEventSummary,
 	InspectLessonSummary,
@@ -7,6 +7,7 @@ import type {
 	InspectProjectDetails,
 	InspectProjectSummary,
 	InspectRunSummary,
+	InspectStuckDispatch,
 } from "./repository";
 
 function formatFailure(run: InspectRunSummary): string {
@@ -85,6 +86,32 @@ export function formatRunsTable(runs: readonly InspectRunSummary[]): string {
 			run.lastUpdatedAt,
 		]),
 		{ minWidths: [12, 12, 8, 8, 12, 12, 8, 20] },
+	);
+}
+
+export function formatStuckDispatchesTable(
+	dispatches: readonly InspectStuckDispatch[],
+): string {
+	return renderTable(
+		[
+			"Run ID",
+			"Status",
+			"Run Phase",
+			"Dispatch Phase",
+			"Agent",
+			"Pending",
+			"Session ID",
+		],
+		dispatches.map((dispatch) => [
+			dispatch.runId,
+			dispatch.status,
+			dispatch.currentPhase ?? "-",
+			dispatch.dispatchPhase,
+			dispatch.agent,
+			formatMinutesDuration(dispatch.staleMinutes),
+			dispatch.sessionId ?? "-",
+		]),
+		{ minWidths: [12, 10, 10, 14, 12, 8, 16] },
 	);
 }
 

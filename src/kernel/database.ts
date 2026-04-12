@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { getAutopilotDbPath, getProjectArtifactDir } from "../utils/paths";
 import { runKernelMigrations } from "./migrations";
 
@@ -11,30 +11,6 @@ const LEGACY_KERNEL_FILES = Object.freeze([
 	`${KERNEL_DB_FILE}-wal`,
 	`${KERNEL_DB_FILE}-shm`,
 ]);
-
-function resolveArtifactDir(path: string): string {
-	if (basename(path) === ".opencode-autopilot") {
-		return path;
-	}
-
-	const artifactDir = getProjectArtifactDir(path);
-	const legacyKernelPath = join(path, KERNEL_DB_FILE);
-	const artifactKernelPath = join(artifactDir, KERNEL_DB_FILE);
-
-	// If a legacy root-level kernel exists, migrate it into the artifact directory.
-	if (existsSync(legacyKernelPath) && !existsSync(artifactKernelPath)) {
-		mkdirSync(artifactDir, { recursive: true });
-		for (const file of LEGACY_KERNEL_FILES) {
-			const legacyFile = join(path, file);
-			if (existsSync(legacyFile)) {
-				renameSync(legacyFile, join(artifactDir, file));
-			}
-		}
-		return artifactDir;
-	}
-
-	return artifactDir;
-}
 
 export function detectLegacyKernelDb(projectRoot: string): string | null {
 	const legacyPath = join(projectRoot, KERNEL_DB_FILE);
@@ -91,33 +67,27 @@ export function resolveKernelDbPathFromProject(
 	return { path: artifactPath, kind: "missing" };
 }
 
-export function getKernelDbPath(artifactDirOrProjectRoot?: string): string {
-	if (
-		typeof artifactDirOrProjectRoot === "string" &&
-		artifactDirOrProjectRoot.length > 0
-	) {
-		// If caller passed an explicit file path ending in kernel.db, honor it directly.
-		if (artifactDirOrProjectRoot.endsWith(KERNEL_DB_FILE)) {
-			return artifactDirOrProjectRoot;
+export function getKernelDbPath(artifactDir?: string): string {
+	if (typeof artifactDir === "string" && artifactDir.length > 0) {
+		if (artifactDir.endsWith(KERNEL_DB_FILE)) {
+			return artifactDir;
 		}
 
-		// Allow project root inputs by resolving to the artifact directory (with legacy migration).
-		const artifactDir = resolveArtifactDir(artifactDirOrProjectRoot);
 		return join(artifactDir, KERNEL_DB_FILE);
 	}
 
 	return getAutopilotDbPath();
 }
 
-export function kernelDbExists(artifactDirOrProjectRoot?: string): boolean {
-	return existsSync(getKernelDbPath(artifactDirOrProjectRoot));
+export function kernelDbExists(artifactDir?: string): boolean {
+	return existsSync(getKernelDbPath(artifactDir));
 }
 
 export function openKernelDb(
-	artifactDirOrProjectRoot?: string,
+	artifactDir?: string,
 	options?: { readonly?: boolean },
 ): Database {
-	const dbPath = getKernelDbPath(artifactDirOrProjectRoot);
+	const dbPath = getKernelDbPath(artifactDir);
 	if (!options?.readonly) {
 		mkdirSync(dirname(dbPath), { recursive: true });
 	}

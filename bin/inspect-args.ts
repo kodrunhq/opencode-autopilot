@@ -2,6 +2,7 @@ type InspectView =
 	| "projects"
 	| "project"
 	| "paths"
+	| "stuck"
 	| "runs"
 	| "events"
 	| "lessons"
@@ -16,6 +17,7 @@ export interface ParsedInspectArgs {
 	readonly verbose: boolean;
 	readonly projectRef: string | null;
 	readonly limit: number;
+	readonly threshold: number;
 	readonly runId: string | null;
 	readonly sessionId: string | null;
 	readonly type: string | null;
@@ -33,6 +35,7 @@ const INSPECT_VIEWS: readonly InspectView[] = Object.freeze([
 	"projects",
 	"project",
 	"paths",
+	"stuck",
 	"runs",
 	"events",
 	"lessons",
@@ -54,6 +57,7 @@ export function inspectUsage(): string {
 		"  projects                     List known projects",
 		"  project --project <ref>      Show one project's details",
 		"  paths --project <ref>        List one project's path history",
+		"  stuck [--project <ref>]      List pipeline runs with stale pending dispatches",
 		"  runs [--project <ref>]       List pipeline runs",
 		"  events [--project <ref>]     List forensic events",
 		"  lessons [--project <ref>]    List stored lessons",
@@ -73,6 +77,7 @@ export function inspectUsage(): string {
 		"  --scope <scope>              Filter memories by scope (project|user)",
 		"  --query <text>               Text search memories (uses FTS when available)",
 		"  --limit <n>                  Limit rows (default: 20 for runs, 50 elsewhere)",
+		"  --threshold <minutes>        Stale dispatch threshold in minutes (default: 60)",
 		"  --verbose                    Show full content and expanded detail blocks",
 		"  --json                       Emit JSON output",
 		"  --help, -h                   Show inspect help",
@@ -93,6 +98,7 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 	let verbose = false;
 	let projectRef: string | null = null;
 	let limit = 50;
+	let threshold = 60;
 	let runId: string | null = null;
 	let sessionId: string | null = null;
 	let type: string | null = null;
@@ -143,6 +149,16 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 				break;
 			}
 			limit = parsed;
+			index += 1;
+			continue;
+		}
+		if (arg === "--threshold") {
+			const parsed = parsePositiveInt(args[index + 1] ?? "");
+			if (parsed === null) {
+				error = "--threshold must be a positive integer.";
+				break;
+			}
+			threshold = parsed;
 			index += 1;
 			continue;
 		}
@@ -236,6 +252,7 @@ export function parseInspectArgs(args: readonly string[]): ParsedInspectArgs {
 		verbose,
 		projectRef,
 		limit,
+		threshold,
 		runId,
 		sessionId,
 		type,

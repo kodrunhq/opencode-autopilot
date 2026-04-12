@@ -58,6 +58,19 @@ interface PipelineRunSummaryRow {
 	readonly last_successful_phase: string | null;
 }
 
+interface StuckDispatchRow {
+	readonly run_id: string;
+	readonly status: string;
+	readonly current_phase: string | null;
+	readonly idea: string;
+	readonly dispatch_id: string;
+	readonly dispatch_phase: string;
+	readonly agent: string;
+	readonly issued_at: string;
+	readonly session_id: string | null;
+	readonly stale_minutes: number;
+}
+
 interface ForensicEventSummaryRow {
 	readonly event_id: number;
 	readonly project_id: string;
@@ -210,6 +223,19 @@ export interface InspectRunSummary {
 	readonly lastSuccessfulPhase: string | null;
 }
 
+export interface InspectStuckDispatch {
+	readonly runId: string;
+	readonly status: string;
+	readonly currentPhase: string | null;
+	readonly idea: string;
+	readonly dispatchId: string;
+	readonly dispatchPhase: string;
+	readonly agent: string;
+	readonly issuedAt: string;
+	readonly sessionId: string | null;
+	readonly staleMinutes: number;
+}
+
 export interface InspectEventSummary {
 	readonly eventId: number;
 	readonly projectId: string;
@@ -294,6 +320,12 @@ export interface InspectMemorySummary {
 
 export interface InspectRunQuery {
 	readonly projectRef?: string;
+	readonly limit?: number;
+}
+
+export interface InspectStuckQuery {
+	readonly projectRef?: string;
+	readonly thresholdMinutes?: number;
 	readonly limit?: number;
 }
 
@@ -699,6 +731,80 @@ export function listRuns(
 					failureAgent: row.failure_agent,
 					failureMessage: row.failure_message,
 					lastSuccessfulPhase: row.last_successful_phase,
+				}),
+			),
+		);
+	});
+}
+
+export function listStuckDispatches(
+	query: InspectStuckQuery = {},
+	input?: InspectDbInput,
+): readonly InspectStuckDispatch[] {
+	return withInspectDb(input, Object.freeze([]), (db) => {
+		if (
+			!tableExists(db, "pipeline_runs") ||
+			!tableExists(db, "run_pending_dispatches")
+		) {
+			return Object.freeze([]);
+		}
+
+		const thresholdMinutes = Math.max(1, query.thresholdMinutes ?? 60);
+		const limit = Math.max(1, query.limit ?? 50);
+		const resolvedProject =
+			typeof query.projectRef === "string"
+				? resolveProjectReferenceInDb(query.projectRef, db)
+				: null;
+		if (query.projectRef && resolvedProject === null) {
+			return Object.freeze([]);
+		}
+
+		const conditions = [
+			"julianday(rpd.issued_at) IS NOT NULL",
+			"CAST((julianday('now') - julianday(rpd.issued_at)) * 1440 AS INTEGER) >= ?",
+		];
+		const params: Array<string | number> = [thresholdMinutes];
+
+		if (resolvedProject !== null) {
+			conditions.push("pr.project_id = ?");
+			params.push(resolvedProject.id);
+		}
+
+		const whereClause = `WHERE ${conditions.join(" AND ")}`;
+		const rows = db
+			.query(
+				`SELECT
+					pr.run_id,
+					pr.status,
+					pr.current_phase,
+					pr.idea,
+					rpd.dispatch_id,
+					rpd.phase AS dispatch_phase,
+					rpd.agent,
+					rpd.issued_at,
+					rpd.session_id,
+					CAST((julianday('now') - julianday(rpd.issued_at)) * 1440 AS INTEGER) AS stale_minutes
+				 FROM pipeline_runs pr
+				 JOIN run_pending_dispatches rpd ON rpd.run_id = pr.run_id
+				 ${whereClause}
+				 ORDER BY stale_minutes DESC, rpd.issued_at ASC, pr.run_id ASC, rpd.dispatch_id ASC
+				 LIMIT ?`,
+			)
+			.all(...params, limit) as StuckDispatchRow[];
+
+		return Object.freeze(
+			rows.map((row) =>
+				Object.freeze({
+					runId: row.run_id,
+					status: row.status,
+					currentPhase: row.current_phase,
+					idea: row.idea,
+					dispatchId: row.dispatch_id,
+					dispatchPhase: row.dispatch_phase,
+					agent: row.agent,
+					issuedAt: row.issued_at,
+					sessionId: row.session_id,
+					staleMinutes: row.stale_minutes,
 				}),
 			),
 		);

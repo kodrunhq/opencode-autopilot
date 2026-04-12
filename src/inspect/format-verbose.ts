@@ -1,4 +1,5 @@
 import {
+	formatMinutesDuration,
 	formatTimestamp,
 	indentLines,
 	renderTable,
@@ -11,6 +12,7 @@ import type {
 	InspectMemorySummary,
 	InspectPreferenceSummary,
 	InspectRunSummary,
+	InspectStuckDispatch,
 } from "./repository";
 
 function formatEvidenceDetail(
@@ -113,6 +115,58 @@ export function formatVerboseEvents(
 	}
 
 	return lines.join("\n");
+}
+
+export function formatVerboseStuckDispatches(
+	dispatches: readonly InspectStuckDispatch[],
+): string {
+	if (dispatches.length === 0) {
+		return "No stuck dispatches found. Pending dispatches appear here when subagent sessions die silently.";
+	}
+
+	const headers = [
+		"Run ID",
+		"Status",
+		"Run Phase",
+		"Dispatch Phase",
+		"Agent",
+		"Pending",
+	];
+	const rows = dispatches.map((dispatch) => [
+		dispatch.runId,
+		dispatch.status,
+		dispatch.currentPhase ?? "-",
+		dispatch.dispatchPhase,
+		dispatch.agent,
+		formatMinutesDuration(dispatch.staleMinutes),
+	]);
+	const lines = [
+		"Stuck Dispatches",
+		"",
+		renderTable(headers, rows, { minWidths: [12, 10, 10, 14, 12, 8] }),
+		"",
+	];
+
+	for (const dispatch of dispatches) {
+		lines.push(
+			`- ${dispatch.runId} | ${dispatch.dispatchPhase} / ${dispatch.agent}`,
+		);
+		lines.push(
+			...indentLines([
+				`Status: ${dispatch.status}`,
+				`Current phase: ${dispatch.currentPhase ?? "-"}`,
+				`Dispatch ID: ${dispatch.dispatchId}`,
+				`Pending since: ${formatTimestamp(dispatch.issuedAt)}`,
+				`Pending for: ${formatMinutesDuration(dispatch.staleMinutes)}`,
+				`Session ID: ${dispatch.sessionId ?? "-"}`,
+			]),
+		);
+		lines.push("  Idea:");
+		lines.push(...indentLines(wrapText(dispatch.idea), "    "));
+		lines.push("");
+	}
+
+	return lines.join("\n").trimEnd();
 }
 
 export function formatVerboseLessons(

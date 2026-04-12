@@ -11,6 +11,7 @@ import {
 	formatProjectDetails,
 	formatProjects,
 	formatRuns,
+	formatStuckDispatches,
 } from "../src/inspect/formatters";
 import {
 	getMemoryOverview,
@@ -21,6 +22,7 @@ import {
 	listPreferences,
 	listProjects,
 	listRuns,
+	listStuckDispatches,
 } from "../src/inspect/repository";
 import { resolveKernelDbPathFromProject } from "../src/kernel/database";
 import { reconcileProjectIds } from "../src/kernel/migrations";
@@ -110,7 +112,7 @@ export async function inspectCliCore(
 	}
 
 	function resolveDbInput(view: string): {
-		dbInput: string | undefined;
+		dbInput: string;
 		dbScope: string;
 	} {
 		if (options.dbPath) {
@@ -245,6 +247,28 @@ export async function inspectCliCore(
 				},
 				parsed.json,
 				`${header}${formatPaths(details, verbose)}`,
+			);
+		}
+		case "stuck": {
+			const { dbInput, dbScope } = resolveDbInput("stuck");
+			const stuckDispatches = listStuckDispatches(
+				{
+					projectRef: parsed.projectRef ?? undefined,
+					thresholdMinutes: parsed.threshold,
+					limit: parsed.limit,
+				},
+				dbInput,
+			);
+			return makeOutput(
+				{
+					action: "inspect_stuck_dispatches",
+					dispatches: stuckDispatches,
+					thresholdMinutes: parsed.threshold,
+					dbScope,
+					dbPath: dbInput,
+				},
+				parsed.json,
+				`${scopeHeader(dbScope, dbInput)}${formatStuckDispatches(stuckDispatches, verbose, parsed.threshold)}`,
 			);
 		}
 		case "runs": {

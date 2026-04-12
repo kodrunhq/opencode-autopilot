@@ -1636,6 +1636,27 @@ export async function orchestrateCore(
 					return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg);
 				}
 
+				// Capture the spawned subagent's session ID into the pending dispatch.
+				// When a dispatch is created, sessionId stores the caller's session.
+				// When the spawned subagent calls back with a result, contextSessionId
+				// is the subagent's own session — persist it so the recovery system can
+				// correlate session.error/session.deleted events to this dispatch.
+				if (
+					contextSessionId &&
+					state.pendingDispatches.length > 0 &&
+					state.pendingDispatches.some((p) => p.sessionId !== contextSessionId)
+				) {
+					state = await updatePersistedState(artifactDir, state, (current) =>
+						patchState(current, {
+							pendingDispatches: current.pendingDispatches.map((p) =>
+								p.sessionId === contextSessionId
+									? p
+									: { ...p, sessionId: contextSessionId },
+							),
+						}),
+					);
+				}
+
 				try {
 					const parsed = parseTypedResultEnvelope(args.result, {
 						runId: state.runId,

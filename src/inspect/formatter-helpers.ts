@@ -16,6 +16,29 @@ export function formatTimestamp(value: string | null): string {
 	return value ?? "-";
 }
 
+export function formatMinutesDuration(totalMinutes: number): string {
+	if (totalMinutes < 60) {
+		return `${totalMinutes}m`;
+	}
+
+	const hours = Math.floor(totalMinutes / 60);
+	const minutes = totalMinutes % 60;
+	if (hours < 24) {
+		return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+	}
+
+	const days = Math.floor(hours / 24);
+	const remainingHours = hours % 24;
+	const parts = [`${days}d`];
+	if (remainingHours > 0) {
+		parts.push(`${remainingHours}h`);
+	}
+	if (minutes > 0) {
+		parts.push(`${minutes}m`);
+	}
+	return parts.join(" ");
+}
+
 export function truncateText(value: string, maxLength: number): string {
 	if (value.length <= maxLength) {
 		return value;
@@ -62,7 +85,8 @@ export function calculateColumnWidths(
 	}
 
 	const widths = [...minWidths];
-	let remainingWidth = availableWidth - minWidths.reduce((sum, width) => sum + width, 0);
+	let remainingWidth =
+		availableWidth - minWidths.reduce((sum, width) => sum + width, 0);
 	const expandable = desiredWidths.map((desired, index) =>
 		Math.max(0, desired - (minWidths[index] ?? 0)),
 	);
@@ -82,7 +106,8 @@ export function calculateColumnWidths(
 
 	while (remainingWidth > 0) {
 		const nextIndex = expandable.findIndex(
-			(extraWidth, index) => extraWidth > (widths[index] ?? 0) - (minWidths[index] ?? 0),
+			(extraWidth, index) =>
+				extraWidth > (widths[index] ?? 0) - (minWidths[index] ?? 0),
 		);
 		if (nextIndex < 0) {
 			break;
@@ -106,7 +131,10 @@ export function renderTable(
 	return [renderRow(headers), divider, ...rows.map(renderRow)].join("\n");
 }
 
-export function wrapText(value: string, width = getTerminalWidth() - 4): readonly string[] {
+export function wrapText(
+	value: string,
+	width = getTerminalWidth() - 4,
+): readonly string[] {
 	const wrapWidth = Math.max(MIN_WRAP_WIDTH, width);
 	const lines: string[] = [];
 
@@ -137,6 +165,9 @@ export function wrapText(value: string, width = getTerminalWidth() - 4): readonl
 	return lines;
 }
 
-export function indentLines(lines: readonly string[], indent = "  "): readonly string[] {
+export function indentLines(
+	lines: readonly string[],
+	indent = "  ",
+): readonly string[] {
 	return lines.map((line) => `${indent}${line}`);
 }
