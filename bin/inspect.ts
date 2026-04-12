@@ -175,7 +175,7 @@ export async function inspectCliCore(
 						"No project record found for current repo in the selected database. Use --global to list all projects.";
 				}
 			}
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
+			const header = scopeHeader(dbScope, dbInput);
 			const note = scopeNote === null ? "" : `${scopeNote}\n\n`;
 			return makeOutput(
 				{
@@ -195,11 +195,10 @@ export async function inspectCliCore(
 			if (details === null) {
 				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
 				{ action: "inspect_project", project: details },
 				parsed.json,
-				`${header}${formatProjectDetails(details, verbose)}`,
+				`${scopeHeader(dbScope, dbInput)}${formatProjectDetails(details, verbose)}`,
 			);
 		}
 		case "paths": {
@@ -208,7 +207,6 @@ export async function inspectCliCore(
 			if (details === null) {
 				return makeError(`Project not found: ${parsed.projectRef}`, parsed.json);
 			}
-			const header = verbose ? `DB scope: ${dbScope} (${dbInput})\n\n` : "";
 			return makeOutput(
 				{
 					action: "inspect_paths",
@@ -216,7 +214,7 @@ export async function inspectCliCore(
 					paths: details.paths,
 				},
 				parsed.json,
-				`${header}${formatPaths(details, verbose)}`,
+				`${scopeHeader(dbScope, dbInput)}${formatPaths(details, verbose)}`,
 			);
 		}
 		case "stuck": {

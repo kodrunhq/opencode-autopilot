@@ -355,7 +355,7 @@ function executeRecoveryAction(
 
 interface RecoveryEventHandlerOptions {
 	readonly orchestrator: RecoveryOrchestrator;
-	readonly db?: Database;
+	readonly db?: Database | (() => Database | null);
 	readonly sdk?: RecoverySdkOperations;
 }
 
@@ -373,6 +373,7 @@ export function createRecoveryEventHandler(
 		try {
 			const { event } = input;
 			const properties = getEventProperties(event);
+			const resolvedDb = typeof db === "function" ? db() : db;
 
 			switch (event.type) {
 				case "session.error": {
@@ -388,8 +389,8 @@ export function createRecoveryEventHandler(
 							executeRecoveryAction(action, sessionId, orchestrator, sdk);
 						}
 					}
-					if (db) {
-						reconcileStalePendingDispatches(sessionId, db);
+					if (resolvedDb) {
+						reconcileStalePendingDispatches(sessionId, resolvedDb);
 					}
 					return;
 				}
@@ -401,16 +402,16 @@ export function createRecoveryEventHandler(
 					}
 
 					orchestrator.reset(sessionId);
-					if (db) {
+					if (resolvedDb) {
 						try {
-							clearRecoveryState(db, sessionId);
+							clearRecoveryState(resolvedDb, sessionId);
 						} catch (error: unknown) {
 							logger.warn("Failed to clear persisted recovery state on session delete", {
 								sessionId,
 								error: error instanceof Error ? error.message : String(error),
 							});
 						}
-						reconcileStalePendingDispatches(sessionId, db);
+						reconcileStalePendingDispatches(sessionId, resolvedDb);
 					}
 					logger.info("Recovery state cleared", { sessionId });
 					return;

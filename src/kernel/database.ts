@@ -6,11 +6,32 @@ import { runKernelMigrations } from "./migrations";
 
 export const KERNEL_DB_FILE = "kernel.db";
 
+const MAX_KERNEL_PATH_WARNING_LENGTH = 200;
+
 const LEGACY_KERNEL_FILES = Object.freeze([
 	KERNEL_DB_FILE,
 	`${KERNEL_DB_FILE}-wal`,
 	`${KERNEL_DB_FILE}-shm`,
 ]);
+
+function truncateKernelPathWarning(path: string): string {
+	if (path.length <= MAX_KERNEL_PATH_WARNING_LENGTH) {
+		return path;
+	}
+
+	return `${path.slice(0, MAX_KERNEL_PATH_WARNING_LENGTH - 3)}...`;
+}
+
+function warnIfNotArtifactDir(path: string): void {
+	const normalizedPath = path.replace(/[\\/]+$/, "");
+	if (normalizedPath.endsWith(".opencode-autopilot") || normalizedPath.endsWith(KERNEL_DB_FILE)) {
+		return;
+	}
+
+	console.warn?.(
+		`openKernelDb: expected artifact dir (.opencode-autopilot) or explicit kernel.db path, got: ${truncateKernelPathWarning(path)}`,
+	);
+}
 
 export function detectLegacyKernelDb(projectRoot: string): string | null {
 	const legacyPath = join(projectRoot, KERNEL_DB_FILE);
@@ -69,6 +90,8 @@ export function resolveKernelDbPathFromProject(
 
 export function getKernelDbPath(artifactDir?: string): string {
 	if (typeof artifactDir === "string" && artifactDir.length > 0) {
+		warnIfNotArtifactDir(artifactDir);
+
 		if (artifactDir.endsWith(KERNEL_DB_FILE)) {
 			return artifactDir;
 		}

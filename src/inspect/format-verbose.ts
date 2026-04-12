@@ -205,6 +205,8 @@ export function formatVerboseMemoryOverview(overview: InspectMemoryOverview): st
 		"Memory Overview",
 		"",
 		`Total observations: ${overview.stats.totalObservations}`,
+		`Total memories: ${overview.stats.totalMemories}`,
+		`Memories by kind: ${JSON.stringify(overview.stats.memoriesByKind)}`,
 		`Total projects: ${overview.stats.totalProjects}`,
 		`Total preferences: ${overview.stats.totalPreferences}`,
 		`Storage size: ${overview.stats.storageSizeKb} KB`,
