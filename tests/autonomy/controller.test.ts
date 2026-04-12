@@ -1,9 +1,16 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { LoopController } from "../../src/autonomy/controller";
 import { TaskOracleBridge } from "../../src/autonomy/oracle-bridge";
 import { VerificationHandler } from "../../src/autonomy/verification";
 import { BaseLogger } from "../../src/logging/logger";
 import type { LogEntry, Logger } from "../../src/logging/types";
+import {
+	formatOracleSignoffEnvelope,
+	getProgramOracleSignoffArtifactPath,
+} from "../../src/orchestrator/signoff";
 
 function createLogger(): Logger {
 	return new BaseLogger(
@@ -14,13 +21,45 @@ function createLogger(): Logger {
 	);
 }
 
+function createProgramSignoff(
+	signoffId: string,
+	verdict: "COMPLETE" | "INCOMPLETE" | "FAILED",
+	reasoning: string,
+): string {
+	return formatOracleSignoffEnvelope({
+		signoffId,
+		scope: "PROGRAM",
+		inputsDigest: `digest-${signoffId}`,
+		verdict,
+		reasoning,
+	});
+}
+
 describe("LoopController", () => {
-	test("completes lifecycle when completion is detected without verification", async () => {
-		const controller = new LoopController({ verifyOnComplete: false, logger: createLogger() });
+	test("requires Oracle signoff even when deterministic verification is disabled", async () => {
+		const oracleBridge = new TaskOracleBridge({
+			generateAttemptId: () => "attempt-no-verify",
+			dispatchOracleTask: async ({ attemptId, parentSessionId }) => ({
+				sessionId: "oracle-session-no-verify",
+				attemptId,
+				parentSessionId: parentSessionId ?? "missing-parent",
+			}),
+			readOracleSessionMessages: async () => [
+				createProgramSignoff("attempt-no-verify", "COMPLETE", "Oracle approved completion."),
+			],
+		});
+		const controller = new LoopController({
+			verifyOnComplete: false,
+			sessionId: "work-session-no-verify",
+			logger: createLogger(),
+			oracleBridge,
+		});
 
 		controller.start("Ship feature", { maxIterations: 3, verifyOnComplete: false });
-		const status = await controller.iterate("<promise>DONE</promise>");
+		const pending = await controller.iterate("<promise>DONE</promise>");
+		expect(pending.state).toBe("oracle_verification_pending");
 
+		const status = await controller.iterate("poll oracle");
 		expect(status.state).toBe("complete");
 		expect(status.currentIteration).toBe(1);
 		expect(controller.isComplete()).toBe(true);
@@ -37,7 +76,9 @@ describe("LoopController", () => {
 		controller.resume();
 		const abortedStatus = controller.abort();
 		expect(abortedStatus.state).toBe("failed");
-		expect(abortedStatus.accumulatedContext.at(-1)).toBe("Loop aborted by operator.");
+		expect(abortedStatus.accumulatedContext[abortedStatus.accumulatedContext.length - 1]).toBe(
+			"Loop aborted by operator.",
+		);
 	});
 
 	test("transitions to max_iterations when the limit is exceeded", async () => {
@@ -57,9 +98,7 @@ describe("LoopController", () => {
 		const oracleSessions = new Map<string, readonly string[]>([
 			[
 				"oracle-session-1",
-				[
-					"ATTEMPT_ID: attempt-1\n<promise>VERIFIED</promise>\nVERDICT: VERIFIED\nSUMMARY: Oracle accepted the completion evidence.",
-				],
+				[createProgramSignoff("attempt-1", "COMPLETE", "Oracle accepted the completion evidence.")],
 			],
 		]);
 		const verificationHandler = new VerificationHandler({
@@ -79,13 +118,13 @@ describe("LoopController", () => {
 			dispatchOracleTask: async ({ parentSessionId, prompt, attemptId }) => {
 				expect(parentSessionId).toBe("work-session-1");
 				expect(attemptId).toBe("attempt-1");
-				expect(prompt).toContain("Review this completion claim and decide whether it is verified.");
+				expect(prompt).toContain("Mandatory program Oracle signoff request.");
 				expect(commandsRun).toEqual(expect.arrayContaining(["run-tests", "run-lint"]));
 				expect(controller.getStatus().state).toBe("verifying");
 				return {
 					sessionId: "oracle-session-1",
 					attemptId,
-					parentSessionId,
+					parentSessionId: parentSessionId ?? "missing-parent",
 				};
 			},
 			readOracleSessionMessages: async ({ sessionId }) => oracleSessions.get(sessionId) ?? [],
@@ -111,6 +150,7 @@ describe("LoopController", () => {
 		expect(completeStatus.state).toBe("complete");
 		expect(completeStatus.oracleVerification?.status).toBe("verified");
 		expect(completeStatus.oracleVerification?.resultAttemptId).toBe("attempt-1");
+		expect(completeStatus.oracleVerification?.signoff?.verdict).toBe("COMPLETE");
 		expect(completeStatus.verificationResults).toHaveLength(1);
 	});
 
@@ -123,13 +163,21 @@ describe("LoopController", () => {
 			[
 				"oracle-session-1",
 				[
-					"ATTEMPT_ID: oracle-attempt-1\nVERDICT: FAILED\nFIX_INSTRUCTIONS: Add the final validation step before declaring completion.",
+					createProgramSignoff(
+						"oracle-attempt-1",
+						"FAILED",
+						"Add the final validation step before declaring completion.",
+					),
 				],
 			],
 			[
 				"oracle-session-2",
 				[
-					"ATTEMPT_ID: oracle-attempt-2\nVERDICT: FAILED\nFIX_INSTRUCTIONS: Add the final validation step before declaring completion.",
+					createProgramSignoff(
+						"oracle-attempt-2",
+						"FAILED",
+						"Add the final validation step before declaring completion.",
+					),
 				],
 			],
 		]);
@@ -167,7 +215,9 @@ describe("LoopController", () => {
 		const firstRejection = await controller.iterate("Polling Oracle result");
 		expect(firstRejection.state).toBe("running");
 		expect(firstRejection.oracleVerification?.attemptCount).toBe(1);
-		expect(firstRejection.accumulatedContext.at(-1)).toContain("Oracle verification failed (1/2)");
+		expect(
+			firstRejection.accumulatedContext[firstRejection.accumulatedContext.length - 1],
+		).toContain("Oracle program signoff rejected (1/2)");
 
 		const stillRunning = await controller.iterate("Worker is still fixing the issue");
 		expect(stillRunning.state).toBe("running");
@@ -180,8 +230,49 @@ describe("LoopController", () => {
 		const terminalFailure = await controller.iterate("Polling Oracle result");
 		expect(terminalFailure.state).toBe("failed");
 		expect(terminalFailure.oracleVerification?.attemptCount).toBe(2);
-		expect(terminalFailure.accumulatedContext.at(-1)).toBe(
-			"Oracle verification exceeded maximum attempts (2). Manual review required.",
+		expect(terminalFailure.accumulatedContext[terminalFailure.accumulatedContext.length - 1]).toBe(
+			"Oracle program signoff exceeded maximum attempts (2). Manual review required.",
 		);
+	});
+
+	test("persists program Oracle signoff artifacts when an artifact directory is configured", async () => {
+		const artifactDir = await mkdtemp(join(tmpdir(), "program-signoff-"));
+		try {
+			const verificationHandler = new VerificationHandler({
+				commandChecks: [{ name: "tests", command: "run-tests" }],
+				runCommand: async () => ({ exitCode: 0, output: "ok" }),
+			});
+			const oracleBridge = new TaskOracleBridge({
+				generateAttemptId: () => "artifact-attempt-1",
+				dispatchOracleTask: async ({ attemptId, parentSessionId }) => ({
+					sessionId: "oracle-session-artifact",
+					attemptId,
+					parentSessionId: parentSessionId ?? "missing-parent",
+				}),
+				readOracleSessionMessages: async () => [
+					createProgramSignoff("artifact-attempt-1", "COMPLETE", "Persisted signoff."),
+				],
+			});
+
+			const controller = new LoopController({
+				artifactDir,
+				sessionId: "artifact-session",
+				verifyOnComplete: true,
+				logger: createLogger(),
+				verificationHandler,
+				oracleBridge,
+			});
+
+			controller.start("Persist signoff", { verifyOnComplete: true });
+			await controller.iterate("<promise>DONE</promise>");
+			await controller.iterate("poll oracle");
+
+			const persisted = JSON.parse(
+				await readFile(getProgramOracleSignoffArtifactPath(artifactDir), "utf-8"),
+			) as { verdict: string };
+			expect(persisted.verdict).toBe("COMPLETE");
+		} finally {
+			await rm(artifactDir, { recursive: true, force: true });
+		}
 	});
 });

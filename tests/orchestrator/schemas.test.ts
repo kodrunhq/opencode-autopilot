@@ -166,6 +166,7 @@ describe("pipelineStateSchema", () => {
 		expect(result.tasks).toEqual([]);
 		expect(result.arenaConfidence).toBeNull();
 		expect(result.exploreTriggered).toBe(false);
+		expect(result.reviewStatus.status).toBe("IDLE");
 	});
 
 	test("throws on invalid state (wrong schemaVersion)", () => {
@@ -243,6 +244,7 @@ describe("pipelineStateSchema", () => {
 		expect(result.decisions).toEqual([]);
 		expect(result.confidence).toEqual([]);
 		expect(result.tasks).toEqual([]);
+		expect(result.programContext).toBeNull();
 	});
 
 	test("returns typed PipelineState", () => {
@@ -259,6 +261,32 @@ describe("pipelineStateSchema", () => {
 		const result: PipelineState = pipelineStateSchema.parse(state);
 		expect(result.runId).toBe("run_typedtestabcdef");
 		expect(result.idea).toBe("typed test");
+	});
+
+	test("parses optional program context for autonomous tranche runs", () => {
+		const state = {
+			schemaVersion: 2,
+			status: "IN_PROGRESS",
+			runId: "run_programtestabcdef",
+			idea: "focused tranche",
+			currentPhase: "RECON",
+			startedAt: "2026-03-31T00:00:00Z",
+			lastUpdatedAt: "2026-03-31T00:00:00Z",
+			phases: [],
+			programContext: {
+				programId: "program_123",
+				trancheId: "tranche_01",
+				trancheTitle: "Persist program state",
+				trancheIndex: 1,
+				trancheCount: 3,
+				selectionRationale: "Selected automatically because it has no unmet dependencies.",
+				originatingRequest: "Implement the remediation plan.",
+				mode: "autonomous",
+			},
+		};
+		const result = pipelineStateSchema.parse(state);
+		expect(result.programContext?.programId).toBe("program_123");
+		expect(result.programContext?.trancheCount).toBe(3);
 	});
 });
 

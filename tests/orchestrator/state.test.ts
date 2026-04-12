@@ -48,6 +48,24 @@ describe("createInitialState", () => {
 		expect(state.confidence).toEqual([]);
 		expect(state.tasks).toEqual([]);
 	});
+
+	test("supports optional program context for autonomous tranche runs", () => {
+		const state = createInitialState("focused tranche", {
+			programContext: {
+				programId: "program_123",
+				trancheId: "tranche_01",
+				trancheTitle: "Persist program state",
+				trancheIndex: 1,
+				trancheCount: 3,
+				selectionRationale: "Selected automatically because it has no unmet dependencies.",
+				originatingRequest: "Implement the remediation plan.",
+				mode: "autonomous",
+			},
+		});
+
+		expect(state.programContext?.programId).toBe("program_123");
+		expect(state.programContext?.trancheIndex).toBe(1);
+	});
 });
 
 describe("saveState + loadState round-trip", () => {
@@ -57,6 +75,24 @@ describe("saveState + loadState round-trip", () => {
 		const loaded = await loadState(tempDir);
 		expect(loaded).toEqual(original);
 		expect(loadLatestPipelineStateFromKernel(tempDir)).toEqual(original);
+	});
+
+	test("persists program context through save/load round-trip", async () => {
+		const original = createInitialState("round-trip test", {
+			programContext: {
+				programId: "program_123",
+				trancheId: "tranche_01",
+				trancheTitle: "Persist program state",
+				trancheIndex: 1,
+				trancheCount: 2,
+				selectionRationale: "Selected automatically.",
+				originatingRequest: "Implement the remediation plan.",
+				mode: "autonomous",
+			},
+		});
+		await saveState(original, tempDir);
+		const loaded = await loadState(tempDir);
+		expect(loaded?.programContext).toEqual(original.programContext);
 	});
 });
 

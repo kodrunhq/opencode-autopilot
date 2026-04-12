@@ -111,6 +111,29 @@ export const notificationsConfigSchema = z.object({
 
 export const notificationsDefaults = notificationsConfigSchema.parse({});
 
+export const interactionModeSchema = z.enum(["interactive", "autonomous"]);
+export type InteractionMode = z.infer<typeof interactionModeSchema>;
+
+export const executionModeSchema = z.enum(["foreground", "background"]);
+export type ExecutionMode = z.infer<typeof executionModeSchema>;
+
+export const visibilityModeSchema = z.enum(["summary", "debug"]);
+export type VisibilityMode = z.infer<typeof visibilityModeSchema>;
+
+export const verificationModeSchema = z.enum(["strict", "normal", "lenient"]);
+export type VerificationMode = z.infer<typeof verificationModeSchema>;
+
+export const modeConfigSchema = z.object({
+	interactionMode: interactionModeSchema.default("interactive"),
+	executionMode: executionModeSchema.default("foreground"),
+	visibilityMode: visibilityModeSchema.default("summary"),
+	verificationMode: verificationModeSchema.default("normal"),
+});
+
+export type ModeConfig = z.infer<typeof modeConfigSchema>;
+
+export const modeDefaults = modeConfigSchema.parse({});
+
 export const verificationCommandSchema = z.object({
 	name: z.string().min(1),
 	command: z.string().min(1),
@@ -225,7 +248,92 @@ const pluginConfigSchemaV6 = z
 
 type PluginConfigV6 = z.infer<typeof pluginConfigSchemaV6>;
 
-const pluginConfigSchemaV7 = z
+interface LegacyModeInput {
+	readonly orchestratorAutonomy?: unknown;
+	readonly orchestratorStrictness?: unknown;
+	readonly backgroundEnabled?: unknown;
+	readonly autonomyEnabled?: unknown;
+	readonly routingEnabled?: unknown;
+	readonly autonomyVerification?: unknown;
+}
+
+function deriveModeFromLegacyInput(input: LegacyModeInput): ModeConfig {
+	const autonomyVerificationResult = verificationModeSchema.safeParse(input.autonomyVerification);
+	const orchestratorVerificationResult = verificationModeSchema.safeParse(
+		input.orchestratorStrictness,
+	);
+	const verificationMode: VerificationMode = autonomyVerificationResult.success
+		? autonomyVerificationResult.data
+		: orchestratorVerificationResult.success
+			? orchestratorVerificationResult.data
+			: modeDefaults.verificationMode;
+	const legacyAutonomousIntent = input.orchestratorAutonomy === "full";
+	const interactionMode: InteractionMode =
+		legacyAutonomousIntent &&
+		input.autonomyEnabled === true &&
+		input.backgroundEnabled === true &&
+		input.routingEnabled === true
+			? "autonomous"
+			: "interactive";
+
+	return modeConfigSchema.parse({
+		interactionMode,
+		executionMode: input.backgroundEnabled === true ? "background" : "foreground",
+		visibilityMode: modeDefaults.visibilityMode,
+		verificationMode,
+	});
+}
+
+function normalizeV7ConfigInput(rawConfig: unknown): unknown {
+	if (!rawConfig || typeof rawConfig !== "object") {
+		return rawConfig;
+	}
+
+	const rawRecord = rawConfig as Record<string, unknown>;
+	if (rawRecord.version !== 7 || "mode" in rawRecord) {
+		return rawConfig;
+	}
+
+	const orchestrator =
+		rawRecord.orchestrator && typeof rawRecord.orchestrator === "object"
+			? (rawRecord.orchestrator as Record<string, unknown>)
+			: null;
+	const background =
+		rawRecord.background && typeof rawRecord.background === "object"
+			? (rawRecord.background as Record<string, unknown>)
+			: null;
+	const autonomy =
+		rawRecord.autonomy && typeof rawRecord.autonomy === "object"
+			? (rawRecord.autonomy as Record<string, unknown>)
+			: null;
+	const routing =
+		rawRecord.routing && typeof rawRecord.routing === "object"
+			? (rawRecord.routing as Record<string, unknown>)
+			: null;
+
+	return {
+		...rawRecord,
+		mode: deriveModeFromLegacyInput({
+			orchestratorAutonomy: orchestrator?.autonomy,
+			orchestratorStrictness: orchestrator?.strictness,
+			backgroundEnabled: background?.enabled,
+			autonomyEnabled: autonomy?.enabled,
+			routingEnabled: routing?.enabled,
+			autonomyVerification: autonomy?.verification,
+		}),
+	};
+}
+
+function isV7ConfigMissingMode(rawConfig: unknown): boolean {
+	return (
+		!!rawConfig &&
+		typeof rawConfig === "object" &&
+		(rawConfig as Record<string, unknown>).version === 7 &&
+		!("mode" in (rawConfig as Record<string, unknown>))
+	);
+}
+
+const pluginConfigSchemaV7Base = z
 	.object({
 		version: z.literal(7),
 		configured: z.boolean(),
@@ -245,6 +353,7 @@ const pluginConfigSchemaV7 = z
 				maxIterations: z.number().int().min(1).max(50).default(10),
 			})
 			.default({ enabled: false, verification: "normal", maxIterations: 10 }),
+		mode: modeConfigSchema.default(modeDefaults),
 		routing: routingConfigSchema.default(routingDefaults),
 		recovery: recoveryConfigSchema.default(recoveryDefaults),
 		mcp: mcpConfigSchema.default(mcpDefaults),
@@ -260,11 +369,40 @@ const pluginConfigSchemaV7 = z
 				});
 			}
 		}
+
+		const modeAnalysis = inspectConfigMode(config);
+		for (const issue of modeAnalysis.issues) {
+			if (issue.severity !== "error") {
+				continue;
+			}
+
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: [...issue.path],
+				message: issue.message,
+			});
+		}
 	});
+
+const pluginConfigSchemaV7 = z.preprocess(normalizeV7ConfigInput, pluginConfigSchemaV7Base);
 
 export const pluginConfigSchema = pluginConfigSchemaV7;
 
 export type PluginConfig = z.infer<typeof pluginConfigSchemaV7>;
+
+export interface ConfigInvariantIssue {
+	readonly code: string;
+	readonly severity: "error" | "warning";
+	readonly message: string;
+	readonly path: readonly (string | number)[];
+}
+
+export interface ConfigModeAnalysis {
+	readonly mode: ModeConfig;
+	readonly verificationProfileConfigured: boolean;
+	readonly issues: readonly ConfigInvariantIssue[];
+	readonly hasErrors: boolean;
+}
 
 export const CONFIG_PATH = join(getGlobalConfigDir(), "opencode-autopilot.json");
 
@@ -373,6 +511,7 @@ export const v7ConfigDefaults = {
 		verification: "normal",
 		maxIterations: 10,
 	},
+	mode: modeDefaults,
 	routing: routingDefaults,
 	recovery: recoveryDefaults,
 	mcp: mcpDefaults,
@@ -396,6 +535,135 @@ export function resolveProjectVerificationSettings(
 	return null;
 }
 
+function hasConfiguredVerificationProfile(
+	config: PluginConfig,
+	projectRoot?: string | null,
+): boolean {
+	if (projectRoot) {
+		return resolveProjectVerificationSettings(config, projectRoot) !== null;
+	}
+
+	if (config.verification.commandChecks.length > 0) {
+		return true;
+	}
+
+	return Object.values(config.verification.projectOverrides).some(
+		(override) => override.commandChecks.length > 0,
+	);
+}
+
+function createConfigIssue(
+	code: string,
+	severity: "error" | "warning",
+	path: readonly (string | number)[],
+	message: string,
+): ConfigInvariantIssue {
+	return Object.freeze({ code, severity, path, message });
+}
+
+export function inspectConfigMode(
+	config: PluginConfig,
+	options: { readonly projectRoot?: string | null } = {},
+): ConfigModeAnalysis {
+	const issues: ConfigInvariantIssue[] = [];
+	const verificationProfileConfigured = hasConfiguredVerificationProfile(
+		config,
+		options.projectRoot,
+	);
+	const disabledLegacyFlags = [
+		!config.autonomy.enabled ? "autonomy.enabled=false" : null,
+		!config.background.enabled ? "background.enabled=false" : null,
+		!config.routing.enabled ? "routing.enabled=false" : null,
+	].filter((value): value is string => value !== null);
+	const legacyAutonomousIntent = config.orchestrator.autonomy === "full";
+
+	if (!verificationProfileConfigured) {
+		issues.push(
+			createConfigIssue(
+				"missing_verification_profile",
+				config.mode.interactionMode === "autonomous" ? "error" : "warning",
+				["verification", "commandChecks"],
+				config.mode.interactionMode === "autonomous"
+					? "Autonomous mode requires a verification profile with at least one command check."
+					: "No verification profile is configured. Autonomous mode will refuse to start until command checks are defined.",
+			),
+		);
+	}
+
+	if (config.mode.interactionMode === "autonomous") {
+		if (config.mode.executionMode !== "background") {
+			issues.push(
+				createConfigIssue(
+					"autonomous_requires_background_execution",
+					"error",
+					["mode", "executionMode"],
+					"Autonomous mode requires executionMode=background.",
+				),
+			);
+		}
+
+		if (config.orchestrator.autonomy !== "full") {
+			issues.push(
+				createConfigIssue(
+					"legacy_orchestrator_autonomy_mismatch",
+					"error",
+					["orchestrator", "autonomy"],
+					"Autonomous mode requires orchestrator.autonomy=full for legacy compatibility.",
+				),
+			);
+		}
+
+		if (!config.autonomy.enabled) {
+			issues.push(
+				createConfigIssue(
+					"legacy_autonomy_disabled",
+					"error",
+					["autonomy", "enabled"],
+					"Autonomous mode forbids autonomy.enabled=false.",
+				),
+			);
+		}
+
+		if (!config.background.enabled) {
+			issues.push(
+				createConfigIssue(
+					"legacy_background_disabled",
+					"error",
+					["background", "enabled"],
+					"Autonomous mode forbids background.enabled=false.",
+				),
+			);
+		}
+
+		if (!config.routing.enabled) {
+			issues.push(
+				createConfigIssue(
+					"legacy_routing_disabled",
+					"error",
+					["routing", "enabled"],
+					"Autonomous mode forbids routing.enabled=false.",
+				),
+			);
+		}
+	} else if (legacyAutonomousIntent && disabledLegacyFlags.length > 0) {
+		issues.push(
+			createConfigIssue(
+				"disabled_legacy_mode_flags",
+				"warning",
+				["orchestrator", "autonomy"],
+				`Legacy autonomy settings are contradictory (${disabledLegacyFlags.join(", ")}). Canonical mode resolves to ${config.mode.interactionMode}/${config.mode.executionMode}.`,
+			),
+		);
+	}
+
+	return Object.freeze({
+		mode: config.mode,
+		verificationProfileConfigured,
+		issues: Object.freeze(issues),
+		hasErrors: issues.some((issue) => issue.severity === "error"),
+	});
+}
+
 export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
 	return {
 		version: 7 as const,
@@ -414,6 +682,10 @@ export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
 			verification: "normal",
 			maxIterations: 10,
 		},
+		mode: deriveModeFromLegacyInput({
+			orchestratorAutonomy: v6Config.orchestrator.autonomy,
+			orchestratorStrictness: v6Config.orchestrator.strictness,
+		}),
 		routing: routingDefaults,
 		recovery: recoveryDefaults,
 		mcp: mcpDefaults,
@@ -427,7 +699,12 @@ export async function loadConfig(configPath: string = CONFIG_PATH): Promise<Plug
 		const parsed = JSON.parse(raw);
 
 		const v7Result = pluginConfigSchemaV7.safeParse(parsed);
-		if (v7Result.success) return v7Result.data;
+		if (v7Result.success) {
+			if (isV7ConfigMissingMode(parsed)) {
+				await saveConfig(v7Result.data, configPath);
+			}
+			return v7Result.data;
+		}
 
 		const v6Result = pluginConfigSchemaV6.safeParse(parsed);
 		if (v6Result.success) {
@@ -498,8 +775,9 @@ export async function saveConfig(
 	configPath: string = CONFIG_PATH,
 ): Promise<void> {
 	await ensureDir(dirname(configPath));
+	const validated = pluginConfigSchema.parse(config);
 	const tmpPath = `${configPath}.tmp.${randomBytes(8).toString("hex")}`;
-	await writeFile(tmpPath, JSON.stringify(config, null, 2), "utf-8");
+	await writeFile(tmpPath, JSON.stringify(validated, null, 2), "utf-8");
 	await rename(tmpPath, configPath);
 }
 
@@ -513,7 +791,6 @@ export function createDefaultConfig(): PluginConfig {
 		configured: false,
 		groups: {},
 		overrides: {},
-		orchestrator: orchestratorDefaults,
 		confidence: confidenceDefaults,
 		fallback: fallbackDefaultsV6,
 		memory: memoryDefaults,
@@ -524,6 +801,16 @@ export function createDefaultConfig(): PluginConfig {
 			enabled: false,
 			verification: "normal",
 			maxIterations: 10,
+		},
+		mode: {
+			interactionMode: "interactive",
+			executionMode: "foreground",
+			visibilityMode: "summary",
+			verificationMode: "normal",
+		},
+		orchestrator: {
+			...orchestratorDefaults,
+			autonomy: "supervised",
 		},
 		routing: routingDefaults,
 		recovery: recoveryDefaults,

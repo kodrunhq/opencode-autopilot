@@ -32,11 +32,17 @@ export const agentResultSchema = z.object({
 });
 
 export const reviewReportSchema = z.object({
+	reviewRunId: z.string().max(128).nullable().default(null),
 	verdict: verdictSchema,
 	findings: z.array(reviewFindingSchema).max(500),
 	agentResults: z.array(agentResultSchema).max(500),
 	scope: z.string().max(128).default("unknown"),
 	agentsRan: z.array(z.string().max(128)).max(32).default([]),
+	selectedReviewers: z.array(z.string().max(128)).max(64).default([]),
+	requiredReviewers: z.array(z.string().max(128)).max(64).default([]),
+	executedReviewers: z.array(z.string().max(128)).max(64).default([]),
+	missingRequiredReviewers: z.array(z.string().max(128)).max(64).default([]),
+	blockingSeverityThreshold: severitySchema.default("HIGH"),
 	totalDurationMs: z.number(),
 	completedAt: z.string().max(128),
 	summary: z.string().max(4096),
@@ -62,6 +68,12 @@ export const reviewMemorySchema = z.object({
 export const reviewStateSchema = z.object({
 	stage: z.number().int().min(1).max(5),
 	selectedAgentNames: z.array(z.string().max(128)).max(32),
+	requiredAgentNames: z.array(z.string().max(128)).max(64).default([]),
+	executedAgentNames: z.array(z.string().max(128)).max(64).default([]),
+	reviewRunId: z.string().max(128).default("review_unknown"),
+	blockingSeverityThreshold: severitySchema.default("HIGH"),
+	runId: z.string().max(128).nullable().default(null),
+	trancheId: z.string().max(128).nullable().default(null),
 	accumulatedFindings: z.array(reviewFindingSchema).max(500),
 	scope: z.string().max(4096),
 	diffEvidence: z.string().max(MAX_DIFF_EVIDENCE_SIZE).optional(),

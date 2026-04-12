@@ -328,6 +328,7 @@ describe("configV7FieldsCheck", () => {
 			},
 			memory: { enabled: true, injectionBudget: 2000, decayHalfLifeDays: 90 },
 			background: {},
+			mode: {},
 			routing: {},
 			recovery: {},
 			mcp: {},
@@ -337,6 +338,7 @@ describe("configV7FieldsCheck", () => {
 		expect(result.status).toBe("pass");
 		expect(result.name).toBe("config-v7-fields");
 		expect(result.message).toContain("background");
+		expect(result.message).toContain("mode");
 		expect(result.message).toContain("routing");
 		expect(result.message).toContain("recovery");
 		expect(result.message).toContain("mcp");
@@ -396,6 +398,7 @@ describe("configV7FieldsCheck", () => {
 		expect(result.message).toContain("missing required fields");
 		expect(result.details).toBeDefined();
 		expect(result.details).toContain("background");
+		expect(result.details).toContain("mode");
 		expect(result.details).toContain("routing");
 		expect(result.details).toContain("recovery");
 		expect(result.details).toContain("mcp");
@@ -441,6 +444,7 @@ describe("configV7FieldsCheck", () => {
 		expect(result.status).toBe("pass");
 		expect(result.name).toBe("config-v7-fields");
 		expect(result.message).toContain("background");
+		expect(result.message).toContain("mode");
 		expect(result.message).toContain("routing");
 		expect(result.message).toContain("recovery");
 		expect(result.message).toContain("mcp");
@@ -488,6 +492,7 @@ describe("configV7FieldsCheck", () => {
 		expect(result.status).toBe("fail");
 		expect(result.name).toBe("config-v7-fields");
 		expect(result.details).toBeDefined();
+		expect(result.details).toContain("mode");
 		expect(result.details).toContain("recovery");
 		expect(result.details).toContain("mcp");
 		expect(result.details).not.toContain("background");

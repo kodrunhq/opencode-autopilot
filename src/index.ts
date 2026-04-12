@@ -97,7 +97,11 @@ import { ocState } from "./tools/state";
 import { ocStocktake } from "./tools/stocktake";
 import { ocSummary } from "./tools/summary";
 import { ocUpdateDocs } from "./tools/update-docs";
-import { getGlobalConfigDir } from "./utils/paths";
+import {
+	cleanupProjectRuntimeArtifacts,
+	getGlobalConfigDir,
+	getProjectArtifactDir,
+} from "./utils/paths";
 import { ContextWarningMonitor } from "./ux/context-warnings";
 import { getRemediationHint } from "./ux/error-hints";
 import { NotificationManager } from "./ux/notifications";
@@ -107,7 +111,9 @@ import {
 	registerProgressTracker,
 	registerTaskToastManager,
 } from "./ux/registry";
+import { createSidebarTuiPlugin } from "./ux/sidebar";
 import { TaskToastManager } from "./ux/task-toast-manager";
+import { createToolVisibilityProjectionHandler, sanitizeChatMessageParts } from "./ux/visibility";
 
 let openCodeConfig: Config | null = null;
 
@@ -237,6 +243,8 @@ const plugin: Plugin = async (input) => {
 	// --- UX surfaces: context warnings, progress tracking, error hints ---
 	const contextWarningMonitor = new ContextWarningMonitor({ notificationManager });
 	const progressTracker = new ProgressTracker({ notificationManager });
+	const visibilityMode = config?.mode?.visibilityMode ?? "summary";
+	const toolVisibilityHandler = createToolVisibilityProjectionHandler({ visibilityMode });
 
 	registerNotificationManager(notificationManager);
 	registerProgressTracker(progressTracker);
@@ -364,6 +372,7 @@ const plugin: Plugin = async (input) => {
 	const getSessionLoopController = (sessionId: string) =>
 		getLoopController(sessionId, {
 			sessionId,
+			artifactDir: getProjectArtifactDir(projectRoot),
 			logger: getLogger("autonomy", "controller"),
 			verificationHandler,
 			dispatchOracleTask: async ({ attemptId, parentSessionId, prompt }) => {
@@ -762,6 +771,15 @@ const plugin: Plugin = async (input) => {
 			await compactionHandler({ event });
 
 			if (event.type === "session.deleted") {
+				try {
+					await cleanupProjectRuntimeArtifacts(projectRoot);
+				} catch (error: unknown) {
+					getLogger("system").warn("Runtime artifact cleanup failed", {
+						projectRoot,
+						error: error instanceof Error ? error.message : String(error),
+					});
+				}
+
 				mcpManager.stopAll().catch(() => {});
 				const sessionID = extractSessionIdFromProperties(event.properties) ?? undefined;
 				if (sessionID) {
@@ -792,6 +810,10 @@ const plugin: Plugin = async (input) => {
 
 			if (fallbackConfig.enabled) {
 				await chatMessageHandler(hookInput, output);
+			}
+
+			if (visibilityMode === "summary") {
+				sanitizeChatMessageParts(output.parts);
 			}
 		},
 		"tool.execute.before": async (
@@ -852,6 +874,12 @@ const plugin: Plugin = async (input) => {
 			} catch {
 				// best-effort
 			}
+
+			try {
+				toolVisibilityHandler(hookInput, output);
+			} catch {
+				// best-effort
+			}
 		},
 		"chat.completion.after": async (
 			hookInput: {
@@ -885,4 +913,4 @@ const plugin: Plugin = async (input) => {
 
 export default plugin;
 
-// Export TUI plugin for sidebar integration
+export const tui = createSidebarTuiPlugin();

@@ -29,8 +29,15 @@ const immediateOracleBridge: OracleBridge = {
 		return {
 			status: "verified",
 			summary: "Oracle approved completion.",
+			signoff: {
+				signoffId: "oracle-attempt-full-pipeline",
+				scope: "PROGRAM",
+				inputsDigest: "digest-full-pipeline",
+				verdict: "COMPLETE",
+				reasoning: "Oracle approved completion.",
+			},
 			rawEvidence:
-				"<promise>VERIFIED</promise>\nVERDICT: VERIFIED\nSUMMARY: Oracle approved completion.",
+				'<oracle-signoff id="oracle-attempt-full-pipeline">{"signoffId":"oracle-attempt-full-pipeline","scope":"PROGRAM","inputsDigest":"digest-full-pipeline","verdict":"COMPLETE","reasoning":"Oracle approved completion."}</oracle-signoff>',
 			attemptId: "oracle-attempt-full-pipeline",
 		};
 	},
@@ -144,12 +151,17 @@ describe("Integration: full pipeline v7 — all subsystems active", () => {
 			maxIterations: 5,
 			verifyOnComplete: false,
 			cooldownMs: 0,
+			sessionId: "full-pipeline-session",
+			oracleBridge: immediateOracleBridge,
 		});
 
 		controller.start("Auth middleware");
-		const loopResult = await controller.iterate(
+		const pending = await controller.iterate(
 			`Background completed: ${taskResult}\n<promise>DONE</promise>`,
 		);
+		expect(pending.state).toBe("oracle_verification_pending");
+
+		const loopResult = await controller.iterate("poll oracle");
 		expect(loopResult.state).toBe("complete");
 
 		const orchestrator = new RecoveryOrchestrator({ maxAttempts: 3 });

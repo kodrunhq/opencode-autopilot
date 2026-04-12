@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { reviewStatusSchema } from "./review-runner";
+import { oracleSignoffStateSchema } from "./signoff";
 
 function generateRunId(): string {
 	return `run_${randomBytes(8).toString("hex")}`;
@@ -61,6 +63,9 @@ const baseBuildProgressSchema = z.object({
 	strikeCount: z.number().default(0),
 	reviewPending: z.boolean().default(false),
 	oraclePending: z.boolean().default(false),
+	oracleSignoffId: z.string().max(128).nullable().default(null),
+	oracleInputsDigest: z.string().max(128).nullable().default(null),
+	lastReviewReport: z.string().max(16_384).nullable().default(null),
 });
 
 // Full schema with defaults for pipeline state
@@ -73,7 +78,7 @@ export const dispatchResultKindSchema = z.enum([
 	"phase_output",
 	"task_completion",
 	"review_findings",
-	"oracle_consultation",
+	"oracle_signoff",
 ]);
 
 export const pendingDispatchSchema = z.object({
@@ -106,6 +111,42 @@ export const branchLifecycleSchema = z.object({
 	createdAt: z.string().max(128).nullable().default(null),
 	lastPushedAt: z.string().max(128).nullable().default(null),
 	tasksPushed: z.array(z.string().max(128)).max(1000).default([]),
+	programId: z.string().max(128).nullable().default(null),
+	trancheId: z.string().max(128).nullable().default(null),
+	humanTitle: z.string().max(256).nullable().default(null),
+	commitStrategy: z.enum(["per_task", "per_wave", "squash"]).default("per_task"),
+	reviewSummary: z.string().max(4096).nullable().default(null),
+	oracleSummary: z.string().max(4096).nullable().default(null),
+	verificationSummary: z.string().max(4096).nullable().default(null),
+});
+
+export const verificationCheckStatusSchema = z.enum([
+	"PASSED",
+	"FAILED",
+	"BLOCKED",
+	"PENDING",
+	"SKIPPED_WITH_REASON",
+]);
+
+export const pipelineVerificationStatusSchema = z.object({
+	status: z.enum(["NOT_STARTED", "PASSED", "FAILED", "BLOCKED", "PENDING"]),
+	summary: z.string().max(4096).nullable().default(null),
+	localStatus: verificationCheckStatusSchema.nullable().default(null),
+	localSummary: z.string().max(4096).nullable().default(null),
+	ciStatus: verificationCheckStatusSchema.nullable().default(null),
+	ciSummary: z.string().max(4096).nullable().default(null),
+	updatedAt: z.string().max(128).nullable().default(null),
+});
+
+export const programContextSchema = z.object({
+	programId: z.string().min(1).max(128),
+	trancheId: z.string().min(1).max(128),
+	trancheTitle: z.string().min(1).max(512),
+	trancheIndex: z.number().int().positive(),
+	trancheCount: z.number().int().positive(),
+	selectionRationale: z.string().max(2048),
+	originatingRequest: z.string().max(4096),
+	mode: z.enum(["autonomous", "interactive"]),
 });
 
 export const pipelineStateSchema = z.object({
@@ -135,12 +176,30 @@ export const pipelineStateSchema = z.object({
 		strikeCount: 0,
 		reviewPending: false,
 		oraclePending: false,
+		oracleSignoffId: null,
+		oracleInputsDigest: null,
+		lastReviewReport: null,
+	}),
+	oracleSignoffs: oracleSignoffStateSchema.default({
+		tranche: null,
+		program: null,
 	}),
 	pendingDispatches: z.array(pendingDispatchSchema).max(2000).default([]),
 	processedResultIds: z.array(z.string().max(128)).max(10_000).default([]),
 	failureContext: failureContextSchema.nullable().default(null),
 	branchLifecycle: branchLifecycleSchema.nullable().default(null),
+	verificationStatus: pipelineVerificationStatusSchema.default({
+		status: "NOT_STARTED",
+		summary: null,
+		localStatus: null,
+		localSummary: null,
+		ciStatus: null,
+		ciSummary: null,
+		updatedAt: null,
+	}),
+	programContext: programContextSchema.nullable().default(null),
 	phaseDispatchCounts: z.record(z.string().max(32), z.number().int().min(0).max(1000)).default({}),
 	retryAttempts: z.record(z.string().max(128), z.number().int().min(0).max(100)).default({}),
 	useWorktrees: z.boolean().default(false),
+	reviewStatus: reviewStatusSchema.default(reviewStatusSchema.parse({})),
 });

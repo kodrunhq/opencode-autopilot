@@ -1,4 +1,5 @@
 import type { ForensicEvent } from "../observability/forensic-types";
+import type { ReviewRun } from "../orchestrator/review-runner";
 import type { PipelineState } from "../orchestrator/types";
 import type { ReviewState } from "../review/types";
 
@@ -21,6 +22,21 @@ export interface PipelineRunRow {
 	readonly state_json: string;
 }
 
+export interface ProgramRunRow {
+	readonly project_id: string;
+	readonly program_id: string;
+	readonly schema_version: number;
+	readonly status: string;
+	readonly mode: string;
+	readonly originating_request: string;
+	readonly created_at: string;
+	readonly current_tranche_id: string | null;
+	readonly final_oracle_verdict: string | null;
+	readonly success_criteria_json: string;
+	readonly blocked_reason: string | null;
+	readonly state_json: string;
+}
+
 export interface ActiveReviewStateRow {
 	readonly project_id: string;
 	readonly stage: ReviewState["stage"];
@@ -34,6 +50,25 @@ export interface ProjectReviewMemoryRow {
 	readonly project_id: string;
 	readonly schema_version: number;
 	readonly last_reviewed_at: string | null;
+	readonly state_json: string;
+}
+
+export interface ReviewRunRow {
+	readonly project_id: string;
+	readonly review_run_id: string;
+	readonly run_id: string | null;
+	readonly tranche_id: string | null;
+	readonly scope: string;
+	readonly status: ReviewRun["status"];
+	readonly verdict: ReviewRun["verdict"];
+	readonly blocking_severity_threshold: string;
+	readonly required_reviewers_json: string;
+	readonly missing_required_reviewers_json: string;
+	readonly findings_summary_json: string;
+	readonly summary: string | null;
+	readonly blocked_reason: string | null;
+	readonly started_at: string;
+	readonly completed_at: string | null;
 	readonly state_json: string;
 }
 

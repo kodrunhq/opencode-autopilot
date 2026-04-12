@@ -135,7 +135,7 @@ describe("autopilot prompt — Oracle-identified gaps", () => {
 
 	test("HIGH 6: prompt contains ambiguity check gate", () => {
 		expect(prompt).toContain("Check for Ambiguity");
-		expect(prompt).toContain("2x+ effort difference");
+		expect(prompt).toContain("autonomous implementation mode");
 	});
 
 	test("HIGH 6: prompt supports multi-intent (primary + secondary)", () => {

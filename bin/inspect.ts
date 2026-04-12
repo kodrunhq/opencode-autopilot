@@ -1,6 +1,7 @@
 import { Database as SqliteDatabase } from "bun:sqlite";
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { CONFIG_PATH, inspectConfigMode, loadConfig } from "../src/config";
 import {
 	formatEvents,
 	formatLessons,
@@ -26,11 +27,16 @@ import {
 } from "../src/inspect/repository";
 import { resolveKernelDbPathFromProject } from "../src/kernel/database";
 import { reconcileProjectIds } from "../src/kernel/migrations";
-import { getAutopilotDbPath, getProjectArtifactDir } from "../src/utils/paths";
+import {
+	getAutopilotDbPath,
+	getProjectArtifactDir,
+	inspectProjectArtifactState,
+} from "../src/utils/paths";
 import { inspectUsage, parseInspectArgs } from "./inspect-args";
 
 export interface InspectCliOptions {
 	readonly dbPath?: string;
+	readonly configPath?: string;
 }
 
 export interface InspectCliResult {
@@ -55,6 +61,53 @@ function makeError(message: string, json: boolean): InspectCliResult {
 			? JSON.stringify({ action: "error", message }, null, 2)
 			: `${message}\n\n${inspectUsage()}`,
 	});
+}
+
+function formatPreflightText(payload: {
+	readonly projectRoot: string;
+	readonly artifactDir: string;
+	readonly mode: ReturnType<typeof inspectConfigMode>["mode"] | null;
+	readonly issues: ReadonlyArray<{
+		readonly code?: string;
+		readonly source: "config" | "artifacts";
+		readonly severity: "error" | "warning";
+		readonly message: string;
+		readonly paths?: readonly string[];
+	}>;
+	readonly verificationProfileConfigured: boolean | null;
+}): string {
+	const lines = [`Project root: ${payload.projectRoot}`, `Artifact dir: ${payload.artifactDir}`];
+
+	if (payload.mode) {
+		lines.push(
+			`Canonical mode: ${payload.mode.interactionMode} / ${payload.mode.executionMode} / ${payload.mode.visibilityMode} / ${payload.mode.verificationMode}`,
+		);
+	}
+
+	if (payload.verificationProfileConfigured !== null) {
+		lines.push(
+			`Verification profile: ${payload.verificationProfileConfigured ? "configured" : "missing"}`,
+		);
+	}
+
+	if (payload.issues.length === 0) {
+		lines.push("", "No preflight issues detected.");
+		return lines.join("\n");
+	}
+
+	lines.push("", "Issues:");
+	for (const issue of payload.issues) {
+		const label = issue.severity === "error" ? "ERROR" : "WARN";
+		const codeSuffix = issue.code ? ` [${issue.code}]` : "";
+		lines.push(`- [${label}] (${issue.source})${codeSuffix} ${issue.message}`);
+		if (issue.paths && issue.paths.length > 0) {
+			for (const filePath of issue.paths) {
+				lines.push(`    ${filePath}`);
+			}
+		}
+	}
+
+	return lines.join("\n");
 }
 
 export async function inspectCliCore(
@@ -95,6 +148,38 @@ export async function inspectCliCore(
 			parsed.json,
 			`Reconciled project IDs in ${targetDb}`,
 		);
+	}
+
+	if (parsed.view === "preflight") {
+		const projectRoot = gitRoot ?? process.cwd();
+		const config = await loadConfig(options.configPath ?? CONFIG_PATH);
+		const artifactState = inspectProjectArtifactState(projectRoot);
+		const modeAnalysis = config ? inspectConfigMode(config, { projectRoot }) : null;
+		const issues = [
+			...artifactState.issues.map((issue) => ({
+				code: issue.code,
+				source: "artifacts" as const,
+				severity: issue.severity,
+				message: issue.message,
+				paths: issue.paths,
+			})),
+			...(modeAnalysis?.issues.map((issue) => ({
+				code: issue.code,
+				source: "config" as const,
+				severity: issue.severity,
+				message: issue.message,
+			})) ?? []),
+		];
+		const payload = {
+			action: "inspect_preflight",
+			projectRoot,
+			artifactDir: artifactState.artifactDir,
+			mode: modeAnalysis?.mode ?? null,
+			verificationProfileConfigured: modeAnalysis?.verificationProfileConfigured ?? null,
+			issues,
+		};
+
+		return makeOutput(payload, parsed.json, formatPreflightText(payload));
 	}
 
 	function resolveDbInput(view: string): {

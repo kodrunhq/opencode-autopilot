@@ -61,7 +61,7 @@ describe("createSdkRunner", () => {
 		);
 
 		expect(result).toBe(
-			"Dispatched via planner (gpt-5.4): plan work (prompt delivered; agent runs async in session)",
+			"Background task dispatched via planner (gpt-5.4). Summary: plan work. Prompt delivered to child session.",
 		);
 	});
 
@@ -77,7 +77,7 @@ describe("createSdkRunner", () => {
 		);
 
 		expect(result).toBe(
-			"Dispatched (gpt-5.4): plan work (prompt delivered; agent runs async in session)",
+			"Background task dispatched (gpt-5.4). Summary: plan work. Prompt delivered to child session.",
 		);
 	});
 
@@ -93,7 +93,7 @@ describe("createSdkRunner", () => {
 		);
 
 		expect(result).toBe(
-			"Dispatched via planner: plan work (prompt delivered; agent runs async in session)",
+			"Background task dispatched via planner. Summary: plan work. Prompt delivered to child session.",
 		);
 	});
 

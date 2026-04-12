@@ -1,3 +1,5 @@
+import type { ProgramOracleSignoff } from "../orchestrator/signoff";
+
 export type LoopState =
 	| "idle"
 	| "running"
@@ -16,6 +18,7 @@ export interface OracleVerificationState {
 	readonly maxAttempts: number;
 	readonly lastResultSummary: string | null;
 	readonly resultAttemptId: string | null;
+	readonly signoff: ProgramOracleSignoff | null;
 }
 
 export interface LoopContext {
@@ -32,13 +35,22 @@ export interface LoopContext {
 
 export interface VerificationResult {
 	readonly passed: boolean;
+	readonly status: VerificationCheckStatus;
 	readonly checks: readonly VerificationCheck[];
 	readonly timestamp: string;
 }
 
+export type VerificationCheckStatus =
+	| "PASSED"
+	| "FAILED"
+	| "BLOCKED"
+	| "PENDING"
+	| "SKIPPED_WITH_REASON";
+
 export interface VerificationCheck {
 	readonly name: string;
 	readonly passed: boolean;
+	readonly status: VerificationCheckStatus;
 	readonly message: string;
 }
 

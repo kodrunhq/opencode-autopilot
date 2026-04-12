@@ -3,6 +3,14 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import {
+	computeManifestBranchName,
+	type DeliveryManifest,
+	deriveProgramId,
+	deriveTrancheId,
+	renderDeliveryPrBody,
+	toHumanTitle,
+} from "../delivery-manifest";
 import type { BranchLifecycle } from "../types";
 
 const execFileAsync = promisify(execFile);
@@ -13,24 +21,28 @@ export interface BranchPrUpdateInput {
 	readonly baseBranch?: string;
 }
 
-export function computeBranchName(runId: string, description?: string): string {
-	const slugCandidate = (description ?? "feature")
-		.toLowerCase()
-		.replace(/[^a-z0-9-]/g, "-")
-		.replace(/-+/g, "-")
-		.replace(/^-|-$/g, "")
-		.slice(0, 60);
-	const slug = slugCandidate.length > 0 ? slugCandidate : "feature";
-	return `autopilot/${runId}/${slug}`;
+export function computeBranchName(
+	programId: string,
+	trancheId: string,
+	humanTitle: string,
+): string {
+	return computeManifestBranchName(programId, trancheId, humanTitle);
 }
 
 export function initBranchLifecycle(input: {
 	readonly runId: string;
 	readonly baseBranch?: string;
 	readonly description?: string;
+	readonly commitStrategy?: BranchLifecycle["commitStrategy"];
+	readonly programId?: string | null;
+	readonly trancheId?: string | null;
+	readonly humanTitle?: string | null;
 }): BranchLifecycle {
+	const humanTitle = toHumanTitle(input.humanTitle ?? input.description);
+	const programId = input.programId ?? deriveProgramId(input.runId, humanTitle);
+	const trancheId = input.trancheId ?? deriveTrancheId(input.runId);
 	return Object.freeze({
-		currentBranch: computeBranchName(input.runId, input.description),
+		currentBranch: computeBranchName(programId, trancheId, humanTitle),
 		baseBranch: input.baseBranch ?? "main",
 		prNumber: null,
 		prUrl: null,
@@ -38,6 +50,13 @@ export function initBranchLifecycle(input: {
 		createdAt: new Date().toISOString(),
 		lastPushedAt: null,
 		tasksPushed: [],
+		programId,
+		trancheId,
+		humanTitle,
+		commitStrategy: input.commitStrategy ?? "per_task",
+		reviewSummary: null,
+		oracleSummary: null,
+		verificationSummary: null,
 	});
 }
 
@@ -91,52 +110,38 @@ export function formatPrTaskSummary(lifecycle: BranchLifecycle): string {
 	return lifecycle.tasksPushed.map((taskId, index) => `${index + 1}. ✅ ${taskId}`).join("\n");
 }
 
-export function buildPrBody(
+export function buildPrBody(manifest: DeliveryManifest): string {
+	return renderDeliveryPrBody(manifest);
+}
+
+export function recordReviewSummary(
 	lifecycle: BranchLifecycle,
-	options: {
-		readonly idea: string;
-		readonly architectureNotes?: string;
-		readonly testSummary?: string;
-		readonly remainingTasks?: readonly string[];
-	},
-): string {
-	const lines = [
-		"## Summary",
-		"",
-		options.idea,
-		"",
-		"## Completed Tasks",
-		"",
-		formatPrTaskSummary(lifecycle),
-		"",
-	];
+	reviewSummary: string,
+): BranchLifecycle {
+	return Object.freeze({
+		...lifecycle,
+		reviewSummary,
+	});
+}
 
-	if (options.architectureNotes) {
-		lines.push("## Architecture Decisions", "", options.architectureNotes, "");
-	}
+export function recordOracleSummary(
+	lifecycle: BranchLifecycle,
+	oracleSummary: string,
+): BranchLifecycle {
+	return Object.freeze({
+		...lifecycle,
+		oracleSummary,
+	});
+}
 
-	if (options.testSummary) {
-		lines.push("## Test Coverage", "", options.testSummary, "");
-	}
-
-	if (options.remainingTasks && options.remainingTasks.length > 0) {
-		lines.push(
-			"## Remaining Tasks",
-			"",
-			...options.remainingTasks.map((task) => `- [ ] ${task}`),
-			"",
-		);
-	}
-
-	lines.push(
-		"---",
-		`Branch: \`${lifecycle.currentBranch}\``,
-		`Base: \`${lifecycle.baseBranch}\``,
-		`Created: ${lifecycle.createdAt ?? "unknown"}`,
-		`Last Push: ${lifecycle.lastPushedAt ?? "unknown"}`,
-	);
-
-	return lines.join("\n");
+export function recordVerificationSummary(
+	lifecycle: BranchLifecycle,
+	verificationSummary: string,
+): BranchLifecycle {
+	return Object.freeze({
+		...lifecycle,
+		verificationSummary,
+	});
 }
 
 export interface WorktreeInfo {

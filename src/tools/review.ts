@@ -1,5 +1,5 @@
 /**
- * oc_review tool -- multi-agent code review.
+ * oc_review tool -- multi-agent code review with persisted review runs.
  *
  * Stateful between invocations:
  * - scope arg -> start new review (stage 1 dispatch)
@@ -11,33 +11,39 @@
  * Memory persisted at {projectRoot}/.opencode-autopilot/review-memory.json
  */
 
-import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { tool } from "@opencode-ai/plugin";
 import {
 	clearActiveReviewStateInKernel,
 	loadActiveReviewStateFromKernel,
+	loadReviewRunFromKernel,
 	saveActiveReviewStateToKernel,
+	saveReviewRunToKernel,
 } from "../kernel/repository";
 import { getLogger } from "../logging/domains";
-import { loadState as loadPipelineState } from "../orchestrator/state";
-import { REVIEW_AGENTS, SPECIALIZED_AGENTS } from "../review/agents/index";
-import { collectDiffEvidence, type ReviewScope } from "../review/diff-evidence";
+import {
+	buildReviewDispatchPrompt,
+	completeReviewRun,
+	parseReviewCoordinatorResult,
+	parseReviewStageResultsEnvelope,
+	planReviewRun,
+	reviewRunSchema,
+	summarizeReviewRun,
+} from "../orchestrator/review-runner";
+import type { ReviewScope } from "../review/diff-evidence";
 import {
 	createEmptyMemory,
 	loadReviewMemory,
 	pruneMemory,
 	saveReviewMemory,
 } from "../review/memory";
+import { parseAgentFindings } from "../review/parse-findings";
 import type { ReviewState } from "../review/pipeline";
 import { advancePipeline } from "../review/pipeline";
-import { sanitizeTemplateContent } from "../review/sanitize";
 import { reviewFindingsEnvelopeSchema, reviewStateSchema } from "../review/schemas";
-import { selectAgents } from "../review/selection";
-import { detectStackTags } from "../review/stack-gate";
+import type { Severity } from "../review/types";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
 import { getProjectArtifactDir } from "../utils/paths";
 
@@ -46,48 +52,21 @@ interface ReviewArgs {
 	readonly filter?: string;
 	readonly directory?: string;
 	readonly findings?: string;
+	readonly reviewRunId?: string;
+	readonly runId?: string;
+	readonly trancheId?: string;
+	readonly selectedReviewers?: readonly string[];
+	readonly requiredReviewers?: readonly string[];
+	readonly blockingSeverityThreshold?: Severity;
 }
 
-const execFileAsync = promisify(execFile);
+interface NormalizedFindingsInput {
+	readonly findingsPayload: string;
+	readonly executedReviewerNames: readonly string[];
+}
 
 const STATE_FILE = "current-review.json";
 let legacyReviewStateMirrorWarned = false;
-
-/**
- * Get changed file paths for the given review scope.
- * Uses execFile (not exec) to prevent shell injection.
- * Returns empty array on any error (best-effort).
- */
-async function getChangedFiles(
-	scope: string,
-	projectRoot: string,
-	directory?: string,
-): Promise<readonly string[]> {
-	try {
-		let args: string[];
-		switch (scope) {
-			case "staged":
-				args = ["diff", "--cached", "--name-only"];
-				break;
-			case "unstaged":
-				args = ["diff", "--name-only"];
-				break;
-			case "branch":
-				args = ["diff", "--name-only", "HEAD"];
-				break;
-			case "directory":
-				args = directory ? ["diff", "--name-only", "--", directory] : ["diff", "--name-only"];
-				break;
-			default:
-				args = ["diff", "--name-only", "HEAD"];
-				break;
-		}
-		const { stdout } = await execFileAsync("git", args, { cwd: projectRoot, timeout: 10000 });
-		return stdout.trim().split("\n").filter(Boolean);
-	} catch {
-		return [];
-	}
-}
 
 /**
  * Load review state from disk. Returns null if no active review.
@@ -107,7 +86,6 @@ async function loadReviewState(artifactDir: string): Promise<ReviewState | null>
 		return validated;
 	} catch (error: unknown) {
 		if (isEnoentError(error)) return null;
-		// Treat parse/schema errors as recoverable — delete corrupt file
 		if (error instanceof SyntaxError || (error && typeof error === "object" && "issues" in error)) {
 			try {
 				await unlink(statePath);
@@ -146,7 +124,6 @@ async function syncLegacyReviewStateMirror(state: ReviewState, artifactDir: stri
  * Save review state atomically.
  */
 async function saveReviewState(state: ReviewState, artifactDir: string): Promise<void> {
-	// Validate before writing (bidirectional validation, same as orchestrator state)
 	const validated = reviewStateSchema.parse(state);
 	saveActiveReviewStateToKernel(artifactDir, validated);
 	await syncLegacyReviewStateMirror(validated, artifactDir);
@@ -165,75 +142,107 @@ export async function clearReviewState(artifactDir: string): Promise<void> {
 	}
 }
 
-/**
- * Start a new review -- detect stacks, select agents, and build stage 1 dispatch prompts.
- */
-async function startNewReview(
-	scope: ReviewScope,
-	projectRoot: string,
-	options?: { readonly filter?: string; readonly directory?: string },
-): Promise<{
-	readonly state: ReviewState;
-	readonly agents: readonly { readonly name: string; readonly prompt: string }[];
-}> {
-	// Detect stacks from changed files via git (run in projectRoot)
-	const changedFiles = await getChangedFiles(scope, projectRoot, options?.directory);
-	const detectedStacks = detectStackTags(changedFiles);
+function uniqueStrings(values: readonly string[]): readonly string[] {
+	return Object.freeze([...new Set(values)]);
+}
 
-	// Build diff analysis from changed file paths
-	const diffAnalysis = {
-		hasTests: changedFiles.some((f) => f.includes("test") || f.includes("spec")),
-		hasAuth: changedFiles.some(
-			(f) => f.includes("auth") || f.includes("login") || f.includes("session"),
-		),
-		hasConfig: changedFiles.some(
-			(f) => f.includes("config") || f.includes("settings") || f.includes(".env"),
-		),
-		fileCount: changedFiles.length,
-	};
+async function buildTransientReviewRun(args: {
+	readonly artifactDir: string;
+	readonly projectRoot: string;
+	readonly currentState: ReviewState;
+}) {
+	const existingRun = loadReviewRunFromKernel(args.artifactDir, args.currentState.reviewRunId);
+	if (existingRun !== null) {
+		return existingRun;
+	}
 
-	// Select agents from all candidates (universal + specialized)
-	const allCandidates = [...REVIEW_AGENTS, ...SPECIALIZED_AGENTS];
-	const artifactDir = getProjectArtifactDir(projectRoot);
-	const pipelineState = await loadPipelineState(artifactDir);
-	const seed = pipelineState ? `${pipelineState.runId}-review-1` : undefined;
-
-	const selection = selectAgents(detectedStacks, diffAnalysis, allCandidates, { seed });
-
-	const selectedNames = selection.selected.map((a) => a.name);
-	const { diff: diffContent, changedFiles: evidenceFiles } = await collectDiffEvidence(
-		projectRoot,
-		scope,
-		options?.directory,
-	);
-	const rawDiffEvidence =
-		diffContent.length > 0 ? sanitizeTemplateContent(diffContent) : `[Scope: ${scope}]`;
-
-	const changedFilesSummary =
-		evidenceFiles.length > 0
-			? `\n\nChanged files (${evidenceFiles.length}):\n${evidenceFiles.map((f) => `- ${f}`).join("\n")}`
-			: "";
-
-	const diffEvidence = `${rawDiffEvidence}${changedFilesSummary}`;
-	// Build stage 1 prompts with real diff evidence.
-	const agentPrompts = selection.selected.map((agent) => {
-		const prompt = agent.prompt
-			.replace("{{DIFF}}", diffEvidence)
-			.replace("{{PRIOR_FINDINGS}}", "No prior findings yet.")
-			.replace("{{MEMORY}}", "");
-		return Object.freeze({ name: agent.name, prompt });
+	const plan = await planReviewRun(args.projectRoot, {
+		scope: args.currentState.scope as ReviewScope,
+		directory: undefined,
+		runId: args.currentState.runId,
+		trancheId: args.currentState.trancheId,
+		reviewRunId: args.currentState.reviewRunId,
+		selectedReviewers: args.currentState.selectedAgentNames,
+		requiredReviewers: args.currentState.requiredAgentNames,
+		blockingSeverityThreshold: args.currentState.blockingSeverityThreshold,
+		startedAt: args.currentState.startedAt,
 	});
+	return reviewRunSchema.parse(plan.reviewRun);
+}
 
-	const state: ReviewState = {
-		stage: 1,
-		selectedAgentNames: selectedNames,
-		accumulatedFindings: [],
-		scope,
-		diffEvidence,
-		startedAt: new Date().toISOString(),
+function normalizeFindingsInput(raw: string): NormalizedFindingsInput {
+	const stageResultsEnvelope = parseReviewStageResultsEnvelope(raw);
+	if (stageResultsEnvelope !== null) {
+		const normalizedFindings = stageResultsEnvelope.results.flatMap((result) =>
+			parseAgentFindings(JSON.stringify({ findings: result.findings }), result.reviewer),
+		);
+		return {
+			findingsPayload: JSON.stringify(
+				reviewFindingsEnvelopeSchema.parse({
+					schemaVersion: 1,
+					kind: "review_findings",
+					findings: normalizedFindings,
+				}),
+			),
+			executedReviewerNames: uniqueStrings(
+				stageResultsEnvelope.results.map((result) => result.reviewer),
+			),
+		};
+	}
+
+	try {
+		const parsed = JSON.parse(raw) as Record<string, unknown>;
+		if (
+			parsed &&
+			typeof parsed === "object" &&
+			"report" in parsed &&
+			typeof parsed.report === "object" &&
+			parsed.report !== null &&
+			Array.isArray((parsed.report as { findings?: unknown }).findings)
+		) {
+			const report = parsed.report as {
+				findings: unknown[];
+				executedReviewers?: unknown;
+			};
+			return {
+				findingsPayload: JSON.stringify(
+					reviewFindingsEnvelopeSchema.parse({
+						schemaVersion: 1,
+						kind: "review_findings",
+						findings: report.findings,
+					}),
+				),
+				executedReviewerNames: Array.isArray(report.executedReviewers)
+					? uniqueStrings(
+							report.executedReviewers.filter(
+								(value): value is string => typeof value === "string",
+							),
+						)
+					: Object.freeze([]),
+			};
+		}
+	} catch {
+		// keep legacy payload for parser fallback
+	}
+
+	const coordinatorResult = parseReviewCoordinatorResult(raw);
+	if (coordinatorResult?.report) {
+		return {
+			findingsPayload: JSON.stringify(
+				reviewFindingsEnvelopeSchema.parse({
+					schemaVersion: 1,
+					kind: "review_findings",
+					findings: coordinatorResult.report.findings,
+				}),
+			),
+			executedReviewerNames: uniqueStrings(coordinatorResult.report.executedReviewers ?? []),
+		};
+	}
+
+	return {
+		findingsPayload: raw,
+		executedReviewerNames: Object.freeze([]),
 	};
-
-	return { state, agents: Object.freeze(agentPrompts) };
 }
 
 export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise<string> {
@@ -241,30 +250,44 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 		const artifactDir = getProjectArtifactDir(projectRoot);
 		const currentState = await loadReviewState(artifactDir);
 
-		// Case 1: No state, scope provided -> start new review
 		if (currentState === null && args.scope) {
-			const { state, agents } = await startNewReview(args.scope, projectRoot, {
-				filter: args.filter,
+			const plan = await planReviewRun(projectRoot, {
+				scope: args.scope,
 				directory: args.directory,
+				runId: args.runId ?? null,
+				trancheId: args.trancheId ?? args.runId ?? null,
+				reviewRunId: args.reviewRunId,
+				selectedReviewers: args.selectedReviewers,
+				requiredReviewers: args.requiredReviewers,
+				blockingSeverityThreshold: args.blockingSeverityThreshold,
 			});
 
-			// Load memory for false positive context
 			const memory = await loadReviewMemory(projectRoot);
 			if (memory) {
-				// Inject false positive context into prompts (via {{MEMORY}} already replaced above)
-				// Future enhancement: pass FP context to agent prompts
+				// Future enhancement: use false-positive memory to alter prompts.
 			}
 
+			const state = reviewStateSchema.parse(plan.reviewState);
 			await saveReviewState(state, artifactDir);
+			saveReviewRunToKernel(artifactDir, plan.reviewRun);
 
 			return JSON.stringify({
 				action: "dispatch",
 				stage: 1,
-				agents,
+				agents: plan.agents,
+				reviewRunId: plan.reviewRun.reviewRunId,
+				selectedReviewers: plan.selectedStageOneReviewers,
+				requiredReviewers: plan.reviewRun.policy.requiredReviewers,
+				reviewStatus: summarizeReviewRun(plan.reviewRun),
+				reviewPrompt: buildReviewDispatchPrompt(plan),
+				submissionFormat: {
+					schemaVersion: 1,
+					kind: "review_stage_results",
+					results: [{ reviewer: "logic-auditor", status: "completed", findings: [] }],
+				},
 			});
 		}
 
-		// Case 2: No state, no scope -> error
 		if (currentState === null && !args.scope) {
 			return JSON.stringify({
 				action: "error",
@@ -272,31 +295,16 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 			});
 		}
 
-		// Case 3: State exists, findings provided -> advance pipeline
 		if (currentState !== null && args.findings) {
-			let findingsPayload = args.findings;
-			try {
-				const parsed = JSON.parse(args.findings);
-				if (
-					parsed &&
-					typeof parsed === "object" &&
-					"report" in parsed &&
-					typeof parsed.report === "object" &&
-					parsed.report !== null &&
-					Array.isArray((parsed.report as { findings?: unknown }).findings)
-				) {
-					findingsPayload = JSON.stringify(
-						reviewFindingsEnvelopeSchema.parse({
-							schemaVersion: 1,
-							kind: "review_findings",
-							findings: (parsed.report as { findings: unknown[] }).findings,
-						}),
-					);
-				}
-			} catch {
-				// keep legacy payload for parser fallback
-			}
-			const result = advancePipeline(findingsPayload, currentState);
+			const normalizedInput = normalizeFindingsInput(args.findings);
+			const result = advancePipeline(
+				normalizedInput.findingsPayload,
+				currentState,
+				"unknown",
+				args.runId,
+				args.runId,
+				{ executedAgentNames: normalizedInput.executedReviewerNames },
+			);
 
 			if (result.action === "dispatch" && result.state) {
 				await saveReviewState(result.state, artifactDir);
@@ -306,20 +314,28 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 					agents: result.agents,
 					message: result.message,
 					parseMode: result.parseMode,
+					reviewRunId: currentState.reviewRunId,
 				});
 			}
 
-			if (result.action === "complete") {
-				// Update memory with findings
+			if (result.action === "complete" && result.report) {
+				const reviewRun = completeReviewRun(
+					await buildTransientReviewRun({ artifactDir, projectRoot, currentState }),
+					result.report,
+					normalizedInput.executedReviewerNames.length > 0
+						? normalizedInput.executedReviewerNames
+						: result.report.executedReviewers,
+				);
+				saveReviewRunToKernel(artifactDir, reviewRun);
+
 				const memory = (await loadReviewMemory(projectRoot)) ?? createEmptyMemory();
 				const updatedMemory = pruneMemory({
 					...memory,
-					recentFindings: [...memory.recentFindings, ...(result.report?.findings ?? [])],
+					recentFindings: [...memory.recentFindings, ...(result.report.findings ?? [])],
 					lastReviewedAt: new Date().toISOString(),
 				});
 				await saveReviewMemory(updatedMemory, projectRoot);
 
-				// Clear state
 				await clearReviewState(artifactDir);
 
 				return JSON.stringify({
@@ -327,24 +343,53 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 					report: result.report,
 					findingsEnvelope: result.findingsEnvelope,
 					parseMode: result.parseMode,
+					reviewRun,
+					reviewStatus: summarizeReviewRun(reviewRun),
+					reviewRunId: reviewRun.reviewRunId,
+					selectedReviewers: reviewRun.reviewers.map((reviewer) => reviewer.reviewer),
+					requiredReviewers: reviewRun.policy.requiredReviewers,
+					executedReviewers: reviewRun.reviewers
+						.filter((reviewer) => reviewer.status === "COMPLETED")
+						.map((reviewer) => reviewer.reviewer),
+					missingRequiredReviewers: reviewRun.reviewers
+						.filter((reviewer) => reviewer.required && reviewer.status !== "COMPLETED")
+						.map((reviewer) => reviewer.reviewer),
 				});
 			}
 
 			if (result.action === "error") {
+				const existingRun = await buildTransientReviewRun({
+					artifactDir,
+					projectRoot,
+					currentState,
+				});
+				const failedReviewRun = reviewRunSchema.parse({
+					...existingRun,
+					status: "FAILED",
+					verdict: "BLOCKED",
+					summary: result.message ?? "Review pipeline error",
+					blockedReason: result.message ?? "Review pipeline error",
+					completedAt: new Date().toISOString(),
+				});
+				saveReviewRunToKernel(artifactDir, failedReviewRun);
 				await clearReviewState(artifactDir);
 				return JSON.stringify({
 					action: "error",
 					message: result.message ?? "Pipeline error",
+					reviewRunId: failedReviewRun.reviewRunId,
+					reviewStatus: summarizeReviewRun(failedReviewRun),
 				});
 			}
 		}
 
-		// Case 4: State exists, no findings -> return status
 		if (currentState !== null && !args.findings) {
+			const reviewRun = loadReviewRunFromKernel(artifactDir, currentState.reviewRunId);
 			return JSON.stringify({
 				action: "status",
 				stage: currentState.stage,
 				message: "Awaiting findings from dispatched agents",
+				reviewRunId: currentState.reviewRunId,
+				reviewStatus: reviewRun ? summarizeReviewRun(reviewRun) : undefined,
 			});
 		}
 
@@ -357,7 +402,7 @@ export async function reviewCore(args: ReviewArgs, projectRoot: string): Promise
 
 export const ocReview = tool({
 	description:
-		"Run multi-agent code review. Provide scope (staged|unstaged|branch|all|directory) to start, or findings from dispatched agents to advance the pipeline. Returns JSON with action (dispatch|complete|status|error).",
+		"Run multi-agent code review. Provide scope to start, or findings from dispatched reviewers to advance the pipeline. Returns JSON with action (dispatch|complete|status|error) plus persisted review-run metadata.",
 	args: {
 		scope: tool.schema
 			.enum(["staged", "unstaged", "branch", "all", "directory"])
@@ -368,7 +413,27 @@ export const ocReview = tool({
 		findings: tool.schema
 			.string()
 			.optional()
-			.describe("JSON findings from previously dispatched review agents"),
+			.describe(
+				"JSON findings or review_stage_results envelope from previously dispatched review agents",
+			),
+		reviewRunId: tool.schema.string().optional().describe("Existing reviewRunId to reuse"),
+		runId: tool.schema.string().optional().describe("Pipeline runId associated with this review"),
+		trancheId: tool.schema
+			.string()
+			.optional()
+			.describe("Program trancheId associated with this review"),
+		selectedReviewers: tool.schema
+			.array(tool.schema.string())
+			.optional()
+			.describe("Pinned stage-one reviewers to use instead of auto-selection"),
+		requiredReviewers: tool.schema
+			.array(tool.schema.string())
+			.optional()
+			.describe("Reviewers that must execute before the review can pass"),
+		blockingSeverityThreshold: tool.schema
+			.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"])
+			.optional()
+			.describe("Minimum severity that blocks shipment while findings stay open"),
 	},
 	async execute(args, context) {
 		return reviewCore(args, context.directory);

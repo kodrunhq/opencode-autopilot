@@ -206,6 +206,9 @@ describe("buildProgressSchema", () => {
 			strikeCount: 0,
 			reviewPending: false,
 			oraclePending: false,
+			oracleSignoffId: null,
+			oracleInputsDigest: null,
+			lastReviewReport: null,
 		});
 	});
 
@@ -278,6 +281,9 @@ describe("pipelineStateSchema with buildProgress", () => {
 			strikeCount: 0,
 			reviewPending: false,
 			oraclePending: false,
+			oracleSignoffId: null,
+			oracleInputsDigest: null,
+			lastReviewReport: null,
 		});
 	});
 });

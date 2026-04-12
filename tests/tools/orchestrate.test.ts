@@ -7,7 +7,15 @@ import { loadLatestPipelineStateFromKernel } from "../../src/kernel/repository";
 import { resetDedupCache } from "../../src/observability/forensic-log";
 import { getPhaseDir } from "../../src/orchestrator/artifacts";
 import { clearAllRetryState, recordRetryAttempt } from "../../src/orchestrator/dispatch-retry";
+import { formatOracleSignoffEnvelope } from "../../src/orchestrator/signoff";
 import { createInitialState, loadState, saveState } from "../../src/orchestrator/state";
+import {
+	buildPipelineIdeaForTranche,
+	loadLatestProgramRunFromKernel,
+	markCurrentTrancheShipped,
+	planProgramRunFromRequest,
+	saveProgramRunToKernel,
+} from "../../src/program";
 import { ocOrchestrate, orchestrateCore } from "../../src/tools/orchestrate";
 import { ocRoute, routeCore } from "../../src/tools/route";
 
@@ -148,6 +156,10 @@ describe("orchestrateCore", () => {
 				attemptCount: 0,
 				strikeCount: 0,
 				reviewPending: false,
+				oraclePending: false,
+				oracleSignoffId: null,
+				oracleInputsDigest: null,
+				lastReviewReport: null,
 			},
 			pendingDispatches: [
 				{
@@ -157,6 +169,7 @@ describe("orchestrateCore", () => {
 					issuedAt: new Date().toISOString(),
 					resultKind: "task_completion" as const,
 					taskId: 1,
+					sessionId: null,
 				},
 			],
 			phases: state.phases.map((p) =>
@@ -450,6 +463,305 @@ describe("orchestrateCore", () => {
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed.phase).toBe("CHALLENGE");
 	});
+
+	test("broad implementation requests start an autonomous multi-tranche program automatically", async () => {
+		const broadIdea = [
+			"Implement the remediation program:",
+			"1. Add program and tranche persistence.",
+			"2. Add autonomous tranche planning heuristics.",
+			"3. Continue automatically across multiple PRs.",
+			"Acceptance criteria:",
+			"- Tranche 1 starts automatically.",
+		].join("\n");
+
+		const result = JSON.parse(
+			await orchestrateCore({ idea: broadIdea, intent: "implementation" }, tempDir),
+		);
+
+		expect(result.action).toBe("dispatch");
+		expect(result.phase).toBe("RECON");
+		expect(result.program).toBeDefined();
+		expect(result.program.trancheIndex).toBe(1);
+		expect(result.program.trancheCount).toBeGreaterThan(1);
+		expect(result.program.selectionRationale).toContain("Selected automatically");
+
+		const state = await loadState(tempDir);
+		expect(state?.programContext?.trancheIndex).toBe(1);
+		expect(state?.programContext?.trancheCount).toBeGreaterThan(1);
+
+		const program = loadLatestProgramRunFromKernel(tempDir);
+		expect(program?.status).toBe("ACTIVE");
+		expect(program?.tranches.length).toBeGreaterThan(1);
+		expect(program?.tranches[0]?.status).toBe("IN_PROGRESS");
+		expect(program?.tranches[1]?.status).toBe("PENDING");
+	});
+
+	test("successful ship queues the next tranche and retrospective completion starts it automatically", async () => {
+		const broadIdea = [
+			"Implement the remediation program:",
+			"1. Add program and tranche persistence.",
+			"2. Continue automatically across multiple PRs.",
+		].join("\n");
+		await orchestrateCore({ idea: broadIdea, intent: "implementation" }, tempDir);
+
+		const activeState = await loadState(tempDir);
+		if (!activeState?.programContext) {
+			throw new Error("Expected initial run to create program context");
+		}
+		const initialProgram = loadLatestProgramRunFromKernel(tempDir);
+		if (!initialProgram) {
+			throw new Error("Expected initial run to persist a program");
+		}
+
+		const queuedProgram = markCurrentTrancheShipped(initialProgram, "manifest_run_1");
+		saveProgramRunToKernel(tempDir, queuedProgram);
+		expect(queuedProgram?.tranches[0]?.status).toBe("SHIPPED");
+		expect(queuedProgram?.tranches[1]?.status).toBe("QUEUED");
+
+		const retrospectiveState = {
+			...activeState,
+			currentPhase: "RETROSPECTIVE" as const,
+			phases: activeState.phases.map((phase) =>
+				["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN", "BUILD", "SHIP"].includes(phase.name)
+					? { ...phase, status: "DONE" as const }
+					: { ...phase, status: "IN_PROGRESS" as const },
+			),
+			pendingDispatches: [
+				{
+					dispatchId: "dispatch_retro_program",
+					phase: "RETROSPECTIVE" as const,
+					agent: "oc-shipper",
+					issuedAt: new Date().toISOString(),
+					resultKind: "phase_output" as const,
+					taskId: null,
+					sessionId: null,
+				},
+			],
+		};
+		await saveState(retrospectiveState, tempDir);
+
+		const retroResult = JSON.parse(
+			await orchestrateCore(
+				{
+					result: JSON.stringify({
+						schemaVersion: 1,
+						resultId: "retro-program-1",
+						runId: retrospectiveState.runId,
+						phase: "RETROSPECTIVE",
+						dispatchId: "dispatch_retro_program",
+						agent: "oc-shipper",
+						kind: "phase_output",
+						taskId: null,
+						payload: { text: JSON.stringify({ lessons: [] }) },
+					}),
+				},
+				tempDir,
+			),
+		);
+
+		expect(retroResult.action).toBe("dispatch");
+		expect(retroResult.phase).toBe("RECON");
+		expect(retroResult.program.trancheIndex).toBe(2);
+
+		const advancedProgram = loadLatestProgramRunFromKernel(tempDir);
+		expect(advancedProgram?.tranches[0]?.status).toBe("COMPLETED");
+		expect(advancedProgram?.tranches[1]?.status).toBe("IN_PROGRESS");
+	});
+
+	test("final tranche waits for program Oracle signoff before completing", async () => {
+		const program = planProgramRunFromRequest(
+			[
+				"Implement the remediation program:",
+				"1. Add program persistence.",
+				"2. Continue automatically across multiple PRs.",
+			].join("\n"),
+			"normal",
+			{ executionMode: "background" },
+		);
+		if (!program || program.tranches.length < 2) {
+			throw new Error("Expected a multi-tranche program fixture");
+		}
+
+		const finalTranche = program.tranches[1];
+		if (!finalTranche) {
+			throw new Error("Expected a final tranche fixture");
+		}
+
+		saveProgramRunToKernel(tempDir, {
+			...program,
+			status: "ACTIVE",
+			currentTrancheId: finalTranche.trancheId,
+			tranches: program.tranches.map((tranche) =>
+				tranche.trancheId === program.tranches[0]?.trancheId
+					? {
+							...tranche,
+							status: "COMPLETED" as const,
+							deliveryManifestId: "manifest_run_1",
+						}
+					: tranche.trancheId === finalTranche.trancheId
+						? {
+								...tranche,
+								status: "SHIPPED" as const,
+								deliveryManifestId: "manifest_run_2",
+							}
+						: tranche,
+			),
+		});
+
+		const retrospectiveState = {
+			...createInitialState(buildPipelineIdeaForTranche(program, finalTranche), {
+				programContext: {
+					programId: program.programId,
+					trancheId: finalTranche.trancheId,
+					trancheTitle: finalTranche.title,
+					trancheIndex: finalTranche.sequence,
+					trancheCount: program.tranches.length,
+					selectionRationale: finalTranche.selectionRationale,
+					originatingRequest: program.originatingRequest,
+					mode: program.mode,
+				},
+			}),
+			currentPhase: "RETROSPECTIVE" as const,
+			phases: createInitialState("fixture").phases.map((phase) =>
+				phase.name === "RETROSPECTIVE"
+					? { ...phase, status: "IN_PROGRESS" as const }
+					: { ...phase, status: "DONE" as const },
+			),
+			pendingDispatches: [
+				{
+					dispatchId: "dispatch_retro_final",
+					phase: "RETROSPECTIVE" as const,
+					agent: "oc-shipper",
+					issuedAt: new Date().toISOString(),
+					resultKind: "phase_output" as const,
+					taskId: null,
+					sessionId: null,
+				},
+			],
+		};
+		await saveState(retrospectiveState, tempDir);
+
+		const blocked = JSON.parse(
+			await orchestrateCore(
+				{
+					result: JSON.stringify({
+						schemaVersion: 1,
+						resultId: "retro-final-program-1",
+						runId: retrospectiveState.runId,
+						phase: "RETROSPECTIVE",
+						dispatchId: "dispatch_retro_final",
+						agent: "oc-shipper",
+						kind: "phase_output",
+						taskId: null,
+						payload: { text: JSON.stringify({ lessons: [] }) },
+					}),
+				},
+				tempDir,
+			),
+		);
+
+		expect(blocked.action).toBe("dispatch");
+		expect(blocked.agent).toBe("oracle");
+		expect(blocked.resultKind).toBe("oracle_signoff");
+
+		const blockedProgram = loadLatestProgramRunFromKernel(tempDir);
+		expect(blockedProgram?.status).toBe("BLOCKED");
+		expect(blockedProgram?.blockedReason).toBe("Program Oracle signoff required");
+
+		const blockedState = await loadState(tempDir);
+		expect(blockedState?.status).not.toBe("COMPLETED");
+		expect(blockedState?.oracleSignoffs.program?.verdict).toBe("PENDING");
+
+		const oracleSignoff = blockedState?.oracleSignoffs.program;
+		if (!oracleSignoff || !blockedState) {
+			throw new Error("Expected pending program Oracle signoff state");
+		}
+
+		const completion = JSON.parse(
+			await orchestrateCore(
+				{
+					result: JSON.stringify({
+						schemaVersion: 1,
+						resultId: "retro-final-program-2",
+						runId: blockedState.runId,
+						phase: "RETROSPECTIVE",
+						dispatchId: blocked.dispatchId,
+						agent: "oracle",
+						kind: "oracle_signoff",
+						taskId: null,
+						payload: {
+							text: formatOracleSignoffEnvelope({
+								signoffId: oracleSignoff.signoffId,
+								scope: "PROGRAM",
+								inputsDigest: oracleSignoff.inputsDigest,
+								verdict: "PASS",
+								reasoning: "Oracle approved final program completion.",
+							}),
+						},
+					}),
+				},
+				tempDir,
+			),
+		);
+
+		expect(completion.action).toBe("complete");
+		expect(completion.programStatus).toBe("COMPLETED");
+
+		const completedProgram = loadLatestProgramRunFromKernel(tempDir);
+		expect(completedProgram?.status).toBe("COMPLETED");
+		expect(completedProgram?.finalOracleVerdict).toBe("Oracle approved final program completion.");
+	});
+
+	test("terminal autonomous program stops are classified explicitly as blocked", async () => {
+		const broadIdea = [
+			"Implement the remediation program:",
+			"1. Add program and tranche persistence.",
+			"2. Continue automatically across multiple PRs.",
+		].join("\n");
+		await orchestrateCore({ idea: broadIdea, intent: "implementation" }, tempDir);
+
+		const activeState = await loadState(tempDir);
+		if (!activeState?.programContext) {
+			throw new Error("Expected initial run to create program context");
+		}
+
+		await saveState(
+			{
+				...activeState,
+				currentPhase: "BUILD" as const,
+				phases: activeState.phases.map((phase) =>
+					phase.name === "BUILD"
+						? { ...phase, status: "IN_PROGRESS" as const }
+						: ["RECON", "CHALLENGE", "ARCHITECT", "EXPLORE", "PLAN"].includes(phase.name)
+							? { ...phase, status: "DONE" as const }
+							: { ...phase, status: "PENDING" as const },
+				),
+				pendingDispatches: [],
+				tasks: [
+					{
+						id: 1,
+						title: "Blocked task",
+						status: "BLOCKED" as const,
+						wave: 1,
+						depends_on: [],
+						attempt: 0,
+						strike: 0,
+					},
+				],
+			},
+			tempDir,
+		);
+
+		const result = JSON.parse(await orchestrateCore({}, tempDir));
+
+		expect(result.action).toBe("error");
+		expect(result.stopClassification).toBe("BLOCKED");
+		expect(result.programStatus).toBe("BLOCKED");
+
+		const blockedProgram = loadLatestProgramRunFromKernel(tempDir);
+		expect(blockedProgram?.status).toBe("BLOCKED");
+		expect(blockedProgram?.tranches[0]?.status).toBe("BLOCKED");
+	});
 });
 
 describe("autopilotAgent", () => {
@@ -470,6 +782,11 @@ describe("autopilotAgent", () => {
 
 	test("prompt is lean (under 10000 chars)", () => {
 		expect(autopilotAgent.prompt?.length).toBeLessThan(10000);
+	});
+
+	test("prompt forbids discretionary tranche questions", () => {
+		expect(autopilotAgent.prompt).toContain("DO NOT ask the user which tranche to do first");
+		expect(autopilotAgent.prompt).toContain("DO NOT ask discretionary questions");
 	});
 
 	test("has maxSteps of 50", () => {

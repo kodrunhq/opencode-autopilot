@@ -1,13 +1,15 @@
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadLatestPipelineStateFromKernel, savePipelineStateToKernel } from "../kernel/repository";
 import { KERNEL_STATE_CONFLICT_CODE } from "../kernel/types";
 import { getLogger } from "../logging/domains";
 import { ensureDir, isEnoentError } from "../utils/fs-helpers";
+import { assertProjectArtifactOwnership } from "../utils/paths";
 import { assertStateInvariants } from "./contracts/invariants";
 import { PHASES, pipelineStateSchema } from "./schemas";
-import type { PipelineState } from "./types";
+import type { PipelineState, ProgramPipelineContext } from "./types";
 
 const STATE_FILE = "state.json";
 let legacyStateMirrorWarned = false;
@@ -17,7 +19,10 @@ function generateRunId(): string {
 	return `run_${randomBytes(8).toString("hex")}`;
 }
 
-export function createInitialState(idea: string): PipelineState {
+export function createInitialState(
+	idea: string,
+	options?: { readonly programContext?: ProgramPipelineContext | null },
+): PipelineState {
 	const now = new Date().toISOString();
 	return pipelineStateSchema.parse({
 		schemaVersion: 2,
@@ -40,6 +45,7 @@ export function createInitialState(idea: string): PipelineState {
 		exploreTriggered: false,
 		pendingDispatches: [],
 		processedResultIds: [],
+		programContext: options?.programContext ?? null,
 	});
 }
 
@@ -47,6 +53,22 @@ async function loadLegacyState(artifactDir: string): Promise<PipelineState | nul
 	const statePath = join(artifactDir, STATE_FILE);
 	try {
 		const raw = await readFile(statePath, "utf-8");
+		const parsed = JSON.parse(raw);
+		const validated = pipelineStateSchema.parse(parsed);
+		assertStateInvariants(validated);
+		return validated;
+	} catch (error: unknown) {
+		if (isEnoentError(error)) {
+			return null;
+		}
+		throw error;
+	}
+}
+
+function loadLegacyStateSync(artifactDir: string): PipelineState | null {
+	const statePath = join(artifactDir, STATE_FILE);
+	try {
+		const raw = readFileSync(statePath, "utf-8");
 		const parsed = JSON.parse(raw);
 		const validated = pipelineStateSchema.parse(parsed);
 		assertStateInvariants(validated);
@@ -82,17 +104,34 @@ async function syncLegacyStateMirror(state: PipelineState, artifactDir: string):
 }
 
 export async function loadState(artifactDir: string): Promise<PipelineState | null> {
-	const kernelState = loadLatestPipelineStateFromKernel(artifactDir);
+	const validatedArtifactDir = assertProjectArtifactOwnership(artifactDir);
+	const kernelState = loadLatestPipelineStateFromKernel(validatedArtifactDir);
 	if (kernelState !== null) {
 		return kernelState;
 	}
 
-	const legacyState = await loadLegacyState(artifactDir);
+	const legacyState = await loadLegacyState(validatedArtifactDir);
 	if (legacyState === null) {
 		return null;
 	}
 
-	savePipelineStateToKernel(artifactDir, legacyState);
+	savePipelineStateToKernel(validatedArtifactDir, legacyState);
+	return legacyState;
+}
+
+export function loadStateSync(artifactDir: string): PipelineState | null {
+	const validatedArtifactDir = assertProjectArtifactOwnership(artifactDir);
+	const kernelState = loadLatestPipelineStateFromKernel(validatedArtifactDir);
+	if (kernelState !== null) {
+		return kernelState;
+	}
+
+	const legacyState = loadLegacyStateSync(validatedArtifactDir);
+	if (legacyState === null) {
+		return null;
+	}
+
+	savePipelineStateToKernel(validatedArtifactDir, legacyState);
 	return legacyState;
 }
 
@@ -101,10 +140,11 @@ export async function saveState(
 	artifactDir: string,
 	expectedRevision?: number,
 ): Promise<void> {
+	const validatedArtifactDir = assertProjectArtifactOwnership(artifactDir);
 	const validated = pipelineStateSchema.parse(state);
 	assertStateInvariants(validated);
-	savePipelineStateToKernel(artifactDir, validated, expectedRevision);
-	await syncLegacyStateMirror(validated, artifactDir);
+	savePipelineStateToKernel(validatedArtifactDir, validated, expectedRevision);
+	await syncLegacyStateMirror(validated, validatedArtifactDir);
 }
 
 export function isStateConflictError(error: unknown): boolean {
@@ -117,6 +157,7 @@ export async function updatePersistedState(
 	transform: (current: Readonly<PipelineState>) => PipelineState,
 	options?: { readonly maxConflicts?: number },
 ): Promise<PipelineState> {
+	const validatedArtifactDir = assertProjectArtifactOwnership(artifactDir);
 	const maxConflicts = options?.maxConflicts ?? 2;
 	let currentState = state;
 
@@ -127,14 +168,14 @@ export async function updatePersistedState(
 		}
 
 		try {
-			await saveState(nextState, artifactDir, currentState.stateRevision);
+			await saveState(nextState, validatedArtifactDir, currentState.stateRevision);
 			return nextState;
 		} catch (error: unknown) {
 			if (!isStateConflictError(error) || attempt >= maxConflicts) {
 				throw error;
 			}
 
-			const latestState = await loadState(artifactDir);
+			const latestState = await loadState(validatedArtifactDir);
 			if (latestState === null) {
 				throw new Error(`${KERNEL_STATE_CONFLICT_CODE}: state disappeared during update`);
 			}

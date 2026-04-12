@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadActiveReviewStateFromKernel } from "../../src/kernel/repository";
+import {
+	loadActiveReviewStateFromKernel,
+	loadLatestReviewRunFromKernel,
+} from "../../src/kernel/repository";
 import { reviewCore } from "../../src/tools/review";
 
 let tempDir: string;
@@ -26,6 +29,8 @@ describe("reviewCore", () => {
 		expect(parsed.action).toBe("dispatch");
 		expect(parsed.stage).toBe(1);
 		expect(Array.isArray(parsed.agents)).toBe(true);
+		expect(typeof parsed.reviewRunId).toBe("string");
+		expect((parsed.reviewStatus as { status?: string }).status).toBe("RUNNING");
 	});
 
 	test("without scope or state returns error", async () => {
@@ -44,6 +49,9 @@ describe("reviewCore", () => {
 		expect(state.stage).toBe(1);
 		expect(state.scope).toBe("staged");
 		expect(loadActiveReviewStateFromKernel(join(tempDir, ".opencode-autopilot"))?.scope).toBe(
+			"staged",
+		);
+		expect(loadLatestReviewRunFromKernel(join(tempDir, ".opencode-autopilot"))?.scope).toBe(
 			"staged",
 		);
 	});
@@ -70,6 +78,8 @@ describe("reviewCore", () => {
 		const parsed = parseResult(result);
 		expect(parsed.action).toBe("complete");
 		expect((parsed.findingsEnvelope as { kind?: string }).kind).toBe("review_findings");
+		expect((parsed.reviewRun as { reviewRunId?: string }).reviewRunId).toBeDefined();
+		expect((parsed.reviewStatus as { status?: string }).status).toBe("PASSED");
 	});
 
 	test("returns status when state exists but no findings provided", async () => {
@@ -117,6 +127,53 @@ describe("reviewCore", () => {
 		const memory = JSON.parse(raw);
 		expect(memory.schemaVersion).toBe(1);
 		expect(memory.lastReviewedAt).not.toBeNull();
+	});
+
+	test("blocks completion when a required reviewer never executes", async () => {
+		await reviewCore(
+			{
+				scope: "all",
+				reviewRunId: "review_required_gap",
+				selectedReviewers: ["logic-auditor"],
+				requiredReviewers: ["logic-auditor", "red-team"],
+			},
+			tempDir,
+		);
+		await reviewCore(
+			{
+				findings: JSON.stringify({
+					schemaVersion: 1,
+					kind: "review_stage_results",
+					results: [{ reviewer: "logic-auditor", status: "completed", findings: [] }],
+				}),
+			},
+			tempDir,
+		);
+		await reviewCore(
+			{
+				findings: JSON.stringify({
+					schemaVersion: 1,
+					kind: "review_stage_results",
+					results: [{ reviewer: "logic-auditor", status: "completed", findings: [] }],
+				}),
+			},
+			tempDir,
+		);
+		const result = await reviewCore(
+			{
+				findings: JSON.stringify({
+					schemaVersion: 1,
+					kind: "review_stage_results",
+					results: [{ reviewer: "product-thinker", status: "completed", findings: [] }],
+				}),
+			},
+			tempDir,
+		);
+		const parsed = parseResult(result);
+
+		expect(parsed.action).toBe("complete");
+		expect((parsed.reviewStatus as { status?: string }).status).toBe("BLOCKED");
+		expect((parsed.missingRequiredReviewers as string[]).includes("red-team")).toBe(true);
 	});
 
 	test("always returns valid JSON (never throws)", async () => {

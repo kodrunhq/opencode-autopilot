@@ -31,6 +31,13 @@ import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
 import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
 import { groupByWave } from "../orchestrator/plan";
 import { getPhaseProgressString } from "../orchestrator/progress";
+import {
+	buildProgramOracleSignoffRequest,
+	isPassingProgramOracleSignoff,
+	type ProgramOracleSignoff,
+	type ProgramOracleSignoffInputs,
+	programOracleSignoffSchema,
+} from "../orchestrator/signoff";
 import { loadAdaptiveSkillContext } from "../orchestrator/skill-injection";
 import {
 	createInitialState,
@@ -40,7 +47,21 @@ import {
 	saveState,
 	updatePersistedState,
 } from "../orchestrator/state";
-import type { Phase, PipelineState } from "../orchestrator/types";
+import type { Phase, PipelineState, ProgramPipelineContext } from "../orchestrator/types";
+import {
+	abandonProgramRun,
+	advanceProgramToNextTranche,
+	blockProgramRun,
+	buildPipelineIdeaForTranche,
+	finalizeProgramRun,
+	getCurrentTranche,
+	loadProgramRunFromKernel,
+	markCurrentTrancheShipped,
+	type ProgramRun,
+	planProgramRunFromRequest,
+	saveProgramRunToKernel,
+	type Tranche,
+} from "../program";
 import { resolveProjectIdentitySync } from "../projects/resolve";
 import { getIntentRouting, type IntentType, IntentTypeSchema } from "../routing/intent-types";
 import { createRouteTicketRepository } from "../routing/route-ticket-repository";
@@ -52,7 +73,12 @@ import {
 	getProjectRootFromArtifactDir,
 } from "../utils/paths";
 import { getNotificationManager, getProgressTracker, getTaskToastManager } from "../ux/registry";
-import { clearReviewState, reviewCore } from "./review";
+import {
+	createVisibilityBus,
+	decorateOrchestrateResponse,
+	type VisibilityBus,
+} from "../ux/visibility";
+import { clearReviewState } from "./review";
 
 interface OrchestrateArgs {
 	readonly idea?: string;
@@ -60,6 +86,11 @@ interface OrchestrateArgs {
 	readonly intent?: IntentType;
 	readonly abandon?: boolean;
 	readonly routeToken?: string;
+}
+
+interface StartFreshRunOptions {
+	readonly programContext?: ProgramPipelineContext | null;
+	readonly verificationProfile?: string;
 }
 
 const ORCHESTRATE_ERROR_CODES = Object.freeze({
@@ -103,6 +134,184 @@ function mapRouteTokenValidationError(reason: string | undefined): string {
 
 function createDispatchId(): string {
 	return `dispatch_${randomBytes(6).toString("hex")}`;
+}
+
+function createProgramPipelineContext(
+	program: Readonly<ProgramRun>,
+	tranche: Readonly<Tranche>,
+): ProgramPipelineContext {
+	return Object.freeze({
+		programId: program.programId,
+		trancheId: tranche.trancheId,
+		trancheTitle: tranche.title,
+		trancheIndex: tranche.sequence,
+		trancheCount: program.tranches.length,
+		selectionRationale: tranche.selectionRationale,
+		originatingRequest: program.originatingRequest.slice(0, 4096),
+		mode: program.mode,
+	});
+}
+
+function buildProgramResponseFields(
+	state: Readonly<PipelineState>,
+): Readonly<Record<string, unknown>> {
+	if (state.programContext === null) {
+		return Object.freeze({});
+	}
+
+	return Object.freeze({
+		program: Object.freeze({
+			programId: state.programContext.programId,
+			trancheId: state.programContext.trancheId,
+			trancheTitle: state.programContext.trancheTitle,
+			trancheIndex: state.programContext.trancheIndex,
+			trancheCount: state.programContext.trancheCount,
+			selectionRationale: state.programContext.selectionRationale,
+			mode: state.programContext.mode,
+		}),
+	});
+}
+
+function updateProgramRunForState(
+	artifactDir: string,
+	state: Readonly<PipelineState>,
+	transform: (program: Readonly<ProgramRun>) => ProgramRun,
+): ProgramRun | null {
+	if (state.programContext === null) {
+		return null;
+	}
+
+	const currentProgram = loadProgramRunFromKernel(artifactDir, state.programContext.programId);
+	if (currentProgram === null) {
+		return null;
+	}
+
+	const updatedProgram = transform(currentProgram);
+	saveProgramRunToKernel(artifactDir, updatedProgram);
+	return updatedProgram;
+}
+
+type ProgramCompletionResolution =
+	| {
+			readonly kind: "continue";
+			readonly program: ProgramRun;
+			readonly nextTranche: Tranche;
+	  }
+	| {
+			readonly kind: "await_oracle";
+			readonly blockedProgram: ProgramRun;
+			readonly dispatch: DispatchResult;
+	  }
+	| {
+			readonly kind: "blocked";
+			readonly blockedProgram: ProgramRun;
+			readonly reason: string;
+	  }
+	| {
+			readonly kind: "complete";
+			readonly program: ProgramRun;
+	  };
+
+function buildProgramOracleSignoffInputs(
+	program: Readonly<ProgramRun>,
+): ProgramOracleSignoffInputs {
+	const trancheResults = program.tranches.map((tranche) => {
+		const manifestLabel = tranche.deliveryManifestId
+			? ` — manifest ${tranche.deliveryManifestId}`
+			: "";
+		return `Tranche ${tranche.sequence}/${program.tranches.length}: ${tranche.title} [${tranche.status}]${manifestLabel}`;
+	});
+
+	const unresolvedRisks = program.tranches
+		.filter((tranche) => tranche.status !== "COMPLETED")
+		.map(
+			(tranche) =>
+				`Tranche ${tranche.sequence}/${program.tranches.length} remains ${tranche.status.toLowerCase()}: ${tranche.title}`,
+		);
+
+	return Object.freeze({
+		originalDossierRequest: program.originatingRequest,
+		trancheResults,
+		unresolvedRisks,
+		acceptedWaivers: [],
+	});
+}
+
+function resolveProgramCompletion(
+	state: Readonly<PipelineState>,
+	program: Readonly<ProgramRun>,
+): ProgramCompletionResolution {
+	const advancedProgram =
+		program.status === "ACTIVE" ? advanceProgramToNextTranche(program) : program;
+	const nextTranche =
+		advancedProgram.status === "ACTIVE" ? getCurrentTranche(advancedProgram) : null;
+
+	if (advancedProgram.status === "ACTIVE" && nextTranche !== null) {
+		return Object.freeze({
+			kind: "continue",
+			program: advancedProgram,
+			nextTranche,
+		});
+	}
+
+	const completionCandidate = finalizeProgramRun(advancedProgram, { status: "COMPLETED" });
+	const existingSignoff = state.oracleSignoffs.program;
+	const request = buildProgramOracleSignoffRequest(
+		buildProgramOracleSignoffInputs(completionCandidate),
+		existingSignoff?.verdict === "PENDING" ? { signoffId: existingSignoff.signoffId } : undefined,
+	);
+	const hasMatchingSignoff =
+		existingSignoff !== null && existingSignoff.inputsDigest === request.inputsDigest;
+
+	if (hasMatchingSignoff && isPassingProgramOracleSignoff(existingSignoff)) {
+		return Object.freeze({
+			kind: "complete",
+			program: finalizeProgramRun(advancedProgram, {
+				status: "COMPLETED",
+				finalOracleVerdict: existingSignoff.reasoning,
+			}),
+		});
+	}
+
+	const blockedProgram = finalizeProgramRun(advancedProgram, {
+		status: "BLOCKED",
+		blockedReason: "Program Oracle signoff required",
+	});
+
+	if (hasMatchingSignoff && existingSignoff.verdict !== "PENDING") {
+		return Object.freeze({
+			kind: "blocked",
+			blockedProgram,
+			reason: existingSignoff.reasoning,
+		});
+	}
+
+	const pendingRequirement = programOracleSignoffSchema.parse({
+		signoffId: request.signoffId,
+		scope: "PROGRAM",
+		inputsDigest: request.inputsDigest,
+		verdict: "PENDING",
+		reasoning: "Program Oracle signoff required",
+	});
+
+	return Object.freeze({
+		kind: "await_oracle",
+		blockedProgram,
+		dispatch: Object.freeze({
+			action: "dispatch",
+			agent: "oracle",
+			prompt: request.prompt,
+			phase: state.currentPhase ?? "RETROSPECTIVE",
+			resultKind: "oracle_signoff",
+			progress: "Program Oracle signoff pending",
+			_stateUpdates: {
+				oracleSignoffs: {
+					...state.oracleSignoffs,
+					program: pendingRequirement,
+				},
+			},
+		} satisfies DispatchResult),
+	});
 }
 
 function startProgressForDispatch(phase: string, totalSteps: number): void {
@@ -206,8 +415,8 @@ function markResultProcessed(
 	});
 }
 
-function asErrorJson(code: string, message: string): string {
-	return JSON.stringify({ action: "error", code, message });
+function asErrorJson(code: string, message: string, visibilityBus?: VisibilityBus): string {
+	return decorateOrchestrateResponse({ action: "error", code, message }, visibilityBus);
 }
 
 function logDeterministicError(
@@ -226,12 +435,15 @@ function logDeterministicError(
 
 function inferExpectedResultKindForAgent(
 	agent?: string,
-): "phase_output" | "task_completion" | "review_findings" {
+): "phase_output" | "task_completion" | "review_findings" | "oracle_signoff" {
 	if (agent === "oc-reviewer") {
 		return "review_findings";
 	}
 	if (agent === "oc-implementer") {
 		return "task_completion";
+	}
+	if (agent === "oracle") {
+		return "oracle_signoff";
 	}
 	return "phase_output";
 }
@@ -364,9 +576,38 @@ function canStartFreshRun(state: Readonly<PipelineState>): boolean {
 	);
 }
 
-async function startFreshRun(idea: string, artifactDir: string): Promise<string> {
-	const newState = createInitialState(idea);
+async function startFreshRun(
+	idea: string,
+	artifactDir: string,
+	options?: StartFreshRunOptions,
+	visibilityBus?: VisibilityBus,
+): Promise<string> {
+	let effectiveIdea = idea;
+	let programContext = options?.programContext ?? null;
+
+	if (programContext === null) {
+		const executionMode = (await loadConfig())?.mode.executionMode ?? "foreground";
+		const plannedProgram = planProgramRunFromRequest(
+			idea,
+			options?.verificationProfile ?? "normal",
+			{ executionMode },
+		);
+		if (plannedProgram !== null) {
+			saveProgramRunToKernel(artifactDir, plannedProgram);
+			const currentTranche = getCurrentTranche(plannedProgram);
+			if (currentTranche !== null) {
+				effectiveIdea = buildPipelineIdeaForTranche(plannedProgram, currentTranche);
+				programContext = createProgramPipelineContext(plannedProgram, currentTranche);
+			}
+		}
+	}
+
+	const newState = createInitialState(effectiveIdea, { programContext });
 	await saveState(newState, artifactDir);
+	publishTrancheStarted(visibilityBus, newState);
+	if (newState.currentPhase !== null) {
+		publishPhaseStarted(visibilityBus, newState, newState.currentPhase);
+	}
 
 	try {
 		await clearReviewState(artifactDir);
@@ -384,7 +625,7 @@ async function startFreshRun(idea: string, artifactDir: string): Promise<string>
 
 	const handler = PHASE_HANDLERS[newState.currentPhase as Phase];
 	const handlerResult = await handler(newState, artifactDir, undefined, undefined);
-	return processHandlerResult(handlerResult, newState, artifactDir, undefined);
+	return processHandlerResult(handlerResult, newState, artifactDir, undefined, visibilityBus);
 }
 
 /**
@@ -412,6 +653,12 @@ export async function handleAbortCleanup(
 					pendingDispatches: [],
 				}),
 			);
+			if (currentState.programContext !== null) {
+				const blockedProgram = updateProgramRunForState(artifactDir, currentState, (program) =>
+					blockProgramRun(program, safeMessage, currentState.programContext?.trancheId),
+				);
+				safeMessage = blockedProgram?.blockedReason ?? safeMessage;
+			}
 		}
 
 		try {
@@ -587,23 +834,13 @@ async function applyStateUpdates(
 }
 
 /**
- * When a handler dispatches "oc-reviewer", call reviewCore directly instead
- * of returning the dispatch instruction. This avoids the JSON round-trip
- * for the review integration in BUILD phase (per CONTEXT.md).
+ * Review dispatches are no longer inlined. Review is a first-class stage with
+ * its own pending dispatch, reviewer roster, and persisted review-run state.
  */
 async function maybeInlineReview(
-	handlerResult: DispatchResult,
-	artifactDir: string,
+	_handlerResult: DispatchResult,
+	_artifactDir: string,
 ): Promise<{ readonly inlined: boolean; readonly reviewResult?: string }> {
-	if (
-		handlerResult.action === "dispatch" &&
-		handlerResult.agent === "oc-reviewer" &&
-		handlerResult.prompt
-	) {
-		const projectRoot = getProjectRootFromArtifactDir(artifactDir);
-		const reviewResult = await reviewCore({ scope: "branch" }, projectRoot);
-		return { inlined: true, reviewResult };
-	}
 	return { inlined: false };
 }
 
@@ -673,9 +910,262 @@ async function injectSkillContext(
 
 /** Build a human-readable progress string for user-facing display. */
 function buildUserProgress(state: PipelineState, label?: string, attempt?: number): string {
+	const tranchePrefix =
+		state.programContext === null
+			? ""
+			: `[Tranche ${state.programContext.trancheIndex}/${state.programContext.trancheCount}] `;
 	const baseProgress = getPhaseProgressString(state);
 	const att = attempt != null ? ` (attempt ${attempt})` : "";
-	return `${baseProgress}${label ? ` — ${label}` : ""}${att}`;
+	return `${tranchePrefix}${baseProgress}${label ? ` — ${label}` : ""}${att}`;
+}
+
+function findTaskTitle(
+	state: Readonly<PipelineState>,
+	taskId: number | string | null | undefined,
+): string | null {
+	if (taskId === null || taskId === undefined) {
+		return null;
+	}
+
+	const normalizedTaskId = typeof taskId === "string" ? Number(taskId) : taskId;
+	if (!Number.isFinite(normalizedTaskId)) {
+		return null;
+	}
+
+	return state.tasks.find((task) => task.id === normalizedTaskId)?.title ?? null;
+}
+
+function publishPhaseStarted(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+	phase: string,
+): void {
+	visibilityBus?.publish({
+		type: "phase_started",
+		runId: state.runId,
+		phase,
+		trancheId: state.programContext?.trancheId ?? null,
+		trancheIndex: state.programContext?.trancheIndex ?? null,
+		trancheCount: state.programContext?.trancheCount ?? null,
+		summary: buildUserProgress(state),
+	});
+}
+
+function publishPhaseCompleted(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+	phase: string,
+): void {
+	visibilityBus?.publish({
+		type: "phase_completed",
+		runId: state.runId,
+		phase,
+		trancheId: state.programContext?.trancheId ?? null,
+		trancheIndex: state.programContext?.trancheIndex ?? null,
+		trancheCount: state.programContext?.trancheCount ?? null,
+		summary: `${buildUserProgress(state)} — complete`,
+	});
+}
+
+function publishTrancheStarted(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+): void {
+	if (state.programContext === null) {
+		return;
+	}
+
+	visibilityBus?.publish({
+		type: "tranche_started",
+		runId: state.runId,
+		phase: state.currentPhase,
+		trancheId: state.programContext.trancheId,
+		trancheIndex: state.programContext.trancheIndex,
+		trancheCount: state.programContext.trancheCount,
+		summary: `Tranche ${state.programContext.trancheIndex}/${state.programContext.trancheCount} started — ${state.programContext.trancheTitle}`,
+		metadata: {
+			title: state.programContext.trancheTitle,
+		},
+	});
+}
+
+function publishTrancheCompleted(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+): void {
+	if (state.programContext === null) {
+		return;
+	}
+
+	visibilityBus?.publish({
+		type: "tranche_completed",
+		runId: state.runId,
+		phase: state.currentPhase,
+		trancheId: state.programContext.trancheId,
+		trancheIndex: state.programContext.trancheIndex,
+		trancheCount: state.programContext.trancheCount,
+		summary: `Tranche ${state.programContext.trancheIndex}/${state.programContext.trancheCount} completed — ${state.programContext.trancheTitle}`,
+		metadata: {
+			title: state.programContext.trancheTitle,
+		},
+	});
+}
+
+function publishTaskStarted(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+	taskId: number | string | null | undefined,
+	agent: string | null | undefined,
+): void {
+	if (taskId === null || taskId === undefined) {
+		return;
+	}
+
+	const taskTitle = findTaskTitle(state, taskId);
+	visibilityBus?.publish({
+		type: "task_started",
+		runId: state.runId,
+		phase: state.currentPhase,
+		taskId,
+		agent: agent ?? null,
+		summary: taskTitle
+			? `Task ${String(taskId)} started — ${taskTitle}`
+			: `Task ${String(taskId)} started`,
+		metadata: taskTitle ? { title: taskTitle } : undefined,
+	});
+}
+
+function publishTaskCompleted(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+	taskId: number | string | null | undefined,
+): void {
+	if (taskId === null || taskId === undefined) {
+		return;
+	}
+
+	const taskTitle = findTaskTitle(state, taskId);
+	visibilityBus?.publish({
+		type: "task_completed",
+		runId: state.runId,
+		phase: state.currentPhase,
+		taskId,
+		summary: taskTitle
+			? `Task ${String(taskId)} completed — ${taskTitle}`
+			: `Task ${String(taskId)} completed`,
+		metadata: taskTitle ? { title: taskTitle } : undefined,
+	});
+}
+
+function publishReviewStarted(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+): void {
+	const reviewerCount = state.reviewStatus.selectedReviewers.length;
+	const wave = state.buildProgress.currentWave;
+	const reviewerSuffix = reviewerCount > 0 ? ` (${reviewerCount} reviewers)` : "";
+	const waveSuffix = wave !== null ? ` for wave ${wave}` : "";
+	visibilityBus?.publish({
+		type: "review_started",
+		runId: state.runId,
+		phase: state.currentPhase,
+		summary: `Review started${waveSuffix}${reviewerSuffix}`,
+		metadata: {
+			reviewerCount,
+			wave,
+		},
+	});
+}
+
+function publishReviewBlocked(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+	reason: string,
+): void {
+	visibilityBus?.publish({
+		type: "review_blocked",
+		runId: state.runId,
+		phase: state.currentPhase,
+		summary: `Review blocked shipment — ${reason}`,
+		metadata: {
+			reason,
+		},
+	});
+}
+
+function publishOraclePassed(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+	summary: string,
+): void {
+	visibilityBus?.publish({
+		type: "oracle_passed",
+		runId: state.runId,
+		phase: state.currentPhase,
+		trancheId: state.programContext?.trancheId ?? null,
+		summary,
+	});
+}
+
+function publishOracleFailed(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+	summary: string,
+): void {
+	visibilityBus?.publish({
+		type: "oracle_failed",
+		runId: state.runId,
+		phase: state.currentPhase,
+		trancheId: state.programContext?.trancheId ?? null,
+		summary,
+	});
+}
+
+function publishVerificationPassed(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+): void {
+	visibilityBus?.publish({
+		type: "verification_passed",
+		runId: state.runId,
+		phase: state.currentPhase,
+		summary:
+			state.branchLifecycle?.verificationSummary ??
+			"Verification passed — delivery gates are satisfied.",
+	});
+}
+
+function publishShipCreated(
+	visibilityBus: VisibilityBus | undefined,
+	state: Readonly<PipelineState>,
+): void {
+	const prUrl = state.branchLifecycle?.prUrl;
+	visibilityBus?.publish({
+		type: "ship_created",
+		runId: state.runId,
+		phase: state.currentPhase,
+		trancheId: state.programContext?.trancheId ?? null,
+		summary: prUrl ? `Ship created — ${prUrl}` : "Ship created — delivery artifacts recorded",
+		metadata: {
+			prUrl,
+		},
+	});
+}
+
+function publishProgramCompleted(
+	visibilityBus: VisibilityBus | undefined,
+	programId: string,
+	trancheCount: number,
+): void {
+	visibilityBus?.publish({
+		type: "program_completed",
+		runId: programId,
+		summary: `Program completed after ${trancheCount} tranche${trancheCount === 1 ? "" : "s"}`,
+		metadata: {
+			programId,
+			trancheCount,
+		},
+	});
 }
 
 function formatElapsed(issuedAt: string): string {
@@ -828,6 +1318,7 @@ async function processHandlerResult(
 	state: Readonly<PipelineState>,
 	artifactDir: string,
 	contextSessionId?: string,
+	visibilityBus?: VisibilityBus,
 ): Promise<string> {
 	const normalizedResult = ensureDispatchIdentity(handlerResult, state);
 
@@ -863,7 +1354,13 @@ async function processHandlerResult(
 		}
 		const freshHandler = PHASE_HANDLERS.BUILD;
 		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
-		return processHandlerResult(freshResult, currentState, artifactDir, contextSessionId);
+		return processHandlerResult(
+			freshResult,
+			currentState,
+			artifactDir,
+			contextSessionId,
+			visibilityBus,
+		);
 	}
 
 	// When concurrent completions both try to replenish the same pending task,
@@ -877,13 +1374,35 @@ async function processHandlerResult(
 	) {
 		const freshHandler = PHASE_HANDLERS.BUILD;
 		const freshResult = await freshHandler(currentState, artifactDir, undefined, undefined);
-		return processHandlerResult(freshResult, currentState, artifactDir, contextSessionId);
+		return processHandlerResult(
+			freshResult,
+			currentState,
+			artifactDir,
+			contextSessionId,
+			visibilityBus,
+		);
 	}
 
 	switch (normalizedResult.action) {
 		case "error": {
 			const codePrefix = normalizedResult.code ? `${normalizedResult.code}: ` : "";
 			const messageBody = normalizedResult.message ?? "Handler returned error";
+			if (
+				normalizedResult.code === "E_SHIP_REVIEW_BLOCKED" ||
+				normalizedResult.progress === "SHIP blocked by review policy"
+			) {
+				publishReviewBlocked(visibilityBus, currentState, messageBody);
+			}
+
+			if (normalizedResult.code === "E_ORACLE_TRANCHE_SIGNOFF_FAILED") {
+				publishOracleFailed(visibilityBus, currentState, messageBody);
+			}
+			const blockedProgram =
+				currentState.programContext !== null && normalizedResult.phase
+					? updateProgramRunForState(artifactDir, currentState, (program) =>
+							blockProgramRun(program, messageBody, currentState.programContext?.trancheId),
+						)
+					: null;
 			logOrchestrationEvent(artifactDir, {
 				timestamp: new Date().toISOString(),
 				phase: normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN",
@@ -894,7 +1413,20 @@ async function processHandlerResult(
 				"Pipeline error",
 				`${normalizedResult.phase ?? "Unknown"}: ${messageBody}`.slice(0, 200),
 			);
-			return JSON.stringify(normalizedResult);
+			return decorateOrchestrateResponse(
+				{
+					...normalizedResult,
+					...buildProgramResponseFields(currentState),
+					...(blockedProgram === null
+						? {}
+						: {
+								stopClassification: "BLOCKED",
+								programStatus: blockedProgram.status,
+								blockedReason: blockedProgram.blockedReason,
+							}),
+				},
+				visibilityBus,
+			);
 		}
 
 		case "dispatch": {
@@ -906,7 +1438,12 @@ async function processHandlerResult(
 				newCount: attempt,
 				nextState,
 			} = await checkCircuitBreaker(currentState, phase, dispatchAgent, artifactDir, 1);
-			if (abortMsg) return abortMsg;
+			if (abortMsg) {
+				return decorateOrchestrateResponse(
+					JSON.parse(abortMsg) as Record<string, unknown>,
+					visibilityBus,
+				);
+			}
 			currentState = nextState;
 
 			// Duplicate dispatch guard: prevent dispatching the same agent+phase twice
@@ -922,7 +1459,7 @@ async function processHandlerResult(
 					agent: dispatchAgent,
 					message: `${ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH}: ${msg}`,
 				});
-				return asErrorJson(ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH, msg);
+				return asErrorJson(ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH, msg, visibilityBus);
 			}
 
 			const pendingEntry: PendingDispatch = {
@@ -959,6 +1496,27 @@ async function processHandlerResult(
 				agent: normalizedResult.agent ?? "unknown",
 				isBackground: false,
 			});
+			if (phase === "BUILD" && normalizedResult.taskId !== null) {
+				publishTaskStarted(
+					visibilityBus,
+					currentState,
+					normalizedResult.taskId,
+					normalizedResult.agent,
+				);
+			}
+			if (phase === "BUILD" && normalizedResult.resultKind === "review_findings") {
+				publishReviewStarted(visibilityBus, currentState);
+			}
+			if (
+				normalizedResult.progress?.toLowerCase().includes("review stage blocked") ||
+				normalizedResult.progress?.toLowerCase().includes("review blocked")
+			) {
+				publishReviewBlocked(
+					visibilityBus,
+					currentState,
+					currentState.reviewStatus.blockedReason ?? normalizedResult.progress,
+				);
+			}
 			startProgressForDispatch(phase, 1);
 
 			// Check if this is a review dispatch that should be inlined
@@ -1007,14 +1565,23 @@ async function processHandlerResult(
 					const nextResult = await handler(withInlineResult, artifactDir, reviewPayloadText, {
 						envelope: inlinedEnvelope,
 					});
-					return processHandlerResult(nextResult, withInlineResult, artifactDir, contextSessionId);
+					return processHandlerResult(
+						nextResult,
+						withInlineResult,
+						artifactDir,
+						contextSessionId,
+						visibilityBus,
+					);
 				}
 				// State unavailable or pipeline completed after inline review — return complete
-				return JSON.stringify({
-					action: "complete",
-					summary: "Inline review completed; no active phase.",
-					_userProgress: progress,
-				});
+				return decorateOrchestrateResponse(
+					{
+						action: "complete",
+						summary: "Inline review completed; no active phase.",
+						_userProgress: progress,
+					},
+					visibilityBus,
+				);
 			}
 
 			currentState = await updatePersistedState(artifactDir, currentState, (current) =>
@@ -1034,21 +1601,29 @@ async function processHandlerResult(
 					normalizedResult.phase,
 				);
 				if (withSkills !== normalizedResult.prompt) {
-					return JSON.stringify({
-						...normalizedResult,
-						prompt: withSkills,
-						dispatchId: pendingEntry.dispatchId,
-						runId: currentState.runId,
-						_userProgress: progress,
-					});
+					return decorateOrchestrateResponse(
+						{
+							...normalizedResult,
+							prompt: withSkills,
+							dispatchId: pendingEntry.dispatchId,
+							runId: currentState.runId,
+							_userProgress: progress,
+							...buildProgramResponseFields(currentState),
+						},
+						visibilityBus,
+					);
 				}
 			}
-			return JSON.stringify({
-				...normalizedResult,
-				dispatchId: pendingEntry.dispatchId,
-				runId: currentState.runId,
-				_userProgress: progress,
-			});
+			return decorateOrchestrateResponse(
+				{
+					...normalizedResult,
+					dispatchId: pendingEntry.dispatchId,
+					runId: currentState.runId,
+					_userProgress: progress,
+					...buildProgramResponseFields(currentState),
+				},
+				visibilityBus,
+			);
 		}
 
 		case "dispatch_multi": {
@@ -1067,7 +1642,12 @@ async function processHandlerResult(
 				artifactDir,
 				multiAgentCount,
 			);
-			if (abortMsg) return abortMsg;
+			if (abortMsg) {
+				return decorateOrchestrateResponse(
+					JSON.parse(abortMsg) as Record<string, unknown>,
+					visibilityBus,
+				);
+			}
 			currentState = nextState;
 
 			// Duplicate dispatch guard: prevent dispatching the same agent+phase twice
@@ -1084,7 +1664,7 @@ async function processHandlerResult(
 						agent: duplicateAgent.agent,
 						message: `${ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH}: ${msg}`,
 					});
-					return asErrorJson(ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH, msg);
+					return asErrorJson(ORCHESTRATE_ERROR_CODES.DUPLICATE_DISPATCH, msg, visibilityBus);
 				}
 			}
 
@@ -1111,6 +1691,15 @@ async function processHandlerResult(
 				addToastTaskForDispatch(pendingEntry, {
 					description: buildProgressLabelFromPending(pendingEntry),
 				});
+				if (phase === "BUILD" && pendingEntry.taskId !== null) {
+					publishTaskStarted(visibilityBus, currentState, pendingEntry.taskId, pendingEntry.agent);
+				}
+			}
+			if (
+				phase === "BUILD" &&
+				pendingEntries.some((entry) => entry.resultKind === "review_findings")
+			) {
+				publishReviewStarted(visibilityBus, currentState);
 			}
 			startProgressForDispatch(phase, pendingEntries.length);
 			currentState = await updatePersistedState(artifactDir, currentState, (current) => {
@@ -1136,27 +1725,97 @@ async function processHandlerResult(
 						...entry,
 						prompt: entry.prompt + combinedSuffix,
 					}));
-					return JSON.stringify({
-						...normalizedResult,
-						agents: enrichedAgents,
-						runId: currentState.runId,
-						_userProgress: progress,
-					});
+					return decorateOrchestrateResponse(
+						{
+							...normalizedResult,
+							agents: enrichedAgents,
+							runId: currentState.runId,
+							_userProgress: progress,
+							...buildProgramResponseFields(currentState),
+						},
+						visibilityBus,
+					);
 				}
 			}
-			return JSON.stringify({
-				...normalizedResult,
-				runId: currentState.runId,
-				_userProgress: progress,
-			});
+			return decorateOrchestrateResponse(
+				{
+					...normalizedResult,
+					runId: currentState.runId,
+					_userProgress: progress,
+					...buildProgramResponseFields(currentState),
+				},
+				visibilityBus,
+			);
 		}
 
 		case "complete": {
 			if (currentState.currentPhase === null) {
-				return JSON.stringify({
-					action: "complete",
-					summary: `Pipeline completed. Idea: ${currentState.idea}`,
-				});
+				return decorateOrchestrateResponse(
+					{
+						action: "complete",
+						summary: `Pipeline completed. Idea: ${currentState.idea}`,
+					},
+					visibilityBus,
+				);
+			}
+
+			const nextPhase = getNextPhase(currentState.currentPhase);
+			let programCompletionResolution: ProgramCompletionResolution | null = null;
+			if (nextPhase === null && currentState.programContext !== null) {
+				const currentProgram = loadProgramRunFromKernel(
+					artifactDir,
+					currentState.programContext.programId,
+				);
+				if (currentProgram !== null) {
+					programCompletionResolution = resolveProgramCompletion(currentState, currentProgram);
+
+					if (programCompletionResolution.kind === "await_oracle") {
+						saveProgramRunToKernel(artifactDir, programCompletionResolution.blockedProgram);
+						return processHandlerResult(
+							programCompletionResolution.dispatch,
+							currentState,
+							artifactDir,
+							contextSessionId,
+							visibilityBus,
+						);
+					}
+
+					if (programCompletionResolution.kind === "blocked") {
+						saveProgramRunToKernel(artifactDir, programCompletionResolution.blockedProgram);
+						publishOracleFailed(visibilityBus, currentState, programCompletionResolution.reason);
+						return decorateOrchestrateResponse(
+							{
+								action: "error",
+								code: "E_ORACLE_PROGRAM_SIGNOFF_REQUIRED",
+								message: "Program Oracle signoff required",
+								programId: currentState.programContext.programId,
+								programStatus: programCompletionResolution.blockedProgram.status,
+								blockedReason: programCompletionResolution.blockedProgram.blockedReason,
+								_userProgress: `Completed tranche ${currentState.programContext.trancheIndex}/${currentState.programContext.trancheCount} and are waiting for program Oracle signoff`,
+								...buildProgramResponseFields(currentState),
+							},
+							visibilityBus,
+						);
+					}
+				}
+			}
+
+			publishPhaseCompleted(visibilityBus, currentState, currentState.currentPhase);
+			if (
+				currentState.currentPhase === "BUILD" &&
+				normalizedResult.progress?.includes("Oracle tranche signoff passed")
+			) {
+				publishOraclePassed(visibilityBus, currentState, normalizedResult.progress);
+			}
+			if (
+				currentState.currentPhase === "RETROSPECTIVE" &&
+				normalizedResult.progress?.includes("Program Oracle signoff passed")
+			) {
+				publishOraclePassed(visibilityBus, currentState, normalizedResult.progress);
+			}
+			if (currentState.currentPhase === "SHIP") {
+				publishVerificationPassed(visibilityBus, currentState);
+				publishShipCreated(visibilityBus, currentState);
 			}
 
 			logOrchestrationEvent(artifactDir, {
@@ -1197,7 +1856,12 @@ async function processHandlerResult(
 
 			getProgressTracker()?.complete();
 
-			const nextPhase = getNextPhase(currentState.currentPhase);
+			if (currentState.currentPhase === "SHIP" && currentState.programContext !== null) {
+				updateProgramRunForState(artifactDir, currentState, (program) =>
+					markCurrentTrancheShipped(program, `manifest_${currentState.runId}`),
+				);
+			}
+
 			const advanced = await updatePersistedState(artifactDir, currentState, (current) =>
 				completePhase(current),
 			);
@@ -1210,15 +1874,66 @@ async function processHandlerResult(
 
 			if (nextPhase === null) {
 				const idx = PHASE_INDEX[currentState.currentPhase] ?? TOTAL_PHASES;
+				if (currentState.programContext !== null) {
+					publishTrancheCompleted(visibilityBus, currentState);
+					const updatedProgram =
+						programCompletionResolution?.kind === "continue"
+							? (saveProgramRunToKernel(artifactDir, programCompletionResolution.program),
+								programCompletionResolution.program)
+							: programCompletionResolution?.kind === "complete"
+								? (saveProgramRunToKernel(artifactDir, programCompletionResolution.program),
+									programCompletionResolution.program)
+								: updateProgramRunForState(artifactDir, currentState, (program) =>
+										advanceProgramToNextTranche(program),
+									);
+					const nextTranche =
+						programCompletionResolution?.kind === "continue"
+							? programCompletionResolution.nextTranche
+							: updatedProgram
+								? getCurrentTranche(updatedProgram)
+								: null;
+
+					if (updatedProgram && nextTranche !== null && updatedProgram.status === "ACTIVE") {
+						return startFreshRun(
+							buildPipelineIdeaForTranche(updatedProgram, nextTranche),
+							artifactDir,
+							{
+								programContext: createProgramPipelineContext(updatedProgram, nextTranche),
+							},
+							visibilityBus,
+						);
+					}
+
+					publishProgramCompleted(
+						visibilityBus,
+						currentState.programContext.programId,
+						updatedProgram?.tranches.length ?? currentState.programContext.trancheCount,
+					);
+
+					return decorateOrchestrateResponse(
+						{
+							action: "complete",
+							summary: `Program completed all ${updatedProgram?.tranches.length ?? currentState.programContext.trancheCount} tranches. Originating request: ${(updatedProgram?.originatingRequest ?? currentState.programContext.originatingRequest).slice(0, 120)}`,
+							programId: currentState.programContext.programId,
+							programStatus: updatedProgram?.status ?? "COMPLETED",
+							_userProgress: `Completed tranche ${currentState.programContext.trancheIndex}/${currentState.programContext.trancheCount} and finished the autonomous program`,
+						},
+						visibilityBus,
+					);
+				}
+
 				void getNotificationManager()?.success(
 					"Pipeline complete",
 					`All ${TOTAL_PHASES} phases finished for: ${currentState.idea.slice(0, 100)}`,
 				);
-				return JSON.stringify({
-					action: "complete",
-					summary: `Pipeline completed all ${TOTAL_PHASES} phases. Idea: ${currentState.idea}`,
-					_userProgress: `Completed ${currentState.currentPhase} (${idx}/${TOTAL_PHASES}), pipeline finished`,
-				});
+				return decorateOrchestrateResponse(
+					{
+						action: "complete",
+						summary: `Pipeline completed all ${TOTAL_PHASES} phases. Idea: ${currentState.idea}`,
+						_userProgress: `Completed ${currentState.currentPhase} (${idx}/${TOTAL_PHASES}), pipeline finished`,
+					},
+					visibilityBus,
+				);
 			}
 
 			// Phase started toast
@@ -1232,16 +1947,26 @@ async function processHandlerResult(
 			);
 
 			// Invoke the next phase handler immediately
+			publishPhaseStarted(visibilityBus, advanced, nextPhase);
 			const nextHandler = PHASE_HANDLERS[nextPhase];
 			const nextResult = await nextHandler(advanced, artifactDir, undefined, undefined);
-			return processHandlerResult(nextResult, advanced, artifactDir, contextSessionId);
+			return processHandlerResult(
+				nextResult,
+				advanced,
+				artifactDir,
+				contextSessionId,
+				visibilityBus,
+			);
 		}
 
 		default:
-			return JSON.stringify({
-				action: "error",
-				message: `Unknown handler action: "${String((handlerResult as unknown as Record<string, unknown>).action)}"`,
-			});
+			return decorateOrchestrateResponse(
+				{
+					action: "error",
+					message: `Unknown handler action: "${String((handlerResult as unknown as Record<string, unknown>).action)}"`,
+				},
+				visibilityBus,
+			);
 	}
 }
 
@@ -1257,19 +1982,21 @@ export async function orchestrateCore(
 	context?: OrchestrateContext,
 ): Promise<string> {
 	try {
+		const visibilityBus = createVisibilityBus({ artifactDir });
 		let state = await loadState(artifactDir);
 		const contextSessionId = context?.sessionId;
 
 		// Auto-finalize stale pending dispatches where the spawned session died without returning.
 		if (state && state.pendingDispatches.length > 0 && args.result === undefined) {
+			const activeState = state;
 			const now = Date.now();
-			const staleDispatches = state.pendingDispatches.filter((pending) => {
+			const staleDispatches = activeState.pendingDispatches.filter((pending) => {
 				const issued = Date.parse(pending.issuedAt);
 				return Number.isFinite(issued) && now - issued > STALE_PENDING_DISPATCH_MS;
 			});
 			if (staleDispatches.length > 0) {
 				const failureContext = {
-					failedPhase: state.currentPhase ?? staleDispatches[0]?.phase ?? "RECON",
+					failedPhase: activeState.currentPhase ?? staleDispatches[0]?.phase ?? "RECON",
 					failedAgent: staleDispatches[0]?.agent ?? null,
 					errorMessage: `Pending dispatch stale for more than ${Math.round(
 						STALE_PENDING_DISPATCH_MS / 60000,
@@ -1277,10 +2004,11 @@ export async function orchestrateCore(
 						.map((d) => `${d.phase}/${d.agent}#${d.dispatchId}`)
 						.join(", ")}`.slice(0, 4096),
 					timestamp: new Date(now).toISOString(),
-					lastSuccessfulPhase: state.phases.filter((p) => p.status === "DONE").pop()?.name ?? null,
+					lastSuccessfulPhase:
+						activeState.phases.filter((p) => p.status === "DONE").pop()?.name ?? null,
 				};
 
-				state = await updatePersistedState(artifactDir, state, (current) =>
+				state = await updatePersistedState(artifactDir, activeState, (current) =>
 					patchState(current, {
 						status: "INTERRUPTED" as const,
 						pendingDispatches: [],
@@ -1296,20 +2024,41 @@ export async function orchestrateCore(
 					message: `${ORCHESTRATE_ERROR_CODES.STALE_PENDING_DISPATCH}: ${failureContext.errorMessage}`,
 				});
 
-				return JSON.stringify({
-					action: "error",
-					code: ORCHESTRATE_ERROR_CODES.STALE_PENDING_DISPATCH,
-					message: failureContext.errorMessage,
-				});
+				const blockedTrancheId = activeState.programContext?.trancheId ?? undefined;
+				const blockedProgram =
+					activeState.programContext !== null
+						? updateProgramRunForState(artifactDir, activeState, (program) =>
+								blockProgramRun(program, failureContext.errorMessage, blockedTrancheId),
+							)
+						: null;
+
+				return decorateOrchestrateResponse(
+					{
+						action: "error",
+						code: ORCHESTRATE_ERROR_CODES.STALE_PENDING_DISPATCH,
+						message: failureContext.errorMessage,
+						...(blockedProgram === null
+							? {}
+							: {
+									stopClassification: "BLOCKED",
+									programStatus: blockedProgram.status,
+									blockedReason: blockedProgram.blockedReason,
+								}),
+					},
+					visibilityBus,
+				);
 			}
 		}
 
 		// No state and no idea -> error
 		if (state === null && !args.idea) {
-			return JSON.stringify({
-				action: "error",
-				message: "No active run. Provide an idea to start.",
-			});
+			return decorateOrchestrateResponse(
+				{
+					action: "error",
+					message: "No active run. Provide an idea to start.",
+				},
+				visibilityBus,
+			);
 		}
 
 		// No state but idea provided -> route token validation and intent guard
@@ -1317,12 +2066,15 @@ export async function orchestrateCore(
 			// Route token validation - only when context is provided (for test compatibility)
 			if (context) {
 				if (!args.routeToken) {
-					return JSON.stringify({
-						action: "error",
-						code: "E_ROUTE_TOKEN_REQUIRED",
-						message:
-							"Route token is required to start the pipeline. Call oc_route first to classify the user's intent and obtain a route token, then pass routeToken to oc_orchestrate.",
-					});
+					return decorateOrchestrateResponse(
+						{
+							action: "error",
+							code: "E_ROUTE_TOKEN_REQUIRED",
+							message:
+								"Route token is required to start the pipeline. Call oc_route first to classify the user's intent and obtain a route token, then pass routeToken to oc_orchestrate.",
+						},
+						visibilityBus,
+					);
 				}
 				if (context.projectRoot) {
 					let db: ReturnType<typeof openKernelDb> | null = null;
@@ -1338,42 +2090,55 @@ export async function orchestrateCore(
 							intent: args.intent ?? "implementation",
 						});
 						if (!validationResult.valid) {
-							return JSON.stringify({
-								action: "error",
-								code: mapRouteTokenValidationError(validationResult.reason),
-								message: `Invalid or expired route token: ${validationResult.reason}. Call oc_route first to obtain a valid route token, then pass it to oc_orchestrate.`,
-							});
+							return decorateOrchestrateResponse(
+								{
+									action: "error",
+									code: mapRouteTokenValidationError(validationResult.reason),
+									message: `Invalid or expired route token: ${validationResult.reason}. Call oc_route first to obtain a valid route token, then pass it to oc_orchestrate.`,
+								},
+								visibilityBus,
+							);
 						}
 					} catch (validationError) {
 						db?.close();
-						return JSON.stringify({
-							action: "error",
-							code: "E_ROUTE_TOKEN_VALIDATION_FAILED",
-							message: `Route ticket validation failed: ${validationError instanceof Error ? validationError.message : String(validationError)}. Ensure the project kernel database is accessible.`,
-						});
+						return decorateOrchestrateResponse(
+							{
+								action: "error",
+								code: "E_ROUTE_TOKEN_VALIDATION_FAILED",
+								message: `Route ticket validation failed: ${validationError instanceof Error ? validationError.message : String(validationError)}. Ensure the project kernel database is accessible.`,
+							},
+							visibilityBus,
+						);
 					} finally {
 						db?.close();
 					}
 				}
 			}
 			if (!args.intent) {
-				return JSON.stringify({
-					action: "error",
-					code: "E_INTENT_REQUIRED",
-					message:
-						"Intent classification is required to start the pipeline. Call oc_route first to classify the user's intent, then pass intent: 'implementation' to oc_orchestrate.",
-				});
+				return decorateOrchestrateResponse(
+					{
+						action: "error",
+						code: "E_INTENT_REQUIRED",
+						message:
+							"Intent classification is required to start the pipeline. Call oc_route first to classify the user's intent, then pass intent: 'implementation' to oc_orchestrate.",
+					},
+					visibilityBus,
+				);
 			}
 			if (args.intent !== "implementation") {
 				const routing = getIntentRouting(args.intent);
-				return JSON.stringify({
-					action: "error",
-					code: "E_INTENT_NOT_IMPLEMENTATION",
-					message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
-				});
+				return decorateOrchestrateResponse(
+					{
+						action: "error",
+						code: "E_INTENT_NOT_IMPLEMENTATION",
+						message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
+					},
+					visibilityBus,
+				);
 			}
 
-			return startFreshRun(args.idea, artifactDir);
+			const verificationProfile = (await loadConfig())?.autonomy?.verification ?? "normal";
+			return startFreshRun(args.idea, artifactDir, { verificationProfile }, visibilityBus);
 		}
 
 		// State exists
@@ -1383,58 +2148,84 @@ export async function orchestrateCore(
 			if (!args.result) {
 				if (args.intent && args.intent !== "implementation") {
 					const routing = getIntentRouting(args.intent);
-					return JSON.stringify({
-						action: "error",
-						code: "E_INTENT_NOT_IMPLEMENTATION",
-						message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
-					});
+					return decorateOrchestrateResponse(
+						{
+							action: "error",
+							code: "E_INTENT_NOT_IMPLEMENTATION",
+							message: `Intent '${args.intent}' does not use the pipeline. Route to ${routing.targetAgent} instead. ${routing.behavior}`,
+						},
+						visibilityBus,
+					);
 				}
 
 				// New user turn with idea on active pipeline requires intent classification
 				if (args.idea && !args.intent) {
-					return JSON.stringify({
-						action: "error",
-						code: "E_INTENT_REQUIRED",
-						message:
-							"A new idea on an active pipeline requires intent classification. Call oc_route first, then pass intent: 'implementation' to continue the pipeline with a new idea.",
-					});
+					return decorateOrchestrateResponse(
+						{
+							action: "error",
+							code: "E_INTENT_REQUIRED",
+							message:
+								"A new idea on an active pipeline requires intent classification. Call oc_route first, then pass intent: 'implementation' to continue the pipeline with a new idea.",
+						},
+						visibilityBus,
+					);
 				}
 
 				if (args.idea && args.intent === "implementation") {
 					if (canStartFreshRun(state)) {
-						return startFreshRun(args.idea, artifactDir);
+						const verificationProfile = (await loadConfig())?.autonomy?.verification ?? "normal";
+						return startFreshRun(args.idea, artifactDir, { verificationProfile }, visibilityBus);
 					}
 
-					return JSON.stringify({
-						action: "error",
-						code: ORCHESTRATE_ERROR_CODES.ACTIVE_RUN_EXISTS,
-						message: `Active pipeline run ${state.runId} is still in progress at ${state.currentPhase}. Resume it with a typed result envelope, or call oc_orchestrate with abandon: true before starting a new idea.`,
-					});
+					return decorateOrchestrateResponse(
+						{
+							action: "error",
+							code: ORCHESTRATE_ERROR_CODES.ACTIVE_RUN_EXISTS,
+							message: `Active pipeline run ${state.runId} is still in progress at ${state.currentPhase}. Resume it with a typed result envelope, or call oc_orchestrate with abandon: true before starting a new idea.`,
+						},
+						visibilityBus,
+					);
 				}
 			}
 
 			if (args.abandon) {
+				const abandonedProgram =
+					state.programContext !== null
+						? updateProgramRunForState(artifactDir, state, (program) => abandonProgramRun(program))
+						: null;
 				const abandonedState = patchState(state, {
 					status: "INTERRUPTED" as const,
 					pendingDispatches: [],
 				});
 				await saveState(abandonedState, artifactDir);
-				return JSON.stringify({
-					action: "abandoned",
-					runId: state.runId,
-					status: "INTERRUPTED",
-					displayText: `Pipeline run ${state.runId} abandoned. Start fresh with oc_orchestrate.`,
-				});
+				return decorateOrchestrateResponse(
+					{
+						action: "abandoned",
+						runId: state.runId,
+						status: "INTERRUPTED",
+						...(abandonedProgram === null
+							? {}
+							: {
+									programId: abandonedProgram.programId,
+									programStatus: abandonedProgram.status,
+								}),
+						displayText: `Pipeline run ${state.runId} abandoned. Start fresh with oc_orchestrate.`,
+					},
+					visibilityBus,
+				);
 			}
 
 			let phaseHandlerContext: PhaseHandlerContext | undefined;
 			let handlerInputResult = args.result;
 
 			if (state.currentPhase === null) {
-				return JSON.stringify({
-					action: "complete",
-					summary: `Pipeline already completed. Idea: ${state.idea}`,
-				});
+				return decorateOrchestrateResponse(
+					{
+						action: "complete",
+						summary: `Pipeline already completed. Idea: ${state.idea}`,
+					},
+					visibilityBus,
+				);
 			}
 
 			if (args.result === undefined && state.pendingDispatches.length > 0) {
@@ -1446,7 +2237,7 @@ export async function orchestrateCore(
 					ORCHESTRATE_ERROR_CODES.PENDING_RESULT_REQUIRED,
 					msg,
 				);
-				return asErrorJson(ORCHESTRATE_ERROR_CODES.PENDING_RESULT_REQUIRED, msg);
+				return asErrorJson(ORCHESTRATE_ERROR_CODES.PENDING_RESULT_REQUIRED, msg, visibilityBus);
 			}
 
 			if (typeof args.result === "string") {
@@ -1459,7 +2250,7 @@ export async function orchestrateCore(
 						ORCHESTRATE_ERROR_CODES.STALE_RESULT,
 						msg,
 					);
-					return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg);
+					return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg, visibilityBus);
 				}
 
 				try {
@@ -1496,7 +2287,7 @@ export async function orchestrateCore(
 							ORCHESTRATE_ERROR_CODES.STALE_RESULT,
 							msg,
 						);
-						return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg);
+						return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg, visibilityBus);
 					}
 
 					const payloadText = parsed.envelope.payload.text;
@@ -1589,7 +2380,13 @@ export async function orchestrateCore(
 							if (state.currentPhase !== null) {
 								const retryHandler = PHASE_HANDLERS[state.currentPhase];
 								const retryResult = await retryHandler(state, artifactDir, undefined, undefined);
-								return processHandlerResult(retryResult, state, artifactDir, contextSessionId);
+								return processHandlerResult(
+									retryResult,
+									state,
+									artifactDir,
+									contextSessionId,
+									visibilityBus,
+								);
 							}
 						}
 
@@ -1638,6 +2435,9 @@ export async function orchestrateCore(
 						showCompletionToastForEnvelope(state, parsed.envelope);
 						state = nextState;
 						advanceProgressForEnvelope(parsed.envelope);
+						if (parsed.envelope.kind === "task_completion") {
+							publishTaskCompleted(visibilityBus, state, parsed.envelope.taskId);
+						}
 
 						phaseHandlerContext = {
 							envelope: parsed.envelope,
@@ -1652,16 +2452,19 @@ export async function orchestrateCore(
 						action: "error",
 						message: `${parsedErr.code}: ${parsedErr.message}`,
 					});
-					return asErrorJson(parsedErr.code, parsedErr.message);
+					return asErrorJson(parsedErr.code, parsedErr.message, visibilityBus);
 				}
 			}
 
 			// Delegate to current phase handler
 			if (state.currentPhase === null) {
-				return JSON.stringify({
-					action: "complete",
-					summary: `Pipeline already completed. Idea: ${state.idea}`,
-				});
+				return decorateOrchestrateResponse(
+					{
+						action: "complete",
+						summary: `Pipeline already completed. Idea: ${state.idea}`,
+					},
+					visibilityBus,
+				);
 			}
 			const handler = PHASE_HANDLERS[state.currentPhase];
 			const handlerResult = await handler(
@@ -1670,10 +2473,19 @@ export async function orchestrateCore(
 				handlerInputResult,
 				phaseHandlerContext,
 			);
-			return processHandlerResult(handlerResult, state, artifactDir, contextSessionId);
+			return processHandlerResult(
+				handlerResult,
+				state,
+				artifactDir,
+				contextSessionId,
+				visibilityBus,
+			);
 		}
 
-		return JSON.stringify({ action: "error", message: "Unexpected state" });
+		return decorateOrchestrateResponse(
+			{ action: "error", message: "Unexpected state" },
+			visibilityBus,
+		);
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
 		const parsedErr = parseErrorCode(error);
@@ -1681,7 +2493,7 @@ export async function orchestrateCore(
 
 		if (isAbortError(error)) {
 			const result = await handleAbortCleanup(artifactDir, safeMessage);
-			return JSON.stringify({
+			return decorateOrchestrateResponse({
 				action: "error",
 				code: "E_INTERRUPTED",
 				message: result.safeMessage,
@@ -1715,7 +2527,7 @@ export async function orchestrateCore(
 			// Swallow save errors -- original error takes priority
 		}
 
-		return JSON.stringify({
+		return decorateOrchestrateResponse({
 			action: "error",
 			code: parsedErr.code,
 			message: safeMessage,

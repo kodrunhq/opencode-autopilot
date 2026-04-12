@@ -1,8 +1,15 @@
 import { randomUUID } from "node:crypto";
+import {
+	buildProgramOracleSignoffRequest,
+	isPassingProgramOracleSignoff,
+	type ProgramOracleSignoff,
+	parseProgramOracleSignoff,
+} from "../orchestrator/signoff";
 
 export interface OracleResult {
 	readonly status: "verified" | "failed";
 	readonly summary: string;
+	readonly signoff: ProgramOracleSignoff;
 	readonly rawEvidence: string;
 	readonly attemptId: string | null;
 }
@@ -17,6 +24,8 @@ export interface OracleConsultationRequest {
 	readonly task: string;
 	readonly completionEvidence: string;
 	readonly parentSessionId: string | null;
+	readonly unresolvedRisks?: readonly string[];
+	readonly acceptedWaivers?: readonly string[];
 }
 
 export interface OracleBridge {
@@ -38,83 +47,43 @@ function normalizeOracleEvidence(evidence: readonly string[] | string): string {
 	return typeof evidence === "string" ? evidence : evidence.join("\n");
 }
 
-function buildOraclePrompt(task: string, completionEvidence: string, attemptId: string): string {
-	return [
-		"Review this completion claim and decide whether it is verified.",
-		`Respond with a line starting with 'ATTEMPT_ID:' followed by ${attemptId}.`,
-		"If the completion is verified, include a line containing '<promise>VERIFIED</promise>'.",
-		"Respond with a line starting with 'VERDICT:' followed by VERIFIED or FAILED.",
-		"If VERIFIED, include a line starting with 'SUMMARY:' containing the verification summary.",
-		"If FAILED, include a line starting with 'FIX_INSTRUCTIONS:' containing concrete fix steps.",
-		"",
-		`ATTEMPT_ID: ${attemptId}`,
-		`Task: ${task}`,
-		"Completion evidence:",
-		completionEvidence,
-	].join("\n");
+function buildOraclePrompt(request: OracleConsultationRequest, attemptId: string): string {
+	return buildProgramOracleSignoffRequest(
+		{
+			originalDossierRequest: request.task,
+			trancheResults: request.completionEvidence
+				.split(/\r?\n/)
+				.map((line) => line.trim())
+				.filter((line) => line.length > 0),
+			unresolvedRisks: request.unresolvedRisks ?? [],
+			acceptedWaivers: request.acceptedWaivers ?? [],
+		},
+		{ signoffId: attemptId },
+	).prompt;
 }
 
-function extractResponseBlock(rawEvidence: string, attemptId?: string): string | null {
-	const blocks = [
-		...rawEvidence.matchAll(/ATTEMPT_ID:\s*(\S+)([\s\S]*?)(?=ATTEMPT_ID:\s*\S+|$)/gi),
-	].map((match) =>
-		Object.freeze({
-			attemptId: match[1],
-			text: `ATTEMPT_ID: ${match[1]}${match[2]}`.trim(),
-		}),
-	);
-
-	if (blocks.length === 0) {
-		return attemptId ? null : rawEvidence;
-	}
-
-	if (!attemptId) {
-		return blocks.at(-1)?.text ?? null;
-	}
-
-	return blocks.findLast((block) => block.attemptId === attemptId)?.text ?? null;
-}
-
-export function parseOracleVerificationEvidence(
+export function parseProgramOracleSignoffEvidence(
 	evidence: readonly string[] | string,
 	attemptId?: string,
 ): OracleResult | null {
 	const rawEvidence = normalizeOracleEvidence(evidence);
-	const responseBlock = extractResponseBlock(rawEvidence, attemptId);
-	if (!responseBlock) {
-		return null;
-	}
-
-	const matchedAttemptId = responseBlock.match(/ATTEMPT_ID:\s*(\S+)/i)?.[1] ?? null;
-	const verdictMatch = responseBlock.match(/(?:^|\n)VERDICT:\s*(VERIFIED|FAILED)(?=\s*(?:\n|$))/i);
-	if (!verdictMatch) {
-		return null;
-	}
-
-	const hasVerifiedPromise = responseBlock
-		.split(/\r?\n/)
-		.some((line) => line.trim() === "<promise>VERIFIED</promise>");
-
-	const summaryMatch = responseBlock.match(/(?:^|\n)SUMMARY:\s*([\s\S]+)/i);
-	const fixInstructionsMatch = responseBlock.match(/(?:^|\n)FIX_INSTRUCTIONS:\s*([\s\S]+)/i);
-	const verdict = verdictMatch[1].toUpperCase();
-	if (verdict === "VERIFIED" && (!summaryMatch || !hasVerifiedPromise)) {
-		return null;
-	}
-
-	if (verdict === "FAILED" && !fixInstructionsMatch) {
+	const signoff = parseProgramOracleSignoff(rawEvidence, {
+		expectedSignoffId: attemptId,
+	});
+	if (!signoff) {
 		return null;
 	}
 
 	return Object.freeze({
-		status: verdict === "VERIFIED" ? "verified" : "failed",
-		summary:
-			(verdict === "VERIFIED" ? summaryMatch?.[1] : fixInstructionsMatch?.[1])?.trim() ??
-			responseBlock.trim(),
+		status: isPassingProgramOracleSignoff(signoff) ? "verified" : "failed",
+		summary: signoff.reasoning,
+		signoff,
 		rawEvidence,
-		attemptId: matchedAttemptId,
+		attemptId: signoff.signoffId,
 	});
 }
+
+export const parseOracleVerificationEvidence = parseProgramOracleSignoffEvidence;
 
 export class TaskOracleBridge implements OracleBridge {
 	constructor(private readonly deps: OracleBridgeDeps = {}) {}
@@ -132,7 +101,7 @@ export class TaskOracleBridge implements OracleBridge {
 		return this.deps.dispatchOracleTask({
 			...request,
 			attemptId,
-			prompt: buildOraclePrompt(request.task, request.completionEvidence, attemptId),
+			prompt: buildOraclePrompt(request, attemptId),
 		});
 	}
 
@@ -142,6 +111,10 @@ export class TaskOracleBridge implements OracleBridge {
 		}
 
 		const messages = await this.deps.readOracleSessionMessages(consultation);
-		return parseOracleVerificationEvidence(messages, consultation.attemptId);
+		if (messages.length === 0) {
+			return null;
+		}
+
+		return parseProgramOracleSignoffEvidence(messages, consultation.attemptId);
 	}
 }

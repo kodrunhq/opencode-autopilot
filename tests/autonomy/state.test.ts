@@ -56,17 +56,23 @@ describe("LoopStateMachine", () => {
 		machine.setOracleVerification({
 			status: "pending",
 			sessionId: "oracle-123",
+			attemptId: "attempt-1",
 			attemptCount: 1,
 			maxAttempts: 3,
 			lastResultSummary: "Needs one more fix",
+			resultAttemptId: null,
+			signoff: null,
 		});
 
 		expect(machine.getContext().oracleVerification).toEqual({
 			status: "pending",
 			sessionId: "oracle-123",
+			attemptId: "attempt-1",
 			attemptCount: 1,
 			maxAttempts: 3,
 			lastResultSummary: "Needs one more fix",
+			resultAttemptId: null,
+			signoff: null,
 		});
 	});
 });

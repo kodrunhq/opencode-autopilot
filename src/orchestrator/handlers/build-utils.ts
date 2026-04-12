@@ -1,6 +1,6 @@
 import { fileExists } from "../../utils/fs-helpers";
 import { getArtifactRef } from "../artifacts";
-import type { BranchLifecycle, BuildProgress, Task } from "../types";
+import type { BranchLifecycle, Task } from "../types";
 import { createWorktree, recordWorktreePath } from "./branch-pr";
 import type { DispatchResult } from "./types";
 import { AGENT_NAMES } from "./types";
@@ -17,15 +17,28 @@ export function coerceTaskId(raw: unknown): number | null {
 	return null;
 }
 
-export const cloneBranchLifecycle = (bl: BranchLifecycle) => ({
+export const cloneBranchLifecycle = (bl: BranchLifecycle): BranchLifecycle => ({
 	...bl,
 	tasksPushed: [...bl.tasksPushed],
 });
 
+interface BuildProgressShape {
+	readonly currentTask: number | null;
+	readonly currentTasks: readonly number[];
+	readonly currentWave: number | null;
+	readonly attemptCount: number;
+	readonly strikeCount: number;
+	readonly reviewPending: boolean;
+	readonly oraclePending: boolean;
+	readonly oracleSignoffId: string | null;
+	readonly oracleInputsDigest: string | null;
+	readonly lastReviewReport: string | null;
+}
+
 export function buildPendingResultWithLifecycle(
 	wave: number,
 	inProgressTasks: readonly Task[],
-	buildProgress: Readonly<BuildProgress>,
+	buildProgress: Readonly<BuildProgressShape>,
 	lifecycle: BranchLifecycle,
 	updatedTasks?: readonly Task[],
 ): DispatchResult {
@@ -86,7 +99,7 @@ export function findInProgressTasks(
 export function buildPendingResultError(
 	wave: number,
 	inProgressTasks: readonly Task[],
-	buildProgress: Readonly<BuildProgress>,
+	buildProgress: Readonly<BuildProgressShape>,
 	updatedTasks?: readonly Task[],
 ): DispatchResult {
 	const taskIds = inProgressTasks.map((task) => task.id);
@@ -121,16 +134,25 @@ export async function buildTaskPrompt(
 	artifactDir: string,
 	runId?: string,
 	mode: "PARALLEL" | "SOLO" = "SOLO",
+	lifecycle?: BranchLifecycle,
 ): Promise<string> {
 	const planRef = getArtifactRef(artifactDir, "PLAN", "tasks.json", runId);
 	const planFallbackRef = getArtifactRef(artifactDir, "PLAN", "tasks.md", runId);
 	const designRef = getArtifactRef(artifactDir, "ARCHITECT", "design.md", runId);
 	const planPath = (await fileExists(planRef)) ? planRef : planFallbackRef;
+	const commitPolicy = lifecycle?.commitStrategy ?? "per_task";
+	const commitInstruction =
+		commitPolicy === "squash"
+			? "Commit policy: squash is allowed only because the tranche policy explicitly requests it. Keep the final squash message deliberate and documented in your completion report."
+			: commitPolicy === "per_wave"
+				? "Commit policy: create deliberate commits that map to the current wave. Do not collapse the entire tranche into one opaque commit."
+				: `Commit policy: create a deliberate git commit for task ${task.id} before reporting completion. Do not bundle unrelated tasks into one opaque commit.`;
 	return [
 		`[EXECUTION MODE: ${mode}]`,
 		`Implement task ${task.id}: ${task.title}.`,
 		`Reference the plan at ${planPath}`,
 		`and architecture at ${designRef}.`,
+		commitInstruction,
 		`If a CLAUDE.md file exists in the project root, read it for project-specific conventions.`,
 		`Check ~/.config/opencode/skills/coding-standards/SKILL.md for coding standards.`,
 		`Report completion when done.`,
@@ -189,7 +211,7 @@ export async function buildParallelDispatch(
 	pendingTasks: readonly Task[],
 	wave: number,
 	effectiveTasks: readonly Task[],
-	buildProgress: Readonly<BuildProgress>,
+	buildProgress: Readonly<BuildProgressShape>,
 	artifactDir: string,
 	runId?: string,
 	maxParallel: number = DEFAULT_MAX_PARALLEL_TASKS,
@@ -217,7 +239,7 @@ export async function buildParallelDispatch(
 
 	if (tasksToDispatch.length === 1) {
 		const task = tasksToDispatch[0];
-		const prompt = await buildTaskPrompt(task, artifactDir, runId, mode);
+		const prompt = await buildTaskPrompt(task, artifactDir, runId, mode, lifecycle);
 		return Object.freeze({
 			action: "dispatch",
 			agent: AGENT_NAMES.BUILD,
@@ -257,7 +279,7 @@ export async function buildParallelDispatch(
 
 		const agents = await Promise.all(
 			worktrees.map(async ({ task, worktreeInfo }) => {
-				const basePrompt = await buildTaskPrompt(task, artifactDir, runId, mode);
+				const basePrompt = await buildTaskPrompt(task, artifactDir, runId, mode, lifecycle);
 				const worktreePath = worktreeInfo.path;
 				const worktreePrompt = `${basePrompt}\n\n[WORKTREE: ${worktreePath}]\nYour working directory is ${worktreePath}. All file operations must be relative to this directory.`;
 				return {
@@ -291,7 +313,7 @@ export async function buildParallelDispatch(
 	const agents = await Promise.all(
 		tasksToDispatch.map(async (task) => ({
 			agent: AGENT_NAMES.BUILD,
-			prompt: await buildTaskPrompt(task, artifactDir, runId, mode),
+			prompt: await buildTaskPrompt(task, artifactDir, runId, mode, lifecycle),
 			taskId: task.id,
 			resultKind: "task_completion" as const,
 		})),

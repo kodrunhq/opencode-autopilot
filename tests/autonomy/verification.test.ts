@@ -47,6 +47,7 @@ describe("VerificationHandler", () => {
 		const result = await handler.verify(createContext());
 
 		expect(result.passed).toBe(true);
+		expect(result.status).toBe("PASSED");
 		expect(result.checks).toHaveLength(3);
 		expect(result.checks.every((check) => check.passed)).toBe(true);
 	});
@@ -67,6 +68,7 @@ describe("VerificationHandler", () => {
 		const result = await handler.verify(createContext());
 
 		expect(result.passed).toBe(false);
+		expect(result.status).toBe("FAILED");
 		expect(result.checks.find((check) => check.name === "tests")?.passed).toBe(false);
 	});
 
@@ -86,6 +88,7 @@ describe("VerificationHandler", () => {
 		const result = await handler.verify(createContext());
 
 		expect(result.passed).toBe(false);
+		expect(result.status).toBe("FAILED");
 		expect(result.checks.find((check) => check.name === "lint")?.message).toContain("lint failure");
 	});
 
@@ -101,6 +104,7 @@ describe("VerificationHandler", () => {
 		const result = await handler.verify(createContext());
 
 		expect(result.passed).toBe(false);
+		expect(result.status).toBe("FAILED");
 		expect(result.checks.find((check) => check.name === "tests")?.message).toContain(
 			"runner unavailable",
 		);
@@ -128,6 +132,7 @@ describe("VerificationHandler", () => {
 			const result = await handler.verify(createContext());
 
 			expect(result.passed).toBe(false);
+			expect(result.status).toBe("BLOCKED");
 			expect(result.checks.find((check) => check.name === "tests")?.message).toContain(
 				"no command runner configured",
 			);
@@ -178,7 +183,9 @@ describe("VerificationHandler", () => {
 			]);
 
 			expect(resultA.passed).toBe(true);
+			expect(resultA.status).toBe("PASSED");
 			expect(resultB.passed).toBe(true);
+			expect(resultB.status).toBe("PASSED");
 			expect(spawnedCwds.sort()).toEqual([rootA, rootB].sort());
 		} finally {
 			if (bunGlobal.Bun) {
@@ -188,6 +195,19 @@ describe("VerificationHandler", () => {
 			await rm(rootA, { recursive: true, force: true });
 			await rm(rootB, { recursive: true, force: true });
 		}
+	});
+
+	test("treats an empty verification profile as blocked", async () => {
+		const handler = new VerificationHandler({
+			commandChecks: [],
+			runCommand: async () => ({ exitCode: 0, output: "ok" }),
+		});
+
+		const result = await handler.verify(createContext());
+
+		expect(result.passed).toBe(false);
+		expect(result.status).toBe("BLOCKED");
+		expect(result.checks[0]?.message).toContain("No verification commands configured");
 	});
 
 	test("resolves verification commands from project package manager and scripts", async () => {

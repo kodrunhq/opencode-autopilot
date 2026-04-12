@@ -15,6 +15,12 @@ function buildDisplayText(action: LoopAction, controller: LoopController): strin
 		`Verification runs: ${context.verificationResults.length}`,
 	];
 
+	if (context.oracleVerification?.signoff) {
+		lines.push(
+			`Oracle signoff: ${context.oracleVerification.signoff.verdict} (${context.oracleVerification.signoff.scope})`,
+		);
+	}
+
 	return lines.join("\n");
 }
 

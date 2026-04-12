@@ -1,10 +1,16 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import { getAutopilotDbPath, getProjectArtifactDir } from "../utils/paths";
+import { dirname, join } from "node:path";
+import {
+	assertProjectArtifactOwnership,
+	getAutopilotDbPath,
+	getProjectArtifactDir,
+	looksLikeProjectRoot,
+	PROJECT_KERNEL_DB_FILE,
+} from "../utils/paths";
 import { runKernelMigrations } from "./migrations";
 
-export const KERNEL_DB_FILE = "kernel.db";
+export const KERNEL_DB_FILE = PROJECT_KERNEL_DB_FILE;
 
 const LEGACY_KERNEL_FILES = Object.freeze([
 	KERNEL_DB_FILE,
@@ -12,50 +18,56 @@ const LEGACY_KERNEL_FILES = Object.freeze([
 	`${KERNEL_DB_FILE}-shm`,
 ]);
 
-const PROJECT_ROOT_SIGNALS = Object.freeze([
-	".git",
-	"package.json",
-	"tsconfig.json",
-	"Cargo.toml",
-	"go.mod",
-	"pom.xml",
-]);
-
-function looksLikeProjectRoot(dirPath: string): boolean {
-	const name = basename(dirPath);
-	if (name === ".opencode-autopilot" || name === KERNEL_DB_FILE) {
-		return false;
-	}
-
-	for (const signal of PROJECT_ROOT_SIGNALS) {
-		if (existsSync(join(dirPath, signal))) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
 export function detectLegacyKernelDb(projectRoot: string): string | null {
 	const legacyPath = join(projectRoot, KERNEL_DB_FILE);
 	return existsSync(legacyPath) ? legacyPath : null;
 }
 
+export function listLegacyKernelDbPaths(projectRoot: string): readonly string[] {
+	return Object.freeze(
+		LEGACY_KERNEL_FILES.map((fileName) => join(projectRoot, fileName)).filter((filePath) =>
+			existsSync(filePath),
+		),
+	);
+}
+
+export interface ProjectKernelDbState {
+	readonly projectRoot: string;
+	readonly artifactDir: string;
+	readonly artifactPath: string;
+	readonly artifactExists: boolean;
+	readonly legacyPaths: readonly string[];
+	readonly mixedState: boolean;
+}
+
+export function inspectProjectKernelDbState(projectRoot: string): ProjectKernelDbState {
+	const artifactDir = getProjectArtifactDir(projectRoot);
+	const artifactPath = join(artifactDir, KERNEL_DB_FILE);
+	const legacyPaths = listLegacyKernelDbPaths(projectRoot);
+	const artifactExists = existsSync(artifactPath);
+
+	return Object.freeze({
+		projectRoot,
+		artifactDir,
+		artifactPath,
+		artifactExists,
+		legacyPaths,
+		mixedState: artifactExists && legacyPaths.length > 0,
+	});
+}
+
 export function migrateLegacyKernelDb(projectRoot: string): string | null {
-	const legacyPath = detectLegacyKernelDb(projectRoot);
-	if (!legacyPath) return null;
+	const legacyPaths = listLegacyKernelDbPaths(projectRoot);
+	if (legacyPaths.length === 0) return null;
 
 	const artifactDir = getProjectArtifactDir(projectRoot);
 	const target = join(artifactDir, KERNEL_DB_FILE);
 	mkdirSync(artifactDir, { recursive: true });
 
-	if (existsSync(target)) {
-		return target;
-	}
-
 	for (const file of LEGACY_KERNEL_FILES) {
 		const legacyFile = join(projectRoot, file);
-		if (existsSync(legacyFile)) {
+		const targetFile = join(artifactDir, file);
+		if (existsSync(legacyFile) && !existsSync(targetFile)) {
 			renameSync(legacyFile, join(artifactDir, file));
 		}
 	}
@@ -69,32 +81,30 @@ export function resolveKernelDbPathFromProject(
 	path: string;
 	kind: "artifact" | "legacy" | "migrated" | "missing" | "artifact_with_legacy";
 } {
-	const artifactDir = getProjectArtifactDir(projectRoot);
-	const artifactPath = join(artifactDir, KERNEL_DB_FILE);
-	const hasArtifact = existsSync(artifactPath);
+	const state = inspectProjectKernelDbState(projectRoot);
 	const legacyPath = detectLegacyKernelDb(projectRoot);
-	if (hasArtifact && legacyPath) {
-		return { path: artifactPath, kind: "artifact_with_legacy" };
+	if (state.mixedState) {
+		return { path: state.artifactPath, kind: "artifact_with_legacy" };
 	}
-	if (hasArtifact) {
-		return { path: artifactPath, kind: "artifact" };
+	if (state.artifactExists) {
+		return { path: state.artifactPath, kind: "artifact" };
 	}
 
 	if (legacyPath) {
 		if (options?.migrateLegacy) {
 			const migrated = migrateLegacyKernelDb(projectRoot);
-			return { path: migrated ?? artifactPath, kind: "migrated" };
+			return { path: migrated ?? state.artifactPath, kind: "migrated" };
 		}
 		return { path: legacyPath, kind: "legacy" };
 	}
 
-	return { path: artifactPath, kind: "missing" };
+	return { path: state.artifactPath, kind: "missing" };
 }
 
 export function getKernelDbPath(artifactDir?: string): string {
 	if (typeof artifactDir === "string" && artifactDir.length > 0) {
 		if (artifactDir.endsWith(KERNEL_DB_FILE)) {
-			return artifactDir;
+			return assertProjectArtifactOwnership(artifactDir);
 		}
 
 		if (looksLikeProjectRoot(artifactDir)) {
@@ -103,7 +113,9 @@ export function getKernelDbPath(artifactDir?: string): string {
 			);
 		}
 
-		return join(artifactDir, KERNEL_DB_FILE);
+		const normalizedPath = assertProjectArtifactOwnership(artifactDir);
+
+		return join(normalizedPath, KERNEL_DB_FILE);
 	}
 
 	return getAutopilotDbPath();
@@ -144,6 +156,6 @@ export function openProjectKernelDb(
 	if (!options?.readonly) {
 		migrateLegacyKernelDb(projectRoot);
 	}
-	const artifactDir = getProjectArtifactDir(projectRoot);
+	const artifactDir = assertProjectArtifactOwnership(getProjectArtifactDir(projectRoot));
 	return openKernelDb(artifactDir, options);
 }

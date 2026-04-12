@@ -9,6 +9,12 @@ describe("Deterministic Replay (Task 3)", () => {
 		stage: 1,
 		scope: initialScope,
 		selectedAgentNames: ["security-auditor", "architecture-verifier"],
+		requiredAgentNames: ["security-auditor", "architecture-verifier"],
+		executedAgentNames: [],
+		reviewRunId: "review_deterministic_replay",
+		blockingSeverityThreshold: "HIGH",
+		runId: "run_deterministic_replay",
+		trancheId: null,
 		accumulatedFindings: [],
 		startedAt: "2026-01-01T00:00:00.000Z",
 	});

@@ -20,8 +20,15 @@ const immediateOracleBridge: OracleBridge = {
 		return {
 			status: "verified",
 			summary: "Oracle approved the completion.",
+			signoff: {
+				signoffId: "oracle-attempt-integration",
+				scope: "PROGRAM",
+				inputsDigest: "digest-integration",
+				verdict: "COMPLETE",
+				reasoning: "Oracle approved the completion.",
+			},
 			rawEvidence:
-				"<promise>VERIFIED</promise>\nVERDICT: VERIFIED\nSUMMARY: Oracle approved the completion.",
+				'<oracle-signoff id="oracle-attempt-integration">{"signoffId":"oracle-attempt-integration","scope":"PROGRAM","inputsDigest":"digest-integration","verdict":"COMPLETE","reasoning":"Oracle approved the completion."}</oracle-signoff>',
 			attemptId: "oracle-attempt-integration",
 		};
 	},
@@ -246,12 +253,17 @@ describe("Integration: background + routing + loop lifecycle", () => {
 			maxIterations: 3,
 			verifyOnComplete: false,
 			cooldownMs: 0,
+			sessionId: "integration-session",
+			oracleBridge: immediateOracleBridge,
 		});
 
 		controller.start("JWT auth middleware implementation");
-		const iterResult = await controller.iterate(
+		const pending = await controller.iterate(
 			`Background task completed: ${backgroundResult}\n<promise>DONE</promise>`,
 		);
+		expect(pending.state).toBe("oracle_verification_pending");
+
+		const iterResult = await controller.iterate("poll oracle");
 		expect(iterResult.state).toBe("complete");
 
 		const finalTask = manager.getStatus(taskId);

@@ -2,13 +2,29 @@ import { loadConfig } from "../../config";
 import { sanitizeTemplateContent } from "../../review/sanitize";
 import { getProjectRootFromArtifactDir } from "../../utils/paths";
 import { getArtifactRef } from "../artifacts";
+import { summarizeOracleOutcome, summarizeReviewOutcome } from "../delivery-manifest";
 import { createOracleGateIntegration, defaultOracleGate } from "../oracle-gate";
 import { groupByWave } from "../plan";
+import {
+	buildReviewDispatchPrompt,
+	buildReviewFixPrompt,
+	buildReviewGateMessage,
+	parseReviewCoordinatorResult,
+	planReviewRun,
+	summarizeReviewRun,
+} from "../review-runner";
+import { persistTrancheOracleSignoff, type TrancheOracleSignoff } from "../signoff";
+import type { Task } from "../types";
 import { assignWaves } from "../wave-assigner";
-import { cleanupWorktrees, initBranchLifecycle, recordTaskPush } from "./branch-pr";
+import {
+	cleanupWorktrees,
+	initBranchLifecycle,
+	recordOracleSummary,
+	recordReviewSummary,
+	recordTaskPush,
+} from "./branch-pr";
 import {
 	buildParallelDispatch,
-	buildPendingResultError,
 	buildPendingResultWithLifecycle,
 	cloneBranchLifecycle,
 	coerceTaskId,
@@ -27,6 +43,163 @@ import {
 import type { DispatchResult, PhaseHandler, PhaseHandlerContext } from "./types";
 import { AGENT_NAMES } from "./types";
 
+function summarizeVerificationResults(reviewReport: string | null): string {
+	return reviewReport
+		? "Wave review completed without CRITICAL findings. No separate local verification artifact is recorded during BUILD."
+		: "No structured review report has been recorded for this tranche.";
+}
+
+function getRemainingBacklog(tasks: readonly Task[]): readonly string[] {
+	return tasks
+		.filter((task) => task.status !== "DONE" && task.status !== "SKIPPED")
+		.map((task) => `Task ${task.id}: ${task.title} [${task.status}]`);
+}
+
+function createBuildCompleteResult(
+	buildProgress: Readonly<BuildProgressLike>,
+	branchLifecycle: ReturnType<typeof cloneBranchLifecycle>,
+	progress: string,
+): DispatchResult {
+	return Object.freeze({
+		action: "complete",
+		phase: "BUILD",
+		progress,
+		_stateUpdates: {
+			branchLifecycle,
+			buildProgress: {
+				...buildProgress,
+				currentTasks: [],
+				currentTask: null,
+				reviewPending: false,
+				oraclePending: false,
+				oracleSignoffId: null,
+				oracleInputsDigest: null,
+			},
+		},
+	} satisfies DispatchResult);
+}
+
+type BuildProgressLike = Readonly<{
+	currentTask: number | null;
+	currentTasks: readonly number[];
+	currentWave: number | null;
+	attemptCount: number;
+	strikeCount: number;
+	reviewPending: boolean;
+	oraclePending: boolean;
+	oracleSignoffId: string | null;
+	oracleInputsDigest: string | null;
+	lastReviewReport: string | null;
+}>;
+
+function buildTrancheOracleGateRequest(
+	state: Parameters<PhaseHandler>[0],
+	tasks: readonly Task[],
+	buildProgress: BuildProgressLike,
+) {
+	const oracleGate = createOracleGateIntegration(defaultOracleGate);
+	return oracleGate.createTrancheSignoffRequest({
+		originalIntent: state.idea,
+		tasks,
+		reviewReport: buildProgress.lastReviewReport ?? "No review report recorded.",
+		verificationResults: summarizeVerificationResults(buildProgress.lastReviewReport),
+		remainingBacklog: getRemainingBacklog(tasks),
+		taskPushes: state.branchLifecycle?.tasksPushed ?? [],
+	});
+}
+
+function createTrancheOracleSignoffDispatch(
+	state: Parameters<PhaseHandler>[0],
+	tasks: readonly Task[],
+	buildProgress: BuildProgressLike,
+	branchLifecycle: ReturnType<typeof cloneBranchLifecycle>,
+): DispatchResult {
+	const request = buildTrancheOracleGateRequest(state, tasks, buildProgress);
+	return Object.freeze({
+		action: "dispatch",
+		agent: "oracle",
+		prompt: request.prompt,
+		phase: "BUILD",
+		resultKind: "oracle_signoff",
+		progress: "Oracle tranche signoff pending",
+		_stateUpdates: {
+			branchLifecycle,
+			buildProgress: {
+				...buildProgress,
+				currentTasks: [...buildProgress.currentTasks],
+				oraclePending: true,
+				oracleSignoffId: request.signoffId,
+				oracleInputsDigest: request.inputsDigest,
+			},
+		},
+	} satisfies DispatchResult);
+}
+
+function resolveBuildCompletionGate(
+	state: Parameters<PhaseHandler>[0],
+	tasks: readonly Task[],
+	buildProgress: BuildProgressLike,
+	branchLifecycle: ReturnType<typeof cloneBranchLifecycle>,
+): DispatchResult {
+	const request = buildTrancheOracleGateRequest(state, tasks, buildProgress);
+	const trancheSignoff = state.oracleSignoffs.tranche;
+	if (trancheSignoff && trancheSignoff.inputsDigest === request.inputsDigest) {
+		if (createOracleGateIntegration(defaultOracleGate).isPassingTrancheSignoff(trancheSignoff)) {
+			return createBuildCompleteResult(
+				buildProgress,
+				branchLifecycle,
+				"All tasks, reviews, and Oracle tranche signoff complete",
+			);
+		}
+
+		const blockingConditions = trancheSignoff.blockingConditions.join("; ");
+		return Object.freeze({
+			action: "error",
+			code: "E_ORACLE_TRANCHE_SIGNOFF_FAILED",
+			phase: "BUILD",
+			message: blockingConditions
+				? `Oracle tranche signoff failed: ${blockingConditions}`
+				: `Oracle tranche signoff failed: ${trancheSignoff.reasoning}`,
+			progress: "Oracle tranche signoff blocked shipping",
+			_stateUpdates: {
+				branchLifecycle,
+				buildProgress: {
+					...buildProgress,
+					currentTasks: [...buildProgress.currentTasks],
+					oraclePending: false,
+					oracleSignoffId: null,
+					oracleInputsDigest: null,
+				},
+			},
+		} satisfies DispatchResult);
+	}
+
+	return createTrancheOracleSignoffDispatch(state, tasks, buildProgress, branchLifecycle);
+}
+
+async function planBuildReviewRun(state: Parameters<PhaseHandler>[0], projectRoot: string) {
+	const existingReviewStatus = state.reviewStatus.status !== "IDLE" ? state.reviewStatus : null;
+	const reuseExistingPlan =
+		existingReviewStatus !== null &&
+		state.buildProgress.reviewPending &&
+		(existingReviewStatus.status === "RUNNING" || existingReviewStatus.status === "PLANNED");
+	return planReviewRun(projectRoot, {
+		scope: "branch",
+		runId: state.runId,
+		trancheId: state.branchLifecycle?.trancheId ?? state.runId,
+		reviewRunId: reuseExistingPlan ? (existingReviewStatus?.reviewRunId ?? undefined) : undefined,
+		selectedReviewers:
+			existingReviewStatus && existingReviewStatus.selectedReviewers.length > 0
+				? existingReviewStatus.selectedReviewers
+				: undefined,
+		requiredReviewers:
+			existingReviewStatus && existingReviewStatus.requiredReviewers.length > 0
+				? existingReviewStatus.requiredReviewers
+				: undefined,
+		blockingSeverityThreshold: existingReviewStatus?.blockingSeverityThreshold,
+	});
+}
+
 export const handleBuild: PhaseHandler = async (
 	state,
 	artifactDir,
@@ -44,7 +217,9 @@ export const handleBuild: PhaseHandler = async (
 		initBranchLifecycle({
 			runId: state.runId,
 			baseBranch: "main",
-			description: state.idea.slice(0, 60),
+			description: state.idea,
+			programId: state.programContext?.programId,
+			trancheId: state.programContext?.trancheId,
 		});
 	const branchLifecycleUpdates =
 		state.branchLifecycle === null
@@ -63,7 +238,7 @@ export const handleBuild: PhaseHandler = async (
 			action: "error",
 			code: "E_BUILD_MAX_STRIKES",
 			phase: "BUILD",
-			message: `Max retries exceeded (${buildProgress.strikeCount} > ${MAX_STRIKES}) — too many CRITICAL review findings`,
+			message: `Max retries exceeded (${buildProgress.strikeCount} > ${MAX_STRIKES}) — too many blocking review findings`,
 		} satisfies DispatchResult);
 	}
 
@@ -106,60 +281,85 @@ export const handleBuild: PhaseHandler = async (
 	}
 
 	if (buildProgress.reviewPending && !resultText) {
+		const reviewPlan = await planBuildReviewRun(state, projectRoot);
 		return Object.freeze({
 			action: "dispatch",
 			agent: AGENT_NAMES.REVIEW,
-			prompt: "Review completed wave. Scope: branch. Report any CRITICAL findings.",
+			prompt: buildReviewDispatchPrompt(reviewPlan),
 			phase: "BUILD",
 			resultKind: "review_findings",
 			progress: "Review pending — dispatching reviewer",
+			_stateUpdates: {
+				reviewStatus: summarizeReviewRun(reviewPlan.reviewRun),
+			},
 		} satisfies DispatchResult);
 	}
 
 	if (buildProgress.reviewPending && resultText) {
-		if (hasCriticalFindings(resultText)) {
-			// Check if Oracle consultation is needed for this task
-			const oracleGate = createOracleGateIntegration(defaultOracleGate);
-			const taskToCheck = effectiveTasks.find((t) => t.id === buildProgress.currentTask);
+		const structuredReview = parseReviewCoordinatorResult(resultText);
+		const structuredReviewStatus =
+			structuredReview?.action === "complete" && structuredReview.reviewStatus
+				? structuredReview.reviewStatus
+				: structuredReview?.action === "complete" && structuredReview.reviewRun
+					? summarizeReviewRun(structuredReview.reviewRun)
+					: null;
+		if (structuredReview && structuredReview.action !== "complete") {
+			return Object.freeze({
+				action: "error",
+				code: "E_BUILD_REVIEW_INCOMPLETE",
+				phase: "BUILD",
+				message:
+					structuredReview.message ??
+					`Review stage returned ${structuredReview.action} instead of complete.`,
+				progress: "Review stage did not complete",
+			} satisfies DispatchResult);
+		}
+		const reviewSummaryText =
+			structuredReviewStatus?.summary ?? summarizeReviewOutcome(resultText).summary;
+		const reviewedBranchLifecycle = recordReviewSummary(initialBranchLifecycle, reviewSummaryText);
+		const safeReviewReport = sanitizeTemplateContent(resultText).slice(0, 4000);
 
-			if (taskToCheck) {
-				const { needsConsultation, prompt: oraclePrompt } = oracleGate.checkTaskForOracle(
-					taskToCheck,
-					{
-						attemptCount: 0,
-						strikeCount: buildProgress.strikeCount,
-						reviewFindings: [resultText],
-						artifactDir,
-						runId: state.runId,
-					},
+		if (
+			structuredReview?.action === "complete" &&
+			structuredReview.reviewRun &&
+			structuredReviewStatus
+		) {
+			const gateMessage = buildReviewGateMessage(structuredReviewStatus);
+			if (gateMessage) {
+				const prompt = buildReviewFixPrompt(
+					structuredReview.reviewRun,
+					getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId),
 				);
 
-				if (needsConsultation && oraclePrompt) {
-					// Dispatch to Oracle instead of BUILD
-					return Object.freeze({
-						action: "dispatch",
-						agent: "oracle",
-						prompt: oraclePrompt,
-						phase: "BUILD",
-						resultKind: "oracle_consultation",
-						taskId: buildProgress.currentTask,
-						progress: "Oracle consultation — CRITICAL findings detected",
-						_stateUpdates: {
-							buildProgress: {
-								...buildProgress,
-								reviewPending: false,
-								oraclePending: true,
-							},
+				return Object.freeze({
+					action: "dispatch",
+					agent: AGENT_NAMES.BUILD,
+					prompt,
+					phase: "BUILD",
+					resultKind: "task_completion",
+					taskId: buildProgress.currentTask,
+					progress: "Fix dispatch — review stage blocked",
+					_stateUpdates: {
+						branchLifecycle: cloneBranchLifecycle(reviewedBranchLifecycle),
+						reviewStatus: structuredReviewStatus,
+						buildProgress: {
+							...buildProgress,
+							reviewPending: false,
+							oraclePending: false,
+							oracleSignoffId: null,
+							oracleInputsDigest: null,
+							strikeCount: buildProgress.strikeCount + 1,
+							lastReviewReport: safeReviewReport,
 						},
-					} satisfies DispatchResult);
-				}
+					},
+				} satisfies DispatchResult);
 			}
+		}
 
-			// No Oracle consultation needed or no task found, proceed with BUILD fix
-			const safeResult = sanitizeTemplateContent(resultText).slice(0, 4000);
+		if (hasCriticalFindings(resultText)) {
 			const prompt = [
 				`CRITICAL review findings detected. Fix the following issues:`,
-				safeResult,
+				safeReviewReport,
 				`Reference ${getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId)} for context.`,
 			].join(" ");
 
@@ -172,10 +372,16 @@ export const handleBuild: PhaseHandler = async (
 				taskId: buildProgress.currentTask,
 				progress: "Fix dispatch — CRITICAL findings",
 				_stateUpdates: {
+					branchLifecycle: cloneBranchLifecycle(reviewedBranchLifecycle),
+					...(structuredReviewStatus ? { reviewStatus: structuredReviewStatus } : {}),
 					buildProgress: {
 						...buildProgress,
 						reviewPending: false,
+						oraclePending: false,
+						oracleSignoffId: null,
+						oracleInputsDigest: null,
 						strikeCount: buildProgress.strikeCount + 1,
+						lastReviewReport: safeReviewReport,
 					},
 				},
 			} satisfies DispatchResult);
@@ -183,23 +389,33 @@ export const handleBuild: PhaseHandler = async (
 
 		const waveMap = groupByWave(effectiveTasks);
 		const nextWave = findCurrentWave(waveMap);
+		const completedReviewProgress = {
+			...buildProgress,
+			reviewPending: false,
+			oraclePending: false,
+			oracleSignoffId: null,
+			oracleInputsDigest: null,
+			lastReviewReport: safeReviewReport,
+		};
+		const reviewStateUpdates = structuredReviewStatus
+			? { reviewStatus: structuredReviewStatus }
+			: {};
 
 		if (nextWave === null) {
-			if (useWorktrees) {
+			const gateResult = resolveBuildCompletionGate(
+				state,
+				effectiveTasks,
+				completedReviewProgress,
+				cloneBranchLifecycle(reviewedBranchLifecycle),
+			);
+			if (gateResult.action === "complete" && useWorktrees) {
 				await cleanupWorktrees(projectRoot, state.runId);
 			}
 			return Object.freeze({
-				action: "complete",
-				phase: "BUILD",
-				progress: "All tasks and reviews complete",
+				...gateResult,
 				_stateUpdates: {
-					branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
-					buildProgress: {
-						...buildProgress,
-						currentTask: null,
-						currentTasks: [],
-						reviewPending: false,
-					},
+					...gateResult._stateUpdates,
+					...reviewStateUpdates,
 				},
 			} satisfies DispatchResult);
 		}
@@ -207,17 +423,28 @@ export const handleBuild: PhaseHandler = async (
 		const pendingTasks = findPendingTasks(waveMap, nextWave);
 		const inProgressTasks = findInProgressTasks(waveMap, nextWave);
 		const updatedProgress = {
-			...buildProgress,
-			reviewPending: false,
+			...completedReviewProgress,
 			currentWave: nextWave,
 		};
 
 		if (pendingTasks.length === 0 && inProgressTasks.length > 0) {
-			return buildPendingResultError(nextWave, inProgressTasks, updatedProgress);
+			const pendingResult = buildPendingResultWithLifecycle(
+				nextWave,
+				inProgressTasks,
+				updatedProgress,
+				reviewedBranchLifecycle,
+			);
+			return Object.freeze({
+				...pendingResult,
+				_stateUpdates: {
+					...pendingResult._stateUpdates,
+					...reviewStateUpdates,
+				},
+			} satisfies DispatchResult);
 		}
 
 		if (pendingTasks.length > 0) {
-			return buildParallelDispatch(
+			const dispatchResult = await buildParallelDispatch(
 				pendingTasks,
 				nextWave,
 				effectiveTasks,
@@ -226,11 +453,19 @@ export const handleBuild: PhaseHandler = async (
 				state.runId,
 				maxParallel,
 				inProgressTasks.length,
-				initialBranchLifecycle,
+				reviewedBranchLifecycle,
 				useWorktrees,
 				projectRoot,
 				state.runId,
 			);
+			const mergedDispatch = mergeDispatchWithLifecycle(dispatchResult, reviewedBranchLifecycle);
+			return Object.freeze({
+				...mergedDispatch,
+				_stateUpdates: {
+					...mergedDispatch._stateUpdates,
+					...reviewStateUpdates,
+				},
+			} satisfies DispatchResult);
 		}
 
 		return Object.freeze({
@@ -238,112 +473,120 @@ export const handleBuild: PhaseHandler = async (
 			code: "E_BUILD_NO_DISPATCHABLE_TASK",
 			phase: "BUILD",
 			message: `Wave ${nextWave} has no dispatchable pending tasks.`,
+			_stateUpdates: {
+				branchLifecycle: cloneBranchLifecycle(reviewedBranchLifecycle),
+				...reviewStateUpdates,
+			},
 		} satisfies DispatchResult);
 	}
 
 	const hasTypedContext = context !== undefined;
 	const isTaskCompletion = hasTypedContext && context.envelope.kind === "task_completion";
-	const isOracleConsultation = hasTypedContext && context.envelope.kind === "oracle_consultation";
-	const rawTaskId =
-		isTaskCompletion || isOracleConsultation ? context.envelope.taskId : buildProgress.currentTask;
+	const isOracleSignoff = hasTypedContext && context.envelope.kind === "oracle_signoff";
+	const rawTaskId = isTaskCompletion ? context.envelope.taskId : buildProgress.currentTask;
 	const taskToComplete = coerceTaskId(rawTaskId);
 
-	// Handle Oracle consultation result
-	if (
-		resultText &&
-		buildProgress.oraclePending &&
-		isOracleConsultation &&
-		taskToComplete !== null
-	) {
-		const oracleGate = createOracleGateIntegration(defaultOracleGate);
-		const {
-			success,
-			result: oracleResult,
-			error,
-		} = oracleGate.applyOracleRecommendation(taskToComplete, resultText);
+	if (resultText && buildProgress.oraclePending && isOracleSignoff) {
+		const signoffId = buildProgress.oracleSignoffId;
+		const inputsDigest = buildProgress.oracleInputsDigest;
+		if (!signoffId || !inputsDigest) {
+			return Object.freeze({
+				action: "error",
+				code: "E_ORACLE_SIGNOFF_CONTEXT_MISSING",
+				phase: "BUILD",
+				message: "Oracle signoff response arrived without pending signoff metadata.",
+			} satisfies DispatchResult);
+		}
 
-		if (!success) {
+		const oracleGate = createOracleGateIntegration(defaultOracleGate);
+		let signoff: TrancheOracleSignoff;
+		try {
+			signoff = oracleGate.parseTrancheSignoff(resultText, {
+				signoffId,
+				inputsDigest,
+			});
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : String(error);
 			return Object.freeze({
 				action: "error",
 				code: "E_ORACLE_PARSE_FAILED",
 				phase: "BUILD",
-				message: `Failed to parse Oracle recommendation: ${error}`,
-				progress: "Oracle consultation failed",
+				message: `Oracle tranche signoff parse failed: ${message}`,
+				progress: "Oracle tranche signoff failed",
 				_stateUpdates: {
 					buildProgress: {
 						...buildProgress,
 						oraclePending: false,
+						oracleSignoffId: null,
+						oracleInputsDigest: null,
 					},
 				},
 			} satisfies DispatchResult);
 		}
 
-		if (!oracleResult) {
-			return Object.freeze({
-				action: "error",
-				code: "E_ORACLE_NO_RESULT",
-				phase: "BUILD",
-				message: "Oracle returned no actionable recommendation",
-				progress: "Oracle consultation inconclusive",
-				_stateUpdates: {
-					buildProgress: {
-						...buildProgress,
-						oraclePending: false,
-					},
-				},
-			} satisfies DispatchResult);
-		}
-
-		// Check if Oracle recommends blocking progression
-		if (
-			oracleResult.recommendedAction.toLowerCase().includes("block") ||
-			oracleResult.recommendedAction.toLowerCase().includes("stop")
-		) {
-			return Object.freeze({
-				action: "error",
-				code: "E_ORACLE_BLOCKED",
-				phase: "BUILD",
-				message: `Oracle blocks progression: ${oracleResult.recommendedAction}`,
-				progress: "Oracle blocked progression — CRITICAL issues",
-				_stateUpdates: {
-					buildProgress: {
-						...buildProgress,
-						oraclePending: false,
-						strikeCount: buildProgress.strikeCount + 1,
-					},
-				},
-			} satisfies DispatchResult);
-		}
-
-		// Oracle allows progression, dispatch to BUILD with fix prompt
-		const safeResult = sanitizeTemplateContent(resultText).slice(0, 4000);
-		const prompt = [
-			`Oracle consultation completed. Recommendation: ${oracleResult.recommendedAction}`,
-			`Reasoning: ${oracleResult.reasoning}`,
-			`Fix the following issues:`,
-			safeResult,
-			`Reference ${getArtifactRef(artifactDir, "PLAN", "tasks.json", state.runId)} for context.`,
-		].join(" ");
-
-		return Object.freeze({
-			action: "dispatch",
-			agent: AGENT_NAMES.BUILD,
-			prompt,
-			phase: "BUILD",
-			resultKind: "task_completion",
-			taskId: taskToComplete,
-			progress: "Fix dispatch — Oracle approved",
-			_stateUpdates: {
-				buildProgress: {
-					...buildProgress,
-					oraclePending: false,
-					strikeCount: buildProgress.strikeCount + 1,
-				},
+		await persistTrancheOracleSignoff(artifactDir, signoff, state.runId);
+		const oracleSummaryLifecycle = recordOracleSummary(
+			initialBranchLifecycle,
+			summarizeOracleOutcome({
+				recommendedAction: `Tranche Oracle ${signoff.verdict}`,
+				reasoning: [signoff.reasoning, ...signoff.blockingConditions].join(" ").trim(),
+			}).summary,
+		);
+		const nextBuildProgress = {
+			...buildProgress,
+			oraclePending: false,
+			oracleSignoffId: null,
+			oracleInputsDigest: null,
+		};
+		const nextStateUpdates = {
+			oracleSignoffs: {
+				...state.oracleSignoffs,
+				tranche: signoff,
 			},
+			buildProgress: nextBuildProgress,
+			branchLifecycle: cloneBranchLifecycle(oracleSummaryLifecycle),
+		};
+
+		if (oracleGate.isPassingTrancheSignoff(signoff)) {
+			if (useWorktrees) {
+				await cleanupWorktrees(projectRoot, state.runId);
+			}
+			return Object.freeze({
+				...createBuildCompleteResult(
+					nextBuildProgress,
+					cloneBranchLifecycle(oracleSummaryLifecycle),
+					"Oracle tranche signoff passed — BUILD complete",
+				),
+				_stateUpdates: {
+					...nextStateUpdates,
+					buildProgress: {
+						...nextBuildProgress,
+						currentTask: null,
+						currentTasks: [],
+					},
+				},
+			} satisfies DispatchResult);
+		}
+
+		const blockingConditions = signoff.blockingConditions.join("; ");
+		return Object.freeze({
+			action: "error",
+			code: "E_ORACLE_TRANCHE_SIGNOFF_FAILED",
+			phase: "BUILD",
+			message: blockingConditions
+				? `Oracle tranche signoff failed: ${blockingConditions}`
+				: `Oracle tranche signoff failed: ${signoff.reasoning}`,
+			progress: "Oracle tranche signoff blocked shipping",
+			_stateUpdates: nextStateUpdates,
 		} satisfies DispatchResult);
 	}
 
-	if (resultText && !buildProgress.reviewPending && taskToComplete === null) {
+	if (
+		resultText &&
+		!buildProgress.reviewPending &&
+		!buildProgress.oraclePending &&
+		taskToComplete === null
+	) {
 		return Object.freeze({
 			action: "error",
 			code: "E_BUILD_TASK_ID_REQUIRED",
@@ -378,16 +621,18 @@ export const handleBuild: PhaseHandler = async (
 		const currentWave = buildProgress.currentWave ?? 1;
 
 		if (isWaveComplete(waveMap, currentWave)) {
+			const reviewPlan = await planBuildReviewRun(state, projectRoot);
 			return Object.freeze({
 				action: "dispatch",
 				agent: AGENT_NAMES.REVIEW,
-				prompt: "Review completed wave. Scope: branch. Report any CRITICAL findings.",
+				prompt: buildReviewDispatchPrompt(reviewPlan),
 				phase: "BUILD",
 				resultKind: "review_findings",
 				progress: `Wave ${currentWave} complete — review pending`,
 				_stateUpdates: {
 					tasks: [...updatedTasks],
 					branchLifecycle: cloneBranchLifecycle(updatedBranchLifecycle),
+					reviewStatus: summarizeReviewRun(reviewPlan.reviewRun),
 					buildProgress: {
 						...buildProgress,
 						currentTask: taskToComplete,
@@ -434,17 +679,16 @@ export const handleBuild: PhaseHandler = async (
 	const currentWave = findCurrentWave(waveMap);
 
 	if (currentWave === null) {
-		if (useWorktrees) {
+		const gateResult = resolveBuildCompletionGate(
+			state,
+			effectiveTasks,
+			buildProgress,
+			cloneBranchLifecycle(initialBranchLifecycle),
+		);
+		if (gateResult.action === "complete" && useWorktrees) {
 			await cleanupWorktrees(projectRoot, state.runId);
 		}
-		return Object.freeze({
-			action: "complete",
-			phase: "BUILD",
-			progress: "All tasks complete",
-			_stateUpdates: {
-				branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
-			},
-		} satisfies DispatchResult);
+		return gateResult;
 	}
 
 	const pendingTasks = findPendingTasks(waveMap, currentWave);
@@ -460,17 +704,16 @@ export const handleBuild: PhaseHandler = async (
 	}
 
 	if (pendingTasks.length === 0) {
-		if (useWorktrees) {
+		const gateResult = resolveBuildCompletionGate(
+			state,
+			effectiveTasks,
+			buildProgress,
+			cloneBranchLifecycle(initialBranchLifecycle),
+		);
+		if (gateResult.action === "complete" && useWorktrees) {
 			await cleanupWorktrees(projectRoot, state.runId);
 		}
-		return Object.freeze({
-			action: "complete",
-			phase: "BUILD",
-			progress: "All tasks complete",
-			_stateUpdates: {
-				branchLifecycle: cloneBranchLifecycle(initialBranchLifecycle),
-			},
-		} satisfies DispatchResult);
+		return gateResult;
 	}
 
 	const initialDispatch = await buildParallelDispatch(

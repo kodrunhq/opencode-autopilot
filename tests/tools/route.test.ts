@@ -35,6 +35,19 @@ describe("routeCore", () => {
 		expect(result.instruction).toContain('intent: "implementation"');
 	});
 
+	test("implementation routing advertises autonomous tranche selection policy", () => {
+		const result = JSON.parse(
+			routeCore({
+				primaryIntent: "implementation",
+				reasoning: "User asked for a broad implementation program",
+				verbalization: "I detect implementation intent",
+			}),
+		);
+
+		expect(result.instruction).toContain("do not ask which tranche to start");
+		expect(result.instruction).toContain("decompose broad requests into tranches automatically");
+	});
+
 	test("routes fix intent to debugger without pipeline", () => {
 		const result = JSON.parse(
 			routeCore({

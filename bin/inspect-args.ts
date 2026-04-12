@@ -9,6 +9,7 @@ type InspectView =
 	| "preferences"
 	| "memory"
 	| "memories"
+	| "preflight"
 	| "reconcile-project-ids";
 
 export interface ParsedInspectArgs {
@@ -42,6 +43,7 @@ const INSPECT_VIEWS: readonly InspectView[] = Object.freeze([
 	"preferences",
 	"memory",
 	"memories",
+	"preflight",
 	"reconcile-project-ids",
 ]);
 
@@ -64,6 +66,7 @@ export function inspectUsage(): string {
 		"  preferences                  List stored preferences",
 		"  memory                       Show memory overview",
 		"  memories [--project <ref>]   List stored memories",
+		"  preflight                    Check mode/config and artifact boundary invariants for the current repo",
 		"  reconcile-project-ids        Reconcile deterministic project IDs in the selected DB (explicit/--global/project)",
 		"",
 		"Options:",

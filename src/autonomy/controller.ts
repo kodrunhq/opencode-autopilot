@@ -1,8 +1,14 @@
 import { getLogger } from "../logging/domains";
 import type { Logger } from "../logging/types";
+import { persistProgramOracleSignoff } from "../orchestrator/signoff";
 import { detectCompletion } from "./completion";
 import { AUTONOMY_DEFAULTS } from "./config";
-import type { OracleBridge, OracleBridgeDeps, OracleConsultation } from "./oracle-bridge";
+import type {
+	OracleBridge,
+	OracleBridgeDeps,
+	OracleConsultation,
+	OracleResult,
+} from "./oracle-bridge";
 import { TaskOracleBridge } from "./oracle-bridge";
 import { LoopStateMachine } from "./state";
 import type { LoopContext, LoopOptions } from "./types";
@@ -19,6 +25,7 @@ export interface LoopControllerConfig {
 	readonly dispatchOracleTask?: OracleBridgeDeps["dispatchOracleTask"];
 	readonly readOracleSessionMessages?: OracleBridgeDeps["readOracleSessionMessages"];
 	readonly maxVerificationAttempts?: number;
+	readonly artifactDir?: string;
 }
 
 function delay(ms: number): Promise<void> {
@@ -45,11 +52,11 @@ function summarizeOracleFailure(
 	attemptCount: number,
 	maxAttempts: number,
 ): string {
-	return `Oracle verification failed (${attemptCount}/${maxAttempts}). Fix instructions: ${summary}`;
+	return `Oracle program signoff rejected (${attemptCount}/${maxAttempts}). Rationale: ${summary}`;
 }
 
 function maxOracleAttemptsMessage(maxAttempts: number): string {
-	return `Oracle verification exceeded maximum attempts (${maxAttempts}). Manual review required.`;
+	return `Oracle program signoff exceeded maximum attempts (${maxAttempts}). Manual review required.`;
 }
 
 const RETIRED_WORKER_COMPLETION_PROMISE = "<promise>RETIRED_DONE</promise>";
@@ -65,6 +72,7 @@ export class LoopController {
 	private readonly verificationHandler: VerificationHandler;
 	private readonly oracleBridge: OracleBridge;
 	private readonly sessionId: string | null;
+	private readonly artifactDir: string | null;
 
 	constructor(config: LoopControllerConfig = {}) {
 		this.maxIterations = config.maxIterations ?? AUTONOMY_DEFAULTS.maxIterations;
@@ -81,6 +89,7 @@ export class LoopController {
 				dispatchOracleTask: config.dispatchOracleTask,
 				readOracleSessionMessages: config.readOracleSessionMessages,
 			});
+		this.artifactDir = config.artifactDir ?? null;
 		this.machine = new LoopStateMachine(this.maxIterations);
 	}
 
@@ -136,8 +145,7 @@ export class LoopController {
 		}
 
 		if (!this.verifyOnComplete) {
-			this.machine.transition("complete");
-			return this.machine.getContext();
+			return this.dispatchOracleProgramSignoff(this.machine.getContext().oracleVerification);
 		}
 
 		this.machine.transition("verifying");
@@ -151,38 +159,7 @@ export class LoopController {
 			return this.machine.getContext();
 		}
 
-		const oracleVerification = this.machine.getContext().oracleVerification;
-		if (oracleVerification?.status === "verified") {
-			this.machine.transition("verified");
-			this.machine.transition("complete");
-			return this.machine.getContext();
-		}
-
-		let consultation: OracleConsultation;
-		try {
-			consultation = await this.oracleBridge.requestOracleConsultation({
-				task: this.machine.getContext().taskDescription,
-				completionEvidence: this.machine.getContext().accumulatedContext.join("\n"),
-				parentSessionId: this.sessionId,
-			});
-		} catch (error: unknown) {
-			const message = error instanceof Error ? error.message : String(error);
-			this.machine.transition("failed");
-			this.machine.addContext(`Oracle verification dispatch failed: ${message}`);
-			return this.machine.getContext();
-		}
-
-		this.machine.setOracleVerification({
-			status: "pending",
-			sessionId: consultation.sessionId,
-			attemptId: consultation.attemptId,
-			attemptCount: oracleVerification?.attemptCount ?? 0,
-			maxAttempts: oracleVerification?.maxAttempts ?? this.maxVerificationAttempts,
-			lastResultSummary: oracleVerification?.lastResultSummary ?? null,
-			resultAttemptId: oracleVerification?.resultAttemptId ?? null,
-		});
-		this.machine.transition("oracle_verification_pending");
-		return this.machine.getContext();
+		return this.dispatchOracleProgramSignoff(this.machine.getContext().oracleVerification);
 	}
 
 	pause(): LoopContext {
@@ -223,24 +200,75 @@ export class LoopController {
 		}
 	}
 
+	private async dispatchOracleProgramSignoff(
+		oracleVerification: LoopContext["oracleVerification"],
+	): Promise<LoopContext> {
+		if (oracleVerification?.status === "verified") {
+			this.machine.transition("verified");
+			this.machine.transition("complete");
+			return this.machine.getContext();
+		}
+
+		let consultation: OracleConsultation;
+		try {
+			consultation = await this.oracleBridge.requestOracleConsultation({
+				task: this.machine.getContext().taskDescription,
+				completionEvidence: this.machine.getContext().accumulatedContext.join("\n"),
+				parentSessionId: this.sessionId,
+				unresolvedRisks: [],
+				acceptedWaivers: [],
+			});
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.machine.transition("failed");
+			this.machine.addContext(`Oracle program signoff dispatch failed: ${message}`);
+			return this.machine.getContext();
+		}
+
+		this.machine.setOracleVerification({
+			status: "pending",
+			sessionId: consultation.sessionId,
+			attemptId: consultation.attemptId,
+			attemptCount: oracleVerification?.attemptCount ?? 0,
+			maxAttempts: oracleVerification?.maxAttempts ?? this.maxVerificationAttempts,
+			lastResultSummary: oracleVerification?.lastResultSummary ?? null,
+			resultAttemptId: oracleVerification?.resultAttemptId ?? null,
+			signoff: oracleVerification?.signoff ?? null,
+		});
+		this.machine.transition("oracle_verification_pending");
+		return this.machine.getContext();
+	}
+
 	private async pollOracleVerification(): Promise<LoopContext> {
 		const oracleVerification = this.machine.getContext().oracleVerification;
 		if (!oracleVerification?.sessionId || !oracleVerification.attemptId || !this.sessionId) {
 			this.machine.transition("failed");
 			this.machine.addContext(
-				"Oracle verification pending without session-scoped consultation data.",
+				"Oracle program signoff pending without session-scoped consultation data.",
 			);
 			return this.machine.getContext();
 		}
 
-		const oracleResult = await this.oracleBridge.checkOracleResult({
-			sessionId: oracleVerification.sessionId,
-			attemptId: oracleVerification.attemptId,
-			parentSessionId: this.sessionId,
-		});
+		let oracleResult: OracleResult | null;
+		try {
+			oracleResult = await this.oracleBridge.checkOracleResult({
+				sessionId: oracleVerification.sessionId,
+				attemptId: oracleVerification.attemptId,
+				parentSessionId: this.sessionId,
+			});
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.machine.transition("failed");
+			this.machine.addContext(`Oracle program signoff parse failed: ${message}`);
+			return this.machine.getContext();
+		}
 		if (!oracleResult) {
 			await this.applyCooldown();
 			return this.machine.getContext();
+		}
+
+		if (this.artifactDir) {
+			await persistProgramOracleSignoff(this.artifactDir, oracleResult.signoff);
 		}
 
 		if (oracleResult.status === "verified") {
@@ -249,6 +277,7 @@ export class LoopController {
 				status: "verified",
 				lastResultSummary: oracleResult.summary,
 				resultAttemptId: oracleResult.attemptId ?? oracleVerification.attemptId,
+				signoff: oracleResult.signoff,
 			});
 			this.machine.transition("verified");
 			this.machine.transition("complete");
@@ -262,6 +291,7 @@ export class LoopController {
 			attemptCount: nextAttemptCount,
 			lastResultSummary: oracleResult.summary,
 			resultAttemptId: oracleResult.attemptId ?? oracleVerification.attemptId,
+			signoff: oracleResult.signoff,
 		});
 		this.machine.retireContextSignal("<promise>DONE</promise>", RETIRED_WORKER_COMPLETION_PROMISE);
 

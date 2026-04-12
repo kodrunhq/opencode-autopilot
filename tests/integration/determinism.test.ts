@@ -46,6 +46,12 @@ describe("Determinism Integration Test (Task 8)", () => {
 				stage: 1,
 				scope: "test-scope",
 				selectedAgentNames: selection.selected.map((a) => a.name),
+				requiredAgentNames: selection.selected.map((a) => a.name),
+				executedAgentNames: [],
+				reviewRunId: "review_integration_determinism",
+				blockingSeverityThreshold: "HIGH",
+				runId: "run_integration_determinism",
+				trancheId: null,
 				accumulatedFindings: [],
 				startedAt: "2026-01-01T00:00:00.000Z",
 			};

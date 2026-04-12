@@ -7,6 +7,7 @@ import {
 import { VerificationHandler } from "../../src/autonomy/verification";
 import { BaseLogger } from "../../src/logging/logger";
 import type { LogEntry, Logger } from "../../src/logging/types";
+import { formatOracleSignoffEnvelope } from "../../src/orchestrator/signoff";
 
 function createLogger(): Logger {
 	return new BaseLogger(
@@ -17,6 +18,20 @@ function createLogger(): Logger {
 	);
 }
 
+function createProgramSignoff(
+	signoffId: string,
+	verdict: "COMPLETE" | "INCOMPLETE" | "FAILED",
+	reasoning: string,
+): string {
+	return formatOracleSignoffEnvelope({
+		signoffId,
+		scope: "PROGRAM",
+		inputsDigest: `digest-${signoffId}`,
+		verdict,
+		reasoning,
+	});
+}
+
 describe("oracle verification integration", () => {
 	test("running -> verifying -> oracle_verification_pending -> complete", async () => {
 		const commandsRun: string[] = [];
@@ -24,9 +39,7 @@ describe("oracle verification integration", () => {
 		const oracleSessions = new Map<string, readonly string[]>([
 			[
 				"oracle-session-1",
-				[
-					"ATTEMPT_ID: attempt-1\n<promise>VERIFIED</promise>\nVERDICT: VERIFIED\nSUMMARY: Oracle accepted the completion evidence.",
-				],
+				[createProgramSignoff("attempt-1", "COMPLETE", "Oracle accepted the completion evidence.")],
 			],
 		]);
 
@@ -78,6 +91,7 @@ describe("oracle verification integration", () => {
 		expect(complete.state).toBe("complete");
 		expect(complete.oracleVerification?.status).toBe("verified");
 		expect(complete.oracleVerification?.resultAttemptId).toBe("attempt-1");
+		expect(complete.oracleVerification?.signoff?.verdict).toBe("COMPLETE");
 	});
 
 	test("same controller session retries after a failed Oracle verdict without stale poisoning", async () => {
@@ -90,14 +104,22 @@ describe("oracle verification integration", () => {
 			[
 				"attempt-1",
 				[
-					"ATTEMPT_ID: attempt-1\nVERDICT: FAILED\nFIX_INSTRUCTIONS: Add the missing validation gate before marking the task complete.",
+					createProgramSignoff(
+						"attempt-1",
+						"FAILED",
+						"Add the missing validation gate before marking the task complete.",
+					),
 				],
 			],
 			[
 				"attempt-2",
 				[
-					"ATTEMPT_ID: attempt-1\nVERDICT: FAILED\nFIX_INSTRUCTIONS: Add the missing validation gate before marking the task complete.",
-					"ATTEMPT_ID: attempt-2\n<promise>VERIFIED</promise>\nVERDICT: VERIFIED\nSUMMARY: Validation is now present.",
+					createProgramSignoff(
+						"attempt-1",
+						"FAILED",
+						"Add the missing validation gate before marking the task complete.",
+					),
+					createProgramSignoff("attempt-2", "COMPLETE", "Validation is now present."),
 				],
 			],
 		]);
@@ -148,6 +170,7 @@ describe("oracle verification integration", () => {
 		expect(verified.oracleVerification?.status).toBe("verified");
 		expect(verified.oracleVerification?.resultAttemptId).toBe("attempt-2");
 		expect(verified.oracleVerification?.lastResultSummary).toBe("Validation is now present.");
+		expect(verified.oracleVerification?.signoff?.verdict).toBe("COMPLETE");
 	});
 
 	test("keeps Oracle consultations isolated across concurrent controller sessions", async () => {
@@ -159,15 +182,11 @@ describe("oracle verification integration", () => {
 		const oracleResponses = new Map<string, readonly string[]>([
 			[
 				"oracle-session-a",
-				[
-					"ATTEMPT_ID: session-a-attempt\n<promise>VERIFIED</promise>\nVERDICT: VERIFIED\nSUMMARY: Session A verified.",
-				],
+				[createProgramSignoff("session-a-attempt", "COMPLETE", "Session A verified.")],
 			],
 			[
 				"oracle-session-b",
-				[
-					"ATTEMPT_ID: session-b-attempt\n<promise>VERIFIED</promise>\nVERDICT: VERIFIED\nSUMMARY: Session B verified.",
-				],
+				[createProgramSignoff("session-b-attempt", "COMPLETE", "Session B verified.")],
 			],
 		]);
 
@@ -249,8 +268,8 @@ describe("oracle verification integration", () => {
 		const failed = await controller.iterate("<promise>DONE</promise>");
 
 		expect(failed.state).toBe("failed");
-		expect(failed.accumulatedContext.at(-1)).toBe(
-			"Oracle verification dispatch failed: No active session available for Oracle dispatch.",
+		expect(failed.accumulatedContext[failed.accumulatedContext.length - 1]).toBe(
+			"Oracle program signoff dispatch failed: No active session available for Oracle dispatch.",
 		);
 	});
 
@@ -258,9 +277,11 @@ describe("oracle verification integration", () => {
 		const result = parseOracleVerificationEvidence(
 			[
 				"context line",
-				"ATTEMPT_ID: attempt-1",
-				"VERDICT: FAILED",
-				"FIX_INSTRUCTIONS: Add the missing final validation step before marking the task complete.",
+				createProgramSignoff(
+					"attempt-1",
+					"FAILED",
+					"Add the missing final validation step before marking the task complete.",
+				),
 			],
 			"attempt-1",
 		);
@@ -271,31 +292,27 @@ describe("oracle verification integration", () => {
 		expect(result?.summary).toBe(
 			"Add the missing final validation step before marking the task complete.",
 		);
-		expect(result?.rawEvidence).toContain("VERDICT: FAILED");
+		expect(result?.signoff.verdict).toBe("FAILED");
 	});
 
-	test("parseOracleVerificationEvidence fails closed without a structured verdict line", () => {
-		expect(
+	test("parseOracleVerificationEvidence throws on malformed signoff blocks", () => {
+		expect(() =>
 			parseOracleVerificationEvidence(
 				[
-					"ATTEMPT_ID: attempt-1",
-					"VERIFIED",
-					"SUMMARY: This should not be accepted without VERDICT.",
+					'<oracle-signoff id="attempt-1">',
+					'{"signoffId":"attempt-1","scope":"PROGRAM"}',
+					"</oracle-signoff>",
 				],
 				"attempt-1",
 			),
-		).toBeNull();
+		).toThrow();
 	});
 
-	test("parseOracleVerificationEvidence fails closed when VERIFIED lacks the exact promise token", () => {
+	test("parseOracleVerificationEvidence returns null when only earlier attempts exist", () => {
 		expect(
 			parseOracleVerificationEvidence(
-				[
-					"ATTEMPT_ID: attempt-1",
-					"VERDICT: VERIFIED",
-					"SUMMARY: This should not be accepted without the promise token.",
-				],
-				"attempt-1",
+				[createProgramSignoff("attempt-1", "FAILED", "Earlier failure")],
+				"attempt-2",
 			),
 		).toBeNull();
 	});
