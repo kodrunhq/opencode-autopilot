@@ -182,8 +182,13 @@ export function reconcileProjectIds(database: Database): void {
 		"active_review_state",
 		"project_review_memory",
 		"project_lesson_memory",
+		"project_lessons",
 		"project_paths",
 		"project_git_fingerprints",
+		"route_tickets",
+		"graph_files",
+		"graph_nodes",
+		"graph_edges",
 	];
 
 	for (const row of rows) {

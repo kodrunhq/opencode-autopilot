@@ -162,6 +162,10 @@ export async function recoverCore(
 					if (runRow) {
 						const state = JSON.parse(runRow.state_json);
 						const timestamp = new Date().toISOString();
+						const lastSuccessfulPhase =
+							state.phases
+								?.filter((phase: { readonly status: string }) => phase.status === "DONE")
+								?.pop()?.name ?? null;
 						state.status = "INTERRUPTED";
 						state.pendingDispatches = [];
 						state.failureContext = {
@@ -169,6 +173,7 @@ export async function recoverCore(
 							failedAgent: row.agent,
 							errorMessage: `Manually finalized: stale dispatch older than ${staleMinutes} minutes`,
 							timestamp,
+							lastSuccessfulPhase,
 						};
 						state.stateRevision = (state.stateRevision ?? 0) + 1;
 						state.lastUpdatedAt = timestamp;
@@ -192,7 +197,7 @@ export async function recoverCore(
 								row.phase,
 								row.agent,
 								state.failureContext.errorMessage,
-								state.failureContext.lastSuccessfulPhase ?? null,
+								lastSuccessfulPhase,
 								row.run_id,
 							],
 						);
