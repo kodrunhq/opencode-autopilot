@@ -175,8 +175,27 @@ function reconcileStalePendingDispatches(
 				});
 
 				db.run(
-					"UPDATE pipeline_runs SET state_json = ?, status = 'INTERRUPTED' WHERE run_id = ?",
-					[JSON.stringify(updatedState), dispatch.run_id],
+					`UPDATE pipeline_runs
+					 SET state_json = ?,
+					     status = 'INTERRUPTED',
+					     state_revision = ?,
+					     last_updated_at = ?,
+					     current_phase = NULL,
+					     failure_phase = ?,
+					     failure_agent = ?,
+					     failure_message = ?,
+					     last_successful_phase = ?
+					 WHERE run_id = ?`,
+					[
+						JSON.stringify(updatedState),
+						updatedState.stateRevision,
+						timestamp,
+						failureContext.failedPhase,
+						failureContext.failedAgent,
+						failureContext.errorMessage,
+						failureContext.lastSuccessfulPhase,
+						dispatch.run_id,
+					],
 				);
 
 				logger.info(

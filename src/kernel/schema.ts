@@ -1,7 +1,7 @@
 import { BACKGROUND_TASKS_SCHEMA_STATEMENTS } from "../background/schema";
 import { GRAPH_SCHEMA_STATEMENTS } from "../graph/schema";
 
-export const KERNEL_SCHEMA_VERSION = 7;
+export const KERNEL_SCHEMA_VERSION = 8;
 
 export const ROUTE_TICKETS_SCHEMA = Object.freeze([
 	`CREATE TABLE IF NOT EXISTS route_tickets (

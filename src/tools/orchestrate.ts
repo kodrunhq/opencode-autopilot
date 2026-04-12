@@ -1636,27 +1636,6 @@ export async function orchestrateCore(
 					return asErrorJson(ORCHESTRATE_ERROR_CODES.STALE_RESULT, msg);
 				}
 
-				// Capture the spawned subagent's session ID into the pending dispatch.
-				// When a dispatch is created, sessionId stores the caller's session.
-				// When the spawned subagent calls back with a result, contextSessionId
-				// is the subagent's own session — persist it so the recovery system can
-				// correlate session.error/session.deleted events to this dispatch.
-				if (
-					contextSessionId &&
-					state.pendingDispatches.length > 0 &&
-					state.pendingDispatches.some((p) => p.sessionId !== contextSessionId)
-				) {
-					state = await updatePersistedState(artifactDir, state, (current) =>
-						patchState(current, {
-							pendingDispatches: current.pendingDispatches.map((p) =>
-								p.sessionId === contextSessionId
-									? p
-									: { ...p, sessionId: contextSessionId },
-							),
-						}),
-					);
-				}
-
 				try {
 					const parsed = parseTypedResultEnvelope(args.result, {
 						runId: state.runId,
@@ -1664,6 +1643,31 @@ export async function orchestrateCore(
 						fallbackDispatchId: detectDispatchFromPending(state),
 						fallbackAgent: detectAgentFromPending(state),
 					});
+
+					// Capture the spawned subagent's session ID into the matched
+					// pending dispatch. Only the dispatch whose dispatchId matches
+					// the result envelope is updated — parallel dispatches in
+					// dispatch_multi keep their own independent session correlation.
+					if (contextSessionId && parsed.envelope.dispatchId) {
+						const targetId = parsed.envelope.dispatchId;
+						const target = state.pendingDispatches.find(
+							(p) => p.dispatchId === targetId,
+						);
+						if (target && target.sessionId !== contextSessionId) {
+							state = await updatePersistedState(
+								artifactDir,
+								state,
+								(current) =>
+									patchState(current, {
+										pendingDispatches: current.pendingDispatches.map((p) =>
+											p.dispatchId === targetId
+												? { ...p, sessionId: contextSessionId }
+												: p,
+										),
+									}),
+							);
+						}
+					}
 
 					if (parsed.envelope.runId !== state.runId) {
 						const msg = `Result runId ${parsed.envelope.runId} does not match active run ${state.runId}.`;
