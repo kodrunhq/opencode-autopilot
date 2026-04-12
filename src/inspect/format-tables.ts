@@ -66,7 +66,16 @@ export function formatRunsTable(runs: readonly InspectRunSummary[]): string {
 
 export function formatStuckDispatchesTable(dispatches: readonly InspectStuckDispatch[]): string {
 	return renderTable(
-		["Run ID", "Status", "Run Phase", "Dispatch Phase", "Agent", "Pending", "Session ID"],
+		[
+			"Run ID",
+			"Status",
+			"Run Phase",
+			"Dispatch Phase",
+			"Agent",
+			"Pending",
+			"Caller Session",
+			"Spawned Session",
+		],
 		dispatches.map((dispatch) => [
 			dispatch.runId,
 			dispatch.status,
@@ -74,9 +83,10 @@ export function formatStuckDispatchesTable(dispatches: readonly InspectStuckDisp
 			dispatch.dispatchPhase,
 			dispatch.agent,
 			formatMinutesDuration(dispatch.staleMinutes),
-			dispatch.sessionId ?? "-",
+			dispatch.callerSessionId ?? dispatch.sessionId ?? "-",
+			dispatch.spawnedSessionId ?? "-",
 		]),
-		{ minWidths: [12, 10, 10, 14, 12, 8, 16] },
+		{ minWidths: [12, 10, 10, 14, 12, 8, 16, 16] },
 	);
 }
 

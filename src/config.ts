@@ -46,7 +46,7 @@ const thresholdsConfigSchema = z.object({
 });
 
 export const orchestratorConfigSchema = z.object({
-	autonomy: z.enum(["full", "supervised", "manual"]).default("full"),
+	autonomy: z.enum(["full", "supervised", "manual"]).default("supervised"),
 	strictness: z.enum(["strict", "normal", "lenient"]).default("normal"),
 	phases: phasesConfigSchema.default(phasesConfigSchema.parse({})),
 	maxParallelTasks: z.number().int().min(1).max(10).default(5),
@@ -649,9 +649,9 @@ export function inspectConfigMode(
 		issues.push(
 			createConfigIssue(
 				"disabled_legacy_mode_flags",
-				"warning",
+				"error",
 				["orchestrator", "autonomy"],
-				`Legacy autonomy settings are contradictory (${disabledLegacyFlags.join(", ")}). Canonical mode resolves to ${config.mode.interactionMode}/${config.mode.executionMode}.`,
+				`Contradictory autonomy configuration: orchestrator.autonomy="full" but ${disabledLegacyFlags.join(", ")}. For autonomous execution, set autonomy.enabled=true, background.enabled=true, and routing.enabled=true — or remove the legacy mode block and set mode.interactionMode="autonomous" explicitly.`,
 			),
 		);
 	}
@@ -665,12 +665,23 @@ export function inspectConfigMode(
 }
 
 export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
+	// Legacy "full" autonomy in v1-v6 maps to "supervised" in v7.
+	// v7 autonomous mode requires verification profiles and feature flags
+	// that old configs never had.  Downgrading preserves a working config;
+	// users who need full autonomy can explicitly enable it in v7 with the
+	// required supporting settings (verification, background, routing).
+	const migratedAutonomy =
+		v6Config.orchestrator.autonomy === "full" ? "supervised" : v6Config.orchestrator.autonomy;
+
 	return {
 		version: 7 as const,
 		configured: v6Config.configured,
 		groups: v6Config.groups,
 		overrides: v6Config.overrides,
-		orchestrator: v6Config.orchestrator,
+		orchestrator: {
+			...v6Config.orchestrator,
+			autonomy: migratedAutonomy,
+		},
 		confidence: v6Config.confidence,
 		fallback: v6Config.fallback,
 		memory: v6Config.memory,
@@ -683,7 +694,7 @@ export function migrateV6toV7(v6Config: PluginConfigV6): PluginConfig {
 			maxIterations: 10,
 		},
 		mode: deriveModeFromLegacyInput({
-			orchestratorAutonomy: v6Config.orchestrator.autonomy,
+			orchestratorAutonomy: migratedAutonomy,
 			orchestratorStrictness: v6Config.orchestrator.strictness,
 		}),
 		routing: routingDefaults,

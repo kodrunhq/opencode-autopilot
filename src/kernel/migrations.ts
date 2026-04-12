@@ -87,9 +87,14 @@ const REBUILD_DDLS: Readonly<Record<string, string>> = Object.freeze({
 		phase TEXT NOT NULL,
 		agent TEXT NOT NULL,
 		issued_at TEXT NOT NULL,
+		status TEXT NOT NULL,
+		received_result_id TEXT,
+		received_at TEXT,
 		result_kind TEXT NOT NULL,
 		task_id TEXT,
 		session_id TEXT,
+		caller_session_id TEXT,
+		spawned_session_id TEXT,
 		PRIMARY KEY (run_id, dispatch_id),
 		FOREIGN KEY (run_id) REFERENCES pipeline_runs(run_id) ON DELETE CASCADE
 	)`,
@@ -218,11 +223,34 @@ export function reconcileProjectIds(database: Database): void {
 	}
 }
 
-function ensureSessionIdOnPendingDispatches(database: Database): void {
+function ensurePendingDispatchSessionCorrelationColumns(database: Database): void {
 	if (!tableExists(database, "run_pending_dispatches")) return;
-	if (columnExists(database, "run_pending_dispatches", "session_id")) return;
+	if (
+		columnExists(database, "run_pending_dispatches", "session_id") &&
+		columnExists(database, "run_pending_dispatches", "caller_session_id") &&
+		columnExists(database, "run_pending_dispatches", "spawned_session_id") &&
+		columnExists(database, "run_pending_dispatches", "status") &&
+		columnExists(database, "run_pending_dispatches", "received_result_id") &&
+		columnExists(database, "run_pending_dispatches", "received_at")
+	) {
+		return;
+	}
 
 	const rebuildTable = `_rebuild_run_pending_dispatches`;
+	const hasSessionId = columnExists(database, "run_pending_dispatches", "session_id");
+	const hasCallerSessionId = columnExists(database, "run_pending_dispatches", "caller_session_id");
+	const hasSpawnedSessionId = columnExists(
+		database,
+		"run_pending_dispatches",
+		"spawned_session_id",
+	);
+	const hasStatus = columnExists(database, "run_pending_dispatches", "status");
+	const hasReceivedResultId = columnExists(
+		database,
+		"run_pending_dispatches",
+		"received_result_id",
+	);
+	const hasReceivedAt = columnExists(database, "run_pending_dispatches", "received_at");
 	database.run(`DROP TABLE IF EXISTS ${rebuildTable}`);
 	database.run(REBUILD_DDLS.run_pending_dispatches);
 	database.run(
@@ -232,9 +260,14 @@ function ensureSessionIdOnPendingDispatches(database: Database): void {
 			phase,
 			agent,
 			issued_at,
+			status,
+			received_result_id,
+			received_at,
 			result_kind,
 			task_id,
-			session_id
+			session_id,
+			caller_session_id,
+			spawned_session_id
 		)
 		SELECT
 			run_id,
@@ -242,13 +275,24 @@ function ensureSessionIdOnPendingDispatches(database: Database): void {
 			phase,
 			agent,
 			issued_at,
+			${hasStatus ? "status" : "'PENDING'"} AS status,
+			${hasReceivedResultId ? "received_result_id" : "NULL"} AS received_result_id,
+			${hasReceivedAt ? "received_at" : "NULL"} AS received_at,
 			result_kind,
 			CAST(task_id AS TEXT) AS task_id,
-			NULL AS session_id
+			${hasSessionId ? "session_id" : hasCallerSessionId ? "caller_session_id" : "NULL"} AS session_id,
+			${hasCallerSessionId ? "caller_session_id" : hasSessionId ? "session_id" : "NULL"} AS caller_session_id,
+			${hasSpawnedSessionId ? "spawned_session_id" : "NULL"} AS spawned_session_id
 		FROM run_pending_dispatches`,
 	);
 	database.run("DROP TABLE run_pending_dispatches");
 	database.run(`ALTER TABLE ${rebuildTable} RENAME TO run_pending_dispatches`);
+	database.run(
+		"CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_caller_session ON run_pending_dispatches(caller_session_id, issued_at DESC, dispatch_id)",
+	);
+	database.run(
+		"CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_spawned_session ON run_pending_dispatches(spawned_session_id, issued_at DESC, dispatch_id)",
+	);
 }
 
 function backfillBackgroundTaskColumns(database: Database): void {
@@ -334,7 +378,13 @@ export function runKernelMigrations(database: Database): void {
 
 	backfillProjectAwareColumns(database);
 	migrateTaskIdToText(database);
-	ensureSessionIdOnPendingDispatches(database);
+	ensurePendingDispatchSessionCorrelationColumns(database);
+	database.run(
+		"CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_caller_session ON run_pending_dispatches(caller_session_id, issued_at DESC, dispatch_id)",
+	);
+	database.run(
+		"CREATE INDEX IF NOT EXISTS idx_run_pending_dispatches_spawned_session ON run_pending_dispatches(spawned_session_id, issued_at DESC, dispatch_id)",
+	);
 	backfillBackgroundTaskColumns(database);
 
 	if (currentVersion < KERNEL_SCHEMA_VERSION) {

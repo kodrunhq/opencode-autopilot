@@ -193,6 +193,7 @@ export const handlePlan: PhaseHandler = async (state, artifactDir, result?) => {
 			return Object.freeze({
 				action: "error",
 				code: "E_PLAN_TASK_LOAD",
+				errorSeverity: isEnoentError(error) ? "recoverable" : "terminal",
 				phase: "PLAN",
 				message: `Failed to load PLAN tasks: ${reason}`,
 				progress: "Planning failed — task extraction error",

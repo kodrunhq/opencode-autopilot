@@ -279,19 +279,29 @@ export function savePipelineStateToKernel(
 					phase,
 					agent,
 					issued_at,
+					status,
+					received_result_id,
+					received_at,
 					result_kind,
 					task_id,
-					session_id
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+					session_id,
+					caller_session_id,
+					spawned_session_id
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 					[
 						validated.runId,
 						pending.dispatchId,
 						pending.phase,
 						pending.agent,
 						pending.issuedAt,
+						pending.status,
+						pending.receivedResultId,
+						pending.receivedAt,
 						pending.resultKind,
 						pending.taskId,
-						pending.sessionId ?? null,
+						pending.sessionId ?? pending.callerSessionId ?? null,
+						pending.callerSessionId ?? pending.sessionId ?? null,
+						pending.spawnedSessionId ?? null,
 					],
 				);
 			}

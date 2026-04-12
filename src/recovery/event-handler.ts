@@ -86,7 +86,8 @@ function reconcileStalePendingDispatches(sessionId: string, db: Database): void 
 			.query(
 				`SELECT run_id, dispatch_id, phase, agent
 				 FROM run_pending_dispatches
-				 WHERE session_id = ?`,
+				 WHERE caller_session_id = ?
+				   AND status IN ('PENDING', 'RESULT_RECEIVED')`,
 			)
 			.all(sessionId) as PendingDispatchRow[];
 
@@ -201,7 +202,10 @@ function reconcileStalePendingDispatches(sessionId: string, db: Database): void 
 		}
 
 		try {
-			db.run("DELETE FROM run_pending_dispatches WHERE session_id = ?", [sessionId]);
+			db.run(
+				"DELETE FROM run_pending_dispatches WHERE caller_session_id = ? AND status IN ('PENDING', 'RESULT_RECEIVED')",
+				[sessionId],
+			);
 		} catch (error: unknown) {
 			logger.warn("Failed to delete reconciled pending dispatch rows", {
 				sessionId,

@@ -20,7 +20,11 @@ function insertProject(db: Database, projectId: string): void {
 	);
 }
 
-function createStateWithPendingDispatch(runId: string, sessionId: string) {
+function createStateWithPendingDispatch(
+	runId: string,
+	callerSessionId: string,
+	spawnedSessionId: string | null = null,
+) {
 	const initialState = createInitialState("forensic recovery");
 	return {
 		...initialState,
@@ -33,9 +37,14 @@ function createStateWithPendingDispatch(runId: string, sessionId: string) {
 				phase: "RECON" as const,
 				agent: "oc-researcher",
 				issuedAt: FIXED_TIMESTAMP,
+				status: "PENDING" as const,
+				receivedResultId: null,
+				receivedAt: null,
 				resultKind: "phase_output" as const,
 				taskId: null,
-				sessionId,
+				callerSessionId,
+				spawnedSessionId,
+				sessionId: callerSessionId,
 			},
 		],
 	};
@@ -87,7 +96,12 @@ function insertPipelineRun(
 	);
 }
 
-function insertPendingDispatch(db: Database, runId: string, sessionId: string): void {
+function insertPendingDispatch(
+	db: Database,
+	runId: string,
+	callerSessionId: string,
+	spawnedSessionId: string | null = null,
+): void {
 	db.run(
 		`INSERT INTO run_pending_dispatches (
 			run_id,
@@ -95,19 +109,29 @@ function insertPendingDispatch(db: Database, runId: string, sessionId: string): 
 			phase,
 			agent,
 			issued_at,
+			status,
+			received_result_id,
+			received_at,
 			result_kind,
 			task_id,
-			session_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			session_id,
+			caller_session_id,
+			spawned_session_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			runId,
 			"dispatch_forensic_1",
 			"RECON",
 			"oc-researcher",
 			FIXED_TIMESTAMP,
+			"PENDING",
+			null,
+			null,
 			"phase_output",
 			null,
-			sessionId,
+			callerSessionId,
+			callerSessionId,
+			spawnedSessionId,
 		],
 	);
 }
@@ -165,7 +189,7 @@ describe("recovery event handler forensic reconciliation", () => {
 			stateJson: string;
 		};
 		const pendingCount = db
-			.query("SELECT COUNT(*) as count FROM run_pending_dispatches WHERE session_id = ?")
+			.query("SELECT COUNT(*) as count FROM run_pending_dispatches WHERE caller_session_id = ?")
 			.get(sessionId) as { count: number };
 		const parsedState = JSON.parse(runRow.stateJson) as {
 			status: string;
@@ -218,8 +242,45 @@ describe("recovery event handler forensic reconciliation", () => {
 			stateRevision: number;
 		};
 		const pendingCount = db
-			.query("SELECT COUNT(*) as count FROM run_pending_dispatches WHERE session_id = ?")
+			.query("SELECT COUNT(*) as count FROM run_pending_dispatches WHERE caller_session_id = ?")
 			.get(pendingSessionId) as { count: number };
+
+		expect(runRow.status).toBe("IN_PROGRESS");
+		expect(runRow.stateRevision).toBe(0);
+		expect(pendingCount.count).toBe(1);
+	});
+
+	test("child-session mismatches do not poison caller-owned recovery state", async () => {
+		const projectId = "project-forensic-child-session";
+		const runId = "run_forensic_child_session";
+		const callerSessionId = "session-parent";
+		const spawnedSessionId = "session-child";
+		insertProject(db, projectId);
+		insertPipelineRun(db, {
+			projectId,
+			runId,
+			stateJson: JSON.stringify(
+				createStateWithPendingDispatch(runId, callerSessionId, spawnedSessionId),
+			),
+		});
+		insertPendingDispatch(db, runId, callerSessionId, spawnedSessionId);
+
+		await handler({
+			event: {
+				type: "session.error",
+				properties: { sessionID: spawnedSessionId },
+			},
+		});
+
+		const runRow = db
+			.query("SELECT status, state_revision as stateRevision FROM pipeline_runs WHERE run_id = ?")
+			.get(runId) as {
+			status: string;
+			stateRevision: number;
+		};
+		const pendingCount = db
+			.query("SELECT COUNT(*) as count FROM run_pending_dispatches WHERE caller_session_id = ?")
+			.get(callerSessionId) as { count: number };
 
 		expect(runRow.status).toBe("IN_PROGRESS");
 		expect(runRow.stateRevision).toBe(0);
@@ -239,7 +300,7 @@ describe("recovery event handler forensic reconciliation", () => {
 		).resolves.toBeUndefined();
 
 		const pendingCount = db
-			.query("SELECT COUNT(*) as count FROM run_pending_dispatches WHERE session_id = ?")
+			.query("SELECT COUNT(*) as count FROM run_pending_dispatches WHERE caller_session_id = ?")
 			.get("session-missing-pipeline") as { count: number };
 
 		expect(pendingCount.count).toBe(0);
@@ -276,7 +337,7 @@ describe("recovery event handler forensic reconciliation", () => {
 			stateJson: string;
 		};
 		const pendingCount = db
-			.query("SELECT COUNT(*) as count FROM run_pending_dispatches WHERE session_id = ?")
+			.query("SELECT COUNT(*) as count FROM run_pending_dispatches WHERE caller_session_id = ?")
 			.get(sessionId) as { count: number };
 
 		expect(runRow.status).toBe("IN_PROGRESS");

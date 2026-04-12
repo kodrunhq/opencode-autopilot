@@ -81,18 +81,45 @@ export const dispatchResultKindSchema = z.enum([
 	"oracle_signoff",
 ]);
 
-export const pendingDispatchSchema = z.object({
-	dispatchId: z.string().min(1).max(128),
-	phase: phaseSchema,
-	agent: z.string().min(1).max(128),
-	issuedAt: z.string().max(128),
-	resultKind: dispatchResultKindSchema.default("phase_output"),
-	taskId: z
-		.union([z.number().int().positive(), z.string().min(1).max(128)])
-		.nullable()
-		.default(null),
-	sessionId: z.string().max(256).nullable().default(null),
-});
+const pendingDispatchSessionIdSchema = z.string().max(256).nullable();
+
+export const pendingDispatchSchema = z
+	.object({
+		dispatchId: z.string().min(1).max(128),
+		phase: phaseSchema,
+		agent: z.string().min(1).max(128),
+		issuedAt: z.string().max(128),
+		status: z.enum(["PENDING", "RESULT_RECEIVED", "FAILED_RECOVERABLE"]).default("PENDING"),
+		receivedResultId: z.string().max(128).nullable().default(null),
+		receivedAt: z.string().max(128).nullable().default(null),
+		resultKind: dispatchResultKindSchema.default("phase_output"),
+		taskId: z
+			.union([z.number().int().positive(), z.string().min(1).max(128)])
+			.nullable()
+			.default(null),
+		callerSessionId: pendingDispatchSessionIdSchema.optional(),
+		spawnedSessionId: pendingDispatchSessionIdSchema.optional(),
+		// Legacy alias retained while callers migrate.
+		sessionId: pendingDispatchSessionIdSchema.optional(),
+	})
+	.transform((input) => {
+		const callerSessionId = input.callerSessionId ?? input.sessionId ?? null;
+
+		return {
+			dispatchId: input.dispatchId,
+			phase: input.phase,
+			agent: input.agent,
+			issuedAt: input.issuedAt,
+			status: input.status,
+			receivedResultId: input.receivedResultId,
+			receivedAt: input.receivedAt,
+			resultKind: input.resultKind,
+			taskId: input.taskId,
+			callerSessionId,
+			spawnedSessionId: input.spawnedSessionId ?? null,
+			sessionId: callerSessionId,
+		};
+	});
 
 export const failureContextSchema = z.object({
 	failedPhase: phaseSchema,

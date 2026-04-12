@@ -121,7 +121,8 @@ export function formatVerboseStuckDispatches(dispatches: readonly InspectStuckDi
 				`Dispatch ID: ${dispatch.dispatchId}`,
 				`Pending since: ${formatTimestamp(dispatch.issuedAt)}`,
 				`Pending for: ${formatMinutesDuration(dispatch.staleMinutes)}`,
-				`Session ID: ${dispatch.sessionId ?? "-"}`,
+				`Caller session ID: ${dispatch.callerSessionId ?? dispatch.sessionId ?? "-"}`,
+				`Spawned session ID: ${dispatch.spawnedSessionId ?? "-"}`,
 			]),
 		);
 		lines.push("  Idea:");

@@ -29,6 +29,7 @@ export async function handleChallenge(
 				action: "error" as const,
 				phase: "CHALLENGE",
 				message: `CHALLENGE agent returned a result but did not write the required artifact: ${artifactPath}. The agent must write brief.md before the phase can complete.`,
+				errorSeverity: "recoverable" as const,
 			});
 		}
 		return Object.freeze({

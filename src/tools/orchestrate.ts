@@ -31,6 +31,7 @@ import { logOrchestrationEvent } from "../orchestrator/orchestration-logger";
 import { completePhase, getNextPhase, PHASE_INDEX, TOTAL_PHASES } from "../orchestrator/phase";
 import { groupByWave } from "../orchestrator/plan";
 import { getPhaseProgressString } from "../orchestrator/progress";
+import { getValidSpawnedSessionId } from "../orchestrator/session-correlation";
 import {
 	buildProgramOracleSignoffRequest,
 	isPassingProgramOracleSignoff,
@@ -106,6 +107,7 @@ const ORCHESTRATE_ERROR_CODES = Object.freeze({
 });
 
 const STALE_PENDING_DISPATCH_MS = 60 * 60 * 1000;
+const ARTIFACT_BACKED_PHASES = ["RECON", "CHALLENGE", "ARCHITECT", "PLAN", "SHIP"] as const;
 
 function mapRouteTokenValidationError(reason: string | undefined): string {
 	switch (reason) {
@@ -344,10 +346,15 @@ function advanceProgressForEnvelope(envelope: Readonly<ResultEnvelope>): void {
 
 function addToastTaskForDispatch(
 	pending: Readonly<PendingDispatch>,
-	options?: { readonly description?: string },
+	options?: {
+		readonly description?: string;
+		readonly currentParentSessionId?: string | null;
+	},
 ): void {
 	getTaskToastManager()?.addTask({
 		id: pending.dispatchId,
+		sessionId:
+			getValidSpawnedSessionId(pending, options?.currentParentSessionId ?? null) ?? undefined,
 		description: options?.description ?? buildProgressLabelFromPending(pending),
 		agent: pending.agent,
 		isBackground: false,
@@ -394,6 +401,50 @@ function removePendingDispatch(state: Readonly<PipelineState>, dispatchId: strin
 	return patchState(state, {
 		pendingDispatches: state.pendingDispatches.filter((entry) => entry.dispatchId !== dispatchId),
 	});
+}
+
+function acceptDispatch(
+	state: Readonly<PipelineState>,
+	dispatchId: string,
+	envelope?: ResultEnvelope,
+): PipelineState {
+	const removed = removePendingDispatch(state, dispatchId);
+	if (envelope) {
+		return markResultProcessed(removed, envelope);
+	}
+	const dispatch = state.pendingDispatches.find((d) => d.dispatchId === dispatchId);
+	if (dispatch?.receivedResultId) {
+		return markResultProcessed(removed, {
+			resultId: dispatch.receivedResultId,
+			dispatchId,
+			phase: dispatch.phase,
+			kind: dispatch.resultKind,
+			taskId: dispatch.taskId,
+		} as ResultEnvelope);
+	}
+	return removed;
+}
+
+function failDispatchRecoverable(
+	state: Readonly<PipelineState>,
+	dispatchId: string,
+): PipelineState {
+	return patchState(state, {
+		pendingDispatches: state.pendingDispatches.map((entry) =>
+			entry.dispatchId === dispatchId
+				? {
+						...entry,
+						status: "FAILED_RECOVERABLE",
+						spawnedSessionId: null,
+						sessionId: entry.callerSessionId,
+					}
+				: entry,
+		),
+	});
+}
+
+function failDispatchTerminal(state: Readonly<PipelineState>, dispatchId: string): PipelineState {
+	return removePendingDispatch(state, dispatchId);
 }
 
 function expectedResultKindForPending(pending: Readonly<PendingDispatch>): string {
@@ -530,8 +581,50 @@ function applyResultEnvelope(
 		);
 	}
 
-	const withoutPending = removePendingDispatch(state, envelope.dispatchId);
-	return markResultProcessed(withoutPending, envelope);
+	const receivedAt = new Date().toISOString();
+	const withReceivedResult = patchState(state, {
+		pendingDispatches: state.pendingDispatches.map((entry) =>
+			entry.dispatchId === envelope.dispatchId
+				? {
+						...entry,
+						status: "RESULT_RECEIVED",
+						receivedResultId: envelope.resultId,
+						receivedAt,
+					}
+				: entry,
+		),
+	});
+	return withReceivedResult;
+}
+
+function isRecoverableHandlerError(handlerResult: Readonly<DispatchResult>): boolean {
+	if (handlerResult.action !== "error") {
+		return false;
+	}
+
+	if (handlerResult.errorSeverity === "recoverable") {
+		return true;
+	}
+
+	if (handlerResult.errorSeverity === "terminal") {
+		return false;
+	}
+
+	if (
+		typeof handlerResult.phase !== "string" ||
+		!ARTIFACT_BACKED_PHASES.includes(handlerResult.phase as (typeof ARTIFACT_BACKED_PHASES)[number])
+	) {
+		return false;
+	}
+
+	const normalizedMessage = handlerResult.message?.toLowerCase() ?? "";
+	return (
+		normalizedMessage.includes("did not write the required artifact") ||
+		normalizedMessage.includes("did not write all required proposals") ||
+		normalizedMessage.includes("did not write required artifacts") ||
+		(handlerResult.code === "E_PLAN_TASK_LOAD" &&
+			normalizedMessage.includes("not found after planner completion"))
+	);
 }
 
 function parseErrorCode(error: unknown): {
@@ -624,7 +717,14 @@ async function startFreshRun(
 
 	const handler = PHASE_HANDLERS[newState.currentPhase as Phase];
 	const handlerResult = await handler(newState, artifactDir, undefined, undefined);
-	return processHandlerResult(handlerResult, newState, artifactDir, undefined, visibilityBus);
+	return processHandlerResult(
+		handlerResult,
+		newState,
+		artifactDir,
+		undefined,
+		undefined,
+		visibilityBus,
+	);
 }
 
 /**
@@ -1317,6 +1417,7 @@ async function processHandlerResult(
 	state: Readonly<PipelineState>,
 	artifactDir: string,
 	contextSessionId?: string,
+	options?: { readonly resultEnvelope?: ResultEnvelope },
 	visibilityBus?: VisibilityBus,
 ): Promise<string> {
 	const normalizedResult = ensureDispatchIdentity(handlerResult, state);
@@ -1358,6 +1459,7 @@ async function processHandlerResult(
 			currentState,
 			artifactDir,
 			contextSessionId,
+			options,
 			visibilityBus,
 		);
 	}
@@ -1378,14 +1480,44 @@ async function processHandlerResult(
 			currentState,
 			artifactDir,
 			contextSessionId,
+			options,
 			visibilityBus,
 		);
 	}
+
+	const resultEnvelope = options?.resultEnvelope;
 
 	switch (normalizedResult.action) {
 		case "error": {
 			const codePrefix = normalizedResult.code ? `${normalizedResult.code}: ` : "";
 			const messageBody = normalizedResult.message ?? "Handler returned error";
+			const isRecoverable = isRecoverableHandlerError(normalizedResult);
+			const shouldAcceptOnError =
+				resultEnvelope !== undefined &&
+				!isRecoverable &&
+				(normalizedResult.code?.endsWith("_PENDING") ?? false);
+
+			if (resultEnvelope) {
+				if (shouldAcceptOnError) {
+					showCompletionToastForEnvelope(currentState, resultEnvelope);
+					advanceProgressForEnvelope(resultEnvelope);
+					if (resultEnvelope.kind === "task_completion") {
+						publishTaskCompleted(visibilityBus, currentState, resultEnvelope.taskId);
+					}
+				}
+
+				currentState = await updatePersistedState(artifactDir, currentState, (current) =>
+					isRecoverable
+						? failDispatchRecoverable(current, resultEnvelope.dispatchId)
+						: shouldAcceptOnError
+							? acceptDispatch(current, resultEnvelope.dispatchId, resultEnvelope)
+							: failDispatchTerminal(current, resultEnvelope.dispatchId),
+				);
+				if (!isRecoverable && !shouldAcceptOnError) {
+					clearToastTaskForDispatch(resultEnvelope.dispatchId);
+				}
+			}
+
 			if (
 				normalizedResult.code === "E_SHIP_REVIEW_BLOCKED" ||
 				normalizedResult.progress === "SHIP blocked by review policy"
@@ -1397,7 +1529,10 @@ async function processHandlerResult(
 				publishOracleFailed(visibilityBus, currentState, messageBody);
 			}
 			const blockedProgram =
-				currentState.programContext !== null && normalizedResult.phase
+				!isRecoverable &&
+				!shouldAcceptOnError &&
+				currentState.programContext !== null &&
+				normalizedResult.phase
 					? updateProgramRunForState(artifactDir, currentState, (program) =>
 							blockProgramRun(program, messageBody, currentState.programContext?.trancheId),
 						)
@@ -1412,6 +1547,15 @@ async function processHandlerResult(
 				"Pipeline error",
 				`${normalizedResult.phase ?? "Unknown"}: ${messageBody}`.slice(0, 200),
 			);
+			if (isRecoverable || shouldAcceptOnError) {
+				return decorateOrchestrateResponse(
+					{
+						...normalizedResult,
+						...buildProgramResponseFields(currentState),
+					},
+					visibilityBus,
+				);
+			}
 			return decorateOrchestrateResponse(
 				{
 					...normalizedResult,
@@ -1429,6 +1573,17 @@ async function processHandlerResult(
 		}
 
 		case "dispatch": {
+			if (resultEnvelope) {
+				showCompletionToastForEnvelope(currentState, resultEnvelope);
+				advanceProgressForEnvelope(resultEnvelope);
+				if (resultEnvelope.kind === "task_completion") {
+					publishTaskCompleted(visibilityBus, currentState, resultEnvelope.taskId);
+				}
+				currentState = await updatePersistedState(artifactDir, currentState, (current) =>
+					acceptDispatch(current, resultEnvelope.dispatchId, resultEnvelope),
+				);
+			}
+
 			// Circuit breaker
 			const phase = normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
 			const dispatchAgent = normalizedResult.agent ?? "unknown";
@@ -1466,8 +1621,13 @@ async function processHandlerResult(
 				phase: phase as Phase,
 				agent: normalizedResult.agent ?? "unknown",
 				issuedAt: new Date().toISOString(),
+				status: "PENDING",
+				receivedResultId: null,
+				receivedAt: null,
 				resultKind: normalizedResult.expectedResultKind ?? "phase_output",
 				taskId: normalizedResult.taskId ?? null,
+				callerSessionId: contextSessionId ?? null,
+				spawnedSessionId: null,
 				sessionId: contextSessionId ?? null,
 			};
 
@@ -1489,11 +1649,9 @@ async function processHandlerResult(
 					200,
 				),
 			);
-			getTaskToastManager()?.addTask({
-				id: pendingEntry.dispatchId,
+			addToastTaskForDispatch(pendingEntry, {
 				description: normalizedResult.progress ?? phase,
-				agent: normalizedResult.agent ?? "unknown",
-				isBackground: false,
+				currentParentSessionId: contextSessionId ?? null,
 			});
 			if (phase === "BUILD" && normalizedResult.taskId !== null) {
 				publishTaskStarted(
@@ -1553,12 +1711,6 @@ async function processHandlerResult(
 						(current) =>
 							applyResultEnvelope(withPendingDispatch(current, pendingEntry), inlinedEnvelope),
 					);
-					getTaskToastManager()?.showCompletionToast({
-						id: pendingEntry.dispatchId,
-						description: normalizedResult.progress ?? phase,
-						duration: formatElapsed(pendingEntry.issuedAt),
-					});
-					advanceProgressForEnvelope(inlinedEnvelope);
 
 					const handler = PHASE_HANDLERS[currentState.currentPhase];
 					const nextResult = await handler(withInlineResult, artifactDir, reviewPayloadText, {
@@ -1569,6 +1721,7 @@ async function processHandlerResult(
 						withInlineResult,
 						artifactDir,
 						contextSessionId,
+						{ resultEnvelope: inlinedEnvelope },
 						visibilityBus,
 					);
 				}
@@ -1626,6 +1779,17 @@ async function processHandlerResult(
 		}
 
 		case "dispatch_multi": {
+			if (resultEnvelope) {
+				showCompletionToastForEnvelope(currentState, resultEnvelope);
+				advanceProgressForEnvelope(resultEnvelope);
+				if (resultEnvelope.kind === "task_completion") {
+					publishTaskCompleted(visibilityBus, currentState, resultEnvelope.taskId);
+				}
+				currentState = await updatePersistedState(artifactDir, currentState, (current) =>
+					acceptDispatch(current, resultEnvelope.dispatchId, resultEnvelope),
+				);
+			}
+
 			// Circuit breaker — key on first agent, increment by total agent count
 			const phase = normalizedResult.phase ?? currentState.currentPhase ?? "UNKNOWN";
 			const multiAgentName = normalizedResult.agents?.[0]?.agent ?? "unknown";
@@ -1673,8 +1837,13 @@ async function processHandlerResult(
 					phase: phase as Phase,
 					agent: entry.agent,
 					issuedAt: new Date().toISOString(),
+					status: "PENDING",
+					receivedResultId: null,
+					receivedAt: null,
 					resultKind: entry.resultKind ?? inferExpectedResultKindForAgent(entry.agent),
 					taskId: entry.taskId ?? null,
+					callerSessionId: contextSessionId ?? null,
+					spawnedSessionId: null,
 					sessionId: contextSessionId ?? null,
 				})) ?? [];
 
@@ -1689,6 +1858,7 @@ async function processHandlerResult(
 			for (const pendingEntry of pendingEntries) {
 				addToastTaskForDispatch(pendingEntry, {
 					description: buildProgressLabelFromPending(pendingEntry),
+					currentParentSessionId: contextSessionId ?? null,
 				});
 				if (phase === "BUILD" && pendingEntry.taskId !== null) {
 					publishTaskStarted(visibilityBus, currentState, pendingEntry.taskId, pendingEntry.agent);
@@ -1748,6 +1918,17 @@ async function processHandlerResult(
 		}
 
 		case "complete": {
+			if (resultEnvelope) {
+				showCompletionToastForEnvelope(currentState, resultEnvelope);
+				advanceProgressForEnvelope(resultEnvelope);
+				if (resultEnvelope.kind === "task_completion") {
+					publishTaskCompleted(visibilityBus, currentState, resultEnvelope.taskId);
+				}
+				currentState = await updatePersistedState(artifactDir, currentState, (current) =>
+					acceptDispatch(current, resultEnvelope.dispatchId, resultEnvelope),
+				);
+			}
+
 			if (currentState.currentPhase === null) {
 				return decorateOrchestrateResponse(
 					{
@@ -1775,6 +1956,7 @@ async function processHandlerResult(
 							currentState,
 							artifactDir,
 							contextSessionId,
+							undefined,
 							visibilityBus,
 						);
 					}
@@ -1954,6 +2136,7 @@ async function processHandlerResult(
 				advanced,
 				artifactDir,
 				contextSessionId,
+				undefined,
 				visibilityBus,
 			);
 		}
@@ -1990,6 +2173,9 @@ export async function orchestrateCore(
 			const activeState = state;
 			const now = Date.now();
 			const staleDispatches = activeState.pendingDispatches.filter((pending) => {
+				if (pending.status !== "PENDING" && pending.status !== "RESULT_RECEIVED") {
+					return false;
+				}
 				const issued = Date.parse(pending.issuedAt);
 				return Number.isFinite(issued) && now - issued > STALE_PENDING_DISPATCH_MS;
 			});
@@ -2260,24 +2446,6 @@ export async function orchestrateCore(
 						fallbackAgent: detectAgentFromPending(state),
 					});
 
-					// Capture the spawned subagent's session ID into the matched
-					// pending dispatch. Only the dispatch whose dispatchId matches
-					// the result envelope is updated — parallel dispatches in
-					// dispatch_multi keep their own independent session correlation.
-					if (contextSessionId && parsed.envelope.dispatchId) {
-						const targetId = parsed.envelope.dispatchId;
-						const target = state.pendingDispatches.find((p) => p.dispatchId === targetId);
-						if (target && target.sessionId !== contextSessionId) {
-							state = await updatePersistedState(artifactDir, state, (current) =>
-								patchState(current, {
-									pendingDispatches: current.pendingDispatches.map((p) =>
-										p.dispatchId === targetId ? { ...p, sessionId: contextSessionId } : p,
-									),
-								}),
-							);
-						}
-					}
-
 					if (parsed.envelope.runId !== state.runId) {
 						const msg = `Result runId ${parsed.envelope.runId} does not match active run ${state.runId}.`;
 						logDeterministicError(
@@ -2374,6 +2542,9 @@ export async function orchestrateCore(
 							state = await updatePersistedState(artifactDir, state, (current) =>
 								applyResultEnvelope(current, parsed.envelope),
 							);
+							state = await updatePersistedState(artifactDir, state, (current) =>
+								failDispatchTerminal(current, parsed.envelope.dispatchId),
+							);
 							clearToastTaskForDispatch(parsed.envelope.dispatchId);
 
 							if (state.currentPhase !== null) {
@@ -2384,6 +2555,7 @@ export async function orchestrateCore(
 									state,
 									artifactDir,
 									contextSessionId,
+									undefined,
 									visibilityBus,
 								);
 							}
@@ -2405,8 +2577,6 @@ export async function orchestrateCore(
 								),
 							});
 						});
-						clearToastTaskForDispatch(parsed.envelope.dispatchId);
-						advanceProgressForEnvelope(parsed.envelope);
 						const failureSummary = buildFailureSummary(
 							failedDispatchId,
 							failedPhase,
@@ -2431,12 +2601,7 @@ export async function orchestrateCore(
 								),
 							});
 						});
-						showCompletionToastForEnvelope(state, parsed.envelope);
 						state = nextState;
-						advanceProgressForEnvelope(parsed.envelope);
-						if (parsed.envelope.kind === "task_completion") {
-							publishTaskCompleted(visibilityBus, state, parsed.envelope.taskId);
-						}
 
 						phaseHandlerContext = {
 							envelope: parsed.envelope,
@@ -2477,6 +2642,7 @@ export async function orchestrateCore(
 				state,
 				artifactDir,
 				contextSessionId,
+				phaseHandlerContext ? { resultEnvelope: phaseHandlerContext.envelope } : undefined,
 				visibilityBus,
 			);
 		}

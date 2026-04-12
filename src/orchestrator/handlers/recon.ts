@@ -29,6 +29,7 @@ export async function handleRecon(
 				action: "error" as const,
 				phase: "RECON",
 				message: `RECON agent returned a result but did not write the required artifact: ${artifactPath}. The agent must write report.md before the phase can complete.`,
+				errorSeverity: "recoverable" as const,
 			});
 		}
 		return Object.freeze({

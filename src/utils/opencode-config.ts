@@ -2,7 +2,10 @@ import { execSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { getLogger } from "../logging/domains";
 import { fileExists } from "./fs-helpers";
+
+const logger = getLogger("opencode-config");
 
 export function parseJsonc(content: string): unknown {
 	let result = "";
@@ -160,11 +163,19 @@ async function findProjectConfig(cwd: string): Promise<string | null> {
 
 		const legacyJsonPath = join(current, "opencode.json");
 		if (await fileExists(legacyJsonPath)) {
+			logger.warn("Legacy config filename detected", {
+				path: legacyJsonPath,
+				hint: 'Rename to ".opencode.json" — legacy filenames will be removed in a future release.',
+			});
 			return legacyJsonPath;
 		}
 
 		const legacyJsoncPath = join(current, "opencode.jsonc");
 		if (await fileExists(legacyJsoncPath)) {
+			logger.warn("Legacy config filename detected", {
+				path: legacyJsoncPath,
+				hint: 'Rename to ".opencode.jsonc" — legacy filenames will be removed in a future release.',
+			});
 			return legacyJsoncPath;
 		}
 
