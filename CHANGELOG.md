@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.2](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.32.1...opencode-autopilot-v1.32.2) (2026-04-12)
+
+
+### Bug Fixes
+
+* enforce release-please trigger guardrails ([3a397d4](https://github.com/kodrunhq/opencode-autopilot/commit/3a397d44033ab6d70544856c043b1c1ea95bb2cb))
+
 ## [1.32.1](https://github.com/kodrunhq/opencode-autopilot/compare/opencode-autopilot-v1.32.0...opencode-autopilot-v1.32.1) (2026-04-11)
 
 
