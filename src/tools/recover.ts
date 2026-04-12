@@ -148,7 +148,17 @@ function resolveRecoveryTarget(
 		return null;
 	}
 
-	const sessionIds = collectPendingDispatchCallerSessionIds(pipelineState.pendingDispatches);
+	let sessionIds = collectPendingDispatchCallerSessionIds(pipelineState.pendingDispatches);
+	if (sessionIds.length === 0) {
+		const dispatchRows = db
+			.query(
+				`SELECT caller_session_id FROM run_pending_dispatches
+				 WHERE run_id = ? AND caller_session_id IS NOT NULL
+				 ORDER BY issued_at DESC`,
+			)
+			.all(options.runId) as Array<{ caller_session_id: string }>;
+		sessionIds = Object.freeze([...new Set(dispatchRows.map((r) => r.caller_session_id))]);
+	}
 	if (sessionIds.length === 0) {
 		return null;
 	}

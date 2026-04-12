@@ -203,7 +203,7 @@ function reconcileStalePendingDispatches(sessionId: string, db: Database): void 
 
 		try {
 			db.run(
-				"DELETE FROM run_pending_dispatches WHERE caller_session_id = ? AND status = 'PENDING'",
+				"DELETE FROM run_pending_dispatches WHERE caller_session_id = ? AND status IN ('PENDING', 'RESULT_RECEIVED')",
 				[sessionId],
 			);
 		} catch (error: unknown) {

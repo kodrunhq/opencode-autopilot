@@ -95,7 +95,25 @@ async function readLogsForRun(
 			return Object.freeze([]);
 		}
 
-		const sessionIds = collectPendingDispatchSessionIds(parsed.data.pendingDispatches);
+		let sessionIds = collectPendingDispatchSessionIds(parsed.data.pendingDispatches);
+		if (sessionIds.length === 0) {
+			const dispatchRows = db
+				.query(
+					`SELECT caller_session_id, spawned_session_id FROM run_pending_dispatches
+					 WHERE run_id = ? AND (caller_session_id IS NOT NULL OR spawned_session_id IS NOT NULL)
+					 ORDER BY issued_at DESC`,
+				)
+				.all(runId) as Array<{
+				readonly caller_session_id: string | null;
+				readonly spawned_session_id: string | null;
+			}>;
+			const uniqueIds = new Set<string>();
+			for (const r of dispatchRows) {
+				if (r.caller_session_id) uniqueIds.add(r.caller_session_id);
+				if (r.spawned_session_id) uniqueIds.add(r.spawned_session_id);
+			}
+			sessionIds = Object.freeze([...uniqueIds]);
+		}
 		const logs = await Promise.all(
 			sessionIds.map((sessionId) => readSessionLog(sessionId, artifactDirOrProjectRoot)),
 		);
