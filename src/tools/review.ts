@@ -185,7 +185,9 @@ function normalizeFindingsInput(raw: string): NormalizedFindingsInput {
 				}),
 			),
 			executedReviewerNames: uniqueStrings(
-				stageResultsEnvelope.results.map((result) => result.reviewer),
+				stageResultsEnvelope.results
+					.filter((result) => result.status === "completed")
+					.map((result) => result.reviewer),
 			),
 		};
 	}

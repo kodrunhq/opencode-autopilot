@@ -11,6 +11,7 @@ import {
 	buildReviewGateMessage,
 	parseReviewCoordinatorResult,
 	planReviewRun,
+	reviewStatusSchema,
 	summarizeReviewRun,
 } from "../review-runner";
 import { persistTrancheOracleSignoff, type TrancheOracleSignoff } from "../signoff";
@@ -303,6 +304,27 @@ export const handleBuild: PhaseHandler = async (
 				: structuredReview?.action === "complete" && structuredReview.reviewRun
 					? summarizeReviewRun(structuredReview.reviewRun)
 					: null;
+		const legacyReviewSummary = summarizeReviewOutcome(resultText);
+		const legacyReviewBlocked =
+			legacyReviewSummary.verdict === "BLOCKED" || hasCriticalFindings(resultText);
+		const legacyReviewStatus =
+			structuredReviewStatus === null
+				? reviewStatusSchema.parse({
+						...state.reviewStatus,
+						status: legacyReviewBlocked ? "BLOCKED" : "PASSED",
+						verdict: legacyReviewBlocked
+							? "BLOCKED"
+							: legacyReviewSummary.verdict === "CONCERNS"
+								? "CONCERNS"
+								: legacyReviewSummary.verdict === "CLEAN"
+									? "CLEAN"
+									: "APPROVED",
+						summary: legacyReviewSummary.summary,
+						blockedReason: legacyReviewBlocked ? legacyReviewSummary.summary : null,
+						completedAt: new Date().toISOString(),
+					})
+				: null;
+		const effectiveReviewStatus = structuredReviewStatus ?? legacyReviewStatus;
 		if (structuredReview && structuredReview.action !== "complete") {
 			return Object.freeze({
 				action: "error",
@@ -314,8 +336,7 @@ export const handleBuild: PhaseHandler = async (
 				progress: "Review stage did not complete",
 			} satisfies DispatchResult);
 		}
-		const reviewSummaryText =
-			structuredReviewStatus?.summary ?? summarizeReviewOutcome(resultText).summary;
+		const reviewSummaryText = effectiveReviewStatus?.summary ?? legacyReviewSummary.summary;
 		const reviewedBranchLifecycle = recordReviewSummary(initialBranchLifecycle, reviewSummaryText);
 		const safeReviewReport = sanitizeTemplateContent(resultText).slice(0, 4000);
 
@@ -373,7 +394,7 @@ export const handleBuild: PhaseHandler = async (
 				progress: "Fix dispatch — CRITICAL findings",
 				_stateUpdates: {
 					branchLifecycle: cloneBranchLifecycle(reviewedBranchLifecycle),
-					...(structuredReviewStatus ? { reviewStatus: structuredReviewStatus } : {}),
+					...(effectiveReviewStatus ? { reviewStatus: effectiveReviewStatus } : {}),
 					buildProgress: {
 						...buildProgress,
 						reviewPending: false,
@@ -397,9 +418,7 @@ export const handleBuild: PhaseHandler = async (
 			oracleInputsDigest: null,
 			lastReviewReport: safeReviewReport,
 		};
-		const reviewStateUpdates = structuredReviewStatus
-			? { reviewStatus: structuredReviewStatus }
-			: {};
+		const reviewStateUpdates = effectiveReviewStatus ? { reviewStatus: effectiveReviewStatus } : {};
 
 		if (nextWave === null) {
 			const gateResult = resolveBuildCompletionGate(

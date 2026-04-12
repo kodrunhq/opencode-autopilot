@@ -391,6 +391,37 @@ describe("handleBuild", () => {
 		expect(result.prompt).toContain("Task B");
 	});
 
+	test("legacy review completion sets a terminal review status", async () => {
+		const baseState = makeBuildState(
+			[
+				{ id: 1, title: "Task A", status: "DONE", wave: 1 },
+				{ id: 2, title: "Task B", status: "PENDING", wave: 2 },
+			],
+			{ currentTask: null, currentWave: 1, reviewPending: true },
+		);
+		const state = {
+			...baseState,
+			reviewStatus: {
+				...baseState.reviewStatus,
+				reviewRunId: "review_legacy_terminal",
+				scope: "branch",
+				status: "RUNNING" as const,
+			},
+		};
+		const result = await handleBuild(
+			state,
+			"/tmp/artifacts",
+			JSON.stringify({ verdict: "CLEAN", summary: "Legacy review accepted." }),
+		);
+
+		expect(result.action).toBe("dispatch");
+		expect(result.agent).toBe(AGENT_NAMES.BUILD);
+		expect(result.prompt).toContain("Task B");
+		expect(result._stateUpdates?.reviewStatus?.status).toBe("PASSED");
+		expect(result._stateUpdates?.reviewStatus?.reviewRunId).toBe("review_legacy_terminal");
+		expect(result._stateUpdates?.reviewStatus?.summary).toBe("Legacy review accepted.");
+	});
+
 	test("review with CRITICAL findings returns fix dispatch", async () => {
 		const state = makeBuildState(
 			[

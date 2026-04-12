@@ -67,4 +67,22 @@ describe("pollRequiredGitHubChecks", () => {
 		expect(result.status).toBe("BLOCKED");
 		expect(result.summary).toContain("gh auth token missing");
 	});
+
+	test("reports skipped required checks without marking the run passed", async () => {
+		const result = await pollRequiredGitHubChecks({
+			prNumber: 42,
+			projectRoot: "/tmp/project",
+			runChecksCommand: async () => ({
+				stdout: JSON.stringify([
+					{ name: "test", state: "SUCCESS", workflow: "CI" },
+					{ name: "docs", state: "SKIPPED", workflow: "CI" },
+				]),
+			}),
+		});
+
+		expect(result.status).toBe("SKIPPED_WITH_REASON");
+		expect(result.summary).toContain("skipped");
+		expect(result.summary).toContain("docs");
+		expect(result.summary).not.toContain("All required GitHub checks passed");
+	});
 });

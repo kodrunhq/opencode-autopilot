@@ -586,8 +586,7 @@ export function completeReviewRun(
 	executedReviewerNames: readonly string[],
 ): ReviewRun {
 	const completedAt = report.completedAt;
-	const effectiveExecutedReviewers =
-		executedReviewerNames.length > 0 ? executedReviewerNames : reviewRun.policy.requiredReviewers;
+	const effectiveExecutedReviewers = uniqueStrings(executedReviewerNames);
 	const persistedFindings = toPersistedFindings(
 		reviewRun.reviewRunId,
 		report.findings,

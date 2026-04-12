@@ -295,6 +295,23 @@ describe("oracle verification integration", () => {
 		expect(result?.signoff.verdict).toBe("FAILED");
 	});
 
+	test("TaskOracleBridge.checkOracleResult treats interim Oracle messages as pending", async () => {
+		const oracleBridge = new TaskOracleBridge({
+			readOracleSessionMessages: async () => [
+				"Working through verification evidence.",
+				"Stand by.",
+			],
+		});
+
+		await expect(
+			oracleBridge.checkOracleResult({
+				sessionId: "oracle-session-pending",
+				attemptId: "attempt-pending",
+				parentSessionId: "work-session-pending",
+			}),
+		).resolves.toBeNull();
+	});
+
 	test("parseOracleVerificationEvidence throws on malformed signoff blocks", () => {
 		expect(() =>
 			parseOracleVerificationEvidence(

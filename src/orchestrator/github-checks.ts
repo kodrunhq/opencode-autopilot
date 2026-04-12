@@ -158,6 +158,13 @@ function summarizeChecks(checks: readonly GitHubCheck[]): string {
 			.join(", ")}.`;
 	}
 
+	const skippedChecks = checks.filter((check) => check.status === "SKIPPED_WITH_REASON");
+	if (skippedChecks.length > 0) {
+		return `Required GitHub checks were skipped: ${skippedChecks
+			.map((check) => check.name)
+			.join(", ")}.`;
+	}
+
 	return `All required GitHub checks passed (${checks.length} total).`;
 }
 
@@ -176,6 +183,10 @@ function summarizeOverallStatus(checks: readonly GitHubCheck[]): GitHubChecksPol
 
 	if (checks.some((check) => check.status === "PENDING")) {
 		return "PENDING";
+	}
+
+	if (checks.some((check) => check.status === "SKIPPED_WITH_REASON")) {
+		return "SKIPPED_WITH_REASON";
 	}
 
 	return "PASSED";

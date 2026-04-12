@@ -71,8 +71,24 @@ describe("reviewCore", () => {
 	});
 
 	test("returns typed findingsEnvelope on completion", async () => {
-		await reviewCore({ scope: "all" }, tempDir);
-		await reviewCore({ findings: '{"findings": []}' }, tempDir);
+		await reviewCore(
+			{
+				scope: "all",
+				selectedReviewers: ["logic-auditor"],
+				requiredReviewers: ["logic-auditor"],
+			},
+			tempDir,
+		);
+		await reviewCore(
+			{
+				findings: JSON.stringify({
+					schemaVersion: 1,
+					kind: "review_stage_results",
+					results: [{ reviewer: "logic-auditor", status: "completed", findings: [] }],
+				}),
+			},
+			tempDir,
+		);
 		await reviewCore({ findings: '{"findings": []}' }, tempDir);
 		const result = await reviewCore({ findings: '{"findings": []}' }, tempDir);
 		const parsed = parseResult(result);
@@ -174,6 +190,36 @@ describe("reviewCore", () => {
 		expect(parsed.action).toBe("complete");
 		expect((parsed.reviewStatus as { status?: string }).status).toBe("BLOCKED");
 		expect((parsed.missingRequiredReviewers as string[]).includes("red-team")).toBe(true);
+	});
+
+	test("failed reviewers in review_stage_results do not count as executed", async () => {
+		await reviewCore(
+			{
+				scope: "all",
+				reviewRunId: "review_failed_stage_result",
+				selectedReviewers: ["logic-auditor"],
+				requiredReviewers: ["logic-auditor"],
+			},
+			tempDir,
+		);
+		await reviewCore(
+			{
+				findings: JSON.stringify({
+					schemaVersion: 1,
+					kind: "review_stage_results",
+					results: [{ reviewer: "logic-auditor", status: "failed", findings: [] }],
+				}),
+			},
+			tempDir,
+		);
+		await reviewCore({ findings: '{"findings": []}' }, tempDir);
+		const result = await reviewCore({ findings: '{"findings": []}' }, tempDir);
+		const parsed = parseResult(result);
+
+		expect(parsed.action).toBe("complete");
+		expect((parsed.reviewStatus as { status?: string }).status).toBe("BLOCKED");
+		expect(parsed.missingRequiredReviewers as string[]).toContain("logic-auditor");
+		expect(parsed.executedReviewers as string[]).not.toContain("logic-auditor");
 	});
 
 	test("always returns valid JSON (never throws)", async () => {

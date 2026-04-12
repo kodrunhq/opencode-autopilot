@@ -67,6 +67,10 @@ export function parseProgramOracleSignoffEvidence(
 	attemptId?: string,
 ): OracleResult | null {
 	const rawEvidence = normalizeOracleEvidence(evidence);
+	if (!rawEvidence.includes("<oracle-signoff")) {
+		return null;
+	}
+
 	const signoff = parseProgramOracleSignoff(rawEvidence, {
 		expectedSignoffId: attemptId,
 	});
